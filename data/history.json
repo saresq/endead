@@ -1,0 +1,167 @@
+[
+  {
+    "playerId": "player-3021",
+    "survivorId": "system",
+    "actionType": "START_GAME",
+    "timestamp": 1771815972075
+  },
+  {
+    "playerId": "player-3021",
+    "survivorId": "survivor-player-3021",
+    "actionType": "OPEN_DOOR",
+    "timestamp": 1771815978092,
+    "payload": {
+      "targetZoneId": "police-reception"
+    }
+  },
+  {
+    "playerId": "player-3021",
+    "survivorId": "survivor-player-3021",
+    "actionType": "MOVE",
+    "timestamp": 1771815984760,
+    "payload": {
+      "targetZoneId": "police-reception"
+    }
+  },
+  {
+    "playerId": "player-3021",
+    "survivorId": "survivor-player-3021",
+    "actionType": "MOVE",
+    "timestamp": 1771815987530,
+    "payload": {
+      "targetZoneId": "police-armory"
+    }
+  },
+  {
+    "playerId": "player-3021",
+    "survivorId": "survivor-player-3021",
+    "actionType": "SEARCH",
+    "timestamp": 1771815990574
+  },
+  {
+    "playerId": "player-3021",
+    "survivorId": "survivor-player-3021",
+    "actionType": "SEARCH",
+    "timestamp": 1771815992280
+  },
+  {
+    "playerId": "player-3021",
+    "survivorId": "survivor-player-3021",
+    "actionType": "MOVE",
+    "timestamp": 1771816000359,
+    "payload": {
+      "targetZoneId": "police-reception"
+    }
+  },
+  {
+    "playerId": "player-3021",
+    "survivorId": "survivor-player-3021",
+    "actionType": "SEARCH",
+    "timestamp": 1771816002591
+  },
+  {
+    "playerId": "player-3021",
+    "survivorId": "survivor-player-3021",
+    "actionType": "MOVE",
+    "timestamp": 1771816018292,
+    "payload": {
+      "targetZoneId": "street-start"
+    }
+  },
+  {
+    "playerId": "player-3021",
+    "survivorId": "survivor-player-3021",
+    "actionType": "MOVE",
+    "timestamp": 1771816025099,
+    "payload": {
+      "targetZoneId": "police-reception"
+    }
+  },
+  {
+    "playerId": "player-3021",
+    "survivorId": "survivor-player-3021",
+    "actionType": "MOVE",
+    "timestamp": 1771816029708,
+    "payload": {
+      "targetZoneId": "street-start"
+    }
+  },
+  {
+    "playerId": "player-3021",
+    "survivorId": "survivor-player-3021",
+    "actionType": "ATTACK",
+    "timestamp": 1771816033400,
+    "payload": {
+      "targetZoneId": "street-start",
+      "weaponId": "card-machete-11"
+    }
+  },
+  {
+    "playerId": "player-3021",
+    "survivorId": "survivor-player-3021",
+    "actionType": "ATTACK",
+    "timestamp": 1771816045077,
+    "payload": {
+      "targetZoneId": "street-start",
+      "weaponId": "card-machete-11"
+    }
+  },
+  {
+    "playerId": "player-3021",
+    "survivorId": "survivor-player-3021",
+    "actionType": "ATTACK",
+    "timestamp": 1771816048748,
+    "payload": {
+      "targetZoneId": "street-start",
+      "weaponId": "card-machete-11"
+    }
+  },
+  {
+    "playerId": "player-3021",
+    "survivorId": "survivor-player-3021",
+    "actionType": "ATTACK",
+    "timestamp": 1771816052240,
+    "payload": {
+      "targetZoneId": "street-start",
+      "weaponId": "card-machete-11"
+    }
+  },
+  {
+    "playerId": "player-3021",
+    "survivorId": "survivor-player-3021",
+    "actionType": "MOVE",
+    "timestamp": 1771816053391,
+    "payload": {
+      "targetZoneId": "police-reception"
+    }
+  },
+  {
+    "playerId": "player-3021",
+    "survivorId": "survivor-player-3021",
+    "actionType": "MOVE",
+    "timestamp": 1771816055591,
+    "payload": {
+      "targetZoneId": "street-start"
+    }
+  },
+  {
+    "playerId": "player-3021",
+    "survivorId": "survivor-player-3021",
+    "actionType": "ATTACK",
+    "timestamp": 1771816057858,
+    "payload": {
+      "targetZoneId": "street-start",
+      "weaponId": "card-machete-11"
+    }
+  },
+  {
+    "playerId": "player-3021",
+    "survivorId": "survivor-player-3021",
+    "actionType": "ATTACK",
+    "timestamp": 1771816060025,
+    "payload": {
+      "targetZoneId": "street-start",
+      "weaponId": "card-machete-11"
+    }
+  }
+]

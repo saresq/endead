@@ -1,0 +1,1123 @@
+{
+  "id": "session-12345",
+  "seed": "1652367728",
+  "turn": 7,
+  "phase": "GAME_OVER",
+  "currentDangerLevel": "BLUE",
+  "lobby": {
+    "players": [
+      {
+        "id": "player-3021",
+        "name": "player-3021",
+        "ready": true,
+        "characterClass": "Goth Girl"
+      }
+    ]
+  },
+  "players": [
+    "player-3021"
+  ],
+  "activePlayerIndex": 0,
+  "firstPlayerTokenIndex": 0,
+  "survivors": {
+    "survivor-player-3021": {
+      "id": "survivor-player-3021",
+      "playerId": "player-3021",
+      "name": "player-3021",
+      "characterClass": "Goth Girl",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "zoneId": "street-start"
+      },
+      "actionsPerTurn": 3,
+      "maxHealth": 3,
+      "wounds": 3,
+      "experience": 3,
+      "dangerLevel": "BLUE",
+      "skills": [
+        "+1 Action"
+      ],
+      "inventory": [
+        {
+          "id": "card-axe-0",
+          "name": "Fire Axe",
+          "type": "WEAPON",
+          "inHand": true,
+          "slot": "HAND_1",
+          "canOpenDoor": true,
+          "openDoorNoise": true,
+          "stats": {
+            "range": [
+              0,
+              0
+            ],
+            "dice": 1,
+            "accuracy": 4,
+            "damage": 2,
+            "noise": true,
+            "dualWield": false
+          }
+        },
+        {
+          "id": "card-machete-11",
+          "name": "Machete",
+          "type": "WEAPON",
+          "stats": {
+            "range": [
+              0,
+              0
+            ],
+            "dice": 1,
+            "accuracy": 3,
+            "damage": 2,
+            "noise": false,
+            "dualWield": true
+          },
+          "inHand": true,
+          "slot": "HAND_2"
+        },
+        {
+          "id": "card-rifle-24",
+          "name": "Rifle",
+          "type": "WEAPON",
+          "stats": {
+            "range": [
+              1,
+              3
+            ],
+            "dice": 1,
+            "accuracy": 3,
+            "damage": 1,
+            "noise": true,
+            "dualWield": false
+          },
+          "inHand": false,
+          "slot": "BACKPACK"
+        },
+        {
+          "id": "card-sawed_off-18",
+          "name": "Sawed-Off",
+          "type": "WEAPON",
+          "stats": {
+            "range": [
+              0,
+              1
+            ],
+            "dice": 2,
+            "accuracy": 3,
+            "damage": 1,
+            "noise": true,
+            "dualWield": true
+          },
+          "inHand": false,
+          "slot": "BACKPACK"
+        }
+      ],
+      "actionsRemaining": 3,
+      "hasMoved": false,
+      "hasSearched": false
+    }
+  },
+  "zombies": {
+    "zombie-3-street-east-2133": {
+      "id": "zombie-3-street-east-2133",
+      "type": "WALKER",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "zoneId": "street-start"
+      },
+      "wounds": 0,
+      "activated": true
+    },
+    "zombie-3-street-south-9442": {
+      "id": "zombie-3-street-south-9442",
+      "type": "WALKER",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "zoneId": "street-start"
+      },
+      "wounds": 0,
+      "activated": true
+    },
+    "zombie-3-street-south-1451": {
+      "id": "zombie-3-street-south-1451",
+      "type": "WALKER",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "zoneId": "street-start"
+      },
+      "wounds": 0,
+      "activated": true
+    },
+    "zombie-4-street-east-200": {
+      "id": "zombie-4-street-east-200",
+      "type": "WALKER",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "zoneId": "street-intersection"
+      },
+      "wounds": 0,
+      "activated": true
+    },
+    "zombie-4-street-south-9035": {
+      "id": "zombie-4-street-south-9035",
+      "type": "WALKER",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "zoneId": "street-intersection"
+      },
+      "wounds": 0,
+      "activated": true
+    },
+    "zombie-5-street-east-9246": {
+      "id": "zombie-5-street-east-9246",
+      "type": "WALKER",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "zoneId": "street-east"
+      },
+      "wounds": 0,
+      "activated": true
+    },
+    "zombie-6-street-east-3742": {
+      "id": "zombie-6-street-east-3742",
+      "type": "WALKER",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "zoneId": "street-east"
+      },
+      "wounds": 0,
+      "activated": false
+    },
+    "zombie-6-street-east-3692": {
+      "id": "zombie-6-street-east-3692",
+      "type": "WALKER",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "zoneId": "street-east"
+      },
+      "wounds": 0,
+      "activated": false
+    },
+    "zombie-6-street-south-7694": {
+      "id": "zombie-6-street-south-7694",
+      "type": "WALKER",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "zoneId": "street-south"
+      },
+      "wounds": 0,
+      "activated": false
+    }
+  },
+  "zones": {
+    "street-start": {
+      "id": "street-start",
+      "connectedZones": [
+        "street-intersection",
+        "police-reception"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": false
+    },
+    "street-intersection": {
+      "id": "street-intersection",
+      "connectedZones": [
+        "street-start",
+        "street-east",
+        "street-north",
+        "street-south"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": false
+    },
+    "street-east": {
+      "id": "street-east",
+      "connectedZones": [
+        "street-intersection"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": true
+    },
+    "street-north": {
+      "id": "street-north",
+      "connectedZones": [
+        "street-intersection"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": false
+    },
+    "street-south": {
+      "id": "street-south",
+      "connectedZones": [
+        "street-intersection",
+        "zone-exit",
+        "diner-front"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": true
+    },
+    "zone-exit": {
+      "id": "zone-exit",
+      "connectedZones": [
+        "street-south"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": true
+    },
+    "police-reception": {
+      "id": "police-reception",
+      "connectedZones": [
+        "police-armory",
+        "street-start"
+      ],
+      "isBuilding": true,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": true,
+      "doorOpen": true,
+      "spawnPoint": false
+    },
+    "police-armory": {
+      "id": "police-armory",
+      "connectedZones": [
+        "police-reception"
+      ],
+      "isBuilding": true,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": true,
+      "doorOpen": true,
+      "spawnPoint": false
+    },
+    "diner-front": {
+      "id": "diner-front",
+      "connectedZones": [
+        "diner-kitchen",
+        "street-south"
+      ],
+      "isBuilding": true,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": true,
+      "doorOpen": false,
+      "spawnPoint": false
+    },
+    "diner-kitchen": {
+      "id": "diner-kitchen",
+      "connectedZones": [
+        "diner-front"
+      ],
+      "isBuilding": true,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": true,
+      "doorOpen": true,
+      "spawnPoint": false
+    }
+  },
+  "equipmentDeck": [
+    {
+      "id": "card-water-30",
+      "name": "Water",
+      "type": "ITEM",
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-pistol-14",
+      "name": "Pistol",
+      "type": "WEAPON",
+      "stats": {
+        "range": [
+          0,
+          1
+        ],
+        "dice": 1,
+        "accuracy": 3,
+        "damage": 1,
+        "noise": true,
+        "dualWield": true
+      },
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-crowbar-2",
+      "name": "Crowbar",
+      "type": "WEAPON",
+      "stats": {
+        "range": [
+          0,
+          0
+        ],
+        "dice": 1,
+        "accuracy": 4,
+        "damage": 1,
+        "noise": true,
+        "dualWield": false
+      },
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-molotov-35",
+      "name": "Molotov",
+      "type": "WEAPON",
+      "stats": {
+        "range": [
+          0,
+          1
+        ],
+        "dice": 0,
+        "accuracy": 0,
+        "damage": 3,
+        "noise": true,
+        "dualWield": false
+      },
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-water-28",
+      "name": "Water",
+      "type": "ITEM",
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-machete-12",
+      "name": "Machete",
+      "type": "WEAPON",
+      "stats": {
+        "range": [
+          0,
+          0
+        ],
+        "dice": 1,
+        "accuracy": 3,
+        "damage": 2,
+        "noise": false,
+        "dualWield": true
+      },
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-canned_food-25",
+      "name": "Canned Food",
+      "type": "ITEM",
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-sawed_off-17",
+      "name": "Sawed-Off",
+      "type": "WEAPON",
+      "stats": {
+        "range": [
+          0,
+          1
+        ],
+        "dice": 2,
+        "accuracy": 3,
+        "damage": 1,
+        "noise": true,
+        "dualWield": true
+      },
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-sub_mg-19",
+      "name": "Sub MG",
+      "type": "WEAPON",
+      "stats": {
+        "range": [
+          0,
+          1
+        ],
+        "dice": 3,
+        "accuracy": 5,
+        "damage": 1,
+        "noise": true,
+        "dualWield": true
+      },
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-katana-9",
+      "name": "Katana",
+      "type": "WEAPON",
+      "stats": {
+        "range": [
+          0,
+          0
+        ],
+        "dice": 2,
+        "accuracy": 4,
+        "damage": 1,
+        "noise": false,
+        "dualWield": true
+      },
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-plenty_of_ammo-37",
+      "name": "Plenty of Ammo",
+      "type": "ITEM",
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-katana-10",
+      "name": "Katana",
+      "type": "WEAPON",
+      "stats": {
+        "range": [
+          0,
+          0
+        ],
+        "dice": 2,
+        "accuracy": 4,
+        "damage": 1,
+        "noise": false,
+        "dualWield": true
+      },
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-molotov-33",
+      "name": "Molotov",
+      "type": "WEAPON",
+      "stats": {
+        "range": [
+          0,
+          1
+        ],
+        "dice": 0,
+        "accuracy": 0,
+        "damage": 3,
+        "noise": true,
+        "dualWield": false
+      },
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-canned_food-26",
+      "name": "Canned Food",
+      "type": "ITEM",
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-plenty_of_ammo-38",
+      "name": "Plenty of Ammo",
+      "type": "ITEM",
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-crowbar-3",
+      "name": "Crowbar",
+      "type": "WEAPON",
+      "stats": {
+        "range": [
+          0,
+          0
+        ],
+        "dice": 1,
+        "accuracy": 4,
+        "damage": 1,
+        "noise": true,
+        "dualWield": false
+      },
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-flashlight-31",
+      "name": "Flashlight",
+      "type": "ITEM",
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-pan-6",
+      "name": "Frying Pan",
+      "type": "WEAPON",
+      "stats": {
+        "range": [
+          0,
+          0
+        ],
+        "dice": 1,
+        "accuracy": 6,
+        "damage": 1,
+        "noise": true,
+        "dualWield": false
+      },
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-flashlight-32",
+      "name": "Flashlight",
+      "type": "ITEM",
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-canned_food-27",
+      "name": "Canned Food",
+      "type": "ITEM",
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-shotgun-21",
+      "name": "Shotgun",
+      "type": "WEAPON",
+      "stats": {
+        "range": [
+          0,
+          1
+        ],
+        "dice": 2,
+        "accuracy": 4,
+        "damage": 2,
+        "noise": true,
+        "dualWield": false
+      },
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-pistol-15",
+      "name": "Pistol",
+      "type": "WEAPON",
+      "stats": {
+        "range": [
+          0,
+          1
+        ],
+        "dice": 1,
+        "accuracy": 3,
+        "damage": 1,
+        "noise": true,
+        "dualWield": true
+      },
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-sub_mg-20",
+      "name": "Sub MG",
+      "type": "WEAPON",
+      "stats": {
+        "range": [
+          0,
+          1
+        ],
+        "dice": 3,
+        "accuracy": 5,
+        "damage": 1,
+        "noise": true,
+        "dualWield": true
+      },
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-water-29",
+      "name": "Water",
+      "type": "ITEM",
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-fire_axe-0",
+      "name": "Fire Axe",
+      "type": "WEAPON",
+      "stats": {
+        "range": [
+          0,
+          0
+        ],
+        "dice": 1,
+        "accuracy": 4,
+        "damage": 2,
+        "noise": true,
+        "dualWield": false
+      },
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-rifle-23",
+      "name": "Rifle",
+      "type": "WEAPON",
+      "stats": {
+        "range": [
+          1,
+          3
+        ],
+        "dice": 1,
+        "accuracy": 3,
+        "damage": 1,
+        "noise": true,
+        "dualWield": false
+      },
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-molotov-34",
+      "name": "Molotov",
+      "type": "WEAPON",
+      "stats": {
+        "range": [
+          0,
+          1
+        ],
+        "dice": 0,
+        "accuracy": 0,
+        "damage": 3,
+        "noise": true,
+        "dualWield": false
+      },
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-baseball_bat-8",
+      "name": "Baseball Bat",
+      "type": "WEAPON",
+      "stats": {
+        "range": [
+          0,
+          0
+        ],
+        "dice": 2,
+        "accuracy": 3,
+        "damage": 1,
+        "noise": true,
+        "dualWield": false
+      },
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-pan-5",
+      "name": "Frying Pan",
+      "type": "WEAPON",
+      "stats": {
+        "range": [
+          0,
+          0
+        ],
+        "dice": 1,
+        "accuracy": 6,
+        "damage": 1,
+        "noise": true,
+        "dualWield": false
+      },
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-pistol-16",
+      "name": "Pistol",
+      "type": "WEAPON",
+      "stats": {
+        "range": [
+          0,
+          1
+        ],
+        "dice": 1,
+        "accuracy": 3,
+        "damage": 1,
+        "noise": true,
+        "dualWield": true
+      },
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-baseball_bat-7",
+      "name": "Baseball Bat",
+      "type": "WEAPON",
+      "stats": {
+        "range": [
+          0,
+          0
+        ],
+        "dice": 2,
+        "accuracy": 3,
+        "damage": 1,
+        "noise": true,
+        "dualWield": false
+      },
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-fire_axe-1",
+      "name": "Fire Axe",
+      "type": "WEAPON",
+      "stats": {
+        "range": [
+          0,
+          0
+        ],
+        "dice": 1,
+        "accuracy": 4,
+        "damage": 2,
+        "noise": true,
+        "dualWield": false
+      },
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-plenty_of_ammo-36",
+      "name": "Plenty of Ammo",
+      "type": "ITEM",
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-shotgun-22",
+      "name": "Shotgun",
+      "type": "WEAPON",
+      "stats": {
+        "range": [
+          0,
+          1
+        ],
+        "dice": 2,
+        "accuracy": 4,
+        "damage": 2,
+        "noise": true,
+        "dualWield": false
+      },
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-pan-4",
+      "name": "Frying Pan",
+      "type": "WEAPON",
+      "stats": {
+        "range": [
+          0,
+          0
+        ],
+        "dice": 1,
+        "accuracy": 6,
+        "damage": 1,
+        "noise": true,
+        "dualWield": false
+      },
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-chainsaw-13",
+      "name": "Chainsaw",
+      "type": "WEAPON",
+      "canOpenDoor": true,
+      "openDoorNoise": true,
+      "stats": {
+        "range": [
+          0,
+          0
+        ],
+        "dice": 5,
+        "accuracy": 5,
+        "damage": 2,
+        "noise": true,
+        "dualWield": false
+      },
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-go_hockeys-39",
+      "name": "Goalie Mask",
+      "type": "ARMOR",
+      "inHand": false,
+      "slot": "BACKPACK"
+    }
+  ],
+  "equipmentDiscard": [],
+  "spawnDeck": [
+    {
+      "id": "spawn-007",
+      "BLUE": {
+        "extraActivation": "WALKER"
+      },
+      "YELLOW": {
+        "extraActivation": "WALKER"
+      },
+      "ORANGE": {
+        "extraActivation": "RUNNER"
+      },
+      "RED": {
+        "extraActivation": "RUNNER"
+      }
+    },
+    {
+      "id": "spawn-006",
+      "BLUE": {
+        "zombies": {
+          "FATTY": 1
+        }
+      },
+      "YELLOW": {
+        "zombies": {
+          "FATTY": 2
+        }
+      },
+      "ORANGE": {
+        "zombies": {
+          "ABOMINATION": 1
+        }
+      },
+      "RED": {
+        "zombies": {
+          "ABOMINATION": 1,
+          "WALKER": 2
+        }
+      }
+    },
+    {
+      "id": "spawn-008",
+      "BLUE": {
+        "doubleSpawn": true
+      },
+      "YELLOW": {
+        "doubleSpawn": true
+      },
+      "ORANGE": {
+        "doubleSpawn": true
+      },
+      "RED": {
+        "doubleSpawn": true
+      }
+    }
+  ],
+  "spawnDiscard": [],
+  "noiseTokens": 0,
+  "config": {
+    "maxSurvivors": 6,
+    "friendlyFire": true
+  },
+  "history": [
+    {
+      "playerId": "player-3021",
+      "survivorId": "system",
+      "actionType": "START_GAME",
+      "timestamp": 1771815972075
+    },
+    {
+      "playerId": "player-3021",
+      "survivorId": "survivor-player-3021",
+      "actionType": "OPEN_DOOR",
+      "timestamp": 1771815978092,
+      "payload": {
+        "targetZoneId": "police-reception"
+      }
+    },
+    {
+      "playerId": "player-3021",
+      "survivorId": "survivor-player-3021",
+      "actionType": "MOVE",
+      "timestamp": 1771815984760,
+      "payload": {
+        "targetZoneId": "police-reception"
+      }
+    },
+    {
+      "playerId": "player-3021",
+      "survivorId": "survivor-player-3021",
+      "actionType": "MOVE",
+      "timestamp": 1771815987530,
+      "payload": {
+        "targetZoneId": "police-armory"
+      }
+    },
+    {
+      "playerId": "player-3021",
+      "survivorId": "survivor-player-3021",
+      "actionType": "SEARCH",
+      "timestamp": 1771815990574
+    },
+    {
+      "playerId": "player-3021",
+      "survivorId": "survivor-player-3021",
+      "actionType": "SEARCH",
+      "timestamp": 1771815992280
+    },
+    {
+      "playerId": "player-3021",
+      "survivorId": "survivor-player-3021",
+      "actionType": "MOVE",
+      "timestamp": 1771816000359,
+      "payload": {
+        "targetZoneId": "police-reception"
+      }
+    },
+    {
+      "playerId": "player-3021",
+      "survivorId": "survivor-player-3021",
+      "actionType": "SEARCH",
+      "timestamp": 1771816002591
+    },
+    {
+      "playerId": "player-3021",
+      "survivorId": "survivor-player-3021",
+      "actionType": "MOVE",
+      "timestamp": 1771816018292,
+      "payload": {
+        "targetZoneId": "street-start"
+      }
+    },
+    {
+      "playerId": "player-3021",
+      "survivorId": "survivor-player-3021",
+      "actionType": "MOVE",
+      "timestamp": 1771816025099,
+      "payload": {
+        "targetZoneId": "police-reception"
+      }
+    },
+    {
+      "playerId": "player-3021",
+      "survivorId": "survivor-player-3021",
+      "actionType": "MOVE",
+      "timestamp": 1771816029708,
+      "payload": {
+        "targetZoneId": "street-start"
+      }
+    },
+    {
+      "playerId": "player-3021",
+      "survivorId": "survivor-player-3021",
+      "actionType": "ATTACK",
+      "timestamp": 1771816033400,
+      "payload": {
+        "targetZoneId": "street-start",
+        "weaponId": "card-machete-11"
+      }
+    },
+    {
+      "playerId": "player-3021",
+      "survivorId": "survivor-player-3021",
+      "actionType": "ATTACK",
+      "timestamp": 1771816045077,
+      "payload": {
+        "targetZoneId": "street-start",
+        "weaponId": "card-machete-11"
+      }
+    },
+    {
+      "playerId": "player-3021",
+      "survivorId": "survivor-player-3021",
+      "actionType": "ATTACK",
+      "timestamp": 1771816048748,
+      "payload": {
+        "targetZoneId": "street-start",
+        "weaponId": "card-machete-11"
+      }
+    },
+    {
+      "playerId": "player-3021",
+      "survivorId": "survivor-player-3021",
+      "actionType": "ATTACK",
+      "timestamp": 1771816052240,
+      "payload": {
+        "targetZoneId": "street-start",
+        "weaponId": "card-machete-11"
+      }
+    },
+    {
+      "playerId": "player-3021",
+      "survivorId": "survivor-player-3021",
+      "actionType": "MOVE",
+      "timestamp": 1771816053391,
+      "payload": {
+        "targetZoneId": "police-reception"
+      }
+    },
+    {
+      "playerId": "player-3021",
+      "survivorId": "survivor-player-3021",
+      "actionType": "MOVE",
+      "timestamp": 1771816055591,
+      "payload": {
+        "targetZoneId": "street-start"
+      }
+    },
+    {
+      "playerId": "player-3021",
+      "survivorId": "survivor-player-3021",
+      "actionType": "ATTACK",
+      "timestamp": 1771816057858,
+      "payload": {
+        "targetZoneId": "street-start",
+        "weaponId": "card-machete-11"
+      }
+    },
+    {
+      "playerId": "player-3021",
+      "survivorId": "survivor-player-3021",
+      "actionType": "ATTACK",
+      "timestamp": 1771816060025,
+      "payload": {
+        "targetZoneId": "street-start",
+        "weaponId": "card-machete-11"
+      }
+    }
+  ],
+  "gameResult": "DEFEAT"
+}

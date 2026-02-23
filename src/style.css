@@ -1,0 +1,419 @@
+
+body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #333;
+}
+
+#app {
+  width: 100vw;
+  height: 100vh;
+}
+
+/* UI Overlay */
+#game-hud, #lobby-ui {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none; /* Let clicks pass through to canvas */
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+#lobby-ui {
+  pointer-events: auto; /* Lobby is interactive */
+  background: rgba(0, 0, 0, 0.9);
+  justify-content: center;
+  align-items: center;
+}
+
+.top-bar {
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 10px 20px;
+  display: flex;
+  gap: 20px;
+  pointer-events: auto;
+  border-bottom: 2px solid #555;
+}
+
+.stat {
+  font-weight: bold;
+}
+
+.danger-blue { color: #55aaff; }
+.danger-yellow { color: #ffff55; }
+.danger-orange { color: #ffaa55; }
+.danger-red { color: #ff5555; }
+
+.turn-active {
+  color: #00ff00;
+  animation: pulse 2s infinite;
+}
+
+/* Dashboard */
+.dashboard {
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+  padding: 20px;
+  display: flex;
+  gap: 30px;
+  pointer-events: auto;
+  border-top: 2px solid #555;
+  align-items: center;
+}
+
+.survivor-info h3 {
+  margin: 0 0 10px 0;
+  color: #ddd;
+}
+
+.bars {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 150px;
+}
+
+.bar {
+  background: #444;
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+
+.hp-bar { border-left: 4px solid #ff4444; }
+.xp-bar { border-left: 4px solid #ffff44; }
+.ap-bar { border-left: 4px solid #4444ff; }
+
+/* Actions */
+.actions-panel, .combat-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+button {
+  background: #555;
+  border: 1px solid #777;
+  color: white;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-weight: bold;
+  transition: background 0.2s;
+}
+
+button:hover:not(:disabled) {
+  background: #777;
+}
+
+button:active:not(:disabled) {
+  background: #999;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.weapon-btn {
+  background: #663333;
+  border-color: #aa5555;
+}
+
+.weapon-btn:hover:not(:disabled) {
+  background: #884444;
+}
+
+.loading {
+  color: white;
+  font-size: 2em;
+  text-align: center;
+  margin-top: 20%;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+
+/* Game Over Screen */
+.game-over {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.95);
+  padding: 40px;
+  border-radius: 10px;
+  text-align: center;
+  pointer-events: auto;
+  border: 2px solid #555;
+  box-shadow: 0 0 50px rgba(0,0,0,0.8);
+}
+
+.game-over h1 {
+  font-size: 3em;
+  margin: 0 0 20px 0;
+}
+
+.game-over.victory h1 { color: #55ff55; }
+.game-over.defeat h1 { color: #ff5555; }
+
+.game-over p {
+  color: #ddd;
+  font-size: 1.2em;
+  margin-bottom: 30px;
+}
+
+.game-over button {
+  font-size: 1.2em;
+  padding: 10px 30px;
+  background: #444;
+}
+
+/* Lobby */
+.lobby-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 600px;
+  max-width: 90%;
+  background: #222;
+  padding: 30px;
+  border-radius: 8px;
+  box-shadow: 0 0 30px rgba(0,0,0,0.5);
+  color: white;
+}
+
+.lobby-container h1 {
+  text-align: center;
+  margin: 0;
+  border-bottom: 1px solid #444;
+  padding-bottom: 15px;
+}
+
+.player-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 200px;
+}
+
+.player-card {
+  background: #333;
+  padding: 10px 15px;
+  border-radius: 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.player-card.me {
+  border: 1px solid #55aaff;
+}
+
+.player-status {
+  font-size: 0.9em;
+  color: #888;
+}
+
+.player-status.ready {
+  color: #55ff55;
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  border-top: 1px solid #444;
+  padding-top: 20px;
+}
+
+.class-selector h3 {
+  margin: 0 0 10px 0;
+}
+
+.class-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.class-btn.selected {
+  background: #55aaff;
+  border-color: #88ccff;
+}
+
+.start-btn {
+  background: #228822;
+  font-size: 1.2em;
+  padding: 15px;
+}
+
+.start-btn:hover:not(:disabled) {
+  background: #33aa33;
+}
+
+/* Floating Message Overlay */
+#message-overlay {
+  position: absolute;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.85);
+  color: #fff;
+  padding: 10px 30px;
+  border-radius: 20px;
+  border: 1px solid #55aaff;
+  font-size: 1.2em;
+  font-weight: bold;
+  pointer-events: none;
+  z-index: 1000;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+  transition: opacity 0.3s ease;
+  opacity: 0;
+}
+
+#message-overlay.visible {
+  opacity: 1;
+}
+
+/* Modal */
+.modal-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  pointer-events: auto;
+  z-index: 2000;
+}
+
+.modal {
+  background: #222;
+  border: 1px solid #555;
+  border-radius: 8px;
+  padding: 20px;
+  width: 500px;
+  max-width: 90%;
+  max-height: 80%;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  box-shadow: 0 0 50px rgba(0,0,0,0.8);
+  color: white;
+}
+
+.modal h2 {
+  margin: 0;
+  border-bottom: 1px solid #444;
+  padding-bottom: 10px;
+}
+
+.inventory-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.item-card {
+  background: #333;
+  padding: 10px;
+  border-radius: 4px;
+  border: 1px solid #444;
+}
+
+.item-card.equipped {
+  border-color: #55aaff;
+  background: #2a2a3a;
+}
+
+.item-card strong {
+  display: block;
+  font-size: 1.1em;
+}
+
+.item-card small {
+  color: #aaa;
+}
+
+.item-card .stats {
+  margin-top: 5px;
+  font-size: 0.9em;
+  color: #ddd;
+}
+
+/* Action Log */
+.last-action-panel {
+  position: absolute;
+  top: 60px;
+  left: 20px;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 10px 15px;
+  border-radius: 5px;
+  color: white;
+  pointer-events: none;
+  border-left: 3px solid #55aaff;
+  font-family: monospace;
+}
+
+.action-desc {
+  font-weight: bold;
+}
+
+.dice-rolls {
+  font-size: 0.9em;
+  color: #ccc;
+  margin-top: 5px;
+}
+
+/* Spawn Info */
+.spawn-info-panel {
+  position: absolute;
+  top: 60px;
+  right: 20px;
+  width: 250px;
+  background: rgba(40, 0, 0, 0.7);
+  padding: 10px 15px;
+  border-radius: 5px;
+  color: white;
+  pointer-events: none;
+  border-right: 3px solid #ff5555;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.spawn-info-panel h3 {
+  margin: 0 0 10px 0;
+  font-size: 1em;
+  text-align: right;
+  color: #ffaaaa;
+}
+
+.spawn-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.spawn-card-log {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 5px;
+  font-size: 0.85em;
+  border-radius: 3px;
+  text-align: right;
+}
