@@ -1,39 +1,46 @@
 {
   "id": "session-12345",
-  "seed": "1652367728",
-  "turn": 7,
-  "phase": "GAME_OVER",
+  "seed": "623020429",
+  "turn": 3,
+  "phase": "PLAYERS",
   "currentDangerLevel": "BLUE",
   "lobby": {
     "players": [
       {
-        "id": "player-3021",
-        "name": "player-3021",
+        "id": "player-5337",
+        "name": "player-5337",
         "ready": true,
         "characterClass": "Goth Girl"
+      },
+      {
+        "id": "player-3266",
+        "name": "player-3266",
+        "ready": true,
+        "characterClass": "Waitress"
       }
     ]
   },
   "players": [
-    "player-3021"
+    "player-5337",
+    "player-3266"
   ],
-  "activePlayerIndex": 0,
+  "activePlayerIndex": 1,
   "firstPlayerTokenIndex": 0,
   "survivors": {
-    "survivor-player-3021": {
-      "id": "survivor-player-3021",
-      "playerId": "player-3021",
-      "name": "player-3021",
+    "survivor-player-5337": {
+      "id": "survivor-player-5337",
+      "playerId": "player-5337",
+      "name": "player-5337",
       "characterClass": "Goth Girl",
       "position": {
         "x": 0,
         "y": 0,
-        "zoneId": "street-start"
+        "zoneId": "police-armory"
       },
       "actionsPerTurn": 3,
       "maxHealth": 3,
-      "wounds": 3,
-      "experience": 3,
+      "wounds": 0,
+      "experience": 0,
       "dangerLevel": "BLUE",
       "skills": [
         "+1 Action"
@@ -43,8 +50,8 @@
           "id": "card-axe-0",
           "name": "Fire Axe",
           "type": "WEAPON",
-          "inHand": true,
-          "slot": "HAND_1",
+          "inHand": false,
+          "slot": "BACKPACK",
           "canOpenDoor": true,
           "openDoorNoise": true,
           "stats": {
@@ -74,8 +81,88 @@
             "noise": false,
             "dualWield": true
           },
+          "inHand": false,
+          "slot": "BACKPACK"
+        },
+        {
+          "id": "card-pistol-14",
+          "name": "Pistol",
+          "type": "WEAPON",
+          "stats": {
+            "range": [
+              0,
+              1
+            ],
+            "dice": 1,
+            "accuracy": 3,
+            "damage": 1,
+            "noise": true,
+            "dualWield": true
+          },
           "inHand": true,
           "slot": "HAND_2"
+        },
+        {
+          "id": "card-crowbar-2",
+          "name": "Crowbar",
+          "type": "WEAPON",
+          "stats": {
+            "range": [
+              0,
+              0
+            ],
+            "dice": 1,
+            "accuracy": 4,
+            "damage": 1,
+            "noise": true,
+            "dualWield": false
+          },
+          "inHand": true,
+          "slot": "HAND_1"
+        }
+      ],
+      "actionsRemaining": 0,
+      "hasMoved": false,
+      "hasSearched": true
+    },
+    "survivor-player-3266": {
+      "id": "survivor-player-3266",
+      "playerId": "player-3266",
+      "name": "player-3266",
+      "characterClass": "Waitress",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "zoneId": "police-armory"
+      },
+      "actionsPerTurn": 3,
+      "maxHealth": 3,
+      "wounds": 0,
+      "experience": 0,
+      "dangerLevel": "BLUE",
+      "skills": [
+        "+1 Action"
+      ],
+      "inventory": [
+        {
+          "id": "card-axe-1",
+          "name": "Fire Axe",
+          "type": "WEAPON",
+          "inHand": true,
+          "slot": "HAND_1",
+          "canOpenDoor": true,
+          "openDoorNoise": true,
+          "stats": {
+            "range": [
+              0,
+              0
+            ],
+            "dice": 1,
+            "accuracy": 4,
+            "damage": 2,
+            "noise": true,
+            "dualWield": false
+          }
         },
         {
           "id": "card-rifle-24",
@@ -110,6 +197,13 @@
             "noise": true,
             "dualWield": true
           },
+          "inHand": true,
+          "slot": "HAND_2"
+        },
+        {
+          "id": "card-water-30",
+          "name": "Water",
+          "type": "ITEM",
           "inHand": false,
           "slot": "BACKPACK"
         }
@@ -120,41 +214,8 @@
     }
   },
   "zombies": {
-    "zombie-3-street-east-2133": {
-      "id": "zombie-3-street-east-2133",
-      "type": "WALKER",
-      "position": {
-        "x": 0,
-        "y": 0,
-        "zoneId": "street-start"
-      },
-      "wounds": 0,
-      "activated": true
-    },
-    "zombie-3-street-south-9442": {
-      "id": "zombie-3-street-south-9442",
-      "type": "WALKER",
-      "position": {
-        "x": 0,
-        "y": 0,
-        "zoneId": "street-start"
-      },
-      "wounds": 0,
-      "activated": true
-    },
-    "zombie-3-street-south-1451": {
-      "id": "zombie-3-street-south-1451",
-      "type": "WALKER",
-      "position": {
-        "x": 0,
-        "y": 0,
-        "zoneId": "street-start"
-      },
-      "wounds": 0,
-      "activated": true
-    },
-    "zombie-4-street-east-200": {
-      "id": "zombie-4-street-east-200",
+    "zombie-1-street-east-5327": {
+      "id": "zombie-1-street-east-5327",
       "type": "WALKER",
       "position": {
         "x": 0,
@@ -164,9 +225,9 @@
       "wounds": 0,
       "activated": true
     },
-    "zombie-4-street-south-9035": {
-      "id": "zombie-4-street-south-9035",
-      "type": "WALKER",
+    "zombie-1-street-south-7052": {
+      "id": "zombie-1-street-south-7052",
+      "type": "FATTY",
       "position": {
         "x": 0,
         "y": 0,
@@ -175,41 +236,8 @@
       "wounds": 0,
       "activated": true
     },
-    "zombie-5-street-east-9246": {
-      "id": "zombie-5-street-east-9246",
-      "type": "WALKER",
-      "position": {
-        "x": 0,
-        "y": 0,
-        "zoneId": "street-east"
-      },
-      "wounds": 0,
-      "activated": true
-    },
-    "zombie-6-street-east-3742": {
-      "id": "zombie-6-street-east-3742",
-      "type": "WALKER",
-      "position": {
-        "x": 0,
-        "y": 0,
-        "zoneId": "street-east"
-      },
-      "wounds": 0,
-      "activated": false
-    },
-    "zombie-6-street-east-3692": {
-      "id": "zombie-6-street-east-3692",
-      "type": "WALKER",
-      "position": {
-        "x": 0,
-        "y": 0,
-        "zoneId": "street-east"
-      },
-      "wounds": 0,
-      "activated": false
-    },
-    "zombie-6-street-south-7694": {
-      "id": "zombie-6-street-south-7694",
+    "zombie-2-street-south-2901": {
+      "id": "zombie-2-street-south-2901",
       "type": "WALKER",
       "position": {
         "x": 0,
@@ -320,7 +348,7 @@
       ],
       "isBuilding": true,
       "hasNoise": false,
-      "noiseTokens": 0,
+      "noiseTokens": 2,
       "searchable": true,
       "doorOpen": true,
       "spawnPoint": false
@@ -352,49 +380,6 @@
     }
   },
   "equipmentDeck": [
-    {
-      "id": "card-water-30",
-      "name": "Water",
-      "type": "ITEM",
-      "inHand": false,
-      "slot": "BACKPACK"
-    },
-    {
-      "id": "card-pistol-14",
-      "name": "Pistol",
-      "type": "WEAPON",
-      "stats": {
-        "range": [
-          0,
-          1
-        ],
-        "dice": 1,
-        "accuracy": 3,
-        "damage": 1,
-        "noise": true,
-        "dualWield": true
-      },
-      "inHand": false,
-      "slot": "BACKPACK"
-    },
-    {
-      "id": "card-crowbar-2",
-      "name": "Crowbar",
-      "type": "WEAPON",
-      "stats": {
-        "range": [
-          0,
-          0
-        ],
-        "dice": 1,
-        "accuracy": 4,
-        "damage": 1,
-        "noise": true,
-        "dualWield": false
-      },
-      "inHand": false,
-      "slot": "BACKPACK"
-    },
     {
       "id": "card-molotov-35",
       "name": "Molotov",
@@ -907,217 +892,270 @@
       }
     },
     {
-      "id": "spawn-006",
+      "id": "spawn-004",
       "BLUE": {
         "zombies": {
-          "FATTY": 1
+          "WALKER": 2
         }
       },
       "YELLOW": {
         "zombies": {
-          "FATTY": 2
+          "WALKER": 4
         }
       },
       "ORANGE": {
         "zombies": {
-          "ABOMINATION": 1
+          "WALKER": 6
         }
       },
       "RED": {
         "zombies": {
-          "ABOMINATION": 1,
-          "WALKER": 2
+          "WALKER": 8
         }
       }
     },
     {
-      "id": "spawn-008",
+      "id": "spawn-001",
       "BLUE": {
-        "doubleSpawn": true
+        "zombies": {
+          "WALKER": 1
+        }
       },
       "YELLOW": {
-        "doubleSpawn": true
+        "zombies": {
+          "WALKER": 2
+        }
       },
       "ORANGE": {
-        "doubleSpawn": true
+        "zombies": {
+          "WALKER": 4
+        }
       },
       "RED": {
-        "doubleSpawn": true
+        "zombies": {
+          "WALKER": 6
+        }
       }
     }
   ],
   "spawnDiscard": [],
-  "noiseTokens": 0,
+  "noiseTokens": 2,
   "config": {
     "maxSurvivors": 6,
     "friendlyFire": true
   },
   "history": [
     {
-      "playerId": "player-3021",
+      "playerId": "player-5337",
       "survivorId": "system",
       "actionType": "START_GAME",
-      "timestamp": 1771815972075
+      "timestamp": 1771963325198
     },
     {
-      "playerId": "player-3021",
-      "survivorId": "survivor-player-3021",
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
       "actionType": "OPEN_DOOR",
-      "timestamp": 1771815978092,
+      "timestamp": 1771963334800,
       "payload": {
         "targetZoneId": "police-reception"
       }
     },
     {
-      "playerId": "player-3021",
-      "survivorId": "survivor-player-3021",
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
       "actionType": "MOVE",
-      "timestamp": 1771815984760,
+      "timestamp": 1771963335266,
       "payload": {
         "targetZoneId": "police-reception"
       }
     },
     {
-      "playerId": "player-3021",
-      "survivorId": "survivor-player-3021",
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
+      "actionType": "SEARCH",
+      "timestamp": 1771963337366
+    },
+    {
+      "playerId": "player-3266",
+      "survivorId": "survivor-player-3266",
       "actionType": "MOVE",
-      "timestamp": 1771815987530,
+      "timestamp": 1771963338964,
+      "payload": {
+        "targetZoneId": "police-reception"
+      }
+    },
+    {
+      "playerId": "player-3266",
+      "survivorId": "survivor-player-3266",
+      "actionType": "SEARCH",
+      "timestamp": 1771963339770
+    },
+    {
+      "playerId": "player-3266",
+      "survivorId": "survivor-player-3266",
+      "actionType": "SEARCH",
+      "timestamp": 1771963340728
+    },
+    {
+      "playerId": "player-3266",
+      "survivorId": "survivor-player-3266",
+      "actionType": "ORGANIZE",
+      "timestamp": 1771963364095,
+      "payload": {
+        "cardId": "card-rifle-24",
+        "targetSlot": "BACKPACK"
+      }
+    },
+    {
+      "playerId": "player-3266",
+      "survivorId": "survivor-player-3266",
+      "actionType": "RESOLVE_SEARCH",
+      "timestamp": 1771963368958,
+      "payload": {
+        "action": "EQUIP",
+        "targetSlot": "HAND_2"
+      }
+    },
+    {
+      "playerId": "player-3266",
+      "survivorId": "survivor-player-3266",
+      "actionType": "SEARCH",
+      "timestamp": 1771963374264
+    },
+    {
+      "playerId": "player-3266",
+      "survivorId": "survivor-player-3266",
+      "actionType": "RESOLVE_SEARCH",
+      "timestamp": 1771963383406,
+      "payload": {
+        "action": "EQUIP",
+        "targetSlot": "BACKPACK"
+      }
+    },
+    {
+      "playerId": "player-3266",
+      "survivorId": "survivor-player-3266",
+      "actionType": "MOVE",
+      "timestamp": 1771963386138,
       "payload": {
         "targetZoneId": "police-armory"
       }
     },
     {
-      "playerId": "player-3021",
-      "survivorId": "survivor-player-3021",
+      "playerId": "player-3266",
+      "survivorId": "survivor-player-3266",
+      "actionType": "MAKE_NOISE",
+      "timestamp": 1771963390630
+    },
+    {
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
       "actionType": "SEARCH",
-      "timestamp": 1771815990574
+      "timestamp": 1771963396029
     },
     {
-      "playerId": "player-3021",
-      "survivorId": "survivor-player-3021",
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
+      "actionType": "ORGANIZE",
+      "timestamp": 1771963398858,
+      "payload": {
+        "cardId": "card-machete-11",
+        "targetSlot": "BACKPACK"
+      }
+    },
+    {
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
+      "actionType": "RESOLVE_SEARCH",
+      "timestamp": 1771963400535,
+      "payload": {
+        "action": "EQUIP",
+        "targetSlot": "HAND_2"
+      }
+    },
+    {
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
+      "actionType": "MOVE",
+      "timestamp": 1771963402030,
+      "payload": {
+        "targetZoneId": "police-armory"
+      }
+    },
+    {
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
+      "actionType": "MAKE_NOISE",
+      "timestamp": 1771963406012
+    },
+    {
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
       "actionType": "SEARCH",
-      "timestamp": 1771815992280
+      "timestamp": 1771963408360
     },
     {
-      "playerId": "player-3021",
-      "survivorId": "survivor-player-3021",
-      "actionType": "MOVE",
-      "timestamp": 1771816000359,
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
+      "actionType": "ORGANIZE",
+      "timestamp": 1771963411197,
       "payload": {
-        "targetZoneId": "police-reception"
+        "cardId": "card-axe-0",
+        "targetSlot": "BACKPACK"
       }
     },
     {
-      "playerId": "player-3021",
-      "survivorId": "survivor-player-3021",
-      "actionType": "SEARCH",
-      "timestamp": 1771816002591
-    },
-    {
-      "playerId": "player-3021",
-      "survivorId": "survivor-player-3021",
-      "actionType": "MOVE",
-      "timestamp": 1771816018292,
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
+      "actionType": "RESOLVE_SEARCH",
+      "timestamp": 1771963412727,
       "payload": {
-        "targetZoneId": "street-start"
+        "action": "EQUIP",
+        "targetSlot": "HAND_1"
       }
     },
     {
-      "playerId": "player-3021",
-      "survivorId": "survivor-player-3021",
-      "actionType": "MOVE",
-      "timestamp": 1771816025099,
-      "payload": {
-        "targetZoneId": "police-reception"
-      }
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
+      "actionType": "MAKE_NOISE",
+      "timestamp": 1771963418673
     },
     {
-      "playerId": "player-3021",
-      "survivorId": "survivor-player-3021",
-      "actionType": "MOVE",
-      "timestamp": 1771816029708,
-      "payload": {
-        "targetZoneId": "street-start"
-      }
-    },
-    {
-      "playerId": "player-3021",
-      "survivorId": "survivor-player-3021",
-      "actionType": "ATTACK",
-      "timestamp": 1771816033400,
-      "payload": {
-        "targetZoneId": "street-start",
-        "weaponId": "card-machete-11"
-      }
-    },
-    {
-      "playerId": "player-3021",
-      "survivorId": "survivor-player-3021",
-      "actionType": "ATTACK",
-      "timestamp": 1771816045077,
-      "payload": {
-        "targetZoneId": "street-start",
-        "weaponId": "card-machete-11"
-      }
-    },
-    {
-      "playerId": "player-3021",
-      "survivorId": "survivor-player-3021",
-      "actionType": "ATTACK",
-      "timestamp": 1771816048748,
-      "payload": {
-        "targetZoneId": "street-start",
-        "weaponId": "card-machete-11"
-      }
-    },
-    {
-      "playerId": "player-3021",
-      "survivorId": "survivor-player-3021",
-      "actionType": "ATTACK",
-      "timestamp": 1771816052240,
-      "payload": {
-        "targetZoneId": "street-start",
-        "weaponId": "card-machete-11"
-      }
-    },
-    {
-      "playerId": "player-3021",
-      "survivorId": "survivor-player-3021",
-      "actionType": "MOVE",
-      "timestamp": 1771816053391,
-      "payload": {
-        "targetZoneId": "police-reception"
-      }
-    },
-    {
-      "playerId": "player-3021",
-      "survivorId": "survivor-player-3021",
-      "actionType": "MOVE",
-      "timestamp": 1771816055591,
-      "payload": {
-        "targetZoneId": "street-start"
-      }
-    },
-    {
-      "playerId": "player-3021",
-      "survivorId": "survivor-player-3021",
-      "actionType": "ATTACK",
-      "timestamp": 1771816057858,
-      "payload": {
-        "targetZoneId": "street-start",
-        "weaponId": "card-machete-11"
-      }
-    },
-    {
-      "playerId": "player-3021",
-      "survivorId": "survivor-player-3021",
-      "actionType": "ATTACK",
-      "timestamp": 1771816060025,
-      "payload": {
-        "targetZoneId": "street-start",
-        "weaponId": "card-machete-11"
-      }
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
+      "actionType": "MAKE_NOISE",
+      "timestamp": 1771963419248
     }
   ],
-  "gameResult": "DEFEAT"
+  "spawnContext": {
+    "cards": [
+      {
+        "zoneId": "street-east",
+        "cardId": "spawn-002",
+        "detail": {
+          "zombies": {}
+        },
+        "dangerLevel": "BLUE"
+      },
+      {
+        "zoneId": "street-south",
+        "cardId": "spawn-008",
+        "detail": {
+          "doubleSpawn": true
+        },
+        "dangerLevel": "BLUE"
+      },
+      {
+        "zoneId": "street-south",
+        "cardId": "spawn-005",
+        "detail": {
+          "zombies": {
+            "WALKER": 1
+          }
+        },
+        "dangerLevel": "BLUE"
+      }
+    ],
+    "timestamp": 1771963406011
+  }
 }

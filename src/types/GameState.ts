@@ -44,7 +44,7 @@ export interface EquipmentCard {
   type: EquipmentType;
   stats?: WeaponStats; // Only for weapons
   inHand: boolean; // true if equipped in hand, false if in backpack
-  slot?: 'BODY' | 'HAND_1' | 'HAND_2' | 'BACKPACK';
+  slot?: 'BODY' | 'HAND_1' | 'HAND_2' | 'BACKPACK' | 'DISCARD';
   canOpenDoor?: boolean;
   openDoorNoise?: boolean;
 }
@@ -164,6 +164,26 @@ export interface LobbyState {
   }[];
 }
 
+export interface TradeSession {
+  activeSurvivorId: EntityId;
+  targetSurvivorId: EntityId;
+  
+  // Track each side's offer
+  offers: {
+    [survivorId: string]: EntityId[]; // List of card IDs offered
+  };
+  
+  // Track desired slot for received items (CardId -> SlotName)
+  receiveLayouts: {
+    [survivorId: string]: Record<EntityId, string>; 
+  };
+
+  // Acceptance status
+  status: {
+    [survivorId: string]: boolean;
+  };
+}
+
 export interface GameState {
   id: string; // Game Session ID
   seed: string; // RNG Seed for deterministic replay
@@ -173,6 +193,9 @@ export interface GameState {
   
   // Lobby Data (Only active during LOBBY phase, but kept for reference)
   lobby: LobbyState;
+
+  // Active Trade Session (if any)
+  activeTrade?: TradeSession;
 
   // Danger Level (highest survivor XP determines this usually)
   currentDangerLevel: DangerLevel;

@@ -12,7 +12,7 @@ This document outlines the current status of the **Endead** project (a Zombicide
 
 ### Core Systems
 - [x] **Game Loop**: Strict turn-based system with `Player Phase` and `Zombie Phase`.
-- [x] **State Management**: robust `GameState` definitions for Survivors, Zombies, Zones, and Cards.
+- [x] **State Management**: Robust `GameState` definitions for Survivors, Zombies, Zones, and Cards.
 - [x] **Action Processing**: Server-side validation and execution of player actions.
 - [x] **Multiplayer Networking**: WebSocket server supporting up to 6 players with real-time state synchronization.
 
@@ -23,51 +23,39 @@ This document outlines the current status of the **Endead** project (a Zombicide
 - [x] **Organize**: Moving items between inventory slots (Body, Hand, Backpack).
 - [x] **Choose Skill**: XP-based skill unlocking system.
 - [x] **Resolve Search**: Logic for keeping or discarding drawn cards.
+- [x] **Combat**: Attack action, dice rolling, weapon stats, damage application, friendly fire.
+- [x] **Open Door**: Mechanics for opening doors, requiring equipment, and spawning noise.
 
 ### Zombie AI & Logic
 - [x] **Spawning**: Danger-level based spawning logic (Blue, Yellow, Orange, Red).
-- [x] **Activation**: Automated zombie turn handling (Move/Attack).
+- [x] **Activation**: Automated zombie turn handling (Move/Attack), including Runner double actions.
 - [x] **Pathfinding**: BFS-based movement towards visible survivors or noise.
 - [x] **Targeting**: Priority logic for attacking survivors in the same zone.
 
 ### Rendering (Client)
-- [x] **Grid Rendering**: Procedural rendering of zones and connections based on configuration.
-- [x] **Entity Rendering**: distinct visual representation for Survivors and Zombie types using geometric shapes.
-- [x] **State Sync**: Client automatically reconciles state updates from the server.
+- [x] **Grid Rendering**: Procedural rendering of zones, connections, walls, and doors.
+- [x] **Entity Rendering**: Distinct visual representation for Survivors and Zombies (Shapes).
+- [x] **Interactive Map**: Click-to-move, Click-to-attack, Click-to-open-door.
+- [x] **HUD**: Action bar, inventory, survivor dashboard, dice log, win/loss screens.
 
-## 3. MVP Roadmap (To-Do)
+### Game Logic
+- [x] **Win/Loss Conditions**: Logic for Victory (Reach Exit) and Defeat (All Dead).
+- [x] **Scenarios**: "City Blocks" scenario implemented.
 
-### Critical Gameplay Mechanics
-- [x] **Combat System**
-    - [x] Implement `ATTACK` action in `ActionProcessor`.
-    - [x] Integrate `DiceService` for hit calculation (Accuracy check).
-    - [x] Apply weapon stats (Range, Damage, Dual Wielding).
-    - [x] Implement Friendly Fire logic (misses with ranged weapons hit survivors).
-- [x] **Map Interaction**
-    - [x] Implement `OPEN_DOOR` action (requires specific equipment like Fire Axe/Crowbar).
-    - [ ] Implement `TRADE` action to swap items between survivors in the same zone.
-- [ ] **Win/Loss Conditions**
-    - Define specific scenario goals (e.g., "Reach Zone X", "Collect Objective Y").
-    - Trigger "Game Over" when all survivors are dead.
-    - Trigger "Victory" when objectives are met.
+## 3. Missing for Complete (Prioritized)
 
-### UI/UX (Frontend)
-- [x] **Lobby/Menu**: Simple screen to select a room and assign characters. (Single Session MVP implemented)
-- [x] **In-Game HUD**:
-    - [x] Action Bar: Buttons for Attack, Move, Open Door, Search.
-    - [x] Inventory UI: Drag-and-drop interface for organizing equipment.
-    - [x] Survivor Dashboard: Display Health, XP, Skills, and Danger Level.
-    - [x] Dice Log: Visual feedback for combat results.
-- [ ] **Interactive Map**: Click-to-move and Click-to-target functionality (InputController update).
+To consider this project truly "Complete" and polished beyond the current MVP status, the following are required:
 
-### Content & Balancing
-- [x] **Equipment Registry**: Populated with standard Zombicide weapons (Pan, Pistol, Fire Axe, Crowbar, Shotgun, Chainsaw, etc.).
-- [x] **Spawn Registry**: Refactored for Danger Level scaling (Blue/Yellow/Orange/Red per card).
-- [x] **Scenarios**: "City Blocks" scenario implemented with full map layout, buildings, and objectives.
+### High Priority (Gameplay)
+1.  **Trade Action**: Implement the ability for survivors in the same zone to swap equipment. This is a core mechanic for Zombicide tactical play.
+2.  **Scenario Objectives**: Expand the `Win/Loss` logic to support varied objectives (e.g., "Take Objective X", "Kill Abomination", "Collect Food") rather than just "Reach Exit".
 
-## 4. Future Polish (Post-MVP)
-- [ ] **Assets**: Replace geometric shapes with actual sprites (Survivors, Zombies, Tiles).
-- [ ] **Sound**: Add SFX for gunshots, zombie groans, and background music.
-- [ ] **Map Editor**: A tool to create and export custom map layouts.
-- [ ] **Persistence**: Database integration (Redis/Postgres) to save active game sessions.
-- [ ] **Animations**: Smooth movement tweens and attack animations.
+### Medium Priority (Polish & Content)
+3.  **Visual Assets**: Replace current geometric shape placeholders with sprites (Survivors, Zombies, Item Icons, Map Tiles).
+4.  **Audio**: Add sound effects (Walk, Shoot, Groan, Door Open) and background music.
+5.  **Animations**: Implement smooth tweens for movement and attack actions instead of instant teleportation/updates.
+
+### Low Priority (Tooling & Infrastructure)
+6.  **Map Editor**: Create a user-friendly tool to design and export custom scenarios/maps.
+7.  **Persistence Layer**: Integrate a database (Redis/Postgres) to save active game sessions and player stats, replacing the current file-based system.
+8.  **Lobby Robustness**: Handle player disconnects/reconnects more gracefully and allow dynamic joining.

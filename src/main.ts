@@ -14,9 +14,24 @@ import { GamePhase } from './types/GameState';
 // --- Initialization ---
 
 async function init() {
-  console.log('Initializing Game Client...');
+  try {
+    console.log('Initializing Game Client...');
 
-  // 1. Generate/Get Player ID
+    // Global Error Handler for "Gray Screen" debugging
+    window.onerror = (msg, url, line, col, error) => {
+        const div = document.createElement('div');
+        div.style.position = 'absolute';
+        div.style.top = '0';
+        div.style.left = '0';
+        div.style.background = 'red';
+        div.style.color = 'white';
+        div.style.padding = '20px';
+        div.style.zIndex = '9999';
+        div.innerText = `Error: ${msg}\n${url}:${line}`;
+        document.body.appendChild(div);
+    };
+
+    // 1. Generate/Get Player ID
   // For MVP, simple random ID or prompt. 
   // Ideally stored in localStorage.
   let playerId = localStorage.getItem('endead_player_id');
@@ -72,8 +87,13 @@ async function init() {
   );
 
   // Initialize UIs
-  lobbyUi = new LobbyUI(playerId);
-  lobbyUi.hide(); // Hide initially until state confirms
+  try {
+      lobbyUi = new LobbyUI(playerId);
+      // Ensure visible
+      lobbyUi.show();
+  } catch (e) {
+      console.error('Failed to init LobbyUI', e);
+  }
 
   // 4. Subscribe to Store Updates (Server State)
   gameStore.subscribe((newState, prevState) => {
@@ -146,6 +166,18 @@ async function init() {
   };
   
   networkManager.connect();
+  } catch (e: any) {
+      console.error('Fatal Init Error:', e);
+      const div = document.createElement('div');
+      div.style.position = 'absolute';
+      div.style.top = '0';
+      div.style.left = '0';
+      div.style.background = 'red';
+      div.style.color = 'white';
+      div.style.padding = '20px';
+      div.innerText = `Fatal Error: ${e.message}`;
+      document.body.appendChild(div);
+  }
 }
 
 init().catch(console.error);

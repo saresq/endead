@@ -389,7 +389,7 @@ export class PixiBoardRenderer {
       }
 
       // Update Visuals (Highlight, Wounds)
-      this.updateEntityVisuals(sprite, entity, activeId);
+      this.updateEntityVisuals(sprite, entity, state, activeId);
 
       // Update Position (Layout Logic)
       const zoneEntities = entitiesByZone[entity.position.zoneId] || [];
@@ -419,7 +419,15 @@ export class PixiBoardRenderer {
     return container;
   }
 
-  private updateEntityVisuals(container: PIXI.Container, entity: Survivor | Zombie, activeId?: EntityId): void {
+  private getPlayerColor(playerId: string, state: GameState): number {
+    const playerIndex = state.players.indexOf(playerId);
+    // Colors: Red, Blue, Green, Yellow, Purple, Cyan
+    const colors = [0xFF0000, 0x0000FF, 0x00FF00, 0xFFFF00, 0xFF00FF, 0x00FFFF];
+    if (playerIndex === -1) return 0xAAAAAA; // Fallback Gray
+    return colors[playerIndex % colors.length];
+  }
+
+  private updateEntityVisuals(container: PIXI.Container, entity: Survivor | Zombie, state: GameState, activeId?: EntityId): void {
     const graphics = container.children[0] as PIXI.Graphics;
     graphics.clear();
 
@@ -434,20 +442,35 @@ export class PixiBoardRenderer {
       graphics.stroke({ width: 2, color: 0x000000 });
     } else {
       // Survivor
+      const survivor = entity as Survivor;
       const isSelected = entity.id === activeId;
+      const isActiveTurn = state.players[state.activePlayerIndex] === survivor.playerId;
       
+      // 1. Selection Highlight (Local Player Selection)
       if (isSelected) {
-        graphics.circle(0, 0, ENTITY_RADIUS + 4);
-        graphics.fill({ color: 0xFFFF00 });
+        graphics.circle(0, 0, ENTITY_RADIUS + 6);
+        graphics.fill({ color: 0xFFFFFF, alpha: 0.5 }); // White Glow
       }
 
-      graphics.circle(0, 0, ENTITY_RADIUS);
-      graphics.fill({ color: 0x0000FF });
+      // 2. Active Player Highlight (Turn Indicator)
+      if (isActiveTurn) {
+        // Draw a pulsing ring or specialized border
+        graphics.circle(0, 0, ENTITY_RADIUS + 4);
+        graphics.stroke({ width: 3, color: 0xFFD700 }); // Gold Border
+      }
+
+      // 3. Survivor Body (Player Color)
+      const playerColor = this.getPlayerColor(survivor.playerId, state);
       
-      if ((entity as Survivor).wounds > 0) {
-        graphics.stroke({ width: 3, color: 0xFF0000 });
+      graphics.circle(0, 0, ENTITY_RADIUS);
+      graphics.fill({ color: playerColor });
+      
+      // 4. Wound Indicator
+      if (survivor.wounds > 0) {
+        graphics.stroke({ width: 3, color: 0xFF0000 }); // Red Outline if wounded
       } else {
-        graphics.stroke({ width: 2, color: 0xFFFFFF });
+        // Standard Outline (Black for contrast against colored body)
+        graphics.stroke({ width: 2, color: 0x000000 });
       }
     }
   }

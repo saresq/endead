@@ -417,3 +417,375 @@ button:disabled {
   border-radius: 3px;
   text-align: right;
 }
+
+/* --- Trade UI --- */
+.trade-modal {
+  width: 800px;
+  max-width: 95vw;
+  height: 750px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  box-shadow: 0 0 50px rgba(0,0,0,0.9);
+}
+
+.trade-workspace {
+  display: flex;
+  flex: 1;
+  gap: 20px;
+  padding: 20px;
+  overflow: hidden;
+}
+
+.trade-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #333;
+  padding: 10px;
+  border-radius: 5px;
+  border: 1px solid #444;
+}
+
+.trade-panel h3 {
+  margin: 0 0 10px 0;
+  text-align: center;
+  color: #ddd;
+  border-bottom: 1px solid #555;
+  padding-bottom: 5px;
+}
+
+.slot-group {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  flex: 1;
+}
+
+.slot-row {
+  display: flex;
+  justify-content: space-around;
+  gap: 10px;
+}
+
+.slot {
+  width: 80px;
+  height: 100px;
+  background: #222;
+  border: 2px dashed #555;
+  border-radius: 5px;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: background 0.2s;
+}
+
+.slot.drag-over {
+  background: #334433;
+  border-color: #55aa55;
+}
+
+.slot-label {
+  position: absolute;
+  top: -20px;
+  left: 0;
+  width: 100%;
+  text-align: center;
+  font-size: 0.8em;
+  color: #888;
+}
+
+.backpack-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  padding: 10px;
+  background: #282828;
+  border-radius: 5px;
+  flex: 1;
+  align-content: flex-start;
+}
+
+.backpack-slot {
+  width: 70px;
+  height: 90px;
+}
+
+/* Trade Table (Center) */
+.trade-table {
+  flex: 1.2;
+  background: #252525;
+  gap: 10px;
+}
+
+.offer-box {
+  flex: 1;
+  background: #303030;
+  border: 1px solid #444;
+  border-radius: 4px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+}
+
+.offer-box h4 {
+  margin: 0 0 5px 0;
+  font-size: 0.9em;
+  color: #aaa;
+}
+
+.offer-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  flex: 1;
+  align-content: flex-start;
+}
+
+.offer-box.drag-over {
+  background: #333344;
+  border-color: #5555aa;
+}
+
+.offer-slot {
+  width: 60px;
+  height: 80px;
+}
+
+.exchange-icon {
+  text-align: center;
+  font-size: 1.5em;
+  color: #666;
+  margin: -5px 0;
+}
+
+/* Footer */
+.trade-footer {
+  padding: 15px 20px;
+  background: #222;
+  border-top: 1px solid #444;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.status-indicators {
+  display: flex;
+  gap: 20px;
+  font-size: 0.9em;
+}
+
+.status {
+  color: #aaa;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.status.ready {
+  color: #55ff55;
+  font-weight: bold;
+}
+
+.status::before {
+  content: '•';
+  font-size: 1.5em;
+  line-height: 0;
+}
+
+.button-group {
+  display: flex;
+  gap: 10px;
+}
+
+.button-group button.secondary {
+  background: #444;
+}
+
+.button-group button.primary {
+  background: #2266aa;
+}
+
+.button-group button.active {
+  background: #228822;
+  border-color: #44cc44;
+}
+
+/* Reused Card/Item Styles */
+.trade-item {
+  width: 100%;
+  height: 100%;
+  background: #444;
+  border: 1px solid #777;
+  border-radius: 4px;
+  padding: 5px;
+  cursor: grab;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  z-index: 10;
+  font-size: 0.9em;
+  box-sizing: border-box;
+  user-select: none;
+}
+
+.trade-item:active {
+  cursor: grabbing;
+}
+
+.trade-item.dragging {
+  opacity: 0.5;
+}
+
+/* --- Ghost / Trade Ghost Items --- */
+.trade-item.ghost-item {
+  background: #442222;
+  border: 1px dashed #aa5555;
+  opacity: 0.9;
+}
+
+.ghost-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  background: #aa5555;
+  color: white;
+  font-size: 0.6em;
+  padding: 1px 3px;
+  border-radius: 2px;
+}
+
+.item-name {
+  font-weight: bold;
+  color: #fff;
+  margin-bottom: 2px;
+}
+
+.item-type {
+  font-size: 0.7em;
+  color: #aaa;
+}
+
+/* New Improvements */
+.subtitle {
+  text-align: center;
+  color: #aaa;
+  font-size: 0.9em;
+  margin-bottom: 10px;
+  font-style: italic;
+}
+
+.inventory-separator {
+  height: 2px;
+  background: #444;
+  margin: 10px 0;
+  width: 100%;
+}
+
+.class-btn.taken {
+  background-color: #333 !important;
+  color: #666 !important;
+  border-color: #444 !important;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.taken-label {
+  display: block;
+  font-size: 0.7em;
+  color: #888;
+}
+
+/* Modal List Styles */
+.modal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 20px;
+  width: 100%;
+}
+
+.modal-list-item {
+  display: flex;
+  align-items: center;
+  padding: 15px;
+  background: #444;
+  border: 1px solid #555;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.modal-list-item:hover {
+  background: #555;
+  border-color: #777;
+  transform: translateY(-2px);
+}
+
+.player-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  margin-right: 15px;
+  border: 2px solid #fff;
+  box-shadow: 0 0 5px rgba(0,0,0,0.5);
+}
+
+.item-text {
+  font-size: 1.2em;
+  color: #fff;
+}
+
+/* Nickname Input */
+#nickname-input {
+  width: 100%;
+  padding: 10px;
+  margin-top: 5px;
+  margin-bottom: 15px;
+  background: #333;
+  border: 1px solid #555;
+  color: white;
+  border-radius: 4px;
+  font-size: 1em;
+  box-sizing: border-box;
+}
+
+#nickname-input:focus {
+  border-color: #55aaff;
+  outline: none;
+}
+
+.nickname-section label {
+  color: #aaa;
+  font-size: 0.9em;
+}
+
+/* Discard Zone */
+.discard-zone {
+  margin-top: 15px;
+  height: 100px;
+  background: #332222;
+  border: 2px dashed #aa5555;
+  border-radius: 5px;
+  position: relative;
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  align-items: center;
+  overflow-x: auto;
+}
+
+.discard-zone .slot-label {
+  color: #aa5555;
+}
+
+.discard-zone.drag-over {
+  background: #443333;
+  border-color: #ff5555;
+}

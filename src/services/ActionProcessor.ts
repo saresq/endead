@@ -1,7 +1,7 @@
 
 import { GameState, ZoneId, GamePhase, Zombie, EquipmentCard, ZombieType, EquipmentType, GameResult, Survivor, DangerLevel } from '../types/GameState';
 import { ActionRequest, ActionResponse, ActionType, ActionError } from '../types/Action';
-import { validateTurn, advanceTurnState } from './TurnManager';
+import { validateTurn, advanceTurnState, checkEndTurn } from './TurnManager';
 import { XPManager } from './XPManager';
 import { DeckService } from './DeckService';
 import { EquipmentManager } from './EquipmentManager';
@@ -12,7 +12,7 @@ import { ZONE_LAYOUT } from '../config/Layout';
 type ActionHandler = (state: GameState, intent: ActionRequest) => GameState;
 
 const handlers: Partial<Record<ActionType, ActionHandler>> = {
-  [ActionType.JOIN_LOBBY]: handleJoinLobby, // Actually handled in server.ts usually, but keeping pattern
+  [ActionType.JOIN_LOBBY]: handleJoinLobby, 
   [ActionType.SELECT_CHARACTER]: handleSelectCharacter,
   [ActionType.START_GAME]: handleStartGame,
   [ActionType.MOVE]: handleMove,
@@ -23,6 +23,11 @@ const handlers: Partial<Record<ActionType, ActionHandler>> = {
   [ActionType.RESOLVE_SEARCH]: handleResolveSearch,
   [ActionType.ORGANIZE]: handleOrganize,
   [ActionType.OPEN_DOOR]: handleOpenDoor,
+  [ActionType.TRADE]: handleTrade, // Legacy/Error
+  [ActionType.TRADE_START]: handleTradeStart,
+  [ActionType.TRADE_OFFER]: handleTradeOffer,
+  [ActionType.TRADE_ACCEPT]: handleTradeAccept,
+  [ActionType.TRADE_CANCEL]: handleTradeCancel,
   [ActionType.NOTHING]: handleNothing,
   [ActionType.END_TURN]: handleEndTurn,
 };
@@ -62,11 +67,39 @@ export function processAction(state: GameState, intent: ActionRequest): ActionRe
     const gameActions = [
         ActionType.MOVE, ActionType.ATTACK, ActionType.SEARCH, 
         ActionType.OPEN_DOOR, ActionType.MAKE_NOISE, ActionType.ORGANIZE,
-        ActionType.END_TURN
+        ActionType.TRADE, ActionType.TRADE_START, ActionType.TRADE_OFFER, 
+        ActionType.TRADE_ACCEPT, ActionType.TRADE_CANCEL, ActionType.END_TURN
     ];
     
     if (gameActions.includes(intent.type)) {
-      newState = advanceTurnState(newState, intent.survivorId!);
+       // Filter out Trade Session Sub-Actions from AP Cost
+       if (intent.type === ActionType.TRADE_START || 
+           intent.type === ActionType.TRADE_OFFER || 
+           intent.type === ActionType.TRADE_ACCEPT || 
+           intent.type === ActionType.TRADE_CANCEL) {
+           // No AP cost yet
+       } 
+       else if (intent.type === ActionType.ORGANIZE && newState.activeTrade) {
+           const trade = newState.activeTrade;
+           if (intent.survivorId === trade.activeSurvivorId || intent.survivorId === trade.targetSurvivorId) {
+               // Free Organize during trade
+           } else {
+               newState = advanceTurnState(newState, intent.survivorId!);
+           }
+       }
+       else if (intent.type === ActionType.ORGANIZE && newState.survivors[intent.survivorId!]?.drawnCard) {
+           // Free Organize during Pickup/Search Resolution
+       }
+       else if (intent.type === ActionType.TRADE) { 
+           newState = advanceTurnState(newState, intent.survivorId!);
+       }
+       else {
+           newState = advanceTurnState(newState, intent.survivorId!);
+       }
+    } else if (intent.type === ActionType.RESOLVE_SEARCH) {
+        // Since RESOLVE_SEARCH doesn't cost AP (cost was paid in SEARCH),
+        // we only need to check if the turn should end now that the blocking condition (drawnCard) is cleared.
+        newState = checkEndTurn(newState);
     }
 
     // 5. Check for Zombie Phase Transition
@@ -84,7 +117,7 @@ export function processAction(state: GameState, intent: ActionRequest): ActionRe
     }
 
     // 6. Log History
-    if (intent.type !== ActionType.SELECT_CHARACTER) { // Don't spam history with selection
+    if (intent.type !== ActionType.SELECT_CHARACTER) {
         newState.history = [
           ...(newState.history || []),
           {
@@ -110,8 +143,6 @@ export function processAction(state: GameState, intent: ActionRequest): ActionRe
 // --- Lobby Handlers ---
 
 function handleJoinLobby(state: GameState, intent: ActionRequest): GameState {
-    // This is mostly handled by server.ts auto-join logic, but can be explicit here
-    // For now, return state as is
     return state;
 }
 
@@ -126,8 +157,15 @@ function handleSelectCharacter(state: GameState, intent: ActionRequest): GameSta
     const charClass = intent.payload?.characterClass;
     if (!charClass) throw new Error('Character class required');
     
-    // Check if taken? For MVP allow duplicates or check
-    const taken = newState.lobby.players.some((p: any) => p.characterClass === charClass && p.id !== intent.playerId);
+    // Optional: Update Nickname
+    if (intent.payload?.name) {
+        newState.lobby.players[playerIndex].name = intent.payload.name;
+    }
+    
+    // Check if class taken by OTHERS
+    const taken = newState.lobby.players.some((p: any) => 
+        p.characterClass === charClass && p.id !== intent.playerId
+    );
     if (taken) throw new Error('Character class already taken');
 
     newState.lobby.players[playerIndex].characterClass = charClass;
@@ -138,28 +176,22 @@ function handleSelectCharacter(state: GameState, intent: ActionRequest): GameSta
 
 function handleStartGame(state: GameState, intent: ActionRequest): GameState {
     if (state.phase !== GamePhase.Lobby) throw new Error('Game already started');
-    
-    // Only first player (host) can start
     if (state.lobby.players[0].id !== intent.playerId) throw new Error('Only host can start game');
     
     const newState = JSON.parse(JSON.stringify(state));
     
-    // Initialize Game
     newState.phase = GamePhase.Players;
     newState.turn = 1;
     newState.players = newState.lobby.players.map((p: any) => p.id);
     
-    // Initialize Equipment Deck
     const deckResult = DeckService.initializeDeck(newState.seed);
     newState.equipmentDeck = deckResult.deck;
     newState.seed = deckResult.newSeed;
 
-    // Initialize Spawn Deck
     const spawnResult = DeckService.initializeSpawnDeck(newState.seed);
     newState.spawnDeck = spawnResult.deck;
     newState.seed = spawnResult.newSeed;
     
-    // Create Survivors
     newState.survivors = {};
     newState.lobby.players.forEach((p: any, index: number) => {
         const survivorId = `survivor-${p.id}`;
@@ -168,7 +200,7 @@ function handleStartGame(state: GameState, intent: ActionRequest): GameState {
             playerId: p.id,
             name: p.name,
             characterClass: p.characterClass,
-            position: { x: 0, y: 0, zoneId: 'street-start' }, // Spawn point
+            position: { x: 0, y: 0, zoneId: 'street-start' },
             actionsPerTurn: 3,
             maxHealth: 3,
             wounds: 0,
@@ -176,7 +208,6 @@ function handleStartGame(state: GameState, intent: ActionRequest): GameState {
             dangerLevel: DangerLevel.Blue,
             skills: ['+1 Action'],
             inventory: [
-                // Default Starting Gear
                 {
                   id: `card-axe-${index}`,
                   name: 'Fire Axe',
@@ -211,29 +242,22 @@ function checkGameEndConditions(state: GameState): GameResult | undefined {
   const survivors = Object.values(state.survivors);
   const zombies = Object.values(state.zombies);
 
-  if (survivors.length === 0) return undefined; // Startup edge case
+  if (survivors.length === 0) return undefined;
 
-  // 1. Defeat: All survivors dead
   const allDead = survivors.every(s => s.wounds >= s.maxHealth);
   if (allDead) return GameResult.Defeat;
 
-  // 2. Victory: All living survivors in Exit Zone AND No Zombies in that zone
-  // Find Exit Zones
   const exitZones = Object.values(state.zones).filter(z => z.isExit).map(z => z.id);
-  
-  if (exitZones.length === 0) return undefined; // No exit defined
+  if (exitZones.length === 0) return undefined;
 
   const livingSurvivors = survivors.filter(s => s.wounds < s.maxHealth);
-  if (livingSurvivors.length === 0) return undefined; // Should be caught by Defeat check, but safety
+  if (livingSurvivors.length === 0) return undefined;
 
   const allInExit = livingSurvivors.every(s => exitZones.includes(s.position.zoneId));
   
   if (allInExit) {
-    // Check if any zombie occupies an exit zone where survivors are present.
     const occupiedExitZones = new Set(livingSurvivors.map(s => s.position.zoneId));
-    
     const zombiesInExit = zombies.some(z => occupiedExitZones.has(z.position.zoneId));
-    
     if (!zombiesInExit) {
       return GameResult.Victory;
     }
@@ -261,14 +285,10 @@ function handleMove(state: GameState, intent: ActionRequest): GameState {
     throw new Error(`Zones not connected: ${currentZone.id} -> ${targetId}`);
   }
 
-  // Door Check for Movement
-  // If moving between building and street (or vice versa), check if door is open
   const isEnteringBuilding = !currentZone.isBuilding && targetZone.isBuilding;
   const isLeavingBuilding = currentZone.isBuilding && !targetZone.isBuilding;
 
   if (isEnteringBuilding || isLeavingBuilding) {
-    // Check which zone holds the door status.
-    // In our simplified model, the BUILDING zone holds the door status.
     const buildingZone = isEnteringBuilding ? targetZone : currentZone;
     if (!buildingZone.doorOpen) {
       throw new Error('Door is closed. You must open it first.');
@@ -296,8 +316,6 @@ function handleOpenDoor(state: GameState, intent: ActionRequest): GameState {
     throw new Error('Target zone not connected');
   }
 
-  // 1. Identify which zone is the building
-  // You open a door OF a building.
   let buildingZone: any = null;
   if (targetZone.isBuilding) buildingZone = targetZone;
   else if (currentZone.isBuilding) buildingZone = currentZone;
@@ -306,28 +324,17 @@ function handleOpenDoor(state: GameState, intent: ActionRequest): GameState {
   
   if (buildingZone.doorOpen) throw new Error('Door is already open');
 
-  // 2. Check Equipment
   const hasOpener = survivor.inventory.some((c: EquipmentCard) => c.inHand && c.canOpenDoor);
   if (!hasOpener) throw new Error('Requires equipment to open doors (in hand)');
 
-  // 3. Open Door
   newState.zones[buildingZone.id].doorOpen = true;
 
-  // 4. Noise
-  // Check if the opener is noisy
   const opener = survivor.inventory.find((c: EquipmentCard) => c.inHand && c.canOpenDoor);
   if (opener && opener.openDoorNoise) {
     const zone = newState.zones[survivor.position.zoneId];
     zone.noiseTokens = (zone.noiseTokens || 0) + 1;
     newState.noiseTokens = (newState.noiseTokens || 0) + 1;
   }
-
-  // 5. Spawn Zombies (First time opening)
-  // For MVP: Simple spawn if empty? Or skip.
-  // Zombicide rule: Spawn in ALL zones of the building.
-  // We need to find all zones connected to this building zone that are ALSO buildings.
-  // BFS restricted to isBuilding=true
-  // TODO: Implement proper building spawn logic. For now, we just open the door.
 
   return newState;
 }
@@ -359,9 +366,6 @@ function handleChooseSkill(state: GameState, intent: ActionRequest): GameState {
 }
 
 function handleSearch(state: GameState, intent: ActionRequest): GameState {
-  // 1. Draw Card
-  // Self-healing: If deck is completely empty (no deck, no discard), initialize it.
-  // This handles legacy saves or games started before the deck init fix.
   if (state.equipmentDeck.length === 0 && state.equipmentDiscard.length === 0) {
       console.warn('Deck empty during search. Auto-initializing deck.');
       const deckResult = DeckService.initializeDeck(state.seed);
@@ -370,12 +374,11 @@ function handleSearch(state: GameState, intent: ActionRequest): GameState {
   }
 
   const { card, newState } = DeckService.drawCard(state);
-  if (!card) throw new Error('Deck empty'); // Should reshuffle discard, if both empty -> fail
+  if (!card) throw new Error('Deck empty'); 
 
   const survivor = newState.survivors[intent.survivorId!];
   const zone = newState.zones[survivor.position.zoneId];
 
-  // 2. Validate Search Eligibility
   if (survivor.hasSearched) throw new Error('Already searched this turn');
   if (!zone.isBuilding && !survivor.skills.includes('search_anywhere')) {
     throw new Error('Can only search inside buildings');
@@ -384,18 +387,16 @@ function handleSearch(state: GameState, intent: ActionRequest): GameState {
     throw new Error('Cannot search zone with zombies');
   }
 
-  // 3. Handle Inventory
-  if (EquipmentManager.hasSpace(survivor)) {
-    // Auto-add
+  // Check if Hand is Full OR Inventory Full
+  // If Hand is Full, we force the Rearrange Modal even if Backpack has space.
+  const handFull = EquipmentManager.isHandFull(survivor);
+  const hasSpace = EquipmentManager.hasSpace(survivor);
+
+  if (!handFull && hasSpace) {
     newState.survivors[intent.survivorId!] = EquipmentManager.addCard(survivor, card);
   } else {
-    // Set Pending State
+    // Hand Full or Inventory Full -> Trigger Modal
     survivor.drawnCard = card;
-    // NOTE: This action normally costs 1 AP.
-    // If we return here, the Processor deducts 1 AP.
-    // The player is now in a "must resolve" state.
-    // Future actions should probably be blocked until resolution?
-    // We trust client/turn manager to enforce logic flow.
   }
 
   survivor.hasSearched = true;
@@ -403,18 +404,40 @@ function handleSearch(state: GameState, intent: ActionRequest): GameState {
 }
 
 function handleResolveSearch(state: GameState, intent: ActionRequest): GameState {
-  // Payload: { action: 'KEEP' | 'DISCARD', discardCardId?: string }
   const survivor = state.survivors[intent.survivorId!];
   if (!survivor.drawnCard) throw new Error('No drawn card to resolve');
 
-  const action = intent.payload?.action; // 'KEEP' or 'DISCARD'
+  const action = intent.payload?.action; 
   
   if (action === 'DISCARD') {
-    // User chose to discard the NEW card
-    // Move drawnCard to discard pile
     const newState = JSON.parse(JSON.stringify(state));
     newState.equipmentDiscard.push(survivor.drawnCard);
     newState.survivors[intent.survivorId!].drawnCard = undefined;
+    return newState;
+  } else if (action === 'EQUIP') {
+    const targetSlot = intent.payload?.targetSlot;
+    if (!targetSlot) throw new Error('Target slot required for EQUIP');
+
+    const newState = JSON.parse(JSON.stringify(state));
+    const s = newState.survivors[intent.survivorId!];
+    
+    // Check if slot occupied
+    if (targetSlot === 'BACKPACK') {
+        const backpackCount = s.inventory.filter((c: EquipmentCard) => c.slot === 'BACKPACK').length;
+        if (backpackCount >= 3) throw new Error('Backpack is full (max 3).');
+    } else {
+        const occupied = s.inventory.some((c: EquipmentCard) => c.slot === targetSlot);
+        if (occupied) throw new Error(`Slot ${targetSlot} is occupied. Move item first.`);
+    }
+    
+    // Equip
+    const newCard = s.drawnCard!;
+    newCard.slot = targetSlot;
+    newCard.inHand = (targetSlot === 'HAND_1' || targetSlot === 'HAND_2');
+    
+    s.inventory.push(newCard);
+    s.drawnCard = undefined;
+    
     return newState;
   } else if (action === 'KEEP') {
     const discardId = intent.payload?.discardCardId;
@@ -432,6 +455,11 @@ function handleOrganize(state: GameState, intent: ActionRequest): GameState {
   const targetSlot = intent.payload?.targetSlot;
 
   if (!cardId || !targetSlot) throw new Error('Missing cardId or targetSlot');
+
+  // Handle explicit DISCARD action via Organize
+  if (targetSlot === 'DISCARD') {
+      return EquipmentManager.discardCard(state, survivorId, cardId);
+  }
 
   const newState = JSON.parse(JSON.stringify(state));
   const survivor = newState.survivors[survivorId];
@@ -460,13 +488,11 @@ function handleAttack(state: GameState, intent: ActionRequest): GameState {
 
   if (!targetZoneId) throw new Error('Target zone required');
 
-  // 1. Get Weapon
   let weapon: EquipmentCard | undefined;
   if (weaponId) {
     weapon = survivor.inventory.find((c: EquipmentCard) => c.id === weaponId && c.inHand);
     if (!weapon) throw new Error('Weapon not found or not equipped');
   } else {
-    // Auto-select if only one
     const weapons = survivor.inventory.filter((c: EquipmentCard) => c.type === 'WEAPON' && c.inHand);
     if (weapons.length === 1) weapon = weapons[0];
     else if (weapons.length === 0) throw new Error('No weapon equipped');
@@ -478,7 +504,6 @@ function handleAttack(state: GameState, intent: ActionRequest): GameState {
   
   const stats = weapon.stats;
 
-  // 2. Range Check
   const currentZoneId = survivor.position.zoneId;
   let distance = 0;
   
@@ -491,7 +516,6 @@ function handleAttack(state: GameState, intent: ActionRequest): GameState {
       throw new Error(`Target out of range (${distance}). Weapon range: ${stats.range.join('-')}`);
   }
 
-  // 3. Roll Dice
   const diceCount = stats.dice; 
   const threshold = stats.accuracy;
   const result = rollDice(newState.seed, diceCount, threshold);
@@ -501,16 +525,14 @@ function handleAttack(state: GameState, intent: ActionRequest): GameState {
       type: ActionType.ATTACK,
       playerId: intent.playerId,
       survivorId: intent.survivorId,
-      dice: (result as any).rolls || [], // Cast to any if rolls is missing in type def, but check DiceService
+      dice: (result as any).rolls || [], 
       hits: result.hits,
       timestamp: Date.now(),
       description: `Attacked with ${weapon.name} (Need ${threshold}+)`
   };
 
-  // 4. Apply Damage
   let zombiesInZone = Object.values(newState.zombies).filter((z: any) => z.position.zoneId === targetZoneId) as Zombie[];
   
-  // Priority Sort: Walker (1) -> Fatty (2) -> Runner (3) -> Abom (4)
   const priorityMap: Record<ZombieType, number> = {
     [ZombieType.Walker]: 1,
     [ZombieType.Fatty]: 2,
@@ -528,7 +550,6 @@ function handleAttack(state: GameState, intent: ActionRequest): GameState {
       
       const toughness = getZombieToughness(zombie.type);
       if (stats.damage >= toughness) {
-          // Kill
           delete newState.zombies[zombie.id];
           xpGained += getZombieXP(zombie.type);
           hits--;
@@ -537,12 +558,10 @@ function handleAttack(state: GameState, intent: ActionRequest): GameState {
       }
   }
 
-  // Apply XP
   if (xpGained > 0) {
     newState.survivors[intent.survivorId!] = XPManager.addXP(survivor, xpGained);
   }
 
-  // 5. Friendly Fire (Ranged only)
   if (stats.range[1] >= 1) {
       const misses = diceCount - result.hits;
       if (misses > 0) {
@@ -559,7 +578,6 @@ function handleAttack(state: GameState, intent: ActionRequest): GameState {
       }
   }
 
-  // 6. Noise
   if (stats.noise) {
       const zone = newState.zones[survivor.position.zoneId];
       zone.noiseTokens = (zone.noiseTokens || 0) + 1;
@@ -567,6 +585,189 @@ function handleAttack(state: GameState, intent: ActionRequest): GameState {
   }
 
   return newState;
+}
+
+// --- Trade Handlers ---
+
+function handleTradeStart(state: GameState, intent: ActionRequest): GameState {
+  const survivorId = intent.survivorId!;
+  const targetSurvivorId = intent.payload?.targetSurvivorId;
+
+  if (!targetSurvivorId) throw new Error('Target survivor required');
+  if (state.activeTrade) throw new Error('Trade already active');
+
+  const newState = JSON.parse(JSON.stringify(state));
+  const active = newState.survivors[survivorId];
+  const target = newState.survivors[targetSurvivorId];
+
+  // Validation
+  if (!target) throw new Error('Target not found');
+  if (active.position.zoneId !== target.position.zoneId) throw new Error('Must be in same zone');
+  if (active.actionsRemaining < 1) throw new Error('Not enough actions');
+
+  // Init Session
+  newState.activeTrade = {
+    activeSurvivorId: survivorId,
+    targetSurvivorId: targetSurvivorId,
+    offers: {
+      [survivorId]: [],
+      [targetSurvivorId]: []
+    },
+    receiveLayouts: {
+      [survivorId]: {},
+      [targetSurvivorId]: {}
+    },
+    status: {
+      [survivorId]: false,
+      [targetSurvivorId]: false
+    }
+  };
+
+  return newState;
+}
+
+function handleTradeOffer(state: GameState, intent: ActionRequest): GameState {
+  if (!state.activeTrade) throw new Error('No active trade');
+  
+  const survivorId = intent.survivorId!;
+  const offerIds = intent.payload?.offerCardIds as string[];
+
+  if (!offerIds) throw new Error('Offer IDs required');
+
+  const newState = JSON.parse(JSON.stringify(state));
+  const trade = newState.activeTrade;
+
+  if (survivorId !== trade.activeSurvivorId && survivorId !== trade.targetSurvivorId) {
+    throw new Error('Not a participant in this trade');
+  }
+
+  const survivor = newState.survivors[survivorId];
+  const inventoryIds = survivor.inventory.map((c: any) => c.id);
+  const allOwned = offerIds.every((id: string) => inventoryIds.includes(id));
+  
+  if (!allOwned) throw new Error('Cannot offer items you do not own');
+
+  trade.offers[survivorId] = offerIds;
+  trade.status[trade.activeSurvivorId] = false;
+  trade.status[trade.targetSurvivorId] = false;
+
+  return newState;
+}
+
+function handleTradeAccept(state: GameState, intent: ActionRequest): GameState {
+  if (!state.activeTrade) throw new Error('No active trade');
+  
+  const survivorId = intent.survivorId!;
+  const newState = JSON.parse(JSON.stringify(state));
+  const trade = newState.activeTrade;
+
+  if (survivorId !== trade.activeSurvivorId && survivorId !== trade.targetSurvivorId) {
+    throw new Error('Not a participant');
+  }
+
+  // Check for receiveLayout in payload
+  if (intent.payload?.receiveLayout) {
+      trade.receiveLayouts = trade.receiveLayouts || {};
+      trade.receiveLayouts[survivorId] = intent.payload.receiveLayout;
+  }
+
+  trade.status[survivorId] = true;
+
+  const s1 = trade.activeSurvivorId;
+  const s2 = trade.targetSurvivorId;
+  
+  if (trade.status[s1] && trade.status[s2]) {
+      return executeTrade(newState);
+  }
+
+  return newState;
+}
+
+function handleTradeCancel(state: GameState, intent: ActionRequest): GameState {
+  if (!state.activeTrade) return state; 
+  
+  const newState = JSON.parse(JSON.stringify(state));
+  delete newState.activeTrade;
+  return newState;
+}
+
+function executeTrade(state: GameState): GameState {
+  const session = state.activeTrade!;
+  const id1 = session.activeSurvivorId;
+  const id2 = session.targetSurvivorId;
+  
+  const s1 = state.survivors[id1];
+  const s2 = state.survivors[id2];
+
+  const offer1 = session.offers[id1] || []; 
+  const offer2 = session.offers[id2] || []; 
+
+  const layout1 = session.receiveLayouts?.[id1] || {};
+  const layout2 = session.receiveLayouts?.[id2] || {};
+
+  const keep1 = s1.inventory.filter((c: any) => !offer1.includes(c.id));
+  const keep2 = s2.inventory.filter((c: any) => !offer2.includes(c.id));
+  
+  const cards1 = s1.inventory.filter((c: any) => offer1.includes(c.id));
+  const cards2 = s2.inventory.filter((c: any) => offer2.includes(c.id));
+
+  // Cards going TO Survivor 2 (from S1)
+  const toS2 = cards1.map((c: any) => {
+      const targetSlot = layout2[c.id] || 'BACKPACK';
+      const inHand = targetSlot === 'HAND_1' || targetSlot === 'HAND_2';
+      return { ...c, slot: targetSlot, inHand };
+  }).filter((c: any) => c.slot !== 'DISCARD');
+
+  // Cards going TO Survivor 1 (from S2)
+  const toS1 = cards2.map((c: any) => {
+      const targetSlot = layout1[c.id] || 'BACKPACK';
+      const inHand = targetSlot === 'HAND_1' || targetSlot === 'HAND_2';
+      return { ...c, slot: targetSlot, inHand };
+  }).filter((c: any) => c.slot !== 'DISCARD');
+
+  // Keep items but remove if they were moved to DISCARD
+  // This handles OWNED items being discarded
+  // We need to check if ANY item in the inventory was mapped to 'DISCARD' in the layout
+  // and update its slot.
+  
+  const processInventory = (inventory: EquipmentCard[], layout: Record<string, string>) => {
+      return inventory.map(c => {
+          if (layout[c.id] === 'DISCARD') {
+              return { ...c, slot: 'DISCARD' };
+          }
+          // Also apply other local reorganizations if specified in layout?
+          // The current implementation only uses layout for RECEIVED items.
+          // But user wants to "select what to discard" which might include existing items.
+          // So let's apply layout to existing items too if present.
+          if (layout[c.id]) {
+              const targetSlot = layout[c.id];
+              const inHand = targetSlot === 'HAND_1' || targetSlot === 'HAND_2';
+              return { ...c, slot: targetSlot, inHand };
+          }
+          return c;
+      }).filter(c => c.slot !== 'DISCARD');
+  };
+
+  s1.inventory = [...processInventory(keep1, layout1), ...toS1];
+  s2.inventory = [...processInventory(keep2, layout2), ...toS2];
+  
+  if (s1.actionsRemaining > 0) s1.actionsRemaining -= 1;
+
+  delete state.activeTrade;
+  
+  state.history.push({
+    playerId: 'system',
+    survivorId: id1,
+    actionType: 'TRADE_COMPLETE',
+    timestamp: Date.now(),
+    payload: { partner: id2, items1: offer1.length, items2: offer2.length }
+  });
+
+  return state;
+}
+
+function handleTrade(state: GameState, intent: ActionRequest): GameState {
+    throw new Error('Deprecated. Use TRADE_START flow.');
 }
 
 // Helpers
@@ -582,7 +783,6 @@ function getDistance(state: GameState, startZoneId: ZoneId, endZoneId: ZoneId): 
     const { id, dist } = queue.shift()!;
     if (id === endZoneId) return dist;
 
-    // Limit search depth
     if (dist > 10) continue; 
 
     const zone = state.zones[id];

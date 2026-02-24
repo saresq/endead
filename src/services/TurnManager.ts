@@ -17,7 +17,24 @@ export function validateTurn(state: GameState, request: ActionRequest): ActionEr
 
   // 2. Check Active Player (Turn Lock)
   const activePlayerId = state.players[state.activePlayerIndex];
-  if (request.playerId !== activePlayerId) {
+  
+  // Exception: Allow Player in Trade to Act (Active or Passive)
+  let isTradeException = false;
+  if (state.activeTrade) {
+     const allowedActions = ['TRADE_OFFER', 'TRADE_ACCEPT', 'TRADE_CANCEL', 'ORGANIZE'];
+     if (allowedActions.includes(request.type)) {
+         // Check if player is a participant
+         const activeSurvivor = state.survivors[state.activeTrade.activeSurvivorId];
+         const targetSurvivor = state.survivors[state.activeTrade.targetSurvivorId];
+         
+         if ((activeSurvivor && request.playerId === activeSurvivor.playerId) || 
+             (targetSurvivor && request.playerId === targetSurvivor.playerId)) {
+             isTradeException = true;
+         }
+     }
+  }
+
+  if (request.playerId !== activePlayerId && !isTradeException) {
     return {
       code: 'NOT_YOUR_TURN',
       message: `It is currently ${activePlayerId}'s turn. You are ${request.playerId}.`,
@@ -42,7 +59,11 @@ export function validateTurn(state: GameState, request: ActionRequest): ActionEr
       }
 
       // 4. Check Action Economy
-      if (survivor.actionsRemaining <= 0) {
+      // Exception: Passive player in a trade does not need actions
+      // Exception: Resolve Search/Pickup or Organize during Pickup is allowed with 0 actions
+      const isPickupException = survivor.drawnCard && (request.type === 'RESOLVE_SEARCH' || request.type === 'ORGANIZE');
+      
+      if (survivor.actionsRemaining <= 0 && !isTradeException && !isPickupException) {
         return {
           code: 'NO_ACTIONS',
           message: `Survivor ${survivor.name} has no actions remaining.`,
@@ -51,6 +72,46 @@ export function validateTurn(state: GameState, request: ActionRequest): ActionEr
   }
 
   return null;
+}
+
+/**
+ * Checks if the turn should automatically end (pass to next player)
+ * based on remaining actions of the active player.
+ */
+export function checkEndTurn(state: GameState): GameState {
+  // Create shallow copy
+  const newState = { ...state };
+
+  // CRITICAL: Do NOT auto-pass if ANY survivor has a pending drawn card 
+  // or if a Trade is active.
+  const anyDrawnCard = Object.values(newState.survivors).some(s => s.drawnCard);
+  
+  if (anyDrawnCard || newState.activeTrade) {
+      return newState;
+  }
+
+  const activePlayerId = newState.players[newState.activePlayerIndex];
+  
+  // Find all survivors belonging to the active player
+  const playerSurvivors = Object.values(newState.survivors).filter(
+    (s) => s.playerId === activePlayerId
+  );
+
+  // Check if ANY survivor has actions remaining
+  const hasActionsLeft = playerSurvivors.some((s) => s.actionsRemaining > 0);
+
+  if (!hasActionsLeft) {
+    // Player is done, move to next player
+    newState.activePlayerIndex++;
+
+    // Check for Phase Change (End of Round)
+    if (newState.activePlayerIndex >= newState.players.length) {
+      newState.activePlayerIndex = 0;
+      newState.phase = GamePhase.Zombies;
+    }
+  }
+
+  return newState;
 }
 
 /**
@@ -70,34 +131,13 @@ export function advanceTurnState(state: GameState, survivorId: string): GameStat
   const survivor = { ...newSurvivors[survivorId] };
   
   // Ensure we don't go below 0, though validation should prevent this
-  survivor.actionsRemaining = Math.max(0, survivor.actionsRemaining - 1);
+  const newActionsRemaining = Math.max(0, survivor.actionsRemaining - 1);
+  survivor.actionsRemaining = newActionsRemaining;
   newSurvivors[survivorId] = survivor;
   newState.survivors = newSurvivors;
 
-  // 2. Check for Turn End (Auto-Pass)
-  const activePlayerId = newState.players[newState.activePlayerIndex];
-  
-  // Find all survivors belonging to the active player
-  const playerSurvivors = Object.values(newState.survivors).filter(
-    (s) => s.playerId === activePlayerId
-  );
-
-  // Check if ANY survivor has actions remaining
-  const hasActionsLeft = playerSurvivors.some((s) => s.actionsRemaining > 0);
-
-  if (!hasActionsLeft) {
-    // Player is done, move to next player
-    newState.activePlayerIndex++;
-
-    // 3. Check for Phase Change (End of Round)
-    if (newState.activePlayerIndex >= newState.players.length) {
-      newState.activePlayerIndex = 0;
-      newState.phase = GamePhase.Zombies;
-      // Note: Turn counter usually increments at the START of a new Players phase
-    }
-  }
-
-  return newState;
+  // 2. Check for Turn End
+  return checkEndTurn(newState);
 }
 
 /**

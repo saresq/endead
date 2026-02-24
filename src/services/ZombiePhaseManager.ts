@@ -212,8 +212,15 @@ export class ZombiePhaseManager {
 
     // 3. Rotate First Player
     if (newState.players.length > 0) {
-      newState.firstPlayerTokenIndex = (newState.firstPlayerTokenIndex + 1) % newState.players.length;
-      newState.activePlayerIndex = newState.firstPlayerTokenIndex;
+      // Rotate the players array so the previous first player moves to the end
+      const firstPlayer = newState.players.shift();
+      if (firstPlayer) {
+        newState.players.push(firstPlayer);
+      }
+      
+      // The new first player is now at index 0
+      newState.activePlayerIndex = 0;
+      newState.firstPlayerTokenIndex = 0; // The token is effectively with the player at index 0
     }
 
     // 4. Increment Turn

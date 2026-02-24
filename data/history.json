@@ -1,167 +1,183 @@
 [
   {
-    "playerId": "player-3021",
+    "playerId": "player-5337",
     "survivorId": "system",
     "actionType": "START_GAME",
-    "timestamp": 1771815972075
+    "timestamp": 1771963325198
   },
   {
-    "playerId": "player-3021",
-    "survivorId": "survivor-player-3021",
+    "playerId": "player-5337",
+    "survivorId": "survivor-player-5337",
     "actionType": "OPEN_DOOR",
-    "timestamp": 1771815978092,
+    "timestamp": 1771963334800,
     "payload": {
       "targetZoneId": "police-reception"
     }
   },
   {
-    "playerId": "player-3021",
-    "survivorId": "survivor-player-3021",
+    "playerId": "player-5337",
+    "survivorId": "survivor-player-5337",
     "actionType": "MOVE",
-    "timestamp": 1771815984760,
+    "timestamp": 1771963335266,
     "payload": {
       "targetZoneId": "police-reception"
     }
   },
   {
-    "playerId": "player-3021",
-    "survivorId": "survivor-player-3021",
+    "playerId": "player-5337",
+    "survivorId": "survivor-player-5337",
+    "actionType": "SEARCH",
+    "timestamp": 1771963337366
+  },
+  {
+    "playerId": "player-3266",
+    "survivorId": "survivor-player-3266",
     "actionType": "MOVE",
-    "timestamp": 1771815987530,
+    "timestamp": 1771963338964,
+    "payload": {
+      "targetZoneId": "police-reception"
+    }
+  },
+  {
+    "playerId": "player-3266",
+    "survivorId": "survivor-player-3266",
+    "actionType": "SEARCH",
+    "timestamp": 1771963339770
+  },
+  {
+    "playerId": "player-3266",
+    "survivorId": "survivor-player-3266",
+    "actionType": "SEARCH",
+    "timestamp": 1771963340728
+  },
+  {
+    "playerId": "player-3266",
+    "survivorId": "survivor-player-3266",
+    "actionType": "ORGANIZE",
+    "timestamp": 1771963364095,
+    "payload": {
+      "cardId": "card-rifle-24",
+      "targetSlot": "BACKPACK"
+    }
+  },
+  {
+    "playerId": "player-3266",
+    "survivorId": "survivor-player-3266",
+    "actionType": "RESOLVE_SEARCH",
+    "timestamp": 1771963368958,
+    "payload": {
+      "action": "EQUIP",
+      "targetSlot": "HAND_2"
+    }
+  },
+  {
+    "playerId": "player-3266",
+    "survivorId": "survivor-player-3266",
+    "actionType": "SEARCH",
+    "timestamp": 1771963374264
+  },
+  {
+    "playerId": "player-3266",
+    "survivorId": "survivor-player-3266",
+    "actionType": "RESOLVE_SEARCH",
+    "timestamp": 1771963383406,
+    "payload": {
+      "action": "EQUIP",
+      "targetSlot": "BACKPACK"
+    }
+  },
+  {
+    "playerId": "player-3266",
+    "survivorId": "survivor-player-3266",
+    "actionType": "MOVE",
+    "timestamp": 1771963386138,
     "payload": {
       "targetZoneId": "police-armory"
     }
   },
   {
-    "playerId": "player-3021",
-    "survivorId": "survivor-player-3021",
+    "playerId": "player-3266",
+    "survivorId": "survivor-player-3266",
+    "actionType": "MAKE_NOISE",
+    "timestamp": 1771963390630
+  },
+  {
+    "playerId": "player-5337",
+    "survivorId": "survivor-player-5337",
     "actionType": "SEARCH",
-    "timestamp": 1771815990574
+    "timestamp": 1771963396029
   },
   {
-    "playerId": "player-3021",
-    "survivorId": "survivor-player-3021",
+    "playerId": "player-5337",
+    "survivorId": "survivor-player-5337",
+    "actionType": "ORGANIZE",
+    "timestamp": 1771963398858,
+    "payload": {
+      "cardId": "card-machete-11",
+      "targetSlot": "BACKPACK"
+    }
+  },
+  {
+    "playerId": "player-5337",
+    "survivorId": "survivor-player-5337",
+    "actionType": "RESOLVE_SEARCH",
+    "timestamp": 1771963400535,
+    "payload": {
+      "action": "EQUIP",
+      "targetSlot": "HAND_2"
+    }
+  },
+  {
+    "playerId": "player-5337",
+    "survivorId": "survivor-player-5337",
+    "actionType": "MOVE",
+    "timestamp": 1771963402030,
+    "payload": {
+      "targetZoneId": "police-armory"
+    }
+  },
+  {
+    "playerId": "player-5337",
+    "survivorId": "survivor-player-5337",
+    "actionType": "MAKE_NOISE",
+    "timestamp": 1771963406012
+  },
+  {
+    "playerId": "player-5337",
+    "survivorId": "survivor-player-5337",
     "actionType": "SEARCH",
-    "timestamp": 1771815992280
+    "timestamp": 1771963408360
   },
   {
-    "playerId": "player-3021",
-    "survivorId": "survivor-player-3021",
-    "actionType": "MOVE",
-    "timestamp": 1771816000359,
+    "playerId": "player-5337",
+    "survivorId": "survivor-player-5337",
+    "actionType": "ORGANIZE",
+    "timestamp": 1771963411197,
     "payload": {
-      "targetZoneId": "police-reception"
+      "cardId": "card-axe-0",
+      "targetSlot": "BACKPACK"
     }
   },
   {
-    "playerId": "player-3021",
-    "survivorId": "survivor-player-3021",
-    "actionType": "SEARCH",
-    "timestamp": 1771816002591
-  },
-  {
-    "playerId": "player-3021",
-    "survivorId": "survivor-player-3021",
-    "actionType": "MOVE",
-    "timestamp": 1771816018292,
+    "playerId": "player-5337",
+    "survivorId": "survivor-player-5337",
+    "actionType": "RESOLVE_SEARCH",
+    "timestamp": 1771963412727,
     "payload": {
-      "targetZoneId": "street-start"
+      "action": "EQUIP",
+      "targetSlot": "HAND_1"
     }
   },
   {
-    "playerId": "player-3021",
-    "survivorId": "survivor-player-3021",
-    "actionType": "MOVE",
-    "timestamp": 1771816025099,
-    "payload": {
-      "targetZoneId": "police-reception"
-    }
+    "playerId": "player-5337",
+    "survivorId": "survivor-player-5337",
+    "actionType": "MAKE_NOISE",
+    "timestamp": 1771963418673
   },
   {
-    "playerId": "player-3021",
-    "survivorId": "survivor-player-3021",
-    "actionType": "MOVE",
-    "timestamp": 1771816029708,
-    "payload": {
-      "targetZoneId": "street-start"
-    }
-  },
-  {
-    "playerId": "player-3021",
-    "survivorId": "survivor-player-3021",
-    "actionType": "ATTACK",
-    "timestamp": 1771816033400,
-    "payload": {
-      "targetZoneId": "street-start",
-      "weaponId": "card-machete-11"
-    }
-  },
-  {
-    "playerId": "player-3021",
-    "survivorId": "survivor-player-3021",
-    "actionType": "ATTACK",
-    "timestamp": 1771816045077,
-    "payload": {
-      "targetZoneId": "street-start",
-      "weaponId": "card-machete-11"
-    }
-  },
-  {
-    "playerId": "player-3021",
-    "survivorId": "survivor-player-3021",
-    "actionType": "ATTACK",
-    "timestamp": 1771816048748,
-    "payload": {
-      "targetZoneId": "street-start",
-      "weaponId": "card-machete-11"
-    }
-  },
-  {
-    "playerId": "player-3021",
-    "survivorId": "survivor-player-3021",
-    "actionType": "ATTACK",
-    "timestamp": 1771816052240,
-    "payload": {
-      "targetZoneId": "street-start",
-      "weaponId": "card-machete-11"
-    }
-  },
-  {
-    "playerId": "player-3021",
-    "survivorId": "survivor-player-3021",
-    "actionType": "MOVE",
-    "timestamp": 1771816053391,
-    "payload": {
-      "targetZoneId": "police-reception"
-    }
-  },
-  {
-    "playerId": "player-3021",
-    "survivorId": "survivor-player-3021",
-    "actionType": "MOVE",
-    "timestamp": 1771816055591,
-    "payload": {
-      "targetZoneId": "street-start"
-    }
-  },
-  {
-    "playerId": "player-3021",
-    "survivorId": "survivor-player-3021",
-    "actionType": "ATTACK",
-    "timestamp": 1771816057858,
-    "payload": {
-      "targetZoneId": "street-start",
-      "weaponId": "card-machete-11"
-    }
-  },
-  {
-    "playerId": "player-3021",
-    "survivorId": "survivor-player-3021",
-    "actionType": "ATTACK",
-    "timestamp": 1771816060025,
-    "payload": {
-      "targetZoneId": "street-start",
-      "weaponId": "card-machete-11"
-    }
+    "playerId": "player-5337",
+    "survivorId": "survivor-player-5337",
+    "actionType": "MAKE_NOISE",
+    "timestamp": 1771963419248
   }
 ]

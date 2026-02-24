@@ -14,6 +14,11 @@ export class EquipmentManager {
     return survivor.inventory.length < (this.MAX_HANDS + this.MAX_BACKPACK);
   }
 
+  public static isHandFull(survivor: Survivor): boolean {
+    const handCount = survivor.inventory.filter(c => c.slot === 'HAND_1' || c.slot === 'HAND_2').length;
+    return handCount >= this.MAX_HANDS;
+  }
+
   /**
    * Adds a card to the first available slot.
    * If full, it does NOT add, requiring a resolution action.
@@ -101,23 +106,63 @@ export class EquipmentManager {
   /**
    * Organizes inventory (moves card to a specific slot).
    */
-  public static moveCardToSlot(survivor: Survivor, cardId: EntityId, targetSlot: 'HAND_1' | 'HAND_2' | 'BACKPACK'): Survivor {
-    const newSurvivor = { ...survivor, inventory: [...survivor.inventory] };
+  public static moveCardToSlot(survivor: Survivor, cardId: EntityId, targetSlot: string): Survivor {
+    const newSurvivor = { ...survivor }; // Shallow clone
+    // Deep clone inventory to mutate
+    newSurvivor.inventory = survivor.inventory.map(c => ({...c}));
+    
     const card = newSurvivor.inventory.find(c => c.id === cardId);
     
     if (!card) throw new Error('Card not found');
 
-    // If target slot is occupied, swap slots
+    // Handle DISCARD slot
+    if (targetSlot === 'DISCARD') {
+        card.slot = 'DISCARD';
+        card.inHand = false;
+        return newSurvivor;
+    }
+
+    // If target slot is occupied by another item, we might need to swap
+    // But if target is BACKPACK, we just add it to pile (since multiple items can be BACKPACK)
+    if (targetSlot === 'BACKPACK') {
+        card.slot = 'BACKPACK';
+        card.inHand = false;
+        return newSurvivor;
+    }
+
+    // For specific slots (HAND_1, HAND_2), check if occupied
     const occupant = newSurvivor.inventory.find(c => c.slot === targetSlot);
     
     if (occupant) {
+      // Swap slots
       occupant.slot = card.slot;
       occupant.inHand = (card.slot === 'HAND_1' || card.slot === 'HAND_2');
     }
 
-    card.slot = targetSlot;
+    card.slot = targetSlot as any;
     card.inHand = (targetSlot === 'HAND_1' || targetSlot === 'HAND_2');
 
     return newSurvivor;
+  }
+
+  /**
+   * Validates if a proposed inventory configuration is legal.
+   * Checks max slots and duplicate slots.
+   */
+  public static validateLoadout(inventory: { slot?: string }[]): boolean {
+    const hands = inventory.filter(c => c.slot === 'HAND_1' || c.slot === 'HAND_2');
+    const backpack = inventory.filter(c => c.slot === 'BACKPACK');
+    const body = inventory.filter(c => c.slot === 'BODY'); // Future proofing
+
+    if (hands.length > this.MAX_HANDS) return false;
+    if (backpack.length > this.MAX_BACKPACK) return false;
+    
+    // Check for duplicate specific slots (e.g. two items in HAND_1)
+    const hand1 = inventory.filter(c => c.slot === 'HAND_1');
+    const hand2 = inventory.filter(c => c.slot === 'HAND_2');
+    
+    if (hand1.length > 1 || hand2.length > 1) return false;
+
+    return true;
   }
 }
