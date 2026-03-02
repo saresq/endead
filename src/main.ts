@@ -10,10 +10,35 @@ import { GameHUD } from './client/ui/GameHUD';
 import { LobbyUI } from './client/ui/LobbyUI';
 import { generateDiff } from './utils/StateDiff';
 import { GamePhase } from './types/GameState';
+import { MapEditor } from './client/editor/MapEditor';
 
 // --- Initialization ---
 
 async function init() {
+  // Simple URL-based routing for Editor
+  const urlParams = new URLSearchParams(window.location.search);
+  if (window.location.pathname === '/editor' || urlParams.has('editor')) {
+      console.log('Starting Map Editor...');
+      
+      // Hide the #app div so it doesn't push the canvas off-screen
+      const appDiv = document.getElementById('app');
+      if (appDiv) appDiv.style.display = 'none';
+
+      const app = new PIXI.Application();
+      await app.init({ 
+        background: '#111111', 
+        resizeTo: window,
+        antialias: true 
+      });
+      app.canvas.style.position = 'absolute';
+      app.canvas.style.top = '0';
+      app.canvas.style.left = '0';
+      document.body.appendChild(app.canvas);
+      
+      new MapEditor(app);
+      return;
+  }
+
   try {
     console.log('Initializing Game Client...');
 

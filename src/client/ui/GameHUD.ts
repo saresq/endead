@@ -231,6 +231,8 @@ export class GameHUD {
 
     const weapons = survivor.inventory.filter(c => c.type === 'WEAPON' && c.inHand);
     const canOpenDoor = survivor.inventory.some(c => c.inHand && c.canOpenDoor);
+    const currentZone = this.state?.zones[survivor.position.zoneId];
+    const canTakeObjective = currentZone?.hasObjective === true;
     
     return `
       <div class="dashboard">
@@ -247,6 +249,7 @@ export class GameHUD {
           <button id="btn-search" ${!isMyTurn || survivor.hasSearched || survivor.actionsRemaining < 1 ? 'disabled' : ''}>Search (1 AP)</button>
           <button id="btn-noise" ${!isMyTurn || survivor.actionsRemaining < 1 ? 'disabled' : ''}>Make Noise (1 AP)</button>
           <button id="btn-door" ${!isMyTurn || survivor.actionsRemaining < 1 || !canOpenDoor ? 'disabled' : ''}>Open Door (1 AP)</button>
+          <button id="btn-objective" ${!isMyTurn || survivor.actionsRemaining < 1 || !canTakeObjective ? 'disabled' : ''} style="${canTakeObjective ? 'background:#d90;color:#000;font-weight:bold;' : ''}">Take Objective (1 AP)</button>
           <button id="btn-trade" ${!isMyTurn || survivor.actionsRemaining < 1 ? 'disabled' : ''}>Trade (1 AP)</button>
           <button id="btn-end-turn" ${!isMyTurn || survivor.actionsRemaining < 1 ? 'disabled' : ''}>End Turn</button>
           <button id="btn-backpack">Backpack (${survivor.inventory.length})</button>
@@ -342,9 +345,17 @@ export class GameHUD {
     });
 
     btnDoor?.addEventListener('click', () => {
-        // Toggle Input Mode for Door
         this.inputController.setMode('OPEN_DOOR');
         this.showMessage('Select a CLOSED DOOR zone (or building zone) to open it.', 5000);
+    });
+
+    const btnObjective = document.getElementById('btn-objective');
+    btnObjective?.addEventListener('click', () => {
+      networkManager.sendAction({
+        playerId: this.localPlayerId,
+        survivorId: survivor.id,
+        type: ActionType.TAKE_OBJECTIVE,
+      });
     });
 
     btnTrade?.addEventListener('click', () => {

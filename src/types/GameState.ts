@@ -1,4 +1,6 @@
 
+import { TileInstance } from './Map';
+
 export type EntityId = string;
 export type ZoneId = string;
 export type PlayerId = string;
@@ -118,17 +120,29 @@ export interface Zombie extends Entity {
 
 // --- World ---
 
+/**
+ * Describes a connection from this zone to an adjacent zone.
+ * Replaces the old flat connectedZones + zone-level doorOpen model.
+ */
+export interface ZoneConnection {
+  toZoneId: ZoneId;
+  hasDoor: boolean;    // true if a door exists on this edge
+  doorOpen: boolean;   // only meaningful if hasDoor=true
+}
+
 export interface Zone {
   id: ZoneId;
-  connectedZones: ZoneId[];
+  connections: ZoneConnection[];  // Edge-level connectivity with door state
+  connectedZones: ZoneId[];       // Convenience: derived list of connected zone IDs (kept for backward compat)
   isBuilding: boolean;
   hasNoise: boolean;
   noiseTokens: number;
   spawnPoint?: boolean;
   exitPoint?: boolean;
-  isExit?: boolean; // New: Objective / Exit Point
+  isExit?: boolean;
+  hasObjective?: boolean;
   searchable: boolean;
-  doorOpen: boolean;
+  doorOpen: boolean;  // DEPRECATED: kept for legacy map compat, use connections[].doorOpen instead
 }
 
 // --- Game State ---
@@ -152,6 +166,24 @@ export enum GamePhase {
 export enum GameResult {
   Victory = 'VICTORY',
   Defeat = 'DEFEAT'
+}
+
+export enum ObjectiveType {
+  ReachExit = 'REACH_EXIT', // All survivors must reach this zone (no zombies allowed)
+  TakeObjective = 'TAKE_OBJECTIVE', // Take X objectives
+  KillZombie = 'KILL_ZOMBIE', // Kill X zombies of a specific type (or any)
+  CollectItem = 'COLLECT_ITEM', // Have X specific items in inventory
+}
+
+export interface Objective {
+  id: string;
+  type: ObjectiveType;
+  description: string;
+  targetId?: string; // ZoneId (for ReachExit), ZombieType (for Kill), ItemName (for Collect)
+  amountRequired: number;
+  amountCurrent: number;
+  completed: boolean;
+  xpValue?: number; // XP given when this objective is completed/taken (usually 5)
 }
 
 // New Interface for Lobby Data
@@ -211,6 +243,11 @@ export interface GameState {
   
   // Map
   zones: Record<ZoneId, Zone>;
+  tiles?: TileInstance[]; // Visual Background Layer
+
+
+  // Objectives
+  objectives: Objective[]; // Dynamic Objectives List
   
   // Decks
   equipmentDeck: EquipmentCard[];
@@ -282,16 +319,26 @@ export const initialGameState: GameState = {
     // --- Streets ---
     'street-start': {
       id: 'street-start',
+      connections: [
+        { toZoneId: 'street-intersection', hasDoor: false, doorOpen: true },
+        { toZoneId: 'police-reception', hasDoor: true, doorOpen: false },
+      ],
       connectedZones: ['street-intersection', 'police-reception'],
       isBuilding: false,
       hasNoise: false,
       noiseTokens: 0,
       searchable: false,
-      doorOpen: true, // Always open to street unless building logic
+      doorOpen: true,
       spawnPoint: false,
     },
     'street-intersection': {
       id: 'street-intersection',
+      connections: [
+        { toZoneId: 'street-start', hasDoor: false, doorOpen: true },
+        { toZoneId: 'street-east', hasDoor: false, doorOpen: true },
+        { toZoneId: 'street-north', hasDoor: false, doorOpen: true },
+        { toZoneId: 'street-south', hasDoor: false, doorOpen: true },
+      ],
       connectedZones: ['street-start', 'street-east', 'street-north', 'street-south'],
       isBuilding: false,
       hasNoise: false,
@@ -302,16 +349,22 @@ export const initialGameState: GameState = {
     },
     'street-east': {
       id: 'street-east',
+      connections: [
+        { toZoneId: 'street-intersection', hasDoor: false, doorOpen: true },
+      ],
       connectedZones: ['street-intersection'],
       isBuilding: false,
       hasNoise: false,
       noiseTokens: 0,
       searchable: false,
       doorOpen: true,
-      spawnPoint: true, // Main Spawn 1
+      spawnPoint: true,
     },
     'street-north': {
       id: 'street-north',
+      connections: [
+        { toZoneId: 'street-intersection', hasDoor: false, doorOpen: true },
+      ],
       connectedZones: ['street-intersection'],
       isBuilding: false,
       hasNoise: false,
@@ -322,16 +375,24 @@ export const initialGameState: GameState = {
     },
     'street-south': {
       id: 'street-south',
+      connections: [
+        { toZoneId: 'street-intersection', hasDoor: false, doorOpen: true },
+        { toZoneId: 'zone-exit', hasDoor: false, doorOpen: true },
+        { toZoneId: 'diner-front', hasDoor: true, doorOpen: false },
+      ],
       connectedZones: ['street-intersection', 'zone-exit', 'diner-front'],
       isBuilding: false,
       hasNoise: false,
       noiseTokens: 0,
       searchable: false,
       doorOpen: true,
-      spawnPoint: true, // Main Spawn 2
+      spawnPoint: true,
     },
     'zone-exit': {
       id: 'zone-exit',
+      connections: [
+        { toZoneId: 'street-south', hasDoor: false, doorOpen: true },
+      ],
       connectedZones: ['street-south'],
       isBuilding: false,
       hasNoise: false,
@@ -339,54 +400,72 @@ export const initialGameState: GameState = {
       searchable: false,
       doorOpen: true,
       spawnPoint: false,
-      isExit: true, // Victory Condition
+      isExit: true,
     },
 
     // --- Building 1: Police Station ---
     'police-reception': {
       id: 'police-reception',
+      connections: [
+        { toZoneId: 'police-armory', hasDoor: false, doorOpen: true },
+        { toZoneId: 'street-start', hasDoor: true, doorOpen: false },
+      ],
       connectedZones: ['police-armory', 'street-start'],
       isBuilding: true,
       hasNoise: false,
       noiseTokens: 0,
       searchable: true,
-      doorOpen: false, // Closed Door to street-start
+      doorOpen: false,
       spawnPoint: false,
+      hasObjective: true,
     },
     'police-armory': {
       id: 'police-armory',
+      connections: [
+        { toZoneId: 'police-reception', hasDoor: false, doorOpen: true },
+      ],
       connectedZones: ['police-reception'],
       isBuilding: true,
       hasNoise: false,
       noiseTokens: 0,
       searchable: true,
-      doorOpen: true, // Internal doors open by default
+      doorOpen: true,
       spawnPoint: false,
     },
 
     // --- Building 2: Diner ---
     'diner-front': {
       id: 'diner-front',
+      connections: [
+        { toZoneId: 'diner-kitchen', hasDoor: false, doorOpen: true },
+        { toZoneId: 'street-south', hasDoor: true, doorOpen: false },
+      ],
       connectedZones: ['diner-kitchen', 'street-south'],
       isBuilding: true,
       hasNoise: false,
       noiseTokens: 0,
       searchable: true,
-      doorOpen: false, // Closed Door to street-south
+      doorOpen: false,
       spawnPoint: false,
     },
     'diner-kitchen': {
       id: 'diner-kitchen',
+      connections: [
+        { toZoneId: 'diner-front', hasDoor: false, doorOpen: true },
+      ],
       connectedZones: ['diner-front'],
       isBuilding: true,
       hasNoise: false,
       noiseTokens: 0,
       searchable: true,
-      doorOpen: true, // Internal doors open
+      doorOpen: true,
       spawnPoint: false,
     }
   },
   
+  objectives: [], // Populated on Start Game
+  tiles: [], // Populated later
+
   equipmentDeck: [], // Populated with card objects
   equipmentDiscard: [],
   spawnDeck: [], // Populated with spawn cards

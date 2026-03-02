@@ -9,14 +9,79 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { HeartbeatManager } from './HeartbeatManager';
 import { PersistenceService } from '../services/PersistenceService';
+import fs from 'fs/promises';
 
 // --- Server Configuration ---
 const app = express();
+app.use(express.json()); // Enable JSON body parsing
 const server = createServer(app);
 const PORT = process.env.PORT || 8080;
 const wss = new WebSocketServer({ server }); // Attach to HTTP server
 const heartbeatManager = new HeartbeatManager(wss);
 const MAX_PLAYERS = 6;
+
+// --- API Routes ---
+
+app.get('/api/maps', async (req, res) => {
+  try {
+    const mapsDir = path.resolve(process.cwd(), 'data/maps');
+    // Ensure directory exists
+    try {
+        await fs.access(mapsDir);
+    } catch {
+        await fs.mkdir(mapsDir, { recursive: true });
+    }
+
+    const files = await fs.readdir(mapsDir);
+    const maps = [];
+
+    for (const file of files) {
+      if (file.endsWith('.json')) {
+        const content = await fs.readFile(path.join(mapsDir, file), 'utf-8');
+        try {
+            maps.push(JSON.parse(content));
+        } catch (e) {
+            console.error(`Failed to parse map ${file}:`, e);
+        }
+      }
+    }
+    res.json(maps);
+  } catch (error) {
+    console.error('Error fetching maps:', error);
+    res.status(500).json({ error: 'Failed to fetch maps' });
+  }
+});
+
+app.post('/api/maps', async (req, res) => {
+  try {
+    const mapData = req.body;
+    if (!mapData || !mapData.name || !mapData.tiles) {
+      res.status(400).json({ error: 'Invalid map data' });
+      return;
+    }
+
+    // Generate ID if missing
+    if (!mapData.id) {
+        mapData.id = `map-${Date.now()}`;
+    }
+
+    const mapsDir = path.resolve(process.cwd(), 'data/maps');
+    try {
+        await fs.access(mapsDir);
+    } catch {
+        await fs.mkdir(mapsDir, { recursive: true });
+    }
+
+    const filePath = path.join(mapsDir, `${mapData.id}.json`);
+    await fs.writeFile(filePath, JSON.stringify(mapData, null, 2));
+
+    log(`Map saved: ${mapData.name} (${mapData.id})`);
+    res.json({ success: true, id: mapData.id });
+  } catch (error) {
+    console.error('Error saving map:', error);
+    res.status(500).json({ error: 'Failed to save map' });
+  }
+});
 
 // --- Static File Serving (Production) ---
 const __filename = fileURLToPath(import.meta.url);

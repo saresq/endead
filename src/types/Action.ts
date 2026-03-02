@@ -22,6 +22,7 @@ export enum ActionType {
   ORGANIZE = 'ORGANIZE',
   CHOOSE_SKILL = 'CHOOSE_SKILL',
   RESOLVE_SEARCH = 'RESOLVE_SEARCH', // New action for full inventory
+  TAKE_OBJECTIVE = 'TAKE_OBJECTIVE', // Take objective token
   NOTHING = 'NOTHING', // Keep alive
   END_TURN = 'END_TURN', // Pass turn / End activation
 }

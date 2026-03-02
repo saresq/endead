@@ -1,8 +1,11 @@
 // src/client/PixiBoardRenderer.ts
 
 import * as PIXI from 'pixi.js';
-import { GameState, ZoneId, EntityId, Survivor, Zombie, Zone } from '../types/GameState';
+import { GameState, ZoneId, EntityId, Survivor, Zombie, Zone, ZoneConnection } from '../types/GameState';
+import { MarkerType } from '../types/Map';
 import { ZONE_LAYOUT, TILE_SIZE, ENTITY_RADIUS, ENTITY_SPACING } from '../config/Layout';
+import { tileService } from '../services/TileService';
+import { TileInstance } from '../types/Map';
 
 export interface RenderOptions {
   activeSurvivorId?: EntityId;
@@ -32,17 +35,43 @@ export class PixiBoardRenderer {
   
   // Camera Control
   private isDragging = false;
+  private _wasDragging = false;
   private lastDragPos = { x: 0, y: 0 };
+  private _pointerIsDown = false;
+  private _pointerStartPos: { x: number, y: number } | null = null;
 
   // State-tracking cache for reconciliation
   private entitySprites: Map<EntityId, PIXI.Container> = new Map();
   private zoneGraphics: Map<ZoneId, PIXI.Graphics> = new Map();
+  private tileSprites: PIXI.Container[] = [];
+  private _lastTileHash: string = '';
+  
+  // Layers
+  private layerGrid: PIXI.Container;
+  private layerTiles: PIXI.Container;
+  private layerZones: PIXI.Container;
+  private layerEntities: PIXI.Container;
 
   constructor(app: PIXI.Application) {
     this.app = app;
     this.container = new PIXI.Container();
     this.app.stage.addChild(this.container);
+    
+    // Create Layers
+    this.layerGrid = new PIXI.Container();
+    this.layerTiles = new PIXI.Container();
+    this.layerZones = new PIXI.Container();
+    this.layerEntities = new PIXI.Container();
+    
+    this.container.addChild(this.layerGrid);
+    this.container.addChild(this.layerTiles);
+    this.container.addChild(this.layerZones);
+    this.container.addChild(this.layerEntities);
+
     this.grid = buildGrid();
+
+    // Ensure tiles loaded
+    tileService.loadAssets();
 
     this.setupCameraControls();
   }
@@ -53,19 +82,47 @@ export class PixiBoardRenderer {
     this.app.stage.hitArea = this.app.screen;
 
     this.app.stage.on('pointerdown', (e) => {
-      this.isDragging = true;
-      this.lastDragPos = { x: e.global.x, y: e.global.y };
+      // Only start drag on middle mouse button (wheel click) to avoid
+      // conflicting with left-click tile placement in editor mode
+      if (e.button === 1) {
+        this.isDragging = true;
+        this.lastDragPos = { x: e.global.x, y: e.global.y };
+      }
+      // Also support right-button drag for camera pan (shift+right or just middle)
+      // Left-click drag: track start position for drag-threshold detection
+      if (e.button === 0) {
+        this._pointerStartPos = { x: e.global.x, y: e.global.y };
+        this._pointerIsDown = true;
+      }
     });
 
     this.app.stage.on('pointerup', () => {
+      // Preserve drag state for one frame so editor's pointerup handler can check it
+      this._wasDragging = this.isDragging;
       this.isDragging = false;
+      this._pointerIsDown = false;
+      this._pointerStartPos = null;
     });
 
     this.app.stage.on('pointerupoutside', () => {
+      this._wasDragging = this.isDragging;
       this.isDragging = false;
+      this._pointerIsDown = false;
+      this._pointerStartPos = null;
     });
 
     this.app.stage.on('pointermove', (e) => {
+      // Left-click: only start dragging after a movement threshold (5px)
+      // This prevents accidental drags when placing tiles
+      if (this._pointerIsDown && !this.isDragging && this._pointerStartPos) {
+        const dx = e.global.x - this._pointerStartPos.x;
+        const dy = e.global.y - this._pointerStartPos.y;
+        if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+          this.isDragging = true;
+          this.lastDragPos = { x: e.global.x, y: e.global.y };
+        }
+      }
+
       if (this.isDragging) {
         const dx = e.global.x - this.lastDragPos.x;
         const dy = e.global.y - this.lastDragPos.y;
@@ -118,13 +175,73 @@ export class PixiBoardRenderer {
     return this.entitySprites.get(id);
   }
 
+  /** Returns true if the camera was being dragged when pointer was released (to suppress click actions). */
+  public get wasDragging(): boolean {
+    return this._wasDragging;
+  }
+
   public screenToWorld(x: number, y: number): { x: number, y: number } {
     const point = new PIXI.Point(x, y);
     const local = this.container.toLocal(point);
     return { x: local.x, y: local.y };
   }
 
+  // Helper to resolve layout from static config OR dynamic ID convention
+  private getZoneLayout(zoneId: ZoneId): { col: number, row: number, w: number, h: number } {
+      if (ZONE_LAYOUT[zoneId]) return ZONE_LAYOUT[zoneId];
+      
+      // Dynamic Zone: z_x_y
+      const parts = zoneId.split('_');
+      if (parts.length === 3 && parts[0] === 'z') {
+          return {
+              col: parseInt(parts[1]),
+              row: parseInt(parts[2]),
+              w: 1,
+              h: 1
+          };
+      }
+
+      return { col: 0, row: 0, w: 1, h: 1 };
+  }
+
+  public drawEditorGrid(width: number, height: number): void {
+      console.log(`[Renderer] Drawing Editor Grid: ${width}x${height}`);
+      
+      this.layerGrid.removeChildren();
+      const graphics = new PIXI.Graphics();
+      this.layerGrid.addChild(graphics);
+
+      // Draw Tiles Grid (450px)
+      const TILE_PIXEL_SIZE = TILE_SIZE * 3;
+      
+      // Draw background rect for visibility
+      graphics.rect(0, 0, width * TILE_PIXEL_SIZE, height * TILE_PIXEL_SIZE);
+      graphics.fill({ color: 0x1a1a1a });
+
+      // Build all grid lines as a single path, then stroke once (PIXI v8 pattern)
+      for (let x = 0; x <= width; x++) {
+          const px = x * TILE_PIXEL_SIZE;
+          graphics.moveTo(px, 0);
+          graphics.lineTo(px, height * TILE_PIXEL_SIZE);
+      }
+
+      for (let y = 0; y <= height; y++) {
+          const py = y * TILE_PIXEL_SIZE;
+          graphics.moveTo(0, py);
+          graphics.lineTo(width * TILE_PIXEL_SIZE, py);
+      }
+
+      // Single stroke call for all grid lines
+      graphics.stroke({ width: 2, color: 0xFF0000, alpha: 0.5 });
+
+  }
+
   public render(state: GameState, options: RenderOptions = {}): void {
+    // 0. Tiles
+    if (state.tiles) {
+       this.renderTiles(state.tiles);
+    }
+    
     // 1. Zones (Board)
     this.reconcileZones(state, options.validMoveZones || []);
 
@@ -132,11 +249,46 @@ export class PixiBoardRenderer {
     this.reconcileEntities(state, options.activeSurvivorId);
   }
 
+  private renderTiles(tiles: TileInstance[]): void {
+     if (!tileService.isReady) return;
+
+     // Dirty check: compare a hash of tile data to detect replacements
+     const tileHash = tiles.map(t => `${t.tileId}:${t.x},${t.y}:${t.rotation}`).join('|');
+     if (tileHash === this._lastTileHash) return;
+     this._lastTileHash = tileHash;
+     
+     this.layerTiles.removeChildren();
+
+     tiles.forEach(tile => {
+         const texture = tileService.getTexture(tile.tileId);
+         if (!texture) return;
+         
+         const sprite = new PIXI.Sprite(texture);
+         
+         // Logic Size: 3x3 Zones = 450x450px
+         const targetSize = TILE_SIZE * 3;
+         const scale = targetSize / texture.width;
+         
+         sprite.scale.set(scale);
+         sprite.anchor.set(0.5);
+
+         // Position logic
+         const px = (tile.x * targetSize) + (targetSize / 2);
+         const py = (tile.y * targetSize) + (targetSize / 2);
+         
+         sprite.x = px;
+         sprite.y = py;
+         sprite.rotation = (tile.rotation * Math.PI) / 180;
+         
+         this.layerTiles.addChild(sprite);
+     });
+  }
+
   private reconcileZones(state: GameState, validZones: ZoneId[]): void {
     // Check for removed zones (rare, but good practice)
     for (const [id, graphic] of this.zoneGraphics) {
       if (!state.zones[id]) {
-        this.container.removeChild(graphic);
+        this.layerZones.removeChild(graphic);
         this.zoneGraphics.delete(id);
       }
     }
@@ -146,16 +298,17 @@ export class PixiBoardRenderer {
       
       if (!graphic) {
         graphic = new PIXI.Graphics();
-        this.container.addChildAt(graphic, 0); // Keep zones at bottom
+        this.layerZones.addChild(graphic);
         this.zoneGraphics.set(zone.id, graphic);
       }
-
-      this.drawZone(graphic, zone, validZones.includes(zone.id), state);
+      
+      const hasTiles = !!state.tiles && state.tiles.length > 0;
+      this.drawZone(graphic, zone, validZones.includes(zone.id), state, hasTiles);
     });
   }
 
-  private drawZone(graphic: PIXI.Graphics, zone: Zone, isValidMove: boolean, state: GameState): void {
-    const layout = ZONE_LAYOUT[zone.id] || { col: 0, row: 0, w: 1, h: 1 };
+  private drawZone(graphic: PIXI.Graphics, zone: Zone, isValidMove: boolean, state: GameState, hasTiles: boolean): void {
+    const layout = this.getZoneLayout(zone.id);
     
     graphic.clear();
 
@@ -165,18 +318,32 @@ export class PixiBoardRenderer {
     const width = layout.w * TILE_SIZE;
     const height = layout.h * TILE_SIZE;
 
-    let color = 0x333333; // Default Street Gray
-    if (zone.isBuilding) color = 0x554444; // Building Brownish
-    if (isValidMove) color = 0x225522; // Highlight Green
-    if (zone.isExit) color = 0x224466; // Exit Zone Blue-ish (Unique Color)
+    if (hasTiles) {
+        // If tiles exist, we only draw HIGHLIGHTS, not the base floor color
+        if (isValidMove) {
+            graphic.rect(x, y, width, height);
+            graphic.fill({ color: 0x00FF00, alpha: 0.3 }); // Green overlay
+        }
+        
+        // Debug / Editor mode might want grid lines
+        // graphic.rect(x, y, width, height);
+        // graphic.stroke({ width: 1, color: 0x000000, alpha: 0.1 });
+    } else {
+        // Legacy Mode: Procedural Colors
+        let color = 0x333333; // Default Street Gray
+        if (zone.isBuilding) color = 0x554444; // Building Brownish
+        if (isValidMove) color = 0x225522; // Highlight Green
+        if (zone.isExit) color = 0x224466; // Exit Zone Blue-ish (Unique Color)
 
-    graphic.rect(x, y, width, height);
-    graphic.fill({ color });
-    
-    // Grid Lines (Subtle)
-    graphic.stroke({ width: 1, color: 0x444444, alpha: 0.5 });
+        graphic.rect(x, y, width, height);
+        graphic.fill({ color });
+        
+        // Grid Lines (Subtle)
+        graphic.stroke({ width: 1, color: 0x444444, alpha: 0.5 });
+    }
 
     // --- 2. Draw Walls & Doors ---
+    // Walls should ALWAYS be drawn for clarity, even with tiles
     // Iterate over each cell in the zone to check neighbors
     for (let i = 0; i < layout.w; i++) {
       for (let j = 0; j < layout.h; j++) {
@@ -187,18 +354,55 @@ export class PixiBoardRenderer {
       }
     }
 
-    // --- 3. Indicators (Noise, Searchable) ---
+    // --- 3. Indicators (Noise, Searchable, Markers) ---
     if (zone.noiseTokens > 0) {
       graphic.circle(x + width - 20, y + 20, 10);
       graphic.fill({ color: 0xFFFF00 });
-      // Could add text for count here if using BitmapText
     }
     
     if (zone.searchable && zone.isBuilding) {
-       // Search Icon Indicator (Small Magnifying Glass Proxy)
        graphic.circle(x + 20, y + 20, 5);
        graphic.fill({ color: 0xFFFFFF });
        graphic.stroke({ width: 1, color: 0x000000 });
+    }
+
+    // Spawn Point indicator (red diamond)
+    if (zone.spawnPoint) {
+      const cx = x + width / 2;
+      const cy = y + height - 20;
+      graphic.moveTo(cx, cy - 10);
+      graphic.lineTo(cx + 8, cy);
+      graphic.lineTo(cx, cy + 10);
+      graphic.lineTo(cx - 8, cy);
+      graphic.closePath();
+      graphic.fill({ color: 0xFF0000 });
+      graphic.stroke({ width: 1, color: 0x000000 });
+    }
+
+    // Exit indicator (blue arrow)
+    if (zone.isExit) {
+      const cx = x + width / 2;
+      const cy = y + height / 2;
+      graphic.rect(cx - 15, cy - 15, 30, 30);
+      graphic.fill({ color: 0x2244AA, alpha: 0.6 });
+      graphic.stroke({ width: 2, color: 0x4488FF });
+      // Arrow shape
+      graphic.moveTo(cx - 6, cy + 6);
+      graphic.lineTo(cx + 6, cy);
+      graphic.lineTo(cx - 6, cy - 6);
+      graphic.stroke({ width: 3, color: 0xFFFFFF });
+    }
+
+    // Objective token indicator (gold star)
+    if (zone.hasObjective) {
+      const cx = x + 25;
+      const cy = y + height - 25;
+      graphic.circle(cx, cy, 10);
+      graphic.fill({ color: 0xFFD700 });
+      graphic.stroke({ width: 2, color: 0x000000 });
+      // Inner dot
+      graphic.circle(cx, cy, 3);
+      graphic.fill({ color: 0x000000 });
     }
   }
 
@@ -209,8 +413,15 @@ export class PixiBoardRenderer {
 
     // Helper to get neighbor zone
     const getNeighbor = (nx: number, ny: number): ZoneId | null => {
+      // 1. Try static grid
       const key = `${nx},${ny}`;
-      return this.grid[key] || null;
+      if (this.grid[key]) return this.grid[key];
+
+      // 2. Try dynamic ID convention
+      const dynamicId = `z_${nx}_${ny}`;
+      if (state.zones[dynamicId]) return dynamicId;
+
+      return null;
     };
 
     const checkAndDrawEdge = (x1: number, y1: number, x2: number, y2: number, nx: number, ny: number) => {
@@ -225,25 +436,28 @@ export class PixiBoardRenderer {
       let doorOpen = false;
 
       if (neighborId) {
-        // Check connectivity
         const isConnected = zone.connectedZones.includes(neighborId);
         const neighbor = state.zones[neighborId];
         
         if (isConnected && neighbor) {
-          // Connected Logic
-          if (zone.isBuilding && neighbor.isBuilding) {
-            // Building <-> Building = Wall with Gap
+          // Use edge-level connection data if available
+          const conn = zone.connections?.find(c => c.toZoneId === neighborId);
+
+          if (conn && conn.hasDoor) {
+            // Explicit door on this edge
+            drawWall = true;
+            isDoor = true;
+            doorOpen = conn.doorOpen;
+          } else if (zone.isBuilding && neighbor.isBuilding) {
+            // Building <-> Building = Wall with Gap (open passage between rooms)
             drawWall = true;
             isGap = true;
           } else if (!zone.isBuilding && !neighbor.isBuilding) {
             // Street <-> Street = Open
             drawWall = false;
           } else {
-            // Building <-> Street = Door
-            drawWall = true; // Use wall as base
-            isDoor = true;
-            // Determine door state: use the building's state
-            doorOpen = zone.isBuilding ? zone.doorOpen : neighbor.doorOpen;
+            // Building <-> Street connected but no door = open passage
+            drawWall = false;
           }
         } else {
            // Not connected -> Solid Wall
@@ -476,7 +690,7 @@ export class PixiBoardRenderer {
   }
 
   private calculatePosition(zoneId: ZoneId, index: number, isZombie: boolean): { x: number, y: number } {
-    const layout = ZONE_LAYOUT[zoneId] || { col: 0, row: 0, w: 1, h: 1 };
+    const layout = this.getZoneLayout(zoneId);
     const zoneX = layout.col * TILE_SIZE;
     const zoneY = layout.row * TILE_SIZE;
     const zoneH = layout.h * TILE_SIZE;

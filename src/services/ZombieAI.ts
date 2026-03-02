@@ -147,12 +147,10 @@ export class ZombieAI {
         // For MVP, we use connectedZones as the graph edges.
         
         if (!visited.has(neighborId)) {
-            const neighbor = state.zones[neighborId];
-            // Simple obstacle check: if door is strictly closed, treat as wall?
-            // Zombicide: Zombies bang on closed doors until they open (spawn noise).
-            // Implementation: Treat as blocked for pathfinding for now.
-            if (neighbor.isBuilding && !neighbor.doorOpen) {
-                continue; 
+            // Edge-level door check: if door is closed on this edge, blocked
+            const conn = zone.connections?.find(c => c.toZoneId === neighborId);
+            if (conn && conn.hasDoor && !conn.doorOpen) {
+                continue; // Door closed, zombies can't pass
             }
             
             visited.add(neighborId);
@@ -222,17 +220,11 @@ export class ZombieAI {
              if (axis === 'row' && neighborPos.row !== startPos.row) continue;
              if (axis === 'col' && neighborPos.col !== startPos.col) continue;
 
-             // Door/Wall Check
-             // If entering/leaving a building with closed door, LOS is blocked.
-             const neighborZone = state.zones[neighborId];
-             if ((currentZone.isBuilding !== neighborZone.isBuilding) || 
-                 (currentZone.isBuilding && neighborZone.isBuilding)) {
-                 // Check door status if relevant.
-                 // Assuming 'doorOpen' on a zone allows looking IN/OUT.
-                 // If either is a building and its door is closed, Block.
-                 if (currentZone.isBuilding && !currentZone.doorOpen) continue; 
-                 if (neighborZone.isBuilding && !neighborZone.doorOpen) continue;
-             }
+              // Edge-level door/wall check for LOS
+              const conn = currentZone.connections?.find(c => c.toZoneId === neighborId);
+              if (conn && conn.hasDoor && !conn.doorOpen) {
+                  continue; // Closed door blocks LOS
+              }
 
              visited.add(neighborId);
              queue.push(neighborId);

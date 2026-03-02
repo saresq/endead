@@ -1,5 +1,5 @@
 
-import { GameState, ZoneId, GamePhase, Zombie, EquipmentCard, ZombieType, EquipmentType, GameResult, Survivor, DangerLevel } from '../types/GameState';
+import { GameState, ZoneId, GamePhase, Zombie, EquipmentCard, ZombieType, EquipmentType, GameResult, Survivor, DangerLevel, ObjectiveType, Objective, Zone, ZoneConnection } from '../types/GameState';
 import { ActionRequest, ActionResponse, ActionType, ActionError } from '../types/Action';
 import { validateTurn, advanceTurnState, checkEndTurn } from './TurnManager';
 import { XPManager } from './XPManager';
@@ -8,8 +8,34 @@ import { EquipmentManager } from './EquipmentManager';
 import { ZombiePhaseManager } from './ZombiePhaseManager';
 import { rollDice } from './DiceService';
 import { ZONE_LAYOUT } from '../config/Layout';
+import { TileInstance, isLegacyMap } from '../types/Map';
+import { compileScenario, compileLegacyTiles } from './ScenarioCompiler';
 
 type ActionHandler = (state: GameState, intent: ActionRequest) => GameState;
+
+// --- Helper: Get edge connection between two zones ---
+function getConnection(zone: Zone, targetZoneId: ZoneId): ZoneConnection | undefined {
+    return zone.connections.find(c => c.toZoneId === targetZoneId);
+}
+
+// --- Helper: Check if door blocks passage on an edge ---
+function isDoorBlocked(zone: Zone, targetZoneId: ZoneId): boolean {
+    const conn = getConnection(zone, targetZoneId);
+    if (!conn) return true; // Not connected at all
+    return conn.hasDoor && !conn.doorOpen;
+}
+
+// --- Helper: Open a door on an edge (both sides) ---
+function openDoorEdge(state: GameState, zoneAId: ZoneId, zoneBId: ZoneId): void {
+    const zoneA = state.zones[zoneAId];
+    const zoneB = state.zones[zoneBId];
+    
+    const connAB = zoneA?.connections.find(c => c.toZoneId === zoneBId);
+    const connBA = zoneB?.connections.find(c => c.toZoneId === zoneAId);
+    
+    if (connAB) connAB.doorOpen = true;
+    if (connBA) connBA.doorOpen = true;
+}
 
 const handlers: Partial<Record<ActionType, ActionHandler>> = {
   [ActionType.JOIN_LOBBY]: handleJoinLobby, 
@@ -23,6 +49,7 @@ const handlers: Partial<Record<ActionType, ActionHandler>> = {
   [ActionType.RESOLVE_SEARCH]: handleResolveSearch,
   [ActionType.ORGANIZE]: handleOrganize,
   [ActionType.OPEN_DOOR]: handleOpenDoor,
+  [ActionType.TAKE_OBJECTIVE]: handleTakeObjective,
   [ActionType.TRADE]: handleTrade, // Legacy/Error
   [ActionType.TRADE_START]: handleTradeStart,
   [ActionType.TRADE_OFFER]: handleTradeOffer,
@@ -67,6 +94,7 @@ export function processAction(state: GameState, intent: ActionRequest): ActionRe
     const gameActions = [
         ActionType.MOVE, ActionType.ATTACK, ActionType.SEARCH, 
         ActionType.OPEN_DOOR, ActionType.MAKE_NOISE, ActionType.ORGANIZE,
+        ActionType.TAKE_OBJECTIVE, // New Action
         ActionType.TRADE, ActionType.TRADE_START, ActionType.TRADE_OFFER, 
         ActionType.TRADE_ACCEPT, ActionType.TRADE_CANCEL, ActionType.END_TURN
     ];
@@ -191,47 +219,131 @@ function handleStartGame(state: GameState, intent: ActionRequest): GameState {
     const spawnResult = DeckService.initializeSpawnDeck(newState.seed);
     newState.spawnDeck = spawnResult.deck;
     newState.seed = spawnResult.newSeed;
-    
-    newState.survivors = {};
-    newState.lobby.players.forEach((p: any, index: number) => {
-        const survivorId = `survivor-${p.id}`;
-        const survivor: Survivor = {
-            id: survivorId,
-            playerId: p.id,
-            name: p.name,
-            characterClass: p.characterClass,
-            position: { x: 0, y: 0, zoneId: 'street-start' },
-            actionsPerTurn: 3,
-            maxHealth: 3,
-            wounds: 0,
-            experience: 0,
-            dangerLevel: DangerLevel.Blue,
-            skills: ['+1 Action'],
-            inventory: [
-                {
-                  id: `card-axe-${index}`,
-                  name: 'Fire Axe',
-                  type: EquipmentType.Weapon,
-                  inHand: true,
-                  slot: 'HAND_1',
-                  canOpenDoor: true,
-                  openDoorNoise: true,
-                  stats: {
-                    range: [0, 0],
-                    dice: 1,
-                    accuracy: 4,
-                    damage: 2,
-                    noise: true,
-                    dualWield: false,
-                  }
-                }
-            ],
-            actionsRemaining: 3,
-            hasMoved: false,
-            hasSearched: false
-        };
-        newState.survivors[survivorId] = survivor;
-    });
+
+    // --- MAP GENERATION ---
+    if (intent.payload?.map) {
+        const mapData = intent.payload.map;
+        console.log(`Loading map: ${mapData.name}`);
+        
+        newState.tiles = mapData.tiles;
+
+        // Use ScenarioCompiler for both new and legacy map formats
+        const compiled = isLegacyMap(mapData)
+            ? compileLegacyTiles(mapData.tiles)
+            : compileScenario(mapData);
+
+        newState.zones = compiled.zones;
+        newState.objectives = compiled.objectives;
+
+        const startZoneId = compiled.playerStartZoneId;
+        
+        // Initialize Survivors at Start Zone
+        newState.lobby.players.forEach((p: any, index: number) => {
+            const survivorId = `survivor-${p.id}`;
+            const survivor: Survivor = {
+                id: survivorId,
+                playerId: p.id,
+                name: p.name,
+                characterClass: p.characterClass,
+                position: { x: 0, y: 0, zoneId: startZoneId },
+                actionsPerTurn: 3,
+                maxHealth: 3,
+                wounds: 0,
+                experience: 0,
+                dangerLevel: DangerLevel.Blue,
+                skills: ['+1 Action'],
+                inventory: [
+                    {
+                      id: `card-axe-${index}`,
+                      name: 'Fire Axe',
+                      type: EquipmentType.Weapon,
+                      inHand: true,
+                      slot: 'HAND_1',
+                      canOpenDoor: true,
+                      openDoorNoise: true,
+                      stats: {
+                        range: [0, 0],
+                        dice: 1,
+                        accuracy: 4,
+                        damage: 2,
+                        noise: true,
+                        dualWield: false,
+                      }
+                    }
+                ],
+                actionsRemaining: 3,
+                hasMoved: false,
+                hasSearched: false
+            };
+            newState.survivors[survivorId] = survivor;
+        });
+
+    } else {
+        // --- LEGACY HARDCODED MAP ---
+        
+        // Initialize Objectives
+        newState.objectives = [
+            {
+                id: 'obj-reach-exit',
+                type: ObjectiveType.ReachExit,
+                description: 'All Survivors must reach the Exit Zone (Zone Exit)',
+                targetId: 'zone-exit',
+                amountRequired: 1, // Only 1 exit zone for now
+                amountCurrent: 0,
+                completed: false
+            },
+            // Temporary: Test Objective
+            {
+                id: 'obj-take-evidence',
+                type: ObjectiveType.TakeObjective,
+                description: 'Secure the evidence from the Police Station.',
+                amountRequired: 1,
+                amountCurrent: 0,
+                completed: false
+            }
+        ];
+
+        newState.survivors = {};
+        newState.lobby.players.forEach((p: any, index: number) => {
+            const survivorId = `survivor-${p.id}`;
+            const survivor: Survivor = {
+                id: survivorId,
+                playerId: p.id,
+                name: p.name,
+                characterClass: p.characterClass,
+                position: { x: 0, y: 0, zoneId: 'street-start' },
+                actionsPerTurn: 3,
+                maxHealth: 3,
+                wounds: 0,
+                experience: 0,
+                dangerLevel: DangerLevel.Blue,
+                skills: ['+1 Action'],
+                inventory: [
+                    {
+                      id: `card-axe-${index}`,
+                      name: 'Fire Axe',
+                      type: EquipmentType.Weapon,
+                      inHand: true,
+                      slot: 'HAND_1',
+                      canOpenDoor: true,
+                      openDoorNoise: true,
+                      stats: {
+                        range: [0, 0],
+                        dice: 1,
+                        accuracy: 4,
+                        damage: 2,
+                        noise: true,
+                        dualWield: false,
+                      }
+                    }
+                ],
+                actionsRemaining: 3,
+                hasMoved: false,
+                hasSearched: false
+            };
+            newState.survivors[survivorId] = survivor;
+        });
+    }
 
     return newState;
 }
@@ -247,20 +359,60 @@ function checkGameEndConditions(state: GameState): GameResult | undefined {
   const allDead = survivors.every(s => s.wounds >= s.maxHealth);
   if (allDead) return GameResult.Defeat;
 
-  const exitZones = Object.values(state.zones).filter(z => z.isExit).map(z => z.id);
-  if (exitZones.length === 0) return undefined;
+  // No objectives? Default to survive (undefined) or maybe victory if empty? 
+  // Standard Zombicide usually has at least one.
+  if (!state.objectives || state.objectives.length === 0) return undefined;
 
   const livingSurvivors = survivors.filter(s => s.wounds < s.maxHealth);
-  if (livingSurvivors.length === 0) return undefined;
-
-  const allInExit = livingSurvivors.every(s => exitZones.includes(s.position.zoneId));
   
-  if (allInExit) {
-    const occupiedExitZones = new Set(livingSurvivors.map(s => s.position.zoneId));
-    const zombiesInExit = zombies.some(z => occupiedExitZones.has(z.position.zoneId));
-    if (!zombiesInExit) {
+  // Check if ALL objectives are met
+  const allObjectivesMet = state.objectives.every(obj => {
+      if (obj.completed) return true;
+
+      if (obj.type === ObjectiveType.ReachExit) {
+          if (!obj.targetId) return false;
+          
+          const exitZoneId = obj.targetId;
+          // All living survivors must be in the exit zone
+          const allInExit = livingSurvivors.every(s => s.position.zoneId === exitZoneId);
+          if (!allInExit) return false;
+
+          // Zone must be clear of zombies
+          const zombiesInExit = zombies.some(z => z.position.zoneId === exitZoneId);
+          if (zombiesInExit) return false;
+
+          return true;
+      }
+      
+      // For other types (Take/Kill/Collect), if not marked completed, check amount
+      if (obj.type === ObjectiveType.CollectItem) {
+        // Collect Item: Check if ANY survivor has the item(s) in inventory
+        // Assuming targetId is the item name or ID prefix
+        const requiredAmount = obj.amountRequired;
+        let foundAmount = 0;
+
+        livingSurvivors.forEach(s => {
+          s.inventory.forEach(card => {
+            // Simple match: does card name contain targetId? or exact match?
+            // Let's use includes for flexibility (e.g. "Canned Food")
+            if (obj.targetId && card.name.includes(obj.targetId)) {
+               foundAmount++;
+            }
+          });
+        });
+
+        // Update amountCurrent for UI feedback
+        // Note: This is a read-only check usually, but we can update state here
+        // However, this function is called frequently, so be careful with mutations if state is immutable
+        // Here we just check the condition.
+        return foundAmount >= requiredAmount;
+      }
+
+      return obj.amountCurrent >= obj.amountRequired;
+  });
+
+  if (allObjectivesMet) {
       return GameResult.Victory;
-    }
   }
 
   return undefined;
@@ -285,14 +437,9 @@ function handleMove(state: GameState, intent: ActionRequest): GameState {
     throw new Error(`Zones not connected: ${currentZone.id} -> ${targetId}`);
   }
 
-  const isEnteringBuilding = !currentZone.isBuilding && targetZone.isBuilding;
-  const isLeavingBuilding = currentZone.isBuilding && !targetZone.isBuilding;
-
-  if (isEnteringBuilding || isLeavingBuilding) {
-    const buildingZone = isEnteringBuilding ? targetZone : currentZone;
-    if (!buildingZone.doorOpen) {
-      throw new Error('Door is closed. You must open it first.');
-    }
+  // Edge-level door check
+  if (isDoorBlocked(currentZone, targetId)) {
+    throw new Error('Door is closed. You must open it first.');
   }
 
   survivor.position.zoneId = targetId;
@@ -316,18 +463,17 @@ function handleOpenDoor(state: GameState, intent: ActionRequest): GameState {
     throw new Error('Target zone not connected');
   }
 
-  let buildingZone: any = null;
-  if (targetZone.isBuilding) buildingZone = targetZone;
-  else if (currentZone.isBuilding) buildingZone = currentZone;
-
-  if (!buildingZone) throw new Error('No building involved in this connection');
-  
-  if (buildingZone.doorOpen) throw new Error('Door is already open');
+  // Edge-level door check
+  const conn = getConnection(currentZone, targetZoneId);
+  if (!conn) throw new Error('No connection to target zone');
+  if (!conn.hasDoor) throw new Error('No door on this edge');
+  if (conn.doorOpen) throw new Error('Door is already open');
 
   const hasOpener = survivor.inventory.some((c: EquipmentCard) => c.inHand && c.canOpenDoor);
   if (!hasOpener) throw new Error('Requires equipment to open doors (in hand)');
 
-  newState.zones[buildingZone.id].doorOpen = true;
+  // Open door on both sides of the edge
+  openDoorEdge(newState, survivor.position.zoneId, targetZoneId);
 
   const opener = survivor.inventory.find((c: EquipmentCard) => c.inHand && c.canOpenDoor);
   if (opener && opener.openDoorNoise) {
@@ -553,6 +699,21 @@ function handleAttack(state: GameState, intent: ActionRequest): GameState {
           delete newState.zombies[zombie.id];
           xpGained += getZombieXP(zombie.type);
           hits--;
+
+          // Update Kill Objectives
+          if (newState.objectives) {
+              newState.objectives.forEach((obj: Objective) => {
+                  if (obj.type === ObjectiveType.KillZombie && !obj.completed) {
+                      // Check if specific type or ANY
+                      if (!obj.targetId || obj.targetId === zombie.type) {
+                          obj.amountCurrent += 1;
+                          if (obj.amountCurrent >= obj.amountRequired) {
+                              obj.completed = true;
+                          }
+                      }
+                  }
+              });
+          }
       } else {
           hits--; 
       }
@@ -768,6 +929,45 @@ function executeTrade(state: GameState): GameState {
 
 function handleTrade(state: GameState, intent: ActionRequest): GameState {
     throw new Error('Deprecated. Use TRADE_START flow.');
+}
+
+
+function handleTakeObjective(state: GameState, intent: ActionRequest): GameState {
+  const newState = JSON.parse(JSON.stringify(state));
+  const survivor = newState.survivors[intent.survivorId!];
+  const zone = newState.zones[survivor.position.zoneId];
+
+  if (!zone.hasObjective) {
+    throw new Error('No objective in this zone');
+  }
+
+  // Remove objective token
+  zone.hasObjective = false;
+  
+  // Grant XP (Standard is 5)
+  newState.survivors[intent.survivorId!] = XPManager.addXP(survivor, 5);
+
+  // Update Objectives Progress
+  if (newState.objectives) {
+      newState.objectives.forEach((obj: Objective) => {
+          if (obj.type === ObjectiveType.TakeObjective && !obj.completed) {
+              obj.amountCurrent += 1;
+              if (obj.amountCurrent >= obj.amountRequired) {
+                  obj.completed = true;
+              }
+          }
+      });
+  }
+
+  newState.history.push({
+      playerId: intent.playerId,
+      survivorId: intent.survivorId,
+      actionType: ActionType.TAKE_OBJECTIVE,
+      timestamp: Date.now(),
+      payload: { zoneId: zone.id }
+  });
+
+  return newState;
 }
 
 // Helpers

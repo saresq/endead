@@ -1,57 +1,52 @@
 {
   "id": "session-12345",
-  "seed": "623020429",
-  "turn": 3,
-  "phase": "PLAYERS",
-  "currentDangerLevel": "BLUE",
+  "seed": "1045574755",
+  "turn": 10,
+  "phase": "GAME_OVER",
+  "currentDangerLevel": "YELLOW",
   "lobby": {
     "players": [
       {
         "id": "player-5337",
-        "name": "player-5337",
-        "ready": true,
-        "characterClass": "Goth Girl"
-      },
-      {
-        "id": "player-3266",
-        "name": "player-3266",
+        "name": "Rev",
         "ready": true,
         "characterClass": "Waitress"
       }
     ]
   },
   "players": [
-    "player-5337",
-    "player-3266"
+    "player-5337"
   ],
-  "activePlayerIndex": 1,
+  "activePlayerIndex": 0,
   "firstPlayerTokenIndex": 0,
   "survivors": {
     "survivor-player-5337": {
       "id": "survivor-player-5337",
       "playerId": "player-5337",
-      "name": "player-5337",
-      "characterClass": "Goth Girl",
+      "name": "Rev",
+      "characterClass": "Waitress",
       "position": {
         "x": 0,
         "y": 0,
-        "zoneId": "police-armory"
+        "zoneId": "z_8_5"
       },
-      "actionsPerTurn": 3,
+      "actionsPerTurn": 4,
       "maxHealth": 3,
       "wounds": 0,
-      "experience": 0,
-      "dangerLevel": "BLUE",
+      "experience": 10,
+      "dangerLevel": "YELLOW",
       "skills": [
-        "+1 Action"
+        "+1 Action",
+        "start_move",
+        "plus_1_action"
       ],
       "inventory": [
         {
           "id": "card-axe-0",
           "name": "Fire Axe",
           "type": "WEAPON",
-          "inHand": false,
-          "slot": "BACKPACK",
+          "inHand": true,
+          "slot": "HAND_1",
           "canOpenDoor": true,
           "openDoorNoise": true,
           "stats": {
@@ -85,86 +80,6 @@
           "slot": "BACKPACK"
         },
         {
-          "id": "card-pistol-14",
-          "name": "Pistol",
-          "type": "WEAPON",
-          "stats": {
-            "range": [
-              0,
-              1
-            ],
-            "dice": 1,
-            "accuracy": 3,
-            "damage": 1,
-            "noise": true,
-            "dualWield": true
-          },
-          "inHand": true,
-          "slot": "HAND_2"
-        },
-        {
-          "id": "card-crowbar-2",
-          "name": "Crowbar",
-          "type": "WEAPON",
-          "stats": {
-            "range": [
-              0,
-              0
-            ],
-            "dice": 1,
-            "accuracy": 4,
-            "damage": 1,
-            "noise": true,
-            "dualWield": false
-          },
-          "inHand": true,
-          "slot": "HAND_1"
-        }
-      ],
-      "actionsRemaining": 0,
-      "hasMoved": false,
-      "hasSearched": true
-    },
-    "survivor-player-3266": {
-      "id": "survivor-player-3266",
-      "playerId": "player-3266",
-      "name": "player-3266",
-      "characterClass": "Waitress",
-      "position": {
-        "x": 0,
-        "y": 0,
-        "zoneId": "police-armory"
-      },
-      "actionsPerTurn": 3,
-      "maxHealth": 3,
-      "wounds": 0,
-      "experience": 0,
-      "dangerLevel": "BLUE",
-      "skills": [
-        "+1 Action"
-      ],
-      "inventory": [
-        {
-          "id": "card-axe-1",
-          "name": "Fire Axe",
-          "type": "WEAPON",
-          "inHand": true,
-          "slot": "HAND_1",
-          "canOpenDoor": true,
-          "openDoorNoise": true,
-          "stats": {
-            "range": [
-              0,
-              0
-            ],
-            "dice": 1,
-            "accuracy": 4,
-            "damage": 2,
-            "noise": true,
-            "dualWield": false
-          }
-        },
-        {
           "id": "card-rifle-24",
           "name": "Rifle",
           "type": "WEAPON",
@@ -179,146 +94,299 @@
             "noise": true,
             "dualWield": false
           },
-          "inHand": false,
-          "slot": "BACKPACK"
-        },
-        {
-          "id": "card-sawed_off-18",
-          "name": "Sawed-Off",
-          "type": "WEAPON",
-          "stats": {
-            "range": [
-              0,
-              1
-            ],
-            "dice": 2,
-            "accuracy": 3,
-            "damage": 1,
-            "noise": true,
-            "dualWield": true
-          },
           "inHand": true,
           "slot": "HAND_2"
-        },
-        {
-          "id": "card-water-30",
-          "name": "Water",
-          "type": "ITEM",
-          "inHand": false,
-          "slot": "BACKPACK"
         }
       ],
       "actionsRemaining": 3,
-      "hasMoved": false,
+      "hasMoved": true,
       "hasSearched": false
     }
   },
   "zombies": {
-    "zombie-1-street-east-5327": {
-      "id": "zombie-1-street-east-5327",
+    "zombie-1-z_5_5-5327": {
+      "id": "zombie-1-z_5_5-5327",
       "type": "WALKER",
       "position": {
         "x": 0,
         "y": 0,
-        "zoneId": "street-intersection"
+        "zoneId": "z_5_3"
       },
       "wounds": 0,
       "activated": true
     },
-    "zombie-1-street-south-7052": {
-      "id": "zombie-1-street-south-7052",
+    "zombie-1-z_6_0-7052": {
+      "id": "zombie-1-z_6_0-7052",
       "type": "FATTY",
       "position": {
         "x": 0,
         "y": 0,
-        "zoneId": "street-intersection"
+        "zoneId": "z_5_3"
       },
       "wounds": 0,
       "activated": true
     },
-    "zombie-2-street-south-2901": {
-      "id": "zombie-2-street-south-2901",
+    "zombie-2-z_6_0-2901": {
+      "id": "zombie-2-z_6_0-2901",
       "type": "WALKER",
       "position": {
         "x": 0,
         "y": 0,
-        "zoneId": "street-south"
+        "zoneId": "z_5_4"
+      },
+      "wounds": 0,
+      "activated": true
+    },
+    "zombie-3-z_5_5-2133": {
+      "id": "zombie-3-z_5_5-2133",
+      "type": "WALKER",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "zoneId": "z_5_3"
+      },
+      "wounds": 0,
+      "activated": true
+    },
+    "zombie-3-z_6_0-9442": {
+      "id": "zombie-3-z_6_0-9442",
+      "type": "WALKER",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "zoneId": "z_6_4"
+      },
+      "wounds": 0,
+      "activated": true
+    },
+    "zombie-3-z_6_0-1451": {
+      "id": "zombie-3-z_6_0-1451",
+      "type": "WALKER",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "zoneId": "z_6_4"
+      },
+      "wounds": 0,
+      "activated": true
+    },
+    "zombie-4-z_5_5-3446": {
+      "id": "zombie-4-z_5_5-3446",
+      "type": "WALKER",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "zoneId": "z_5_4"
+      },
+      "wounds": 0,
+      "activated": true
+    },
+    "zombie-4-z_6_0-8302": {
+      "id": "zombie-4-z_6_0-8302",
+      "type": "WALKER",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "zoneId": "z_6_4"
+      },
+      "wounds": 0,
+      "activated": true
+    },
+    "zombie-5-z_5_5-6087": {
+      "id": "zombie-5-z_5_5-6087",
+      "type": "WALKER",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "zoneId": "z_6_4"
+      },
+      "wounds": 0,
+      "activated": true
+    },
+    "zombie-6-z_5_5-9035": {
+      "id": "zombie-6-z_5_5-9035",
+      "type": "WALKER",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "zoneId": "z_5_4"
+      },
+      "wounds": 0,
+      "activated": true
+    },
+    "zombie-6-z_6_0-1403": {
+      "id": "zombie-6-z_6_0-1403",
+      "type": "WALKER",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "zoneId": "z_6_3"
+      },
+      "wounds": 0,
+      "activated": true
+    },
+    "zombie-6-z_6_0-7142": {
+      "id": "zombie-6-z_6_0-7142",
+      "type": "WALKER",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "zoneId": "z_6_3"
+      },
+      "wounds": 0,
+      "activated": true
+    },
+    "zombie-7-z_5_5-9246": {
+      "id": "zombie-7-z_5_5-9246",
+      "type": "WALKER",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "zoneId": "z_6_4"
+      },
+      "wounds": 0,
+      "activated": true
+    },
+    "zombie-7-z_5_5-544": {
+      "id": "zombie-7-z_5_5-544",
+      "type": "WALKER",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "zoneId": "z_6_4"
+      },
+      "wounds": 0,
+      "activated": true
+    },
+    "zombie-7-z_6_0-389": {
+      "id": "zombie-7-z_6_0-389",
+      "type": "FATTY",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "zoneId": "z_6_2"
+      },
+      "wounds": 0,
+      "activated": true
+    },
+    "zombie-7-z_6_0-3742": {
+      "id": "zombie-7-z_6_0-3742",
+      "type": "FATTY",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "zoneId": "z_6_2"
+      },
+      "wounds": 0,
+      "activated": true
+    },
+    "zombie-8-z_5_5-5545": {
+      "id": "zombie-8-z_5_5-5545",
+      "type": "RUNNER",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "zoneId": "z_6_4"
+      },
+      "wounds": 0,
+      "activated": true
+    },
+    "zombie-8-z_6_0-1131": {
+      "id": "zombie-8-z_6_0-1131",
+      "type": "WALKER",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "zoneId": "z_6_1"
+      },
+      "wounds": 0,
+      "activated": true
+    },
+    "zombie-9-z_5_5-2823": {
+      "id": "zombie-9-z_5_5-2823",
+      "type": "WALKER",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "zoneId": "z_5_5"
+      },
+      "wounds": 0,
+      "activated": false
+    },
+    "zombie-9-z_5_5-2731": {
+      "id": "zombie-9-z_5_5-2731",
+      "type": "WALKER",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "zoneId": "z_5_5"
+      },
+      "wounds": 0,
+      "activated": false
+    },
+    "zombie-9-z_6_0-7235": {
+      "id": "zombie-9-z_6_0-7235",
+      "type": "WALKER",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "zoneId": "z_6_0"
+      },
+      "wounds": 0,
+      "activated": false
+    },
+    "zombie-9-z_6_0-6439": {
+      "id": "zombie-9-z_6_0-6439",
+      "type": "WALKER",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "zoneId": "z_6_0"
+      },
+      "wounds": 0,
+      "activated": false
+    },
+    "zombie-9-z_6_0-9083": {
+      "id": "zombie-9-z_6_0-9083",
+      "type": "WALKER",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "zoneId": "z_6_0"
+      },
+      "wounds": 0,
+      "activated": false
+    },
+    "zombie-9-z_6_0-4868": {
+      "id": "zombie-9-z_6_0-4868",
+      "type": "WALKER",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "zoneId": "z_6_0"
       },
       "wounds": 0,
       "activated": false
     }
   },
   "zones": {
-    "street-start": {
-      "id": "street-start",
-      "connectedZones": [
-        "street-intersection",
-        "police-reception"
+    "z_0_0": {
+      "id": "z_0_0",
+      "connections": [
+        {
+          "toZoneId": "z_0_1",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_1_0",
+          "hasDoor": true,
+          "doorOpen": false
+        }
       ],
-      "isBuilding": false,
-      "hasNoise": false,
-      "noiseTokens": 0,
-      "searchable": false,
-      "doorOpen": true,
-      "spawnPoint": false
-    },
-    "street-intersection": {
-      "id": "street-intersection",
       "connectedZones": [
-        "street-start",
-        "street-east",
-        "street-north",
-        "street-south"
-      ],
-      "isBuilding": false,
-      "hasNoise": false,
-      "noiseTokens": 0,
-      "searchable": false,
-      "doorOpen": true,
-      "spawnPoint": false
-    },
-    "street-east": {
-      "id": "street-east",
-      "connectedZones": [
-        "street-intersection"
-      ],
-      "isBuilding": false,
-      "hasNoise": false,
-      "noiseTokens": 0,
-      "searchable": false,
-      "doorOpen": true,
-      "spawnPoint": true
-    },
-    "street-north": {
-      "id": "street-north",
-      "connectedZones": [
-        "street-intersection"
-      ],
-      "isBuilding": false,
-      "hasNoise": false,
-      "noiseTokens": 0,
-      "searchable": false,
-      "doorOpen": true,
-      "spawnPoint": false
-    },
-    "street-south": {
-      "id": "street-south",
-      "connectedZones": [
-        "street-intersection",
-        "zone-exit",
-        "diner-front"
-      ],
-      "isBuilding": false,
-      "hasNoise": false,
-      "noiseTokens": 0,
-      "searchable": false,
-      "doorOpen": true,
-      "spawnPoint": true
-    },
-    "zone-exit": {
-      "id": "zone-exit",
-      "connectedZones": [
-        "street-south"
+        "z_0_1",
+        "z_1_0"
       ],
       "isBuilding": false,
       "hasNoise": false,
@@ -326,60 +394,1794 @@
       "searchable": false,
       "doorOpen": true,
       "spawnPoint": false,
-      "isExit": true
+      "isExit": false,
+      "hasObjective": false
     },
-    "police-reception": {
-      "id": "police-reception",
+    "z_1_0": {
+      "id": "z_1_0",
+      "connections": [
+        {
+          "toZoneId": "z_1_1",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_0_0",
+          "hasDoor": true,
+          "doorOpen": false
+        }
+      ],
       "connectedZones": [
-        "police-armory",
-        "street-start"
+        "z_1_1",
+        "z_0_0"
       ],
       "isBuilding": true,
       "hasNoise": false,
       "noiseTokens": 0,
       "searchable": true,
       "doorOpen": true,
-      "spawnPoint": false
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
     },
-    "police-armory": {
-      "id": "police-armory",
-      "connectedZones": [
-        "police-reception"
+    "z_2_0": {
+      "id": "z_2_0",
+      "connections": [
+        {
+          "toZoneId": "z_3_0",
+          "hasDoor": false,
+          "doorOpen": true
+        }
       ],
-      "isBuilding": true,
-      "hasNoise": false,
-      "noiseTokens": 2,
-      "searchable": true,
-      "doorOpen": true,
-      "spawnPoint": false
-    },
-    "diner-front": {
-      "id": "diner-front",
       "connectedZones": [
-        "diner-kitchen",
-        "street-south"
+        "z_3_0"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_0_1": {
+      "id": "z_0_1",
+      "connections": [
+        {
+          "toZoneId": "z_0_0",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_0_2",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_0_0",
+        "z_0_2"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_1_1": {
+      "id": "z_1_1",
+      "connections": [
+        {
+          "toZoneId": "z_1_0",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_1_2",
+          "hasDoor": true,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_2_1",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_1_0",
+        "z_1_2",
+        "z_2_1"
       ],
       "isBuilding": true,
       "hasNoise": false,
       "noiseTokens": 0,
       "searchable": true,
-      "doorOpen": false,
-      "spawnPoint": false
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
     },
-    "diner-kitchen": {
-      "id": "diner-kitchen",
+    "z_2_1": {
+      "id": "z_2_1",
+      "connections": [
+        {
+          "toZoneId": "z_1_1",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_3_1",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
       "connectedZones": [
-        "diner-front"
+        "z_1_1",
+        "z_3_1"
       ],
       "isBuilding": true,
       "hasNoise": false,
       "noiseTokens": 0,
       "searchable": true,
       "doorOpen": true,
-      "spawnPoint": false
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_0_2": {
+      "id": "z_0_2",
+      "connections": [
+        {
+          "toZoneId": "z_0_1",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_0_3",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_1_2",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_0_1",
+        "z_0_3",
+        "z_1_2"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_1_2": {
+      "id": "z_1_2",
+      "connections": [
+        {
+          "toZoneId": "z_1_1",
+          "hasDoor": true,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_1_3",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_0_2",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_2_2",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_1_1",
+        "z_1_3",
+        "z_0_2",
+        "z_2_2"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_2_2": {
+      "id": "z_2_2",
+      "connections": [
+        {
+          "toZoneId": "z_2_3",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_1_2",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_3_2",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_2_3",
+        "z_1_2",
+        "z_3_2"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_3_0": {
+      "id": "z_3_0",
+      "connections": [
+        {
+          "toZoneId": "z_2_0",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_2_0"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_4_0": {
+      "id": "z_4_0",
+      "connections": [
+        {
+          "toZoneId": "z_4_1",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_4_1"
+      ],
+      "isBuilding": true,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": true,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_5_0": {
+      "id": "z_5_0",
+      "connections": [
+        {
+          "toZoneId": "z_5_1",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_6_0",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_5_1",
+        "z_6_0"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_3_1": {
+      "id": "z_3_1",
+      "connections": [
+        {
+          "toZoneId": "z_2_1",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_4_1",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_2_1",
+        "z_4_1"
+      ],
+      "isBuilding": true,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": true,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_4_1": {
+      "id": "z_4_1",
+      "connections": [
+        {
+          "toZoneId": "z_4_0",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_4_2",
+          "hasDoor": true,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_3_1",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_5_1",
+          "hasDoor": true,
+          "doorOpen": false
+        }
+      ],
+      "connectedZones": [
+        "z_4_0",
+        "z_4_2",
+        "z_3_1",
+        "z_5_1"
+      ],
+      "isBuilding": true,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": true,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_5_1": {
+      "id": "z_5_1",
+      "connections": [
+        {
+          "toZoneId": "z_5_0",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_5_2",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_4_1",
+          "hasDoor": true,
+          "doorOpen": false
+        },
+        {
+          "toZoneId": "z_6_1",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_5_0",
+        "z_5_2",
+        "z_4_1",
+        "z_6_1"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_3_2": {
+      "id": "z_3_2",
+      "connections": [
+        {
+          "toZoneId": "z_3_3",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_2_2",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_4_2",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_3_3",
+        "z_2_2",
+        "z_4_2"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_4_2": {
+      "id": "z_4_2",
+      "connections": [
+        {
+          "toZoneId": "z_4_1",
+          "hasDoor": true,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_4_3",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_3_2",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_5_2",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_4_1",
+        "z_4_3",
+        "z_3_2",
+        "z_5_2"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_5_2": {
+      "id": "z_5_2",
+      "connections": [
+        {
+          "toZoneId": "z_5_1",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_5_3",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_4_2",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_6_2",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_5_1",
+        "z_5_3",
+        "z_4_2",
+        "z_6_2"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_0_3": {
+      "id": "z_0_3",
+      "connections": [
+        {
+          "toZoneId": "z_0_2",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_1_3",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_0_2",
+        "z_1_3"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_1_3": {
+      "id": "z_1_3",
+      "connections": [
+        {
+          "toZoneId": "z_1_2",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_1_4",
+          "hasDoor": true,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_0_3",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_2_3",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_1_2",
+        "z_1_4",
+        "z_0_3",
+        "z_2_3"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_2_3": {
+      "id": "z_2_3",
+      "connections": [
+        {
+          "toZoneId": "z_2_2",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_1_3",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_3_3",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_2_2",
+        "z_1_3",
+        "z_3_3"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_0_4": {
+      "id": "z_0_4",
+      "connections": [
+        {
+          "toZoneId": "z_1_4",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_1_4"
+      ],
+      "isBuilding": true,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": true,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_1_4": {
+      "id": "z_1_4",
+      "connections": [
+        {
+          "toZoneId": "z_1_3",
+          "hasDoor": true,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_1_5",
+          "hasDoor": true,
+          "doorOpen": false
+        },
+        {
+          "toZoneId": "z_0_4",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_2_4",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_1_3",
+        "z_1_5",
+        "z_0_4",
+        "z_2_4"
+      ],
+      "isBuilding": true,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": true,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_2_4": {
+      "id": "z_2_4",
+      "connections": [
+        {
+          "toZoneId": "z_1_4",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_3_4",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_1_4",
+        "z_3_4"
+      ],
+      "isBuilding": true,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": true,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_0_5": {
+      "id": "z_0_5",
+      "connections": [
+        {
+          "toZoneId": "z_1_5",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_1_5"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_1_5": {
+      "id": "z_1_5",
+      "connections": [
+        {
+          "toZoneId": "z_1_4",
+          "hasDoor": true,
+          "doorOpen": false
+        },
+        {
+          "toZoneId": "z_0_5",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_2_5",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_1_4",
+        "z_0_5",
+        "z_2_5"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_2_5": {
+      "id": "z_2_5",
+      "connections": [
+        {
+          "toZoneId": "z_1_5",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_3_5",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_1_5",
+        "z_3_5"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_3_3": {
+      "id": "z_3_3",
+      "connections": [
+        {
+          "toZoneId": "z_3_2",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_2_3",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_4_3",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_3_2",
+        "z_2_3",
+        "z_4_3"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_4_3": {
+      "id": "z_4_3",
+      "connections": [
+        {
+          "toZoneId": "z_4_2",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_3_3",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_5_3",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_4_2",
+        "z_3_3",
+        "z_5_3"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_5_3": {
+      "id": "z_5_3",
+      "connections": [
+        {
+          "toZoneId": "z_5_2",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_5_4",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_4_3",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_6_3",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_5_2",
+        "z_5_4",
+        "z_4_3",
+        "z_6_3"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_3_4": {
+      "id": "z_3_4",
+      "connections": [
+        {
+          "toZoneId": "z_2_4",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_4_4",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_2_4",
+        "z_4_4"
+      ],
+      "isBuilding": true,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": true,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_4_4": {
+      "id": "z_4_4",
+      "connections": [
+        {
+          "toZoneId": "z_4_5",
+          "hasDoor": true,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_3_4",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_4_5",
+        "z_3_4"
+      ],
+      "isBuilding": true,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": true,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_5_4": {
+      "id": "z_5_4",
+      "connections": [
+        {
+          "toZoneId": "z_5_3",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_5_5",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_6_4",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_5_3",
+        "z_5_5",
+        "z_6_4"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_3_5": {
+      "id": "z_3_5",
+      "connections": [
+        {
+          "toZoneId": "z_2_5",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_4_5",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_2_5",
+        "z_4_5"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_4_5": {
+      "id": "z_4_5",
+      "connections": [
+        {
+          "toZoneId": "z_4_4",
+          "hasDoor": true,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_3_5",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_5_5",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_4_4",
+        "z_3_5",
+        "z_5_5"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_5_5": {
+      "id": "z_5_5",
+      "connections": [
+        {
+          "toZoneId": "z_5_4",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_4_5",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_6_5",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_5_4",
+        "z_4_5",
+        "z_6_5"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": true,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_6_0": {
+      "id": "z_6_0",
+      "connections": [
+        {
+          "toZoneId": "z_6_1",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_5_0",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_7_0",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_6_1",
+        "z_5_0",
+        "z_7_0"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": true,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_7_0": {
+      "id": "z_7_0",
+      "connections": [
+        {
+          "toZoneId": "z_7_1",
+          "hasDoor": true,
+          "doorOpen": false
+        },
+        {
+          "toZoneId": "z_6_0",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_8_0",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_7_1",
+        "z_6_0",
+        "z_8_0"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_8_0": {
+      "id": "z_8_0",
+      "connections": [
+        {
+          "toZoneId": "z_8_1",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_7_0",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_8_1",
+        "z_7_0"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_6_1": {
+      "id": "z_6_1",
+      "connections": [
+        {
+          "toZoneId": "z_6_0",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_6_2",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_5_1",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_6_0",
+        "z_6_2",
+        "z_5_1"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_7_1": {
+      "id": "z_7_1",
+      "connections": [
+        {
+          "toZoneId": "z_7_0",
+          "hasDoor": true,
+          "doorOpen": false
+        },
+        {
+          "toZoneId": "z_7_2",
+          "hasDoor": true,
+          "doorOpen": false
+        }
+      ],
+      "connectedZones": [
+        "z_7_0",
+        "z_7_2"
+      ],
+      "isBuilding": true,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": true,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_8_1": {
+      "id": "z_8_1",
+      "connections": [
+        {
+          "toZoneId": "z_8_0",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_8_2",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_8_0",
+        "z_8_2"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_6_2": {
+      "id": "z_6_2",
+      "connections": [
+        {
+          "toZoneId": "z_6_1",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_6_3",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_5_2",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_7_2",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_6_1",
+        "z_6_3",
+        "z_5_2",
+        "z_7_2"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_7_2": {
+      "id": "z_7_2",
+      "connections": [
+        {
+          "toZoneId": "z_7_1",
+          "hasDoor": true,
+          "doorOpen": false
+        },
+        {
+          "toZoneId": "z_7_3",
+          "hasDoor": true,
+          "doorOpen": false
+        },
+        {
+          "toZoneId": "z_6_2",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_8_2",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_7_1",
+        "z_7_3",
+        "z_6_2",
+        "z_8_2"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_8_2": {
+      "id": "z_8_2",
+      "connections": [
+        {
+          "toZoneId": "z_8_1",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_8_3",
+          "hasDoor": true,
+          "doorOpen": false
+        },
+        {
+          "toZoneId": "z_7_2",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_8_1",
+        "z_8_3",
+        "z_7_2"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_6_3": {
+      "id": "z_6_3",
+      "connections": [
+        {
+          "toZoneId": "z_6_2",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_6_4",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_5_3",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_6_2",
+        "z_6_4",
+        "z_5_3"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_7_3": {
+      "id": "z_7_3",
+      "connections": [
+        {
+          "toZoneId": "z_7_2",
+          "hasDoor": true,
+          "doorOpen": false
+        },
+        {
+          "toZoneId": "z_7_4",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_8_3",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_7_2",
+        "z_7_4",
+        "z_8_3"
+      ],
+      "isBuilding": true,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": true,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_8_3": {
+      "id": "z_8_3",
+      "connections": [
+        {
+          "toZoneId": "z_8_2",
+          "hasDoor": true,
+          "doorOpen": false
+        },
+        {
+          "toZoneId": "z_8_4",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_7_3",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_8_2",
+        "z_8_4",
+        "z_7_3"
+      ],
+      "isBuilding": true,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": true,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_6_4": {
+      "id": "z_6_4",
+      "connections": [
+        {
+          "toZoneId": "z_6_3",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_6_5",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_5_4",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_7_4",
+          "hasDoor": true,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_6_3",
+        "z_6_5",
+        "z_5_4",
+        "z_7_4"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_7_4": {
+      "id": "z_7_4",
+      "connections": [
+        {
+          "toZoneId": "z_7_3",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_7_5",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_6_4",
+          "hasDoor": true,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_8_4",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_7_3",
+        "z_7_5",
+        "z_6_4",
+        "z_8_4"
+      ],
+      "isBuilding": true,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": true,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_8_4": {
+      "id": "z_8_4",
+      "connections": [
+        {
+          "toZoneId": "z_8_3",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_8_5",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_7_4",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_8_3",
+        "z_8_5",
+        "z_7_4"
+      ],
+      "isBuilding": true,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": true,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_6_5": {
+      "id": "z_6_5",
+      "connections": [
+        {
+          "toZoneId": "z_6_4",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_5_5",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_6_4",
+        "z_5_5"
+      ],
+      "isBuilding": false,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": false,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_7_5": {
+      "id": "z_7_5",
+      "connections": [
+        {
+          "toZoneId": "z_7_4",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_8_5",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_7_4",
+        "z_8_5"
+      ],
+      "isBuilding": true,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": true,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": false,
+      "hasObjective": false
+    },
+    "z_8_5": {
+      "id": "z_8_5",
+      "connections": [
+        {
+          "toZoneId": "z_8_4",
+          "hasDoor": false,
+          "doorOpen": true
+        },
+        {
+          "toZoneId": "z_7_5",
+          "hasDoor": false,
+          "doorOpen": true
+        }
+      ],
+      "connectedZones": [
+        "z_8_4",
+        "z_7_5"
+      ],
+      "isBuilding": true,
+      "hasNoise": false,
+      "noiseTokens": 0,
+      "searchable": true,
+      "doorOpen": true,
+      "spawnPoint": false,
+      "isExit": true,
+      "hasObjective": false
     }
   },
+  "objectives": [
+    {
+      "id": "obj-reach-exit",
+      "type": "REACH_EXIT",
+      "description": "All Survivors must reach the Exit",
+      "targetId": "z_8_5",
+      "amountRequired": 1,
+      "amountCurrent": 0,
+      "completed": false
+    },
+    {
+      "id": "obj-take-objectives",
+      "type": "TAKE_OBJECTIVE",
+      "description": "Collect all objective tokens (2)",
+      "amountRequired": 2,
+      "amountCurrent": 2,
+      "completed": true
+    }
+  ],
+  "tiles": [
+    {
+      "id": "tile-0-0",
+      "tileId": "1R",
+      "x": 0,
+      "y": 0,
+      "rotation": 0
+    },
+    {
+      "id": "tile-1-0",
+      "tileId": "2R",
+      "x": 1,
+      "y": 0,
+      "rotation": 270
+    },
+    {
+      "id": "tile-0-1",
+      "tileId": "4R",
+      "x": 0,
+      "y": 1,
+      "rotation": 270
+    },
+    {
+      "id": "tile-1-1",
+      "tileId": "5R",
+      "x": 1,
+      "y": 1,
+      "rotation": 0
+    },
+    {
+      "id": "tile-2-0",
+      "tileId": "9R",
+      "x": 2,
+      "y": 0,
+      "rotation": 270
+    },
+    {
+      "id": "tile-2-1",
+      "tileId": "8V",
+      "x": 2,
+      "y": 1,
+      "rotation": 270
+    }
+  ],
   "equipmentDeck": [
+    {
+      "id": "card-sawed_off-18",
+      "name": "Sawed-Off",
+      "type": "WEAPON",
+      "stats": {
+        "range": [
+          0,
+          1
+        ],
+        "dice": 2,
+        "accuracy": 3,
+        "damage": 1,
+        "noise": true,
+        "dualWield": true
+      },
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-water-30",
+      "name": "Water",
+      "type": "ITEM",
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-pistol-14",
+      "name": "Pistol",
+      "type": "WEAPON",
+      "stats": {
+        "range": [
+          0,
+          1
+        ],
+        "dice": 1,
+        "accuracy": 3,
+        "damage": 1,
+        "noise": true,
+        "dualWield": true
+      },
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-crowbar-2",
+      "name": "Crowbar",
+      "type": "WEAPON",
+      "stats": {
+        "range": [
+          0,
+          0
+        ],
+        "dice": 1,
+        "accuracy": 4,
+        "damage": 1,
+        "noise": true,
+        "dualWield": false
+      },
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
     {
       "id": "card-molotov-35",
       "name": "Molotov",
@@ -877,45 +2679,7 @@
   "equipmentDiscard": [],
   "spawnDeck": [
     {
-      "id": "spawn-007",
-      "BLUE": {
-        "extraActivation": "WALKER"
-      },
-      "YELLOW": {
-        "extraActivation": "WALKER"
-      },
-      "ORANGE": {
-        "extraActivation": "RUNNER"
-      },
-      "RED": {
-        "extraActivation": "RUNNER"
-      }
-    },
-    {
-      "id": "spawn-004",
-      "BLUE": {
-        "zombies": {
-          "WALKER": 2
-        }
-      },
-      "YELLOW": {
-        "zombies": {
-          "WALKER": 4
-        }
-      },
-      "ORANGE": {
-        "zombies": {
-          "WALKER": 6
-        }
-      },
-      "RED": {
-        "zombies": {
-          "WALKER": 8
-        }
-      }
-    },
-    {
-      "id": "spawn-001",
+      "id": "spawn-005",
       "BLUE": {
         "zombies": {
           "WALKER": 1
@@ -923,23 +2687,73 @@
       },
       "YELLOW": {
         "zombies": {
-          "WALKER": 2
+          "WALKER": 2,
+          "RUNNER": 1
         }
       },
       "ORANGE": {
         "zombies": {
-          "WALKER": 4
+          "WALKER": 4,
+          "RUNNER": 2
         }
       },
       "RED": {
         "zombies": {
-          "WALKER": 6
+          "WALKER": 6,
+          "RUNNER": 3
+        }
+      }
+    },
+    {
+      "id": "spawn-006",
+      "BLUE": {
+        "zombies": {
+          "FATTY": 1
+        }
+      },
+      "YELLOW": {
+        "zombies": {
+          "FATTY": 2
+        }
+      },
+      "ORANGE": {
+        "zombies": {
+          "ABOMINATION": 1
+        }
+      },
+      "RED": {
+        "zombies": {
+          "ABOMINATION": 1,
+          "WALKER": 2
+        }
+      }
+    },
+    {
+      "id": "spawn-003",
+      "BLUE": {
+        "zombies": {
+          "WALKER": 1
+        }
+      },
+      "YELLOW": {
+        "zombies": {
+          "FATTY": 1
+        }
+      },
+      "ORANGE": {
+        "zombies": {
+          "FATTY": 2
+        }
+      },
+      "RED": {
+        "zombies": {
+          "FATTY": 3
         }
       }
     }
   ],
   "spawnDiscard": [],
-  "noiseTokens": 2,
+  "noiseTokens": 0,
   "config": {
     "maxSurvivors": 6,
     "friendlyFire": true
@@ -949,115 +2763,476 @@
       "playerId": "player-5337",
       "survivorId": "system",
       "actionType": "START_GAME",
-      "timestamp": 1771963325198
+      "timestamp": 1772465855277,
+      "payload": {
+        "map": {
+          "id": "map-1772465771065",
+          "name": "Default",
+          "width": 3,
+          "height": 2,
+          "tiles": [
+            {
+              "id": "tile-0-0",
+              "tileId": "1R",
+              "x": 0,
+              "y": 0,
+              "rotation": 0
+            },
+            {
+              "id": "tile-1-0",
+              "tileId": "2R",
+              "x": 1,
+              "y": 0,
+              "rotation": 270
+            },
+            {
+              "id": "tile-0-1",
+              "tileId": "4R",
+              "x": 0,
+              "y": 1,
+              "rotation": 270
+            },
+            {
+              "id": "tile-1-1",
+              "tileId": "5R",
+              "x": 1,
+              "y": 1,
+              "rotation": 0
+            },
+            {
+              "id": "tile-2-0",
+              "tileId": "9R",
+              "x": 2,
+              "y": 0,
+              "rotation": 270
+            },
+            {
+              "id": "tile-2-1",
+              "tileId": "8V",
+              "x": 2,
+              "y": 1,
+              "rotation": 270
+            }
+          ],
+          "rooms": [
+            {
+              "id": "room-0",
+              "name": "Room 1",
+              "cells": [
+                {
+                  "x": 1,
+                  "y": 0
+                },
+                {
+                  "x": 1,
+                  "y": 1
+                },
+                {
+                  "x": 2,
+                  "y": 1
+                },
+                {
+                  "x": 3,
+                  "y": 1
+                },
+                {
+                  "x": 4,
+                  "y": 1
+                },
+                {
+                  "x": 4,
+                  "y": 0
+                }
+              ]
+            },
+            {
+              "id": "room-1",
+              "name": "Room 2",
+              "cells": [
+                {
+                  "x": 7,
+                  "y": 1
+                }
+              ]
+            },
+            {
+              "id": "room-2",
+              "name": "Room 3",
+              "cells": [
+                {
+                  "x": 7,
+                  "y": 3
+                },
+                {
+                  "x": 8,
+                  "y": 3
+                },
+                {
+                  "x": 7,
+                  "y": 4
+                },
+                {
+                  "x": 8,
+                  "y": 4
+                },
+                {
+                  "x": 7,
+                  "y": 5
+                },
+                {
+                  "x": 8,
+                  "y": 5
+                }
+              ]
+            },
+            {
+              "id": "room-3",
+              "name": "Room 4",
+              "cells": [
+                {
+                  "x": 0,
+                  "y": 4
+                },
+                {
+                  "x": 1,
+                  "y": 4
+                },
+                {
+                  "x": 2,
+                  "y": 4
+                },
+                {
+                  "x": 3,
+                  "y": 4
+                },
+                {
+                  "x": 4,
+                  "y": 4
+                }
+              ]
+            }
+          ],
+          "doors": [
+            {
+              "x1": 0,
+              "y1": 0,
+              "x2": 1,
+              "y2": 0,
+              "open": false
+            },
+            {
+              "x1": 1,
+              "y1": 1,
+              "x2": 1,
+              "y2": 2,
+              "open": false
+            },
+            {
+              "x1": 4,
+              "y1": 1,
+              "x2": 5,
+              "y2": 1,
+              "open": false
+            },
+            {
+              "x1": 4,
+              "y1": 2,
+              "x2": 4,
+              "y2": 1,
+              "open": false
+            },
+            {
+              "x1": 1,
+              "y1": 4,
+              "x2": 1,
+              "y2": 5,
+              "open": false
+            },
+            {
+              "x1": 1,
+              "y1": 4,
+              "x2": 1,
+              "y2": 3,
+              "open": false
+            },
+            {
+              "x1": 4,
+              "y1": 4,
+              "x2": 4,
+              "y2": 5,
+              "open": false
+            },
+            {
+              "x1": 6,
+              "y1": 4,
+              "x2": 7,
+              "y2": 4,
+              "open": false
+            },
+            {
+              "x1": 7,
+              "y1": 2,
+              "x2": 7,
+              "y2": 3,
+              "open": false
+            },
+            {
+              "x1": 8,
+              "y1": 2,
+              "x2": 8,
+              "y2": 3,
+              "open": false
+            },
+            {
+              "x1": 7,
+              "y1": 1,
+              "x2": 7,
+              "y2": 2,
+              "open": false
+            },
+            {
+              "x1": 7,
+              "y1": 1,
+              "x2": 7,
+              "y2": 0,
+              "open": false
+            }
+          ],
+          "markers": [
+            {
+              "type": "PLAYER_START",
+              "x": 0,
+              "y": 2
+            },
+            {
+              "type": "ZOMBIE_SPAWN",
+              "x": 5,
+              "y": 5
+            },
+            {
+              "type": "ZOMBIE_SPAWN",
+              "x": 6,
+              "y": 0
+            },
+            {
+              "type": "EXIT",
+              "x": 8,
+              "y": 5
+            },
+            {
+              "type": "OBJECTIVE",
+              "x": 3,
+              "y": 1
+            },
+            {
+              "type": "OBJECTIVE",
+              "x": 3,
+              "y": 4
+            }
+          ]
+        }
+      }
+    },
+    {
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
+      "actionType": "MOVE",
+      "timestamp": 1772465950151,
+      "payload": {
+        "targetZoneId": "z_1_2"
+      }
     },
     {
       "playerId": "player-5337",
       "survivorId": "survivor-player-5337",
       "actionType": "OPEN_DOOR",
-      "timestamp": 1771963334800,
+      "timestamp": 1772465952399,
       "payload": {
-        "targetZoneId": "police-reception"
+        "targetZoneId": "z_1_1"
       }
     },
     {
       "playerId": "player-5337",
       "survivorId": "survivor-player-5337",
       "actionType": "MOVE",
-      "timestamp": 1771963335266,
+      "timestamp": 1772465953407,
       "payload": {
-        "targetZoneId": "police-reception"
+        "targetZoneId": "z_1_1"
+      }
+    },
+    {
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
+      "actionType": "MOVE",
+      "timestamp": 1772465954931,
+      "payload": {
+        "targetZoneId": "z_2_1"
+      }
+    },
+    {
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
+      "actionType": "MOVE",
+      "timestamp": 1772465958082,
+      "payload": {
+        "targetZoneId": "z_3_1"
+      }
+    },
+    {
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
+      "actionType": "TAKE_OBJECTIVE",
+      "timestamp": 1772465959948,
+      "payload": {
+        "zoneId": "z_3_1"
+      }
+    },
+    {
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
+      "actionType": "TAKE_OBJECTIVE",
+      "timestamp": 1772465959952
+    },
+    {
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
+      "actionType": "MOVE",
+      "timestamp": 1772465961824,
+      "payload": {
+        "targetZoneId": "z_4_1"
+      }
+    },
+    {
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
+      "actionType": "OPEN_DOOR",
+      "timestamp": 1772465965240,
+      "payload": {
+        "targetZoneId": "z_4_2"
       }
     },
     {
       "playerId": "player-5337",
       "survivorId": "survivor-player-5337",
       "actionType": "SEARCH",
-      "timestamp": 1771963337366
+      "timestamp": 1772465972049
     },
     {
-      "playerId": "player-3266",
-      "survivorId": "survivor-player-3266",
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
       "actionType": "MOVE",
-      "timestamp": 1771963338964,
+      "timestamp": 1772465976773,
       "payload": {
-        "targetZoneId": "police-reception"
+        "targetZoneId": "z_3_1"
       }
     },
     {
-      "playerId": "player-3266",
-      "survivorId": "survivor-player-3266",
-      "actionType": "SEARCH",
-      "timestamp": 1771963339770
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
+      "actionType": "MOVE",
+      "timestamp": 1772465977215,
+      "payload": {
+        "targetZoneId": "z_2_1"
+      }
     },
     {
-      "playerId": "player-3266",
-      "survivorId": "survivor-player-3266",
-      "actionType": "SEARCH",
-      "timestamp": 1771963340728
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
+      "actionType": "MOVE",
+      "timestamp": 1772465977839,
+      "payload": {
+        "targetZoneId": "z_1_1"
+      }
     },
     {
-      "playerId": "player-3266",
-      "survivorId": "survivor-player-3266",
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
+      "actionType": "MOVE",
+      "timestamp": 1772465980832,
+      "payload": {
+        "targetZoneId": "z_1_2"
+      }
+    },
+    {
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
+      "actionType": "MOVE",
+      "timestamp": 1772465981221,
+      "payload": {
+        "targetZoneId": "z_1_3"
+      }
+    },
+    {
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
+      "actionType": "OPEN_DOOR",
+      "timestamp": 1772465983657,
+      "payload": {
+        "targetZoneId": "z_1_4"
+      }
+    },
+    {
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
+      "actionType": "MOVE",
+      "timestamp": 1772465984666,
+      "payload": {
+        "targetZoneId": "z_1_4"
+      }
+    },
+    {
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
+      "actionType": "MOVE",
+      "timestamp": 1772465988915,
+      "payload": {
+        "targetZoneId": "z_2_4"
+      }
+    },
+    {
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
+      "actionType": "MOVE",
+      "timestamp": 1772465989556,
+      "payload": {
+        "targetZoneId": "z_3_4"
+      }
+    },
+    {
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
+      "actionType": "TAKE_OBJECTIVE",
+      "timestamp": 1772465990773,
+      "payload": {
+        "zoneId": "z_3_4"
+      }
+    },
+    {
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
+      "actionType": "TAKE_OBJECTIVE",
+      "timestamp": 1772465990773
+    },
+    {
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
+      "actionType": "MOVE",
+      "timestamp": 1772465995127,
+      "payload": {
+        "targetZoneId": "z_4_4"
+      }
+    },
+    {
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
+      "actionType": "SEARCH",
+      "timestamp": 1772465997497
+    },
+    {
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
       "actionType": "ORGANIZE",
-      "timestamp": 1771963364095,
-      "payload": {
-        "cardId": "card-rifle-24",
-        "targetSlot": "BACKPACK"
-      }
-    },
-    {
-      "playerId": "player-3266",
-      "survivorId": "survivor-player-3266",
-      "actionType": "RESOLVE_SEARCH",
-      "timestamp": 1771963368958,
-      "payload": {
-        "action": "EQUIP",
-        "targetSlot": "HAND_2"
-      }
-    },
-    {
-      "playerId": "player-3266",
-      "survivorId": "survivor-player-3266",
-      "actionType": "SEARCH",
-      "timestamp": 1771963374264
-    },
-    {
-      "playerId": "player-3266",
-      "survivorId": "survivor-player-3266",
-      "actionType": "RESOLVE_SEARCH",
-      "timestamp": 1771963383406,
-      "payload": {
-        "action": "EQUIP",
-        "targetSlot": "BACKPACK"
-      }
-    },
-    {
-      "playerId": "player-3266",
-      "survivorId": "survivor-player-3266",
-      "actionType": "MOVE",
-      "timestamp": 1771963386138,
-      "payload": {
-        "targetZoneId": "police-armory"
-      }
-    },
-    {
-      "playerId": "player-3266",
-      "survivorId": "survivor-player-3266",
-      "actionType": "MAKE_NOISE",
-      "timestamp": 1771963390630
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "SEARCH",
-      "timestamp": 1771963396029
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "ORGANIZE",
-      "timestamp": 1771963398858,
+      "timestamp": 1772466002359,
       "payload": {
         "cardId": "card-machete-11",
         "targetSlot": "BACKPACK"
@@ -1067,7 +3242,7 @@
       "playerId": "player-5337",
       "survivorId": "survivor-player-5337",
       "actionType": "RESOLVE_SEARCH",
-      "timestamp": 1771963400535,
+      "timestamp": 1772466003999,
       "payload": {
         "action": "EQUIP",
         "targetSlot": "HAND_2"
@@ -1076,86 +3251,115 @@
     {
       "playerId": "player-5337",
       "survivorId": "survivor-player-5337",
+      "actionType": "END_TURN",
+      "timestamp": 1772466008712
+    },
+    {
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
+      "actionType": "OPEN_DOOR",
+      "timestamp": 1772466013240,
+      "payload": {
+        "targetZoneId": "z_4_5"
+      }
+    },
+    {
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
       "actionType": "MOVE",
-      "timestamp": 1771963402030,
+      "timestamp": 1772466015282,
       "payload": {
-        "targetZoneId": "police-armory"
+        "targetZoneId": "z_4_5"
       }
     },
     {
       "playerId": "player-5337",
       "survivorId": "survivor-player-5337",
-      "actionType": "MAKE_NOISE",
-      "timestamp": 1771963406012
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "SEARCH",
-      "timestamp": 1771963408360
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "ORGANIZE",
-      "timestamp": 1771963411197,
+      "actionType": "MOVE",
+      "timestamp": 1772466017077,
       "payload": {
-        "cardId": "card-axe-0",
-        "targetSlot": "BACKPACK"
+        "targetZoneId": "z_5_5"
       }
     },
     {
       "playerId": "player-5337",
       "survivorId": "survivor-player-5337",
-      "actionType": "RESOLVE_SEARCH",
-      "timestamp": 1771963412727,
+      "actionType": "MOVE",
+      "timestamp": 1772466018304,
       "payload": {
-        "action": "EQUIP",
-        "targetSlot": "HAND_1"
+        "targetZoneId": "z_6_5"
       }
     },
     {
       "playerId": "player-5337",
       "survivorId": "survivor-player-5337",
-      "actionType": "MAKE_NOISE",
-      "timestamp": 1771963418673
+      "actionType": "MOVE",
+      "timestamp": 1772466021895,
+      "payload": {
+        "targetZoneId": "z_6_4"
+      }
     },
     {
       "playerId": "player-5337",
       "survivorId": "survivor-player-5337",
-      "actionType": "MAKE_NOISE",
-      "timestamp": 1771963419248
+      "actionType": "OPEN_DOOR",
+      "timestamp": 1772466036693,
+      "payload": {
+        "targetZoneId": "z_7_4"
+      }
+    },
+    {
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
+      "actionType": "MOVE",
+      "timestamp": 1772466038483,
+      "payload": {
+        "targetZoneId": "z_7_4"
+      }
+    },
+    {
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
+      "actionType": "MOVE",
+      "timestamp": 1772466039269,
+      "payload": {
+        "targetZoneId": "z_7_5"
+      }
+    },
+    {
+      "playerId": "player-5337",
+      "survivorId": "survivor-player-5337",
+      "actionType": "MOVE",
+      "timestamp": 1772466041901,
+      "payload": {
+        "targetZoneId": "z_8_5"
+      }
     }
   ],
   "spawnContext": {
     "cards": [
       {
-        "zoneId": "street-east",
-        "cardId": "spawn-002",
-        "detail": {
-          "zombies": {}
-        },
-        "dangerLevel": "BLUE"
-      },
-      {
-        "zoneId": "street-south",
-        "cardId": "spawn-008",
-        "detail": {
-          "doubleSpawn": true
-        },
-        "dangerLevel": "BLUE"
-      },
-      {
-        "zoneId": "street-south",
-        "cardId": "spawn-005",
+        "zoneId": "z_5_5",
+        "cardId": "spawn-001",
         "detail": {
           "zombies": {
-            "WALKER": 1
+            "WALKER": 2
           }
         },
-        "dangerLevel": "BLUE"
+        "dangerLevel": "YELLOW"
+      },
+      {
+        "zoneId": "z_6_0",
+        "cardId": "spawn-004",
+        "detail": {
+          "zombies": {
+            "WALKER": 4
+          }
+        },
+        "dangerLevel": "YELLOW"
       }
     ],
-    "timestamp": 1771963406011
-  }
+    "timestamp": 1772466039268
+  },
+  "gameResult": "VICTORY"
 }

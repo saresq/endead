@@ -47,8 +47,8 @@ This document outlines the current status of the **Endead** project (a Zombicide
 To consider this project truly "Complete" and polished beyond the current MVP status, the following are required:
 
 ### High Priority (Gameplay)
-1.  **Trade Action**: Implement the ability for survivors in the same zone to swap equipment. This is a core mechanic for Zombicide tactical play.
-2.  **Scenario Objectives**: Expand the `Win/Loss` logic to support varied objectives (e.g., "Take Objective X", "Kill Abomination", "Collect Food") rather than just "Reach Exit".
+50: - [x] **Trade Action**: Implement the ability for survivors in the same zone to swap equipment. This is a core mechanic for Zombicide tactical play.
+51: - [x] **Scenario Objectives**: Expand the `Win/Loss` logic to support varied objectives (e.g., "Take Objective X", "Kill Abomination", "Collect Food") rather than just "Reach Exit".
 
 ### Medium Priority (Polish & Content)
 3.  **Visual Assets**: Replace current geometric shape placeholders with sprites (Survivors, Zombies, Item Icons, Map Tiles).

@@ -209,7 +209,7 @@ export class InputController {
 
     for (const zoneId in survivorsByZone) {
       const zoneSurvivors = survivorsByZone[zoneId];
-      const layout = ZONE_LAYOUT[zoneId] || { col: 0, row: 0 };
+      const layout = this.getZoneLayout(zoneId) || { col: 0, row: 0, w: 1, h: 1 };
       const zoneX = layout.col * TILE_SIZE;
       const zoneY = layout.row * TILE_SIZE;
 
@@ -235,10 +235,27 @@ export class InputController {
     return null;
   }
 
+  private getZoneLayout(zoneId: ZoneId): { col: number, row: number, w: number, h: number } | null {
+    // Static layout first
+    if (ZONE_LAYOUT[zoneId]) return ZONE_LAYOUT[zoneId];
+    
+    // Dynamic zone: z_x_y
+    const parts = zoneId.split('_');
+    if (parts.length === 3 && parts[0] === 'z') {
+      return {
+        col: parseInt(parts[1]),
+        row: parseInt(parts[2]),
+        w: 1,
+        h: 1
+      };
+    }
+    return null;
+  }
+
   private hitTestZones(x: number, y: number, state: GameState): ZoneId | null {
-    // Iterate all zones (AABB check)
+    // Iterate all zones (AABB check) - supports both static and dynamic zones
     for (const zoneId in state.zones) {
-      const layout = ZONE_LAYOUT[zoneId];
+      const layout = this.getZoneLayout(zoneId);
       if (!layout) continue;
 
       const zx = layout.col * TILE_SIZE;

@@ -7,6 +7,8 @@ export class LobbyUI {
   private container: HTMLElement;
   private localPlayerId: PlayerId;
   private state: GameState | null = null;
+  private availableMaps: any[] = [];
+  private selectedMapId: string | null = null;
 
   constructor(playerId: PlayerId) {
     this.localPlayerId = playerId;
@@ -15,7 +17,23 @@ export class LobbyUI {
     this.container.id = 'lobby-ui';
     document.body.appendChild(this.container);
 
+    this.fetchMaps();
     this.render();
+  }
+
+  private async fetchMaps() {
+      try {
+          const res = await fetch('/api/maps');
+          if (res.ok) {
+              this.availableMaps = await res.json();
+              if (this.availableMaps.length > 0) {
+                  this.selectedMapId = this.availableMaps[0].id;
+              }
+              this.render(); // Re-render with maps
+          }
+      } catch (e) {
+          console.error('Failed to load maps', e);
+      }
   }
 
   public update(state: GameState): void {
@@ -118,6 +136,18 @@ export class LobbyUI {
           ` : '<div class="error">Not in Lobby</div>'}
 
           ${isHost ? `
+            <div class="map-selection" style="margin-bottom: 10px;">
+                <label>Select Scenario:</label>
+                <select id="map-select">
+                    ${this.availableMaps.map(m => `
+                        <option value="${m.id}" ${m.id === this.selectedMapId ? 'selected' : ''}>
+                            ${m.name} (${m.width}x${m.height})
+                        </option>
+                    `).join('')}
+                    ${this.availableMaps.length === 0 ? '<option>Loading maps...</option>' : ''}
+                </select>
+            </div>
+
             <button id="btn-start-game" class="start-btn" ${this.state.lobby.players.length > 0 ? '' : 'disabled'}>
               Start Game
             </button>
@@ -151,11 +181,22 @@ export class LobbyUI {
       });
     });
 
+    const mapSelect = this.container.querySelector('#map-select');
+    mapSelect?.addEventListener('change', (e) => {
+        this.selectedMapId = (e.target as HTMLSelectElement).value;
+    });
+
     const startBtn = this.container.querySelector('#btn-start-game');
     startBtn?.addEventListener('click', () => {
+      // Find selected map
+      const map = this.availableMaps.find(m => m.id === this.selectedMapId);
+      
       networkManager.sendAction({
         playerId: this.localPlayerId,
-        type: ActionType.START_GAME
+        type: ActionType.START_GAME,
+        payload: {
+            map: map
+        }
       });
     });
   }
