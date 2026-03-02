@@ -168,9 +168,7 @@ async function startRoom(roomId: string): Promise<void> {
     playerId,
     (selectedId) => {
       if (gameStore.state && gameStore.state.phase !== GamePhase.Lobby) {
-        renderer.render(gameStore.state, {
-          activeSurvivorId: selectedId || undefined,
-        });
+        renderer.render(gameStore.state, inputController!.getRenderOptions(gameStore.state));
       }
       gameHud?.update(gameStore.state, selectedId);
     },
@@ -214,9 +212,7 @@ async function startRoom(roomId: string): Promise<void> {
       }
     }
 
-    renderer.render(newState, {
-      activeSurvivorId: inputController.selection || undefined,
-    });
+    renderer.render(newState, inputController.getRenderOptions(newState));
     gameHud.update(newState, inputController.selection);
   });
 

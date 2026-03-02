@@ -6,11 +6,13 @@ import { ZONE_LAYOUT, TILE_SIZE, ENTITY_RADIUS } from '../config/Layout';
 import { networkManager } from './NetworkManager';
 import { gameStore } from './GameStore';
 import { PixiBoardRenderer } from './PixiBoardRenderer';
+import { RenderOptions } from './PixiBoardRenderer';
 
 export class InputController {
   private app: PIXI.Application;
   private renderer: PixiBoardRenderer;
   private selectedSurvivorId: EntityId | null = null;
+  private pendingMoveZoneId: ZoneId | null = null;
   private localPlayerId: PlayerId;
   private interactionMode: 'DEFAULT' | 'ATTACK' | 'OPEN_DOOR' = 'DEFAULT';
   private selectedWeaponId: EntityId | null = null;
@@ -36,8 +38,29 @@ export class InputController {
   public setMode(mode: 'DEFAULT' | 'ATTACK' | 'OPEN_DOOR', weaponId?: EntityId): void {
     this.interactionMode = mode;
     this.selectedWeaponId = weaponId || null;
+    if (mode !== 'DEFAULT') {
+      this.pendingMoveZoneId = null;
+    }
     console.log(`Input Mode: ${mode}`);
     if (this.onModeChange) this.onModeChange(mode);
+    this.requestRender();
+  }
+
+  public getRenderOptions(state: GameState): RenderOptions {
+    const validMoveZones = this.getValidMoveZones(state);
+    const pendingMoveZoneId = this.pendingMoveZoneId && validMoveZones.includes(this.pendingMoveZoneId)
+      ? this.pendingMoveZoneId
+      : null;
+
+    if (!pendingMoveZoneId && this.pendingMoveZoneId) {
+      this.pendingMoveZoneId = null;
+    }
+
+    return {
+      activeSurvivorId: this.selectedSurvivorId || undefined,
+      validMoveZones,
+      pendingMoveZoneId: pendingMoveZoneId || undefined,
+    };
   }
 
   private setupListeners(): void {
@@ -53,7 +76,9 @@ export class InputController {
     this.app.stage.eventMode = 'static';
     this.app.stage.hitArea = this.app.screen;
     
-    this.app.stage.on('pointerdown', (event: PIXI.FederatedPointerEvent) => {
+    this.app.stage.on('pointerup', (event: PIXI.FederatedPointerEvent) => {
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+      if (this.renderer.consumeGestureSuppression()) return;
       const { x, y } = event.global;
       this.handleClick(x, y);
     });
@@ -89,6 +114,7 @@ export class InputController {
     if (!isMyTurn) {
         // If not my turn, ensure my survivor is selected
         this.selectMySurvivor(currentState);
+        this.clearPendingMove();
         return;
     }
 
@@ -109,11 +135,18 @@ export class InputController {
           this.sendOpenDoorAction(clickedZoneId);
           this.setMode('DEFAULT');
         } else {
-          // DEFAULT = MOVE
+          // DEFAULT = MOVE (tap once to preview, tap again to confirm)
           if (currentZone && currentZone.connectedZones.includes(clickedZoneId)) {
-            this.sendMoveAction(clickedZoneId);
+            if (this.pendingMoveZoneId === clickedZoneId) {
+              this.sendMoveAction(clickedZoneId);
+              this.pendingMoveZoneId = null;
+            } else {
+              this.pendingMoveZoneId = clickedZoneId;
+            }
+            this.requestRender();
           } else {
             console.warn('InputController: Target zone not connected.');
+            this.clearPendingMove();
           }
         }
       } else {
@@ -122,6 +155,7 @@ export class InputController {
         // Maybe just don't deselect on miss click?
         // Or select my survivor?
         this.selectMySurvivor(currentState);
+        this.clearPendingMove();
         this.setMode('DEFAULT');
       }
     }
@@ -138,6 +172,7 @@ export class InputController {
   private selectSurvivor(id: EntityId): void {
     if (this.selectedSurvivorId !== id) {
       this.selectedSurvivorId = id;
+      this.pendingMoveZoneId = null;
       if (this.onSelectionChange) this.onSelectionChange(id);
       this.setMode('DEFAULT'); // Reset mode on new selection
     }
@@ -146,8 +181,36 @@ export class InputController {
   private deselect(): void {
     if (this.selectedSurvivorId !== null) {
       this.selectedSurvivorId = null;
+      this.pendingMoveZoneId = null;
       if (this.onSelectionChange) this.onSelectionChange(null);
       this.setMode('DEFAULT');
+    }
+  }
+
+  private getValidMoveZones(state: GameState): ZoneId[] {
+    if (!this.selectedSurvivorId || this.interactionMode !== 'DEFAULT') return [];
+
+    const activePlayerId = state.players[state.activePlayerIndex];
+    if (activePlayerId !== this.localPlayerId) return [];
+
+    const survivor = state.survivors[this.selectedSurvivorId];
+    if (!survivor || survivor.playerId !== this.localPlayerId || survivor.actionsRemaining < 1) return [];
+
+    const currentZone = state.zones[survivor.position.zoneId];
+    if (!currentZone) return [];
+
+    return currentZone.connectedZones;
+  }
+
+  private clearPendingMove(): void {
+    if (!this.pendingMoveZoneId) return;
+    this.pendingMoveZoneId = null;
+    this.requestRender();
+  }
+
+  private requestRender(): void {
+    if (this.onSelectionChange) {
+      this.onSelectionChange(this.selectedSurvivorId);
     }
   }
 

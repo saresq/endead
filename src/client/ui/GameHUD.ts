@@ -18,6 +18,7 @@ export class GameHUD {
   private currentMessageTimer: number | null = null;
   private isBackpackOpen: boolean = false;
   private isEndGameConfirmOpen: boolean = false;
+  private isHudExpanded: boolean = false;
 
   constructor(inputController: InputController, playerId: PlayerId) {
     this.inputController = inputController;
@@ -88,15 +89,22 @@ export class GameHUD {
 
     this.container.innerHTML = `
       <div class="top-bar">
-        <div class="stat">Turn: ${this.state.turn}</div>
-        <div class="stat">Phase: ${this.state.phase}</div>
-        <div class="stat danger-${this.state.currentDangerLevel.toLowerCase()}">Danger: ${this.state.currentDangerLevel}</div>
-        <div class="stat ${isMyTurn ? 'turn-active' : ''}">${isMyTurn ? 'YOUR TURN' : `Waiting for Player ${this.state.activePlayerIndex + 1}`}</div>
-        ${isHost ? '<button id="btn-end-game" class="danger">End Game</button>' : ''}
+        <div class="top-bar-stats">
+          <div class="stat">Turn ${this.state.turn}</div>
+          <div class="stat">${this.state.phase}</div>
+          <div class="stat danger-${this.state.currentDangerLevel.toLowerCase()}">Danger ${this.state.currentDangerLevel}</div>
+          <div class="stat ${isMyTurn ? 'turn-active' : ''}">${isMyTurn ? 'YOUR TURN' : `Player ${this.state.activePlayerIndex + 1}`}</div>
+        </div>
+        <div class="top-bar-actions">
+          <button id="btn-toggle-hud" class="hud-toggle">${this.isHudExpanded ? 'Compact HUD' : 'More HUD'}</button>
+          ${isHost ? '<button id="btn-end-game" class="danger">End Game</button>' : ''}
+        </div>
       </div>
 
-      ${this.renderLastAction()}
-      ${this.renderSpawnInfo()}
+      <div class="hud-feed ${this.isHudExpanded ? 'open' : ''}">
+        ${this.renderLastAction()}
+        ${this.renderSpawnInfo()}
+      </div>
 
       ${activeSurvivor ? this.renderSurvivorDashboard(activeSurvivor, isMyTurn) : ''}
       ${this.isEndGameConfirmOpen ? this.renderEndGameConfirmModal() : ''}
@@ -106,8 +114,10 @@ export class GameHUD {
     if (activeSurvivor) {
       // Backpack Listeners (Always available)
       const btnBackpack = document.getElementById('btn-backpack');
+      const btnBackpackCompact = document.getElementById('btn-backpack-compact');
       const btnCloseBackpack = document.getElementById('btn-close-backpack');
       btnBackpack?.addEventListener('click', () => this.toggleBackpack());
+      btnBackpackCompact?.addEventListener('click', () => this.toggleBackpack());
       btnCloseBackpack?.addEventListener('click', () => this.toggleBackpack());
 
       // Turn-based Actions (Only if my turn)
@@ -119,6 +129,12 @@ export class GameHUD {
     const btnEndGame = document.getElementById('btn-end-game');
     btnEndGame?.addEventListener('click', () => {
       this.openEndGameConfirm();
+    });
+
+    const btnToggleHud = document.getElementById('btn-toggle-hud');
+    btnToggleHud?.addEventListener('click', () => {
+      this.isHudExpanded = !this.isHudExpanded;
+      this.render();
     });
 
     this.attachEndGameConfirmListeners();
@@ -242,6 +258,7 @@ export class GameHUD {
 
     return `
       <div class="last-action-panel">
+          <div class="feed-title">Last Action</div>
           <div class="action-desc">${action.description || action.type}</div>
           ${details}
       </div>
@@ -253,11 +270,11 @@ export class GameHUD {
     
     return `
       <div class="spawn-info-panel">
-         <h3>Zombie Spawn Phase</h3>
+         <h3>Spawn</h3>
          <div class="spawn-cards">
-           ${this.state.spawnContext.cards.map(c => `
-              <div class="spawn-card-log">
-                 Zone ${c.zoneId}: 
+            ${this.state.spawnContext.cards.map(c => `
+               <div class="spawn-card-log">
+                  Zone ${c.zoneId}: 
                  ${c.detail.doubleSpawn ? 'DOUBLE SPAWN!' : ''}
                  ${c.detail.extraActivation ? `EXTRA ACTIVATION: ${c.detail.extraActivation}` : ''}
                  ${c.detail.zombies ? Object.entries(c.detail.zombies).map(([t, n]) => `${n} ${t}`).join(', ') : ''}
@@ -304,37 +321,44 @@ export class GameHUD {
     
     return `
       <div class="dashboard">
-        <div class="survivor-info">
-          <h3>${survivor.name} (${survivor.characterClass})</h3>
-          <div class="bars">
-            <div class="bar hp-bar">HP: ${survivor.maxHealth - survivor.wounds}/${survivor.maxHealth}</div>
-            <div class="bar xp-bar">XP: ${survivor.experience}</div>
-            <div class="bar ap-bar">AP: ${survivor.actionsRemaining}/${survivor.actionsPerTurn}</div>
+        <div class="survivor-info compact">
+          <h3>${survivor.name} <span class="survivor-class">${survivor.characterClass}</span></h3>
+          <div class="bars inline">
+            <div class="bar hp-bar">HP ${survivor.maxHealth - survivor.wounds}/${survivor.maxHealth}</div>
+            <div class="bar xp-bar">XP ${survivor.experience}</div>
+            <div class="bar ap-bar">AP ${survivor.actionsRemaining}/${survivor.actionsPerTurn}</div>
           </div>
         </div>
 
-        <div class="actions-panel">
+        <div class="actions-panel compact">
           <button id="btn-search" ${!isMyTurn || survivor.hasSearched || survivor.actionsRemaining < 1 ? 'disabled' : ''}>Search (1 AP)</button>
           <button id="btn-noise" ${!isMyTurn || survivor.actionsRemaining < 1 ? 'disabled' : ''}>Make Noise (1 AP)</button>
           <button id="btn-door" ${!isMyTurn || survivor.actionsRemaining < 1 || !canOpenDoor ? 'disabled' : ''}>Open Door (1 AP)</button>
           <button id="btn-objective" ${!isMyTurn || survivor.actionsRemaining < 1 || !canTakeObjective ? 'disabled' : ''} style="${canTakeObjective ? 'background:#d90;color:#000;font-weight:bold;' : ''}">Take Objective (1 AP)</button>
           <button id="btn-trade" ${!isMyTurn || survivor.actionsRemaining < 1 ? 'disabled' : ''}>Trade (1 AP)</button>
           <button id="btn-end-turn" ${!isMyTurn || survivor.actionsRemaining < 1 ? 'disabled' : ''}>End Turn</button>
-          <button id="btn-backpack">Backpack (${survivor.inventory.length})</button>
         </div>
 
-        <div class="combat-panel">
-          <h4>Equipped Weapons</h4>
-          ${weapons.map(w => `
-            <button class="weapon-btn" data-id="${w.id}" ${!isMyTurn || survivor.actionsRemaining < 1 ? 'disabled' : ''}>
-              Attack with ${w.name} (${w.stats?.dice}d6 / ${w.stats?.accuracy}+)
-            </button>
-          `).join('')}
-          ${weapons.length === 0 ? '<div class="warning">No Weapon Equipped</div>' : ''}
+        <div class="dashboard-secondary ${this.isHudExpanded ? 'open' : ''}">
+          <div class="combat-panel">
+            <h4>Equipped Weapons</h4>
+            ${weapons.map(w => `
+              <button class="weapon-btn" data-id="${w.id}" ${!isMyTurn || survivor.actionsRemaining < 1 ? 'disabled' : ''}>
+                Attack with ${w.name} (${w.stats?.dice}d6 / ${w.stats?.accuracy}+)
+              </button>
+            `).join('')}
+            ${weapons.length === 0 ? '<div class="warning">No Weapon Equipped</div>' : ''}
+          </div>
+
+          <div class="inventory-preview">
+            <small>Inventory: ${survivor.inventory.length} items</small>
+            <button id="btn-backpack">Backpack</button>
+          </div>
         </div>
-        
-        <div class="inventory-preview">
-           <small>Inventory: ${survivor.inventory.length} items</small>
+
+        <div class="dashboard-compact-tools">
+          <button id="btn-backpack-compact">Bag (${survivor.inventory.length})</button>
+          <button id="btn-dashboard-more">${this.isHudExpanded ? 'Less' : 'More'}</button>
         </div>
         ${this.isBackpackOpen ? this.renderBackpackModal(survivor) : ''}
       </div>
@@ -395,6 +419,12 @@ export class GameHUD {
     const btnTrade = document.getElementById('btn-trade');
     const btnEndTurn = document.getElementById('btn-end-turn');
     const weaponBtns = document.querySelectorAll('.weapon-btn');
+    const btnDashboardMore = document.getElementById('btn-dashboard-more');
+
+    btnDashboardMore?.addEventListener('click', () => {
+      this.isHudExpanded = !this.isHudExpanded;
+      this.render();
+    });
 
     btnSearch?.addEventListener('click', () => {
       networkManager.sendAction({

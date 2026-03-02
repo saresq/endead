@@ -10,6 +10,7 @@ import { TileInstance } from '../types/Map';
 export interface RenderOptions {
   activeSurvivorId?: EntityId;
   validMoveZones?: ZoneId[];
+  pendingMoveZoneId?: ZoneId;
 }
 
 type GridMap = Record<string, ZoneId>;
@@ -39,6 +40,10 @@ export class PixiBoardRenderer {
   private lastDragPos = { x: 0, y: 0 };
   private _pointerIsDown = false;
   private _pointerStartPos: { x: number, y: number } | null = null;
+  private activeTouchPoints: Map<number, { x: number, y: number }> = new Map();
+  private pinchDistance = 0;
+  private pinchCenter: { x: number, y: number } | null = null;
+  private suppressTapUntil = 0;
 
   // State-tracking cache for reconciliation
   private entitySprites: Map<EntityId, PIXI.Container> = new Map();
@@ -82,6 +87,21 @@ export class PixiBoardRenderer {
     this.app.stage.hitArea = this.app.screen;
 
     this.app.stage.on('pointerdown', (e) => {
+      this._wasDragging = false;
+
+      if (e.pointerType === 'touch') {
+        this.activeTouchPoints.set(e.pointerId, { x: e.global.x, y: e.global.y });
+
+        if (this.activeTouchPoints.size === 1) {
+          this._pointerStartPos = { x: e.global.x, y: e.global.y };
+          this._pointerIsDown = true;
+          this.lastDragPos = { x: e.global.x, y: e.global.y };
+        } else if (this.activeTouchPoints.size >= 2) {
+          this.beginPinch();
+        }
+        return;
+      }
+
       // Only start drag on middle mouse button (wheel click) to avoid
       // conflicting with left-click tile placement in editor mode
       if (e.button === 1) {
@@ -96,22 +116,125 @@ export class PixiBoardRenderer {
       }
     });
 
-    this.app.stage.on('pointerup', () => {
+    this.app.stage.on('pointerup', (e) => {
+      if (e.pointerType === 'touch') {
+        this.activeTouchPoints.delete(e.pointerId);
+
+        if (this.activeTouchPoints.size >= 2) {
+          this.beginPinch();
+          return;
+        }
+
+        if (this.activeTouchPoints.size === 1) {
+          const remaining = Array.from(this.activeTouchPoints.values())[0];
+          this._pointerStartPos = { x: remaining.x, y: remaining.y };
+          this.lastDragPos = { x: remaining.x, y: remaining.y };
+          this._pointerIsDown = true;
+          this.pinchDistance = 0;
+          this.pinchCenter = null;
+          this.isDragging = false;
+          return;
+        }
+
+        if (this.isDragging || this.pinchCenter) {
+          this._wasDragging = true;
+          this.suppressTapUntil = Date.now() + 150;
+        }
+        this.endPointerGesture();
+        return;
+      }
+
       // Preserve drag state for one frame so editor's pointerup handler can check it
-      this._wasDragging = this.isDragging;
-      this.isDragging = false;
-      this._pointerIsDown = false;
-      this._pointerStartPos = null;
+      if (this.isDragging) {
+        this._wasDragging = true;
+        this.suppressTapUntil = Date.now() + 150;
+      }
+      this.endPointerGesture();
     });
 
-    this.app.stage.on('pointerupoutside', () => {
-      this._wasDragging = this.isDragging;
-      this.isDragging = false;
-      this._pointerIsDown = false;
-      this._pointerStartPos = null;
+    this.app.stage.on('pointerupoutside', (e) => {
+      if (e.pointerType === 'touch') {
+        this.activeTouchPoints.delete(e.pointerId);
+        if (this.activeTouchPoints.size === 0) {
+          if (this.isDragging || this.pinchCenter) {
+            this.suppressTapUntil = Date.now() + 150;
+          }
+          this.endPointerGesture();
+        }
+        return;
+      }
+
+      if (this.isDragging) {
+        this._wasDragging = true;
+        this.suppressTapUntil = Date.now() + 150;
+      }
+      this.endPointerGesture();
+    });
+
+    this.app.stage.on('pointercancel', (e) => {
+      if (e.pointerType === 'touch') {
+        this.activeTouchPoints.delete(e.pointerId);
+      }
+      this.endPointerGesture();
+      this.suppressTapUntil = Date.now() + 150;
     });
 
     this.app.stage.on('pointermove', (e) => {
+      if (e.pointerType === 'touch') {
+        if (!this.activeTouchPoints.has(e.pointerId)) return;
+
+        this.activeTouchPoints.set(e.pointerId, { x: e.global.x, y: e.global.y });
+
+        if (this.activeTouchPoints.size >= 2) {
+          const pinch = this.getPinchMetrics();
+          if (!pinch) return;
+
+          if (!this.pinchCenter || this.pinchDistance <= 0) {
+            this.pinchCenter = pinch.center;
+            this.pinchDistance = pinch.distance;
+            return;
+          }
+
+          const dx = pinch.center.x - this.pinchCenter.x;
+          const dy = pinch.center.y - this.pinchCenter.y;
+          this.container.x += dx;
+          this.container.y += dy;
+
+          if (this.pinchDistance > 0 && pinch.distance > 0) {
+            const scaleDelta = pinch.distance / this.pinchDistance;
+            const targetScale = this.container.scale.x * scaleDelta;
+            this.applyZoom(targetScale, pinch.center.x, pinch.center.y);
+          }
+
+          this.pinchCenter = pinch.center;
+          this.pinchDistance = pinch.distance;
+          this.isDragging = true;
+          this._wasDragging = true;
+          this.suppressTapUntil = Date.now() + 150;
+          return;
+        }
+
+        if (this._pointerIsDown && this._pointerStartPos) {
+          const dx = e.global.x - this._pointerStartPos.x;
+          const dy = e.global.y - this._pointerStartPos.y;
+          if (!this.isDragging && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) {
+            this.isDragging = true;
+            this.lastDragPos = { x: e.global.x, y: e.global.y };
+          }
+        }
+
+        if (this.isDragging) {
+          const dx = e.global.x - this.lastDragPos.x;
+          const dy = e.global.y - this.lastDragPos.y;
+          this.container.x += dx;
+          this.container.y += dy;
+          this.lastDragPos = { x: e.global.x, y: e.global.y };
+          this._wasDragging = true;
+          this.suppressTapUntil = Date.now() + 150;
+        }
+        return;
+      }
+
       // Left-click: only start dragging after a movement threshold (5px)
       // This prevents accidental drags when placing tiles
       if (this._pointerIsDown && !this.isDragging && this._pointerStartPos) {
@@ -141,30 +264,62 @@ export class PixiBoardRenderer {
       const scaleFactor = 1.1;
       const zoomIn = e.deltaY < 0;
       
-      let newScale = this.container.scale.x * (zoomIn ? scaleFactor : 1/scaleFactor);
-      
-      // Clamp Zoom
-      newScale = Math.max(0.2, Math.min(newScale, 3.0));
+      const newScale = this.container.scale.x * (zoomIn ? scaleFactor : 1 / scaleFactor);
 
       // Zoom towards mouse pointer
-      // Get mouse pos relative to container
       const rect = canvas.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
 
-      const worldPos = {
-        x: (mouseX - this.container.x) / this.container.scale.x,
-        y: (mouseY - this.container.y) / this.container.scale.y
-      };
-
-      this.container.scale.set(newScale);
-
-      // Adjust position to keep mouse over same world point
-      const newX = mouseX - worldPos.x * newScale;
-      const newY = mouseY - worldPos.y * newScale;
-
-      this.container.position.set(newX, newY);
+      this.applyZoom(newScale, mouseX, mouseY);
     }, { passive: false });
+  }
+
+  private endPointerGesture(): void {
+    this.isDragging = false;
+    this._pointerIsDown = false;
+    this._pointerStartPos = null;
+    this.pinchDistance = 0;
+    this.pinchCenter = null;
+  }
+
+  private beginPinch(): void {
+    const pinch = this.getPinchMetrics();
+    if (!pinch) return;
+    this.pinchDistance = pinch.distance;
+    this.pinchCenter = pinch.center;
+    this._pointerIsDown = false;
+    this._pointerStartPos = null;
+  }
+
+  private getPinchMetrics(): { distance: number, center: { x: number, y: number } } | null {
+    if (this.activeTouchPoints.size < 2) return null;
+    const points = Array.from(this.activeTouchPoints.values());
+    const p1 = points[0];
+    const p2 = points[1];
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    return {
+      distance: Math.sqrt(dx * dx + dy * dy),
+      center: {
+        x: (p1.x + p2.x) / 2,
+        y: (p1.y + p2.y) / 2,
+      }
+    };
+  }
+
+  private applyZoom(targetScale: number, screenX: number, screenY: number): void {
+    const newScale = Math.max(0.2, Math.min(targetScale, 3.0));
+    const worldPos = {
+      x: (screenX - this.container.x) / this.container.scale.x,
+      y: (screenY - this.container.y) / this.container.scale.y
+    };
+
+    this.container.scale.set(newScale);
+    this.container.position.set(
+      screenX - worldPos.x * newScale,
+      screenY - worldPos.y * newScale,
+    );
   }
 
   /**
@@ -175,9 +330,17 @@ export class PixiBoardRenderer {
     return this.entitySprites.get(id);
   }
 
-  /** Returns true if the camera was being dragged when pointer was released (to suppress click actions). */
+  /** Returns true when latest pointer gesture should suppress click actions. */
+  public consumeGestureSuppression(): boolean {
+    const now = Date.now();
+    const shouldSuppress = this._wasDragging || now < this.suppressTapUntil;
+    this._wasDragging = false;
+    return shouldSuppress;
+  }
+
+  /** Backward compatible gesture check used by editor mode. */
   public get wasDragging(): boolean {
-    return this._wasDragging;
+    return this._wasDragging || Date.now() < this.suppressTapUntil;
   }
 
   public screenToWorld(x: number, y: number): { x: number, y: number } {
@@ -243,7 +406,7 @@ export class PixiBoardRenderer {
     }
     
     // 1. Zones (Board)
-    this.reconcileZones(state, options.validMoveZones || []);
+    this.reconcileZones(state, options.validMoveZones || [], options.pendingMoveZoneId);
 
     // 2. Entities (Survivors & Zombies)
     this.reconcileEntities(state, options.activeSurvivorId);
@@ -284,7 +447,7 @@ export class PixiBoardRenderer {
      });
   }
 
-  private reconcileZones(state: GameState, validZones: ZoneId[]): void {
+  private reconcileZones(state: GameState, validZones: ZoneId[], pendingMoveZoneId?: ZoneId): void {
     // Check for removed zones (rare, but good practice)
     for (const [id, graphic] of this.zoneGraphics) {
       if (!state.zones[id]) {
@@ -303,11 +466,11 @@ export class PixiBoardRenderer {
       }
       
       const hasTiles = !!state.tiles && state.tiles.length > 0;
-      this.drawZone(graphic, zone, validZones.includes(zone.id), state, hasTiles);
+      this.drawZone(graphic, zone, validZones.includes(zone.id), zone.id === pendingMoveZoneId, state, hasTiles);
     });
   }
 
-  private drawZone(graphic: PIXI.Graphics, zone: Zone, isValidMove: boolean, state: GameState, hasTiles: boolean): void {
+  private drawZone(graphic: PIXI.Graphics, zone: Zone, isValidMove: boolean, isPendingMove: boolean, state: GameState, hasTiles: boolean): void {
     const layout = this.getZoneLayout(zone.id);
     
     graphic.clear();
@@ -324,6 +487,11 @@ export class PixiBoardRenderer {
             graphic.rect(x, y, width, height);
             graphic.fill({ color: 0x00FF00, alpha: 0.3 }); // Green overlay
         }
+
+        if (isPendingMove) {
+            graphic.rect(x, y, width, height);
+            graphic.fill({ color: 0x00AAFF, alpha: 0.35 });
+        }
         
         // Debug / Editor mode might want grid lines
         // graphic.rect(x, y, width, height);
@@ -333,6 +501,7 @@ export class PixiBoardRenderer {
         let color = 0x333333; // Default Street Gray
         if (zone.isBuilding) color = 0x554444; // Building Brownish
         if (isValidMove) color = 0x225522; // Highlight Green
+        if (isPendingMove) color = 0x224466;
         if (zone.isExit) color = 0x224466; // Exit Zone Blue-ish (Unique Color)
 
         graphic.rect(x, y, width, height);
@@ -340,6 +509,11 @@ export class PixiBoardRenderer {
         
         // Grid Lines (Subtle)
         graphic.stroke({ width: 1, color: 0x444444, alpha: 0.5 });
+    }
+
+    if (isPendingMove) {
+      graphic.rect(x + 2, y + 2, width - 4, height - 4);
+      graphic.stroke({ width: 3, color: 0x00CCFF, alpha: 0.95 });
     }
 
     // --- 2. Draw Walls & Doors ---

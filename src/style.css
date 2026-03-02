@@ -12,6 +12,10 @@ body {
   height: 100vh;
 }
 
+#app canvas {
+  touch-action: none;
+}
+
 #menu-ui {
   position: absolute;
   inset: 0;
@@ -118,15 +122,44 @@ body {
 .top-bar {
   background: rgba(0, 0, 0, 0.8);
   color: white;
-  padding: 10px 20px;
+  padding: 8px 12px;
   display: flex;
-  gap: 20px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   pointer-events: auto;
   border-bottom: 2px solid #555;
 }
 
+.top-bar-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.top-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hud-toggle {
+  background: #2e3a56;
+  border-color: #5573aa;
+}
+
+.hud-toggle:hover:not(:disabled) {
+  background: #3a4b73;
+}
+
 .stat {
   font-weight: bold;
+  font-size: 0.85rem;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+  padding: 4px 8px;
 }
 
 .danger-blue { color: #55aaff; }
@@ -143,17 +176,25 @@ body {
 .dashboard {
   background: rgba(0, 0, 0, 0.9);
   color: white;
-  padding: 20px;
+  padding: 10px;
   display: flex;
-  gap: 30px;
+  gap: 10px;
+  flex-wrap: wrap;
   pointer-events: auto;
   border-top: 2px solid #555;
-  align-items: center;
+  align-items: flex-start;
 }
 
 .survivor-info h3 {
-  margin: 0 0 10px 0;
+  margin: 0;
   color: #ddd;
+  font-size: 1rem;
+}
+
+.survivor-class {
+  font-size: 0.8rem;
+  color: #9cb1d9;
+  margin-left: 4px;
 }
 
 .bars {
@@ -163,11 +204,18 @@ body {
   min-width: 150px;
 }
 
+.bars.inline {
+  flex-direction: row;
+  flex-wrap: wrap;
+  min-width: 0;
+  margin-top: 6px;
+}
+
 .bar {
   background: #444;
-  padding: 2px 5px;
+  padding: 3px 7px;
   border-radius: 3px;
-  font-size: 0.9em;
+  font-size: 0.78rem;
 }
 
 .hp-bar { border-left: 4px solid #ff4444; }
@@ -175,10 +223,62 @@ body {
 .ap-bar { border-left: 4px solid #4444ff; }
 
 /* Actions */
-.actions-panel, .combat-panel {
+.actions-panel,
+.combat-panel {
   display: flex;
   flex-direction: column;
   gap: 5px;
+}
+
+.actions-panel.compact {
+  flex: 1;
+  min-width: 260px;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+
+.dashboard-secondary {
+  display: none;
+  width: 100%;
+  gap: 10px;
+  grid-template-columns: 1fr auto;
+  align-items: start;
+}
+
+.dashboard-secondary.open {
+  display: grid;
+}
+
+.dashboard-compact-tools {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.inventory-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.inventory-preview small {
+  color: #bbb;
+}
+
+.hud-feed {
+  display: none;
+  gap: 8px;
+  align-items: stretch;
+  pointer-events: none;
+  margin: 6px 8px 0;
+}
+
+.hud-feed.open {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr);
 }
 
 button {
@@ -477,16 +577,20 @@ button.danger:hover:not(:disabled) {
 
 /* Action Log */
 .last-action-panel {
-  position: absolute;
-  top: 60px;
-  left: 20px;
   background: rgba(0, 0, 0, 0.6);
-  padding: 10px 15px;
+  padding: 8px 10px;
   border-radius: 5px;
   color: white;
   pointer-events: none;
   border-left: 3px solid #55aaff;
   font-family: monospace;
+}
+
+.feed-title {
+  font-size: 0.72rem;
+  color: #97b8e8;
+  margin-bottom: 4px;
+  text-transform: uppercase;
 }
 
 .action-desc {
@@ -501,24 +605,22 @@ button.danger:hover:not(:disabled) {
 
 /* Spawn Info */
 .spawn-info-panel {
-  position: absolute;
-  top: 60px;
-  right: 20px;
-  width: 250px;
+  width: auto;
   background: rgba(40, 0, 0, 0.7);
-  padding: 10px 15px;
+  padding: 8px 10px;
   border-radius: 5px;
   color: white;
   pointer-events: none;
   border-right: 3px solid #ff5555;
-  max-height: 50vh;
+  max-height: 140px;
   overflow-y: auto;
 }
 
 .spawn-info-panel h3 {
-  margin: 0 0 10px 0;
-  font-size: 1em;
-  text-align: right;
+  margin: 0 0 6px 0;
+  font-size: 0.72rem;
+  text-align: left;
+  text-transform: uppercase;
   color: #ffaaaa;
 }
 
@@ -531,9 +633,68 @@ button.danger:hover:not(:disabled) {
 .spawn-card-log {
   background: rgba(0, 0, 0, 0.3);
   padding: 5px;
-  font-size: 0.85em;
+  font-size: 0.74rem;
   border-radius: 3px;
-  text-align: right;
+  text-align: left;
+}
+
+@media (min-width: 901px) {
+  .hud-feed {
+    display: grid;
+    grid-template-columns: minmax(280px, 1fr) minmax(280px, 1fr);
+  }
+
+  .dashboard-secondary {
+    display: grid;
+  }
+
+  .dashboard-compact-tools {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .top-bar {
+    padding: 6px 8px;
+  }
+
+  .top-bar-actions button {
+    padding: 6px 8px;
+    font-size: 0.72rem;
+  }
+
+  .dashboard {
+    padding: 8px;
+    gap: 8px;
+  }
+
+  .survivor-info {
+    width: 100%;
+  }
+
+  .actions-panel.compact {
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(120px, 1fr));
+  }
+
+  .dashboard-secondary.open {
+    grid-template-columns: 1fr;
+  }
+
+  .inventory-preview {
+    align-items: stretch;
+  }
+
+  .hud-feed.open {
+    grid-template-columns: 1fr;
+  }
+
+  #message-overlay {
+    top: 56px;
+    font-size: 0.95rem;
+    padding: 8px 12px;
+    max-width: 92vw;
+  }
 }
 
 /* --- Trade UI --- */
