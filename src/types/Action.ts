@@ -7,6 +7,7 @@ export enum ActionType {
   JOIN_LOBBY = 'JOIN_LOBBY',
   SELECT_CHARACTER = 'SELECT_CHARACTER',
   START_GAME = 'START_GAME',
+  END_GAME = 'END_GAME',
 
   // Game Actions
   MOVE = 'MOVE',

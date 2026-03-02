@@ -17,6 +17,7 @@ export class GameHUD {
   private selectedSurvivorId: EntityId | null = null;
   private currentMessageTimer: number | null = null;
   private isBackpackOpen: boolean = false;
+  private isEndGameConfirmOpen: boolean = false;
 
   constructor(inputController: InputController, playerId: PlayerId) {
     this.inputController = inputController;
@@ -82,6 +83,7 @@ export class GameHUD {
     }
 
     const isMyTurn = this.state.players[this.state.activePlayerIndex] === this.localPlayerId;
+    const isHost = this.state.players[0] === this.localPlayerId;
     const activeSurvivor = this.selectedSurvivorId ? this.state.survivors[this.selectedSurvivorId] : null;
 
     this.container.innerHTML = `
@@ -90,12 +92,14 @@ export class GameHUD {
         <div class="stat">Phase: ${this.state.phase}</div>
         <div class="stat danger-${this.state.currentDangerLevel.toLowerCase()}">Danger: ${this.state.currentDangerLevel}</div>
         <div class="stat ${isMyTurn ? 'turn-active' : ''}">${isMyTurn ? 'YOUR TURN' : `Waiting for Player ${this.state.activePlayerIndex + 1}`}</div>
+        ${isHost ? '<button id="btn-end-game" class="danger">End Game</button>' : ''}
       </div>
 
       ${this.renderLastAction()}
       ${this.renderSpawnInfo()}
 
       ${activeSurvivor ? this.renderSurvivorDashboard(activeSurvivor, isMyTurn) : ''}
+      ${this.isEndGameConfirmOpen ? this.renderEndGameConfirmModal() : ''}
     `;
 
     // Attach Event Listeners
@@ -111,6 +115,13 @@ export class GameHUD {
         this.attachActionListeners(activeSurvivor);
       }
     }
+
+    const btnEndGame = document.getElementById('btn-end-game');
+    btnEndGame?.addEventListener('click', () => {
+      this.openEndGameConfirm();
+    });
+
+    this.attachEndGameConfirmListeners();
     
     // Check for Trade Session
     if (this.state.activeTrade) {
@@ -151,13 +162,70 @@ export class GameHUD {
 
   private renderGameOver(): void {
     const isVictory = this.state?.gameResult === GameResult.Victory;
+    const isHost = this.state?.players[0] === this.localPlayerId;
     this.container.innerHTML = `
       <div class="game-over ${isVictory ? 'victory' : 'defeat'}">
         <h1>${isVictory ? 'VICTORY!' : 'DEFEAT'}</h1>
         <p>${isVictory ? 'All survivors have escaped!' : 'The zombies have overwhelmed you...'}</p>
-        <button onclick="location.reload()">Play Again</button>
+        ${isHost
+          ? '<button id="btn-play-again">Play Again</button>'
+          : '<p>Waiting for host to start the next game.</p>'}
+      </div>
+      ${this.isEndGameConfirmOpen ? this.renderEndGameConfirmModal() : ''}
+    `;
+
+    const btnPlayAgain = document.getElementById('btn-play-again');
+    btnPlayAgain?.addEventListener('click', () => {
+      this.openEndGameConfirm();
+    });
+
+    this.attachEndGameConfirmListeners();
+  }
+
+  private renderEndGameConfirmModal(): string {
+    return `
+      <div class="modal-overlay" id="end-game-confirm-overlay">
+        <div class="modal">
+          <h2>End current game?</h2>
+          <p>This will return everyone to the lobby.</p>
+          <div class="modal-actions">
+            <button id="btn-confirm-end-game" class="danger">Yes, End Game</button>
+            <button id="btn-cancel-end-game">Cancel</button>
+          </div>
+        </div>
       </div>
     `;
+  }
+
+  private openEndGameConfirm(): void {
+    this.isEndGameConfirmOpen = true;
+    this.render();
+  }
+
+  private closeEndGameConfirm(): void {
+    this.isEndGameConfirmOpen = false;
+    this.render();
+  }
+
+  private attachEndGameConfirmListeners(): void {
+    const btnConfirm = document.getElementById('btn-confirm-end-game');
+    const btnCancel = document.getElementById('btn-cancel-end-game');
+    const overlay = document.getElementById('end-game-confirm-overlay');
+
+    btnConfirm?.addEventListener('click', () => {
+      this.isEndGameConfirmOpen = false;
+      networkManager.sendAction({
+        playerId: this.localPlayerId,
+        type: ActionType.END_GAME,
+      });
+    });
+
+    btnCancel?.addEventListener('click', () => this.closeEndGameConfirm());
+    overlay?.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        this.closeEndGameConfirm();
+      }
+    });
   }
 
   private renderLastAction(): string {

@@ -1,5 +1,5 @@
 
-import { GameState, ZoneId, GamePhase, Zombie, EquipmentCard, ZombieType, EquipmentType, GameResult, Survivor, DangerLevel, ObjectiveType, Objective, Zone, ZoneConnection } from '../types/GameState';
+import { GameState, ZoneId, GamePhase, Zombie, EquipmentCard, ZombieType, EquipmentType, GameResult, Survivor, DangerLevel, ObjectiveType, Objective, Zone, ZoneConnection, initialGameState } from '../types/GameState';
 import { ActionRequest, ActionResponse, ActionType, ActionError } from '../types/Action';
 import { validateTurn, advanceTurnState, checkEndTurn } from './TurnManager';
 import { XPManager } from './XPManager';
@@ -41,6 +41,7 @@ const handlers: Partial<Record<ActionType, ActionHandler>> = {
   [ActionType.JOIN_LOBBY]: handleJoinLobby, 
   [ActionType.SELECT_CHARACTER]: handleSelectCharacter,
   [ActionType.START_GAME]: handleStartGame,
+  [ActionType.END_GAME]: handleEndGame,
   [ActionType.MOVE]: handleMove,
   [ActionType.ATTACK]: handleAttack,
   [ActionType.MAKE_NOISE]: handleMakeNoise,
@@ -61,7 +62,11 @@ const handlers: Partial<Record<ActionType, ActionHandler>> = {
 
 export function processAction(state: GameState, intent: ActionRequest): ActionResponse {
   // 0. Pre-check: Lobby Actions don't check Turns
-  if (intent.type === ActionType.SELECT_CHARACTER || intent.type === ActionType.START_GAME) {
+  if (
+    intent.type === ActionType.SELECT_CHARACTER ||
+    intent.type === ActionType.START_GAME ||
+    intent.type === ActionType.END_GAME
+  ) {
       // Allow through
   } else {
       // 1. Validate Turn Ownership
@@ -346,6 +351,20 @@ function handleStartGame(state: GameState, intent: ActionRequest): GameState {
     }
 
     return newState;
+}
+
+function handleEndGame(state: GameState, intent: ActionRequest): GameState {
+    const hostId = state.lobby.players[0]?.id || state.players[0];
+    if (!hostId) throw new Error('Cannot end game without a host');
+    if (intent.playerId !== hostId) throw new Error('Only host can end game');
+
+    const resetState = JSON.parse(JSON.stringify(initialGameState)) as GameState;
+    resetState.lobby.players = state.lobby.players.map((player: any) => ({
+      ...player,
+      ready: false,
+    }));
+
+    return resetState;
 }
 
 // --- Game End Logic ---

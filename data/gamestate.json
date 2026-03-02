@@ -1,44 +1,42 @@
 {
   "id": "session-12345",
-  "seed": "1045574755",
-  "turn": 10,
-  "phase": "GAME_OVER",
-  "currentDangerLevel": "YELLOW",
+  "seed": "2146039242",
+  "turn": 1,
+  "phase": "PLAYERS",
+  "currentDangerLevel": "BLUE",
   "lobby": {
     "players": [
       {
-        "id": "player-5337",
-        "name": "Rev",
+        "id": "player-647",
+        "name": "Con",
         "ready": true,
         "characterClass": "Waitress"
       }
     ]
   },
   "players": [
-    "player-5337"
+    "player-647"
   ],
   "activePlayerIndex": 0,
   "firstPlayerTokenIndex": 0,
   "survivors": {
-    "survivor-player-5337": {
-      "id": "survivor-player-5337",
-      "playerId": "player-5337",
-      "name": "Rev",
+    "survivor-player-647": {
+      "id": "survivor-player-647",
+      "playerId": "player-647",
+      "name": "Con",
       "characterClass": "Waitress",
       "position": {
         "x": 0,
         "y": 0,
-        "zoneId": "z_8_5"
+        "zoneId": "z_0_2"
       },
-      "actionsPerTurn": 4,
+      "actionsPerTurn": 3,
       "maxHealth": 3,
       "wounds": 0,
-      "experience": 10,
-      "dangerLevel": "YELLOW",
+      "experience": 0,
+      "dangerLevel": "BLUE",
       "skills": [
-        "+1 Action",
-        "start_move",
-        "plus_1_action"
+        "+1 Action"
       ],
       "inventory": [
         {
@@ -60,315 +58,14 @@
             "noise": true,
             "dualWield": false
           }
-        },
-        {
-          "id": "card-machete-11",
-          "name": "Machete",
-          "type": "WEAPON",
-          "stats": {
-            "range": [
-              0,
-              0
-            ],
-            "dice": 1,
-            "accuracy": 3,
-            "damage": 2,
-            "noise": false,
-            "dualWield": true
-          },
-          "inHand": false,
-          "slot": "BACKPACK"
-        },
-        {
-          "id": "card-rifle-24",
-          "name": "Rifle",
-          "type": "WEAPON",
-          "stats": {
-            "range": [
-              1,
-              3
-            ],
-            "dice": 1,
-            "accuracy": 3,
-            "damage": 1,
-            "noise": true,
-            "dualWield": false
-          },
-          "inHand": true,
-          "slot": "HAND_2"
         }
       ],
       "actionsRemaining": 3,
-      "hasMoved": true,
+      "hasMoved": false,
       "hasSearched": false
     }
   },
-  "zombies": {
-    "zombie-1-z_5_5-5327": {
-      "id": "zombie-1-z_5_5-5327",
-      "type": "WALKER",
-      "position": {
-        "x": 0,
-        "y": 0,
-        "zoneId": "z_5_3"
-      },
-      "wounds": 0,
-      "activated": true
-    },
-    "zombie-1-z_6_0-7052": {
-      "id": "zombie-1-z_6_0-7052",
-      "type": "FATTY",
-      "position": {
-        "x": 0,
-        "y": 0,
-        "zoneId": "z_5_3"
-      },
-      "wounds": 0,
-      "activated": true
-    },
-    "zombie-2-z_6_0-2901": {
-      "id": "zombie-2-z_6_0-2901",
-      "type": "WALKER",
-      "position": {
-        "x": 0,
-        "y": 0,
-        "zoneId": "z_5_4"
-      },
-      "wounds": 0,
-      "activated": true
-    },
-    "zombie-3-z_5_5-2133": {
-      "id": "zombie-3-z_5_5-2133",
-      "type": "WALKER",
-      "position": {
-        "x": 0,
-        "y": 0,
-        "zoneId": "z_5_3"
-      },
-      "wounds": 0,
-      "activated": true
-    },
-    "zombie-3-z_6_0-9442": {
-      "id": "zombie-3-z_6_0-9442",
-      "type": "WALKER",
-      "position": {
-        "x": 0,
-        "y": 0,
-        "zoneId": "z_6_4"
-      },
-      "wounds": 0,
-      "activated": true
-    },
-    "zombie-3-z_6_0-1451": {
-      "id": "zombie-3-z_6_0-1451",
-      "type": "WALKER",
-      "position": {
-        "x": 0,
-        "y": 0,
-        "zoneId": "z_6_4"
-      },
-      "wounds": 0,
-      "activated": true
-    },
-    "zombie-4-z_5_5-3446": {
-      "id": "zombie-4-z_5_5-3446",
-      "type": "WALKER",
-      "position": {
-        "x": 0,
-        "y": 0,
-        "zoneId": "z_5_4"
-      },
-      "wounds": 0,
-      "activated": true
-    },
-    "zombie-4-z_6_0-8302": {
-      "id": "zombie-4-z_6_0-8302",
-      "type": "WALKER",
-      "position": {
-        "x": 0,
-        "y": 0,
-        "zoneId": "z_6_4"
-      },
-      "wounds": 0,
-      "activated": true
-    },
-    "zombie-5-z_5_5-6087": {
-      "id": "zombie-5-z_5_5-6087",
-      "type": "WALKER",
-      "position": {
-        "x": 0,
-        "y": 0,
-        "zoneId": "z_6_4"
-      },
-      "wounds": 0,
-      "activated": true
-    },
-    "zombie-6-z_5_5-9035": {
-      "id": "zombie-6-z_5_5-9035",
-      "type": "WALKER",
-      "position": {
-        "x": 0,
-        "y": 0,
-        "zoneId": "z_5_4"
-      },
-      "wounds": 0,
-      "activated": true
-    },
-    "zombie-6-z_6_0-1403": {
-      "id": "zombie-6-z_6_0-1403",
-      "type": "WALKER",
-      "position": {
-        "x": 0,
-        "y": 0,
-        "zoneId": "z_6_3"
-      },
-      "wounds": 0,
-      "activated": true
-    },
-    "zombie-6-z_6_0-7142": {
-      "id": "zombie-6-z_6_0-7142",
-      "type": "WALKER",
-      "position": {
-        "x": 0,
-        "y": 0,
-        "zoneId": "z_6_3"
-      },
-      "wounds": 0,
-      "activated": true
-    },
-    "zombie-7-z_5_5-9246": {
-      "id": "zombie-7-z_5_5-9246",
-      "type": "WALKER",
-      "position": {
-        "x": 0,
-        "y": 0,
-        "zoneId": "z_6_4"
-      },
-      "wounds": 0,
-      "activated": true
-    },
-    "zombie-7-z_5_5-544": {
-      "id": "zombie-7-z_5_5-544",
-      "type": "WALKER",
-      "position": {
-        "x": 0,
-        "y": 0,
-        "zoneId": "z_6_4"
-      },
-      "wounds": 0,
-      "activated": true
-    },
-    "zombie-7-z_6_0-389": {
-      "id": "zombie-7-z_6_0-389",
-      "type": "FATTY",
-      "position": {
-        "x": 0,
-        "y": 0,
-        "zoneId": "z_6_2"
-      },
-      "wounds": 0,
-      "activated": true
-    },
-    "zombie-7-z_6_0-3742": {
-      "id": "zombie-7-z_6_0-3742",
-      "type": "FATTY",
-      "position": {
-        "x": 0,
-        "y": 0,
-        "zoneId": "z_6_2"
-      },
-      "wounds": 0,
-      "activated": true
-    },
-    "zombie-8-z_5_5-5545": {
-      "id": "zombie-8-z_5_5-5545",
-      "type": "RUNNER",
-      "position": {
-        "x": 0,
-        "y": 0,
-        "zoneId": "z_6_4"
-      },
-      "wounds": 0,
-      "activated": true
-    },
-    "zombie-8-z_6_0-1131": {
-      "id": "zombie-8-z_6_0-1131",
-      "type": "WALKER",
-      "position": {
-        "x": 0,
-        "y": 0,
-        "zoneId": "z_6_1"
-      },
-      "wounds": 0,
-      "activated": true
-    },
-    "zombie-9-z_5_5-2823": {
-      "id": "zombie-9-z_5_5-2823",
-      "type": "WALKER",
-      "position": {
-        "x": 0,
-        "y": 0,
-        "zoneId": "z_5_5"
-      },
-      "wounds": 0,
-      "activated": false
-    },
-    "zombie-9-z_5_5-2731": {
-      "id": "zombie-9-z_5_5-2731",
-      "type": "WALKER",
-      "position": {
-        "x": 0,
-        "y": 0,
-        "zoneId": "z_5_5"
-      },
-      "wounds": 0,
-      "activated": false
-    },
-    "zombie-9-z_6_0-7235": {
-      "id": "zombie-9-z_6_0-7235",
-      "type": "WALKER",
-      "position": {
-        "x": 0,
-        "y": 0,
-        "zoneId": "z_6_0"
-      },
-      "wounds": 0,
-      "activated": false
-    },
-    "zombie-9-z_6_0-6439": {
-      "id": "zombie-9-z_6_0-6439",
-      "type": "WALKER",
-      "position": {
-        "x": 0,
-        "y": 0,
-        "zoneId": "z_6_0"
-      },
-      "wounds": 0,
-      "activated": false
-    },
-    "zombie-9-z_6_0-9083": {
-      "id": "zombie-9-z_6_0-9083",
-      "type": "WALKER",
-      "position": {
-        "x": 0,
-        "y": 0,
-        "zoneId": "z_6_0"
-      },
-      "wounds": 0,
-      "activated": false
-    },
-    "zombie-9-z_6_0-4868": {
-      "id": "zombie-9-z_6_0-4868",
-      "type": "WALKER",
-      "position": {
-        "x": 0,
-        "y": 0,
-        "zoneId": "z_6_0"
-      },
-      "wounds": 0,
-      "activated": false
-    }
-  },
+  "zombies": {},
   "zones": {
     "z_0_0": {
       "id": "z_0_0",
@@ -483,7 +180,7 @@
         {
           "toZoneId": "z_1_2",
           "hasDoor": true,
-          "doorOpen": true
+          "doorOpen": false
         },
         {
           "toZoneId": "z_2_1",
@@ -571,7 +268,7 @@
         {
           "toZoneId": "z_1_1",
           "hasDoor": true,
-          "doorOpen": true
+          "doorOpen": false
         },
         {
           "toZoneId": "z_1_3",
@@ -731,7 +428,7 @@
       "doorOpen": true,
       "spawnPoint": false,
       "isExit": false,
-      "hasObjective": false
+      "hasObjective": true
     },
     "z_4_1": {
       "id": "z_4_1",
@@ -744,7 +441,7 @@
         {
           "toZoneId": "z_4_2",
           "hasDoor": true,
-          "doorOpen": true
+          "doorOpen": false
         },
         {
           "toZoneId": "z_3_1",
@@ -850,7 +547,7 @@
         {
           "toZoneId": "z_4_1",
           "hasDoor": true,
-          "doorOpen": true
+          "doorOpen": false
         },
         {
           "toZoneId": "z_4_3",
@@ -960,7 +657,7 @@
         {
           "toZoneId": "z_1_4",
           "hasDoor": true,
-          "doorOpen": true
+          "doorOpen": false
         },
         {
           "toZoneId": "z_0_3",
@@ -1048,7 +745,7 @@
         {
           "toZoneId": "z_1_3",
           "hasDoor": true,
-          "doorOpen": true
+          "doorOpen": false
         },
         {
           "toZoneId": "z_1_5",
@@ -1319,7 +1016,7 @@
       "doorOpen": true,
       "spawnPoint": false,
       "isExit": false,
-      "hasObjective": false
+      "hasObjective": true
     },
     "z_4_4": {
       "id": "z_4_4",
@@ -1327,7 +1024,7 @@
         {
           "toZoneId": "z_4_5",
           "hasDoor": true,
-          "doorOpen": true
+          "doorOpen": false
         },
         {
           "toZoneId": "z_3_4",
@@ -1414,7 +1111,7 @@
         {
           "toZoneId": "z_4_4",
           "hasDoor": true,
-          "doorOpen": true
+          "doorOpen": false
         },
         {
           "toZoneId": "z_3_5",
@@ -1885,7 +1582,7 @@
         {
           "toZoneId": "z_7_4",
           "hasDoor": true,
-          "doorOpen": true
+          "doorOpen": false
         }
       ],
       "connectedZones": [
@@ -1919,7 +1616,7 @@
         {
           "toZoneId": "z_6_4",
           "hasDoor": true,
-          "doorOpen": true
+          "doorOpen": false
         },
         {
           "toZoneId": "z_8_4",
@@ -2072,8 +1769,8 @@
       "type": "TAKE_OBJECTIVE",
       "description": "Collect all objective tokens (2)",
       "amountRequired": 2,
-      "amountCurrent": 2,
-      "completed": true
+      "amountCurrent": 0,
+      "completed": false
     }
   ],
   "tiles": [
@@ -2121,6 +1818,42 @@
     }
   ],
   "equipmentDeck": [
+    {
+      "id": "card-machete-11",
+      "name": "Machete",
+      "type": "WEAPON",
+      "stats": {
+        "range": [
+          0,
+          0
+        ],
+        "dice": 1,
+        "accuracy": 3,
+        "damage": 2,
+        "noise": false,
+        "dualWield": true
+      },
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
+    {
+      "id": "card-rifle-24",
+      "name": "Rifle",
+      "type": "WEAPON",
+      "stats": {
+        "range": [
+          1,
+          3
+        ],
+        "dice": 1,
+        "accuracy": 3,
+        "damage": 1,
+        "noise": true,
+        "dualWield": false
+      },
+      "inHand": false,
+      "slot": "BACKPACK"
+    },
     {
       "id": "card-sawed_off-18",
       "name": "Sawed-Off",
@@ -2679,7 +2412,7 @@
   "equipmentDiscard": [],
   "spawnDeck": [
     {
-      "id": "spawn-005",
+      "id": "spawn-003",
       "BLUE": {
         "zombies": {
           "WALKER": 1
@@ -2687,20 +2420,17 @@
       },
       "YELLOW": {
         "zombies": {
-          "WALKER": 2,
-          "RUNNER": 1
+          "FATTY": 1
         }
       },
       "ORANGE": {
         "zombies": {
-          "WALKER": 4,
-          "RUNNER": 2
+          "FATTY": 2
         }
       },
       "RED": {
         "zombies": {
-          "WALKER": 6,
-          "RUNNER": 3
+          "FATTY": 3
         }
       }
     },
@@ -2729,7 +2459,43 @@
       }
     },
     {
-      "id": "spawn-003",
+      "id": "spawn-002",
+      "BLUE": {
+        "zombies": {}
+      },
+      "YELLOW": {
+        "zombies": {
+          "RUNNER": 1
+        }
+      },
+      "ORANGE": {
+        "zombies": {
+          "RUNNER": 2
+        }
+      },
+      "RED": {
+        "zombies": {
+          "RUNNER": 3
+        }
+      }
+    },
+    {
+      "id": "spawn-008",
+      "BLUE": {
+        "doubleSpawn": true
+      },
+      "YELLOW": {
+        "doubleSpawn": true
+      },
+      "ORANGE": {
+        "doubleSpawn": true
+      },
+      "RED": {
+        "doubleSpawn": true
+      }
+    },
+    {
+      "id": "spawn-005",
       "BLUE": {
         "zombies": {
           "WALKER": 1
@@ -2737,17 +2503,81 @@
       },
       "YELLOW": {
         "zombies": {
-          "FATTY": 1
+          "WALKER": 2,
+          "RUNNER": 1
         }
       },
       "ORANGE": {
         "zombies": {
-          "FATTY": 2
+          "WALKER": 4,
+          "RUNNER": 2
         }
       },
       "RED": {
         "zombies": {
-          "FATTY": 3
+          "WALKER": 6,
+          "RUNNER": 3
+        }
+      }
+    },
+    {
+      "id": "spawn-007",
+      "BLUE": {
+        "extraActivation": "WALKER"
+      },
+      "YELLOW": {
+        "extraActivation": "WALKER"
+      },
+      "ORANGE": {
+        "extraActivation": "RUNNER"
+      },
+      "RED": {
+        "extraActivation": "RUNNER"
+      }
+    },
+    {
+      "id": "spawn-004",
+      "BLUE": {
+        "zombies": {
+          "WALKER": 2
+        }
+      },
+      "YELLOW": {
+        "zombies": {
+          "WALKER": 4
+        }
+      },
+      "ORANGE": {
+        "zombies": {
+          "WALKER": 6
+        }
+      },
+      "RED": {
+        "zombies": {
+          "WALKER": 8
+        }
+      }
+    },
+    {
+      "id": "spawn-001",
+      "BLUE": {
+        "zombies": {
+          "WALKER": 1
+        }
+      },
+      "YELLOW": {
+        "zombies": {
+          "WALKER": 2
+        }
+      },
+      "ORANGE": {
+        "zombies": {
+          "WALKER": 4
+        }
+      },
+      "RED": {
+        "zombies": {
+          "WALKER": 6
         }
       }
     }
@@ -2760,10 +2590,10 @@
   },
   "history": [
     {
-      "playerId": "player-5337",
+      "playerId": "player-647",
       "survivorId": "system",
       "actionType": "START_GAME",
-      "timestamp": 1772465855277,
+      "timestamp": 1772477440660,
       "payload": {
         "map": {
           "id": "map-1772465771065",
@@ -3032,334 +2862,6 @@
           ]
         }
       }
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "MOVE",
-      "timestamp": 1772465950151,
-      "payload": {
-        "targetZoneId": "z_1_2"
-      }
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "OPEN_DOOR",
-      "timestamp": 1772465952399,
-      "payload": {
-        "targetZoneId": "z_1_1"
-      }
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "MOVE",
-      "timestamp": 1772465953407,
-      "payload": {
-        "targetZoneId": "z_1_1"
-      }
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "MOVE",
-      "timestamp": 1772465954931,
-      "payload": {
-        "targetZoneId": "z_2_1"
-      }
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "MOVE",
-      "timestamp": 1772465958082,
-      "payload": {
-        "targetZoneId": "z_3_1"
-      }
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "TAKE_OBJECTIVE",
-      "timestamp": 1772465959948,
-      "payload": {
-        "zoneId": "z_3_1"
-      }
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "TAKE_OBJECTIVE",
-      "timestamp": 1772465959952
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "MOVE",
-      "timestamp": 1772465961824,
-      "payload": {
-        "targetZoneId": "z_4_1"
-      }
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "OPEN_DOOR",
-      "timestamp": 1772465965240,
-      "payload": {
-        "targetZoneId": "z_4_2"
-      }
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "SEARCH",
-      "timestamp": 1772465972049
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "MOVE",
-      "timestamp": 1772465976773,
-      "payload": {
-        "targetZoneId": "z_3_1"
-      }
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "MOVE",
-      "timestamp": 1772465977215,
-      "payload": {
-        "targetZoneId": "z_2_1"
-      }
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "MOVE",
-      "timestamp": 1772465977839,
-      "payload": {
-        "targetZoneId": "z_1_1"
-      }
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "MOVE",
-      "timestamp": 1772465980832,
-      "payload": {
-        "targetZoneId": "z_1_2"
-      }
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "MOVE",
-      "timestamp": 1772465981221,
-      "payload": {
-        "targetZoneId": "z_1_3"
-      }
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "OPEN_DOOR",
-      "timestamp": 1772465983657,
-      "payload": {
-        "targetZoneId": "z_1_4"
-      }
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "MOVE",
-      "timestamp": 1772465984666,
-      "payload": {
-        "targetZoneId": "z_1_4"
-      }
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "MOVE",
-      "timestamp": 1772465988915,
-      "payload": {
-        "targetZoneId": "z_2_4"
-      }
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "MOVE",
-      "timestamp": 1772465989556,
-      "payload": {
-        "targetZoneId": "z_3_4"
-      }
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "TAKE_OBJECTIVE",
-      "timestamp": 1772465990773,
-      "payload": {
-        "zoneId": "z_3_4"
-      }
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "TAKE_OBJECTIVE",
-      "timestamp": 1772465990773
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "MOVE",
-      "timestamp": 1772465995127,
-      "payload": {
-        "targetZoneId": "z_4_4"
-      }
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "SEARCH",
-      "timestamp": 1772465997497
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "ORGANIZE",
-      "timestamp": 1772466002359,
-      "payload": {
-        "cardId": "card-machete-11",
-        "targetSlot": "BACKPACK"
-      }
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "RESOLVE_SEARCH",
-      "timestamp": 1772466003999,
-      "payload": {
-        "action": "EQUIP",
-        "targetSlot": "HAND_2"
-      }
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "END_TURN",
-      "timestamp": 1772466008712
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "OPEN_DOOR",
-      "timestamp": 1772466013240,
-      "payload": {
-        "targetZoneId": "z_4_5"
-      }
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "MOVE",
-      "timestamp": 1772466015282,
-      "payload": {
-        "targetZoneId": "z_4_5"
-      }
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "MOVE",
-      "timestamp": 1772466017077,
-      "payload": {
-        "targetZoneId": "z_5_5"
-      }
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "MOVE",
-      "timestamp": 1772466018304,
-      "payload": {
-        "targetZoneId": "z_6_5"
-      }
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "MOVE",
-      "timestamp": 1772466021895,
-      "payload": {
-        "targetZoneId": "z_6_4"
-      }
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "OPEN_DOOR",
-      "timestamp": 1772466036693,
-      "payload": {
-        "targetZoneId": "z_7_4"
-      }
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "MOVE",
-      "timestamp": 1772466038483,
-      "payload": {
-        "targetZoneId": "z_7_4"
-      }
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "MOVE",
-      "timestamp": 1772466039269,
-      "payload": {
-        "targetZoneId": "z_7_5"
-      }
-    },
-    {
-      "playerId": "player-5337",
-      "survivorId": "survivor-player-5337",
-      "actionType": "MOVE",
-      "timestamp": 1772466041901,
-      "payload": {
-        "targetZoneId": "z_8_5"
-      }
     }
-  ],
-  "spawnContext": {
-    "cards": [
-      {
-        "zoneId": "z_5_5",
-        "cardId": "spawn-001",
-        "detail": {
-          "zombies": {
-            "WALKER": 2
-          }
-        },
-        "dangerLevel": "YELLOW"
-      },
-      {
-        "zoneId": "z_6_0",
-        "cardId": "spawn-004",
-        "detail": {
-          "zombies": {
-            "WALKER": 4
-          }
-        },
-        "dangerLevel": "YELLOW"
-      }
-    ],
-    "timestamp": 1772466039268
-  },
-  "gameResult": "VICTORY"
+  ]
 }

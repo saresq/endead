@@ -122,6 +122,15 @@ button:disabled {
   cursor: not-allowed;
 }
 
+button.danger {
+  background: #8a2f2f;
+  border-color: #bb4a4a;
+}
+
+button.danger:hover:not(:disabled) {
+  background: #a33a3a;
+}
+
 .weapon-btn {
   background: #663333;
   border-color: #aa5555;
@@ -320,6 +329,12 @@ button:disabled {
   margin: 0;
   border-bottom: 1px solid #444;
   padding-bottom: 10px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 .inventory-list {
