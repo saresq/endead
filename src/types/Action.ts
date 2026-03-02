@@ -5,6 +5,7 @@ import type { GameState } from './GameState';
 export enum ActionType {
   // Lobby Actions
   JOIN_LOBBY = 'JOIN_LOBBY',
+  UPDATE_NICKNAME = 'UPDATE_NICKNAME',
   SELECT_CHARACTER = 'SELECT_CHARACTER',
   START_GAME = 'START_GAME',
   END_GAME = 'END_GAME',

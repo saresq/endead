@@ -12,6 +12,89 @@ body {
   height: 100vh;
 }
 
+#menu-ui {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at top, #2f3648 0%, #1f2229 45%, #15171c 100%);
+  z-index: 3000;
+}
+
+.menu-card {
+  width: 420px;
+  max-width: 92vw;
+  background: rgba(22, 24, 30, 0.95);
+  border: 1px solid #4d5566;
+  border-radius: 10px;
+  padding: 24px;
+  color: #e6e8ee;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.45);
+}
+
+.menu-card h1 {
+  margin: 0;
+  text-align: center;
+}
+
+.menu-message {
+  background: #3b2d2d;
+  border: 1px solid #805252;
+  color: #ffd2d2;
+  border-radius: 6px;
+  padding: 10px;
+  text-align: center;
+}
+
+.menu-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.menu-field input,
+.menu-join-row input {
+  background: #2a2f3c;
+  border: 1px solid #596278;
+  color: #fff;
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.menu-actions {
+  display: flex;
+}
+
+.menu-primary {
+  width: 100%;
+  background: #2f5d3b;
+  border-color: #3c7d4d;
+}
+
+.menu-primary:hover:not(:disabled) {
+  background: #3a744b;
+}
+
+.menu-divider {
+  text-align: center;
+  color: #9ca4b8;
+  font-size: 0.9em;
+}
+
+.menu-join-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.menu-secondary {
+  background: #40485b;
+}
+
 /* UI Overlay */
 #game-hud, #lobby-ui {
   position: absolute;
@@ -207,6 +290,26 @@ button.danger:hover:not(:disabled) {
   margin: 0;
   border-bottom: 1px solid #444;
   padding-bottom: 15px;
+}
+
+.room-meta {
+  display: flex;
+  justify-content: center;
+}
+
+.room-id {
+  font-family: monospace;
+  background: #303546;
+  border: 1px solid #596078;
+  color: #dde6ff;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.room-id.copied {
+  background: #2f5d3b;
+  border-color: #4f9c66;
 }
 
 .player-list {

@@ -1,50 +1,45 @@
-
 import express from 'express';
 import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { initialGameState, GameState, PlayerId, GamePhase } from '../types/GameState';
 import { processAction } from '../services/ActionProcessor';
-import { ActionRequest, ActionResponse, ActionType } from '../types/Action';
+import { ActionRequest, ActionResponse } from '../types/Action';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { HeartbeatManager } from './HeartbeatManager';
-import { PersistenceService } from '../services/PersistenceService';
 import fs from 'fs/promises';
 
-// --- Server Configuration ---
 const app = express();
-app.use(express.json()); // Enable JSON body parsing
+app.use(express.json());
 const server = createServer(app);
 const PORT = process.env.PORT || 8080;
-const wss = new WebSocketServer({ server }); // Attach to HTTP server
+const wss = new WebSocketServer({ server });
 const heartbeatManager = new HeartbeatManager(wss);
 const MAX_PLAYERS = 6;
+const ROOM_IDLE_CLEANUP_MS = 5 * 60 * 1000;
 
-// --- API Routes ---
-
-app.get('/api/maps', async (req, res) => {
+app.get('/api/maps', async (_req, res) => {
   try {
     const mapsDir = path.resolve(process.cwd(), 'data/maps');
-    // Ensure directory exists
     try {
-        await fs.access(mapsDir);
+      await fs.access(mapsDir);
     } catch {
-        await fs.mkdir(mapsDir, { recursive: true });
+      await fs.mkdir(mapsDir, { recursive: true });
     }
 
     const files = await fs.readdir(mapsDir);
     const maps = [];
 
     for (const file of files) {
-      if (file.endsWith('.json')) {
-        const content = await fs.readFile(path.join(mapsDir, file), 'utf-8');
-        try {
-            maps.push(JSON.parse(content));
-        } catch (e) {
-            console.error(`Failed to parse map ${file}:`, e);
-        }
+      if (!file.endsWith('.json')) continue;
+      const content = await fs.readFile(path.join(mapsDir, file), 'utf-8');
+      try {
+        maps.push(JSON.parse(content));
+      } catch (e) {
+        console.error(`Failed to parse map ${file}:`, e);
       }
     }
+
     res.json(maps);
   } catch (error) {
     console.error('Error fetching maps:', error);
@@ -60,16 +55,15 @@ app.post('/api/maps', async (req, res) => {
       return;
     }
 
-    // Generate ID if missing
     if (!mapData.id) {
-        mapData.id = `map-${Date.now()}`;
+      mapData.id = `map-${Date.now()}`;
     }
 
     const mapsDir = path.resolve(process.cwd(), 'data/maps');
     try {
-        await fs.access(mapsDir);
+      await fs.access(mapsDir);
     } catch {
-        await fs.mkdir(mapsDir, { recursive: true });
+      await fs.mkdir(mapsDir, { recursive: true });
     }
 
     const filePath = path.join(mapsDir, `${mapData.id}.json`);
@@ -83,63 +77,112 @@ app.post('/api/maps', async (req, res) => {
   }
 });
 
-// --- Static File Serving (Production) ---
+app.post('/api/rooms', (_req, res) => {
+  const roomId = generateRoomId();
+  const room = createRoom(roomId);
+  rooms.set(roomId, room);
+  log(`Room created: ${roomId}`);
+  res.json({ roomId });
+});
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const distPath = path.resolve(__dirname, '../../dist');
 
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(distPath));
-  
-  // SPA Fallback
-  app.get('/{*any}', (req, res) => {
+  app.get('/{*any}', (_req, res) => {
     res.sendFile(path.join(distPath, 'index.html'));
   });
 }
 
-// --- State ---
-let gameState: GameState = { ...initialGameState };
-const clients = new Map<WebSocket, PlayerId>();
-const connections = new Map<PlayerId, WebSocket>();
+interface RoomContext {
+  id: string;
+  gameState: GameState;
+  clients: Map<WebSocket, PlayerId>;
+  connections: Map<PlayerId, WebSocket>;
+  cleanupTimer: NodeJS.Timeout | null;
+}
 
-// --- Initialization ---
-(async () => {
-  await PersistenceService.init();
-  const loadedState = await PersistenceService.loadState();
-  if (loadedState) {
-    gameState = loadedState;
-    console.log('[Server] Game state restored from disk.');
-  } else {
-    console.log('[Server] No valid save found. Starting fresh.');
-  }
-})();
+interface SocketSession {
+  roomId: string;
+  playerId: PlayerId;
+}
 
-// --- Helpers ---
+const rooms = new Map<string, RoomContext>();
+const socketSessions = new Map<WebSocket, SocketSession>();
+
 const log = (msg: string) => console.log(`[Server] ${new Date().toISOString()} - ${msg}`);
 
-const broadcastState = () => {
+function generateRoomId(): string {
+  let roomId = '';
+  do {
+    roomId = Math.random().toString(36).slice(2, 8);
+  } while (rooms.has(roomId));
+  return roomId;
+}
+
+function createRoom(roomId: string): RoomContext {
+  const gameState = JSON.parse(JSON.stringify(initialGameState)) as GameState;
+  gameState.id = roomId;
+  gameState.seed = `seed-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+
+  return {
+    id: roomId,
+    gameState,
+    clients: new Map(),
+    connections: new Map(),
+    cleanupTimer: null,
+  };
+}
+
+function ensureRoom(roomId: string): RoomContext | null {
+  return rooms.get(roomId) || null;
+}
+
+function clearRoomCleanup(room: RoomContext): void {
+  if (room.cleanupTimer) {
+    clearTimeout(room.cleanupTimer);
+    room.cleanupTimer = null;
+  }
+}
+
+function scheduleRoomCleanup(room: RoomContext): void {
+  if (room.cleanupTimer || room.connections.size > 0) return;
+
+  room.cleanupTimer = setTimeout(() => {
+    const latestRoom = rooms.get(room.id);
+    if (!latestRoom) return;
+    if (latestRoom.connections.size > 0) {
+      latestRoom.cleanupTimer = null;
+      return;
+    }
+
+    rooms.delete(room.id);
+    log(`Room ${room.id} deleted after 5 minutes idle.`);
+  }, ROOM_IDLE_CLEANUP_MS);
+
+  log(`Room ${room.id} scheduled for cleanup in 5 minutes.`);
+}
+
+function sendError(ws: WebSocket, error: { code: string; message: string }) {
+  if (ws.readyState !== WebSocket.OPEN) return;
+  ws.send(JSON.stringify({ type: 'ERROR', payload: error }));
+}
+
+function broadcastRoomState(room: RoomContext): void {
   const message = JSON.stringify({
     type: 'STATE_UPDATE',
-    payload: gameState,
+    payload: room.gameState,
   });
 
-  clients.forEach((_, ws) => {
+  room.clients.forEach((_playerId, ws) => {
     if (ws.readyState === WebSocket.OPEN) {
       ws.send(message);
     }
   });
-};
+}
 
-const sendError = (ws: WebSocket, error: { code: string; message: string }) => {
-  ws.send(JSON.stringify({
-    type: 'ERROR',
-    payload: error,
-  }));
-};
-
-// --- Connection Handling ---
-
-// Start Heartbeat
 heartbeatManager.start();
 
 wss.on('connection', (ws) => {
@@ -166,11 +209,13 @@ wss.on('connection', (ws) => {
   });
 });
 
-// --- Message Routing ---
-
 interface JoinMessage {
   type: 'JOIN';
-  payload: { playerId: PlayerId };
+  payload: {
+    roomId: string;
+    playerId: PlayerId;
+    name?: string;
+  };
 }
 
 interface ActionMessage {
@@ -189,25 +234,34 @@ function handleMessage(ws: WebSocket, message: ClientMessage) {
       handleAction(ws, message.payload);
       break;
     default:
-      log(`Unknown message type: ${(message as any).type}`);
       sendError(ws, { code: 'UNKNOWN_TYPE', message: `Unknown message type: ${(message as any).type}` });
   }
 }
 
-// --- Specific Handlers ---
+function handleJoin(ws: WebSocket, payload: { roomId: string; playerId: PlayerId; name?: string }) {
+  const { roomId, playerId, name } = payload;
 
-function handleJoin(ws: WebSocket, payload: { playerId: PlayerId }) {
-  const { playerId } = payload;
+  if (!roomId) {
+    sendError(ws, { code: 'MISSING_ROOM_ID', message: 'roomId is required.' });
+    return;
+  }
 
   if (!playerId) {
     sendError(ws, { code: 'MISSING_PLAYER_ID', message: 'playerId is required.' });
     return;
   }
 
-  // 1. Check if player already connected
-  const existingSocket = connections.get(playerId);
-  if (existingSocket) {
-    log(`Player ${playerId} re-connecting. Terminating previous session.`);
+  const room = ensureRoom(roomId);
+  if (!room) {
+    sendError(ws, { code: 'ROOM_NOT_FOUND', message: 'Room not found.' });
+    return;
+  }
+
+  clearRoomCleanup(room);
+
+  const existingSocket = room.connections.get(playerId);
+  if (existingSocket && existingSocket !== ws) {
+    log(`Player ${playerId} re-connecting to room ${roomId}. Terminating previous session.`);
     if (existingSocket.readyState === WebSocket.OPEN) {
       existingSocket.send(JSON.stringify({
         type: 'ERROR',
@@ -215,108 +269,113 @@ function handleJoin(ws: WebSocket, payload: { playerId: PlayerId }) {
       }));
       existingSocket.close(1000, 'New session connected');
     }
-  } else {
-    // New connection check limit
-    if (connections.size >= MAX_PLAYERS) {
-      sendError(ws, { code: 'SERVER_FULL', message: 'Game server is full.' });
+  }
+
+  const knownPlayer = room.gameState.lobby.players.some((p) => p.id === playerId) || room.gameState.players.includes(playerId);
+  const isLobby = room.gameState.phase === GamePhase.Lobby;
+
+  if (!isLobby && !knownPlayer) {
+    sendError(ws, { code: 'GAME_IN_PROGRESS', message: 'Game currently in progress' });
+    return;
+  }
+
+  if (isLobby && !knownPlayer && room.gameState.lobby.players.length >= MAX_PLAYERS) {
+    sendError(ws, { code: 'SERVER_FULL', message: 'Game server is full.' });
+    return;
+  }
+
+  socketSessions.set(ws, { roomId, playerId });
+  room.clients.set(ws, playerId);
+  room.connections.set(playerId, ws);
+
+  if (isLobby) {
+    const lobbyPlayer = room.gameState.lobby.players.find((p) => p.id === playerId);
+    if (!lobbyPlayer) {
+      room.gameState.lobby.players.push({
+        id: playerId,
+        name: (name || playerId).trim().slice(0, 24) || playerId,
+        ready: false,
+        characterClass: 'Standard',
+      });
+      broadcastRoomState(room);
       return;
     }
-    log(`Player ${playerId} joined.`);
-  }
 
-  // 2. Register Connection (Overwrite if exists)
-  clients.set(ws, playerId);
-  connections.set(playerId, ws);
-
-  // 3. Auto-Add to Lobby if in Lobby Phase
-  if (gameState.phase === GamePhase.Lobby) {
-    // Check if player already in lobby list
-    const inLobby = gameState.lobby.players.some(p => p.id === playerId);
-    if (!inLobby) {
-        gameState.lobby.players.push({
-            id: playerId,
-            name: playerId, // Default name
-            ready: false,
-            characterClass: 'Standard' // Default class
-        });
-        // We modified state directly here, should probably go through processor but JOIN is special
-        // Persist logic similar to action
-        PersistenceService.saveState(gameState); 
-        broadcastState();
-    } else {
-        // Just send state
-        ws.send(JSON.stringify({
-            type: 'STATE_UPDATE',
-            payload: gameState,
-        }));
+    const nextName = (name || '').trim().slice(0, 24);
+    if (nextName && lobbyPlayer.name !== nextName) {
+      lobbyPlayer.name = nextName;
+      broadcastRoomState(room);
+      return;
     }
-  } else {
-      // Game in progress, just send state
-      ws.send(JSON.stringify({
-        type: 'STATE_UPDATE',
-        payload: gameState,
-      }));
   }
+
+  ws.send(JSON.stringify({ type: 'STATE_UPDATE', payload: room.gameState }));
 }
 
 function handleDisconnect(ws: WebSocket) {
-  const playerId = clients.get(ws);
-  if (playerId) {
-    log(`Socket disconnected for player ${playerId}.`);
-    clients.delete(ws);
-    
-    if (connections.get(playerId) === ws) {
-      connections.delete(playerId);
-      log(`Player ${playerId} fully removed from active sessions.`);
-      
-      // If in lobby, remove them? Or keep them as "offline"?
-      // For MVP, if in Lobby, remove them to allow others.
-      if (gameState.phase === GamePhase.Lobby) {
-          gameState.lobby.players = gameState.lobby.players.filter(p => p.id !== playerId);
-          broadcastState();
-      }
-    } else {
-      log(`Player ${playerId} disconnected an old socket. Session preserved.`);
-    }
-  } else {
+  const session = socketSessions.get(ws);
+  if (!session) {
     log('Unidentified client disconnected.');
+    return;
+  }
+
+  const { roomId, playerId } = session;
+  const room = rooms.get(roomId);
+  socketSessions.delete(ws);
+
+  if (!room) return;
+
+  room.clients.delete(ws);
+
+  if (room.connections.get(playerId) === ws) {
+    room.connections.delete(playerId);
+    log(`Player ${playerId} disconnected from room ${roomId}.`);
+
+    if (room.gameState.phase === GamePhase.Lobby) {
+      room.gameState.lobby.players = room.gameState.lobby.players.filter((p) => p.id !== playerId);
+      broadcastRoomState(room);
+    }
+  }
+
+  if (room.connections.size === 0) {
+    scheduleRoomCleanup(room);
   }
 }
 
 function handleAction(ws: WebSocket, request: ActionRequest) {
-  const playerId = clients.get(ws);
+  const session = socketSessions.get(ws);
 
-  if (!playerId) {
+  if (!session) {
     sendError(ws, { code: 'UNAUTHORIZED', message: 'You must JOIN before sending actions.' });
     return;
   }
 
-  // Enforce Identity: Request must act on behalf of the connected player
-  if (request.playerId !== playerId) {
-    sendError(ws, { code: 'IDENTITY_MISMATCH', message: `You are connected as ${playerId} but tried to act as ${request.playerId}.` });
+  const room = rooms.get(session.roomId);
+  if (!room) {
+    sendError(ws, { code: 'ROOM_NOT_FOUND', message: 'Room no longer exists.' });
     return;
   }
 
-  log(`Processing action: ${request.type} from ${playerId}`);
+  if (request.playerId !== session.playerId) {
+    sendError(ws, {
+      code: 'IDENTITY_MISMATCH',
+      message: `You are connected as ${session.playerId} but tried to act as ${request.playerId}.`
+    });
+    return;
+  }
 
-  // Process Action via ActionProcessor
-  const response: ActionResponse = processAction(gameState, request);
+  log(`Processing action: ${request.type} from ${session.playerId} in room ${session.roomId}`);
+
+  const response: ActionResponse = processAction(room.gameState, request);
 
   if (response.success && response.newState) {
-    log(`Action successful. Broadcasting state update.`);
-    gameState = response.newState;
-    
-    // Persist State
-    PersistenceService.saveState(gameState).catch(err => {
-      console.error('[Server] Persistence failure:', err);
-    });
-
-    broadcastState();
-  } else {
-    const error = response.error || { code: 'UNKNOWN_ERROR', message: 'Action failed unexpectedly.' };
-    log(`Action failed: ${error.code} - ${error.message}`);
-    sendError(ws, error);
+    room.gameState = response.newState;
+    broadcastRoomState(room);
+    return;
   }
+
+  const error = response.error || { code: 'UNKNOWN_ERROR', message: 'Action failed unexpectedly.' };
+  sendError(ws, error);
 }
 
 server.listen(PORT, () => {

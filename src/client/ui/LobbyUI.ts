@@ -1,17 +1,20 @@
 
-import { GameState, PlayerId, GamePhase } from '../../types/GameState';
+import { GameState, PlayerId } from '../../types/GameState';
 import { ActionType } from '../../types/Action';
 import { networkManager } from '../NetworkManager';
 
 export class LobbyUI {
   private container: HTMLElement;
   private localPlayerId: PlayerId;
+  private roomId: string;
   private state: GameState | null = null;
   private availableMaps: any[] = [];
   private selectedMapId: string | null = null;
+  private nameDebounceTimer: number | null = null;
 
-  constructor(playerId: PlayerId) {
+  constructor(playerId: PlayerId, roomId: string) {
     this.localPlayerId = playerId;
+    this.roomId = roomId;
     
     this.container = document.createElement('div');
     this.container.id = 'lobby-ui';
@@ -78,6 +81,9 @@ export class LobbyUI {
     this.container.innerHTML = `
       <div class="lobby-container">
         <h1>Lobby</h1>
+        <div class="room-meta">
+          <span class="room-id" id="room-id-pill" title="Copy room URL">Room ID: ${this.roomId}</span>
+        </div>
         <div class="player-list">
           ${this.state.lobby.players.map((p, idx) => `
             <div class="player-card ${p.id === this.localPlayerId ? 'me' : ''}" style="border-left: 5px solid ${playerColors[idx % playerColors.length]}">
@@ -162,6 +168,55 @@ export class LobbyUI {
   private attachListeners(): void {
     const classBtns = this.container.querySelectorAll('.class-btn');
     const nameInput = this.container.querySelector('#nickname-input') as HTMLInputElement;
+    const roomIdPill = this.container.querySelector('#room-id-pill');
+
+    roomIdPill?.addEventListener('click', async () => {
+      const roomUrl = `${window.location.origin}/room/${this.roomId}`;
+      try {
+        await navigator.clipboard.writeText(roomUrl);
+        roomIdPill.classList.add('copied');
+        roomIdPill.textContent = `Copied: ${this.roomId}`;
+        window.setTimeout(() => {
+          roomIdPill.classList.remove('copied');
+          roomIdPill.textContent = `Room ID: ${this.roomId}`;
+        }, 1200);
+      } catch {
+        window.prompt('Copy this room URL:', roomUrl);
+      }
+    });
+
+    const pushNicknameUpdate = () => {
+      const nextName = nameInput?.value?.trim();
+      if (!nextName) return;
+
+      localStorage.setItem('endead_nickname', nextName.slice(0, 24));
+
+      networkManager.sendAction({
+        playerId: this.localPlayerId,
+        type: ActionType.UPDATE_NICKNAME,
+        payload: { name: nextName }
+      });
+    };
+
+    if (nameInput) {
+      nameInput.addEventListener('input', () => {
+        if (this.nameDebounceTimer) {
+          clearTimeout(this.nameDebounceTimer);
+        }
+
+        this.nameDebounceTimer = window.setTimeout(() => {
+          pushNicknameUpdate();
+        }, 500);
+      });
+
+      nameInput.addEventListener('blur', () => {
+        if (this.nameDebounceTimer) {
+          clearTimeout(this.nameDebounceTimer);
+          this.nameDebounceTimer = null;
+        }
+        pushNicknameUpdate();
+      });
+    }
 
     classBtns.forEach(btn => {
       btn.addEventListener('click', (e) => {

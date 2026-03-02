@@ -19,9 +19,11 @@ export class NetworkManager {
   }
 
   public onConnected?: () => void;
+  public onDisconnected?: () => void;
+  public onServerError?: (error: { code: string; message: string }) => void;
 
   public connect(): void {
-    if (this.ws) return;
+    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) return;
     this.ws = new WebSocket(this.url);
     this.ws.onopen = () => {
       console.log('NetworkManager: Connected to server.');
@@ -34,15 +36,26 @@ export class NetworkManager {
           gameStore.update(message.payload);
         } else if (message.type === 'ERROR') {
           console.error('Server Error:', message.payload);
+          if (this.onServerError) this.onServerError(message.payload);
         }
       } catch (e) {
         console.error('NetworkManager: Failed to parse message', e);
       }
     };
     this.ws.onerror = (e) => console.error('NetworkManager: WebSocket error', e);
+    this.ws.onclose = () => {
+      this.ws = null;
+      if (this.onDisconnected) this.onDisconnected();
+    };
   }
 
-  public joinGame(playerId: string): void {
+  public disconnect(): void {
+    if (!this.ws) return;
+    this.ws.close(1000, 'Client disconnect');
+    this.ws = null;
+  }
+
+  public joinGame(playerId: string, roomId: string, name?: string): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       console.warn('NetworkManager: Not connected, cannot join game.');
       return;
@@ -50,7 +63,7 @@ export class NetworkManager {
 
     const message = {
       type: 'JOIN',
-      payload: { playerId },
+      payload: { playerId, roomId, name },
     };
     this.ws.send(JSON.stringify(message));
   }

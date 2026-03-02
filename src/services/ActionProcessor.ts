@@ -39,6 +39,7 @@ function openDoorEdge(state: GameState, zoneAId: ZoneId, zoneBId: ZoneId): void 
 
 const handlers: Partial<Record<ActionType, ActionHandler>> = {
   [ActionType.JOIN_LOBBY]: handleJoinLobby, 
+  [ActionType.UPDATE_NICKNAME]: handleUpdateNickname,
   [ActionType.SELECT_CHARACTER]: handleSelectCharacter,
   [ActionType.START_GAME]: handleStartGame,
   [ActionType.END_GAME]: handleEndGame,
@@ -63,6 +64,7 @@ const handlers: Partial<Record<ActionType, ActionHandler>> = {
 export function processAction(state: GameState, intent: ActionRequest): ActionResponse {
   // 0. Pre-check: Lobby Actions don't check Turns
   if (
+    intent.type === ActionType.UPDATE_NICKNAME ||
     intent.type === ActionType.SELECT_CHARACTER ||
     intent.type === ActionType.START_GAME ||
     intent.type === ActionType.END_GAME
@@ -150,7 +152,7 @@ export function processAction(state: GameState, intent: ActionRequest): ActionRe
     }
 
     // 6. Log History
-    if (intent.type !== ActionType.SELECT_CHARACTER) {
+    if (intent.type !== ActionType.SELECT_CHARACTER && intent.type !== ActionType.UPDATE_NICKNAME) {
         newState.history = [
           ...(newState.history || []),
           {
@@ -177,6 +179,24 @@ export function processAction(state: GameState, intent: ActionRequest): ActionRe
 
 function handleJoinLobby(state: GameState, intent: ActionRequest): GameState {
     return state;
+}
+
+function handleUpdateNickname(state: GameState, intent: ActionRequest): GameState {
+    if (state.phase !== GamePhase.Lobby) throw new Error('Game already started');
+
+    const rawName = intent.payload?.name;
+    const normalizedName = typeof rawName === 'string' ? rawName.trim() : '';
+    const nextName = normalizedName.slice(0, 24);
+
+    if (!nextName) throw new Error('Nickname is required');
+
+    const newState = JSON.parse(JSON.stringify(state));
+    const player = newState.lobby.players.find((p: any) => p.id === intent.playerId);
+
+    if (!player) throw new Error('Player not in lobby');
+
+    player.name = nextName;
+    return newState;
 }
 
 function handleSelectCharacter(state: GameState, intent: ActionRequest): GameState {
