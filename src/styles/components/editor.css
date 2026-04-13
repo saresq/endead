@@ -1,0 +1,675 @@
+/* ==========================================================================
+   Editor — Map Editor & Tile Definition Editor
+   ========================================================================== */
+
+/* ---------- Shared Layout ---------- */
+
+.editor-sidebar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 280px;
+  height: 100vh;
+  background: var(--surface-1);
+  color: var(--text-primary);
+  overflow-y: auto;
+  padding: var(--space-3);
+  border-left: 1px solid var(--surface-4);
+  font-family: var(--font-mono);
+  z-index: var(--z-overlay);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.editor-sidebar__title {
+  margin: 0;
+  font-size: var(--text-lg);
+  color: var(--accent);
+  font-weight: var(--font-bold);
+}
+
+.editor-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.editor-section__label {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* ---------- Status Bar ---------- */
+
+.editor-status {
+  padding: var(--space-2);
+  background: var(--surface-0);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  min-height: 20px;
+  color: var(--text-secondary);
+}
+
+/* ---------- Tool Grid ---------- */
+
+.editor-tool-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-1);
+}
+
+.editor-tool-btn {
+  padding: var(--space-2) var(--space-1);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  border: 2px solid var(--surface-4);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  transition: all var(--duration-fast) var(--ease-in-out);
+  text-align: center;
+}
+
+.editor-tool-btn:hover {
+  background: var(--surface-3);
+  color: var(--text-primary);
+}
+
+.editor-tool-btn--active {
+  outline: 2px solid var(--text-primary);
+  color: var(--text-primary);
+  background: var(--surface-3);
+}
+
+/* ---------- Button Row ---------- */
+
+.editor-btn-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.editor-btn-row > * {
+  flex: 1;
+}
+
+/* ---------- Tile Palette ---------- */
+
+.editor-tile-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.editor-tile-item {
+  border: 2px solid var(--surface-4);
+  cursor: pointer;
+  text-align: center;
+  padding: var(--space-1);
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: var(--font-bold);
+  color: var(--text-secondary);
+  transition: all var(--duration-fast) var(--ease-in-out);
+}
+
+.editor-tile-item:hover {
+  border-color: var(--text-muted);
+  background: var(--surface-3);
+}
+
+.editor-tile-item--selected {
+  border-color: var(--success);
+  background: var(--success-muted);
+  color: var(--text-primary);
+}
+
+/* ---------- Room Panel ---------- */
+
+.editor-room-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.editor-room-entry {
+  padding: var(--space-1) var(--space-2);
+  background: var(--surface-2);
+  border: 1px solid var(--surface-4);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--text-xs);
+  transition: all var(--duration-fast) var(--ease-in-out);
+}
+
+.editor-room-entry:hover {
+  background: var(--surface-3);
+}
+
+.editor-room-entry--active {
+  background: var(--surface-3);
+  border-color: var(--accent);
+}
+
+/* ---------- Validation Panel ---------- */
+
+.editor-validation {
+  padding: var(--space-2);
+  background: var(--surface-0);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+}
+
+.editor-validation__ok {
+  color: var(--success);
+}
+
+.editor-validation__error {
+  color: var(--danger);
+}
+
+.editor-validation__warn {
+  color: var(--warning);
+}
+
+/* ---------- Instructions ---------- */
+
+.editor-instructions {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin-top: auto;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--surface-4);
+  line-height: 1.5;
+}
+
+/* ==========================================================================
+   Tile Definition Editor — Full-page view
+   ========================================================================== */
+
+.tde-container {
+  position: absolute;
+  inset: 0;
+  background: var(--surface-0);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  z-index: var(--z-overlay);
+  display: flex;
+  overflow: hidden;
+}
+
+.tde--panning,
+.tde--panning * {
+  cursor: grab !important;
+}
+
+.tde--panning:active,
+.tde--panning:active * {
+  cursor: grabbing !important;
+}
+
+/* ---------- Left Panel: Tile List ---------- */
+
+.tde-list-panel {
+  width: 220px;
+  background: var(--surface-1);
+  border-right: 1px solid var(--surface-4);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.tde-list-header {
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--surface-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.tde-list-header__title {
+  margin: 0;
+  font-size: var(--text-lg);
+  color: var(--accent);
+  font-weight: var(--font-bold);
+}
+
+.tde-tile-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.tde-tile-entry {
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-2);
+  border: 1px solid var(--surface-4);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--text-secondary);
+  transition: all var(--duration-fast) var(--ease-in-out);
+}
+
+.tde-tile-entry:hover {
+  background: var(--surface-3);
+  color: var(--text-primary);
+}
+
+.tde-tile-entry--active {
+  background: var(--accent-muted);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ---------- Main Panel (right of list) ---------- */
+
+.tde-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ---------- Header (fixed toolbar) ---------- */
+
+.tde-header {
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--surface-4);
+  background: var(--surface-1);
+}
+
+.tde-toolbar {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+  flex-wrap: wrap;
+  padding: var(--space-2) var(--space-3);
+}
+
+/* ---------- Viewport (zoomable) ---------- */
+
+.tde-viewport {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-0);
+  min-height: 0;
+}
+
+.tde-zoom-container {
+  transform-origin: center center;
+  transition: transform 0.1s ease-out;
+}
+
+/* ---------- Properties Panel (fixed bottom) ---------- */
+
+.tde-props-panel {
+  flex-shrink: 0;
+  border-top: 1px solid var(--surface-4);
+  background: var(--surface-1);
+  padding: var(--space-2) var(--space-3);
+  min-height: 40px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.tde-props-stats {
+  display: flex;
+  gap: var(--space-4);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin-bottom: var(--space-1);
+}
+
+.tde-props-rooms {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.tde-toolbar__section {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.tde-toolbar__label {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-right: var(--space-1);
+  white-space: nowrap;
+}
+
+/* ---------- Grid ---------- */
+
+.tde-grid-wrapper {
+  position: relative;
+  flex-shrink: 0;
+  border: 2px solid var(--surface-4);
+  border-radius: var(--radius-sm);
+  overflow: visible;
+}
+
+.tde-cell {
+  position: absolute;
+  cursor: crosshair;
+  border: none;
+  outline: 1px solid rgba(255, 255, 255, 0.06);
+  outline-offset: -1px;
+  box-sizing: border-box;
+  user-select: none;
+}
+
+.tde-cell:hover {
+  filter: brightness(1.2);
+}
+
+.tde-edge {
+  position: absolute;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: background var(--duration-fast);
+  z-index: 2;
+}
+
+.tde-edge:hover {
+  filter: brightness(1.3);
+}
+
+.tde-ext-edge {
+  position: absolute;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: background var(--duration-fast);
+}
+
+.tde-ext-edge:hover {
+  filter: brightness(1.3);
+}
+
+/* ---------- Mode Buttons ---------- */
+
+.tde-mode-btn {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--surface-4);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  transition: all var(--duration-fast) var(--ease-in-out);
+}
+
+.tde-mode-btn--active {
+  border-color: var(--accent);
+  background: var(--accent-muted);
+  color: var(--accent);
+}
+
+/* ---------- Brush Buttons ---------- */
+
+.tde-brush-btn {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--surface-4);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  transition: all var(--duration-fast) var(--ease-in-out);
+}
+
+.tde-brush-btn--active {
+  border-color: var(--text-primary);
+  color: var(--text-primary);
+}
+
+.tde-brush-btn--street.tde-brush-btn--active {
+  background: rgba(0, 200, 0, 0.2);
+  border-color: rgba(0, 200, 0, 0.6);
+  color: var(--success);
+}
+
+.tde-brush-btn--building.tde-brush-btn--active {
+  background: rgba(100, 100, 255, 0.2);
+  border-color: rgba(100, 100, 255, 0.6);
+  color: var(--accent);
+}
+
+.tde-brush-btn--eraser.tde-brush-btn--active,
+.tde-brush-btn--open.tde-brush-btn--active {
+  background: var(--danger-muted);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.tde-brush-btn--crosswalk.tde-brush-btn--active {
+  background: rgba(0, 100, 200, 0.2);
+  border-color: rgba(0, 150, 255, 0.6);
+  color: rgb(100, 180, 255);
+}
+
+.tde-brush-btn--wall.tde-brush-btn--active {
+  background: rgba(139, 69, 19, 0.25);
+  border-color: rgba(180, 100, 40, 0.7);
+  color: rgb(220, 160, 90);
+}
+
+.tde-brush-btn--doorway.tde-brush-btn--active {
+  background: rgba(255, 200, 50, 0.2);
+  border-color: rgba(255, 200, 50, 0.6);
+  color: rgb(255, 220, 100);
+}
+
+/* ---------- Add Zone Button ---------- */
+
+.tde-add-zone-btn {
+  border-style: dashed !important;
+  font-weight: var(--font-bold);
+}
+
+.tde-add-zone-btn--active {
+  border-style: solid !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 0 6px currentColor;
+}
+
+/* ---------- Room Buttons ---------- */
+
+.tde-room-btn {
+  width: 28px;
+  height: 28px;
+  border: 2px solid;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: var(--font-bold);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ---------- Sidebar ---------- */
+
+.tde-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  min-width: 180px;
+}
+
+.tde-sidebar__label {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: var(--space-1);
+}
+
+/* ---------- Room Properties ---------- */
+
+.tde-room-prop-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+  font-size: var(--text-xs);
+}
+
+.tde-room-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.tde-dark-toggle {
+  padding: 2px var(--space-2);
+  border: 1px solid var(--surface-4);
+  background: var(--warning-muted);
+  color: var(--warning);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+}
+
+.tde-dark-toggle--dark {
+  background: var(--surface-3);
+  color: var(--text-muted);
+  border-color: var(--text-muted);
+}
+
+.tde-dark-toggle .icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* Room light icons on the tile grid */
+.tde-room-light-icon {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 2;
+  color: var(--warning);
+  filter: drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000);
+}
+
+.tde-room-light-icon .icon {
+  width: 24px;
+  height: 24px;
+  stroke: currentColor;
+  stroke-width: 2;
+  paint-order: stroke fill;
+}
+
+.tde-room-light-icon--dark {
+  color: #ffffff;
+}
+
+.tde-room-name-input {
+  width: 64px;
+  padding: 1px var(--space-1);
+  border: 1px solid var(--surface-4);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  font-family: inherit;
+}
+.tde-room-name-input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+
+/* ---------- Cell Info ---------- */
+
+.tde-cell-info {
+  padding: var(--space-2);
+  background: var(--surface-1);
+  border-radius: var(--radius-sm);
+  min-height: 40px;
+  font-size: var(--text-sm);
+}
+
+.tde-cell-info--empty {
+  color: var(--text-muted);
+}
+
+/* ---------- Help Text ---------- */
+
+.tde-help {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* ---------- Boundary Lines ---------- */
+
+.tde-boundary {
+  position: absolute;
+  z-index: 3;
+  pointer-events: auto;
+  transition: filter var(--duration-fast);
+}
+
+.tde-boundary:hover {
+  filter: brightness(1.5);
+}
+
+/* ---------- Drag Preview ---------- */
+
+.tde-drag-preview {
+  position: absolute;
+  border: 2px solid;
+  border-radius: 1px;
+  z-index: 5;
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+/* ---------- Door Markers ---------- */
+
+.tde-door-marker {
+  position: absolute;
+  background: rgba(180, 80, 20, 0.85);
+  border: 1px solid rgba(255, 200, 100, 0.6);
+  border-radius: 1px;
+  z-index: 3;
+  pointer-events: none;
+}
+
+/* ---------- Footer ---------- */
+
+.tde-footer {
+  flex-shrink: 0;
+  display: flex;
+  gap: var(--space-2);
+  justify-content: flex-end;
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--surface-4);
+  background: var(--surface-1);
+}

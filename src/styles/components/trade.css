@@ -1,0 +1,307 @@
+/* ==========================================================================
+   Trade & Pickup — Inventory management overlay and slot layout
+   Items rendered via item-card.css component.
+   ========================================================================== */
+
+/* ---------- Overlay Container ---------- */
+
+.trade-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: rgba(13, 15, 20, 0.8);
+  z-index: var(--z-modal);
+  padding: var(--space-4);
+}
+
+@media (max-width: 767px) {
+  .trade-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+}
+
+/* ---------- Modal Card ---------- */
+
+.trade-modal {
+  background: var(--surface-1);
+  border: 1px solid var(--surface-4);
+  border-radius: var(--radius-xl);
+  width: 520px;
+  max-width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-lg);
+  color: var(--text-primary);
+  overflow: hidden;
+}
+
+.trade-modal--wide {
+  width: 760px;
+}
+
+@media (max-width: 767px) {
+  .trade-modal {
+    width: 100%;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    max-height: 92vh;
+  }
+}
+
+/* ---------- Header ---------- */
+
+.trade-modal__header {
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--surface-4);
+  flex-shrink: 0;
+}
+
+.trade-modal__title {
+  font-size: var(--text-lg);
+  font-weight: var(--font-bold);
+  margin: 0;
+}
+
+.trade-modal__subtitle {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin-top: var(--space-1);
+}
+
+/* ---------- Body ---------- */
+
+.trade-modal__body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--space-4) var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  overscroll-behavior: contain;
+}
+
+/* ---------- Footer ---------- */
+
+.trade-modal__footer {
+  padding: var(--space-3) var(--space-5);
+  padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--surface-4);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+  background: var(--surface-2);
+}
+
+.trade-modal__footer-hint {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.trade-modal__footer-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+/* ---------- Section ---------- */
+
+.trade-section__label {
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-2);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* ---------- Slot Grid ---------- */
+
+.trade-slots {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.trade-slot-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-2);
+}
+
+.trade-backpack-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+/* Individual Slot — a drop target that wraps an item-card */
+.trade-slot {
+  background: var(--surface-0);
+  border: 2px dashed var(--surface-4);
+  border-radius: var(--radius-md);
+  padding: var(--space-1);
+  min-height: 52px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  transition: background var(--duration-fast) var(--ease-in-out),
+              border-color var(--duration-fast) var(--ease-in-out);
+  position: relative;
+}
+
+.trade-slot.drag-over {
+  background: var(--success-muted);
+  border-color: var(--success);
+}
+
+.trade-slot--filled {
+  border-style: solid;
+  border-color: var(--surface-4);
+  background: transparent;
+  padding: 0;
+}
+
+.trade-slot--ghost {
+  border-color: var(--accent);
+  border-style: dashed;
+  background: transparent;
+  padding: 0;
+}
+
+/* Item card inside a filled slot removes its own border to merge with slot */
+.trade-slot--filled > .item-card,
+.trade-slot--ghost > .item-card {
+  border: none;
+  background: transparent;
+  width: 100%;
+}
+
+.trade-slot__label {
+  position: absolute;
+  top: -10px;
+  left: var(--space-2);
+  font-size: 10px;
+  font-weight: var(--font-semibold);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--surface-1);
+  padding: 0 var(--space-1);
+}
+
+/* ---------- Discard Zone ---------- */
+
+.trade-discard {
+  background: var(--surface-0);
+  border: 2px dashed var(--surface-4);
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
+  min-height: 52px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  transition: background var(--duration-fast) var(--ease-in-out),
+              border-color var(--duration-fast) var(--ease-in-out);
+}
+
+.trade-discard.drag-over {
+  background: var(--danger-muted);
+  border-color: var(--danger);
+}
+
+/* ---------- Trade-specific: Two Column Layout ---------- */
+
+.trade-columns {
+  display: flex;
+  gap: var(--space-4);
+}
+
+@media (max-width: 767px) {
+  .trade-columns {
+    flex-direction: column;
+  }
+}
+
+.trade-column {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* Offer box */
+.trade-offer-box {
+  background: var(--surface-2);
+  border: 1px solid var(--surface-4);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  min-height: 60px;
+  transition: background var(--duration-fast) var(--ease-in-out),
+              border-color var(--duration-fast) var(--ease-in-out);
+}
+
+.trade-offer-box.drag-over {
+  background: var(--accent-muted);
+  border-color: var(--accent);
+}
+
+.trade-offer-box__title {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-weight: var(--font-semibold);
+  margin-bottom: var(--space-2);
+}
+
+.trade-offer-box__items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.trade-exchange-arrow {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: var(--text-lg);
+  padding: var(--space-1) 0;
+}
+
+/* Status indicators */
+.trade-status {
+  display: flex;
+  gap: var(--space-4);
+  font-size: var(--text-sm);
+}
+
+.trade-status__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--text-muted);
+}
+
+.trade-status__item::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.trade-status__item--ready {
+  color: var(--success);
+  font-weight: var(--font-semibold);
+}
+
+.trade-status__item--ready::before {
+  background: var(--success);
+}

@@ -58,16 +58,52 @@ export function validateTurn(state: GameState, request: ActionRequest): ActionEr
         };
       }
 
+      // 3b. Check if Survivor is Dead
+      if (survivor.wounds >= survivor.maxHealth) {
+        return {
+          code: 'SURVIVOR_DEAD',
+          message: `Survivor ${survivor.name} is dead and cannot perform actions.`,
+        };
+      }
+
       // 4. Check Action Economy
       // Exception: Passive player in a trade does not need actions
       // Exception: Resolve Search/Pickup or Organize during Pickup is allowed with 0 actions
       const isPickupException = survivor.drawnCard && (request.type === 'RESOLVE_SEARCH' || request.type === 'ORGANIZE');
-      
-      if (survivor.actionsRemaining <= 0 && !isTradeException && !isPickupException) {
+
+      // Check if survivor has a free action that covers this request
+      const hasFreeAction = (
+        (request.type === 'MOVE' && survivor.freeMovesRemaining > 0) ||
+        (request.type === 'SEARCH' && survivor.freeSearchesRemaining > 0) ||
+        (request.type === 'ATTACK' && survivor.freeCombatsRemaining > 0)
+      );
+
+      if (survivor.actionsRemaining <= 0 && !isTradeException && !isPickupException && !hasFreeAction) {
         return {
           code: 'NO_ACTIONS',
           message: `Survivor ${survivor.name} has no actions remaining.`,
         };
+      }
+
+      // Zombie zone control: moving out of a zone with zombies costs +1 AP penalty
+      // Slippery skill waives the penalty entirely
+      if (request.type === 'MOVE' && !survivor.skills.includes('slippery')) {
+        const currentZone = state.zones[survivor.position.zoneId];
+        const hasZombies = currentZone && Object.values(state.zombies).some(
+          (z: any) => z.position.zoneId === currentZone.id
+        );
+        if (hasZombies) {
+          // With free move: free covers base cost, need 1 AP for penalty
+          // Without free move: need 2 AP total (1 base + 1 penalty)
+          const hasFreeMove = survivor.freeMovesRemaining > 0;
+          const apNeeded = hasFreeMove ? 1 : 2;
+          if (survivor.actionsRemaining < apNeeded) {
+            return {
+              code: 'NOT_ENOUGH_AP',
+              message: `Moving out of a zone with zombies requires ${apNeeded} action(s).`,
+            };
+          }
+        }
       }
   }
 
@@ -92,22 +128,25 @@ export function checkEndTurn(state: GameState): GameState {
 
   const activePlayerId = newState.players[newState.activePlayerIndex];
   
-  // Find all survivors belonging to the active player
+  // Find all living survivors belonging to the active player
   const playerSurvivors = Object.values(newState.survivors).filter(
-    (s) => s.playerId === activePlayerId
+    (s) => s.playerId === activePlayerId && s.wounds < s.maxHealth
   );
 
-  // Check if ANY survivor has actions remaining
+  // Check if ANY living survivor has actions remaining
   const hasActionsLeft = playerSurvivors.some((s) => s.actionsRemaining > 0);
 
   if (!hasActionsLeft) {
-    // Player is done, move to next player
-    newState.activePlayerIndex++;
+    // Player is done, move to next player (wrap around)
+    const nextIndex = (newState.activePlayerIndex + 1) % newState.players.length;
 
-    // Check for Phase Change (End of Round)
-    if (newState.activePlayerIndex >= newState.players.length) {
-      newState.activePlayerIndex = 0;
+    // Check for Phase Change (End of Round) — all players have had their turn
+    // when we wrap back to the first player token holder
+    if (nextIndex === newState.firstPlayerTokenIndex) {
+      newState.activePlayerIndex = nextIndex;
       newState.phase = GamePhase.Zombies;
+    } else {
+      newState.activePlayerIndex = nextIndex;
     }
   }
 

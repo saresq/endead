@@ -2,7 +2,8 @@
 import * as PIXI from 'pixi.js';
 import { GameState, EntityId, ZoneId, PlayerId } from '../types/GameState';
 import { ActionType } from '../types/Action';
-import { ZONE_LAYOUT, TILE_SIZE, ENTITY_RADIUS } from '../config/Layout';
+import { TILE_SIZE, ENTITY_RADIUS } from '../config/Layout';
+import { getZoneLayout } from './utils/zoneLayout';
 import { networkManager } from './NetworkManager';
 import { gameStore } from './GameStore';
 import { PixiBoardRenderer } from './PixiBoardRenderer';
@@ -41,7 +42,6 @@ export class InputController {
     if (mode !== 'DEFAULT') {
       this.pendingMoveZoneId = null;
     }
-    console.log(`Input Mode: ${mode}`);
     if (this.onModeChange) this.onModeChange(mode);
     this.requestRender();
   }
@@ -136,7 +136,7 @@ export class InputController {
           this.setMode('DEFAULT');
         } else {
           // DEFAULT = MOVE (tap once to preview, tap again to confirm)
-          if (currentZone && currentZone.connectedZones.includes(clickedZoneId)) {
+          if (currentZone && currentZone.connections.some(c => c.toZoneId === clickedZoneId)) {
             if (this.pendingMoveZoneId === clickedZoneId) {
               this.sendMoveAction(clickedZoneId);
               this.pendingMoveZoneId = null;
@@ -166,6 +166,18 @@ export class InputController {
     const mySurvivor = Object.values(state.survivors).find(s => s.playerId === this.localPlayerId);
     if (mySurvivor) {
         this.selectSurvivor(mySurvivor.id);
+    }
+  }
+
+  public selectMySurvivorById(id: EntityId): void {
+    this.selectSurvivor(id);
+  }
+
+  public confirmPendingMove(): void {
+    if (this.pendingMoveZoneId) {
+      this.sendMoveAction(this.pendingMoveZoneId);
+      this.pendingMoveZoneId = null;
+      this.requestRender();
     }
   }
 
@@ -199,7 +211,10 @@ export class InputController {
     const currentZone = state.zones[survivor.position.zoneId];
     if (!currentZone) return [];
 
-    return currentZone.connectedZones;
+    // Filter out zones blocked by closed doors
+    return currentZone.connections
+      .filter(c => !(c.hasDoor && !c.doorOpen))
+      .map(c => c.toZoneId);
   }
 
   private clearPendingMove(): void {
@@ -272,19 +287,22 @@ export class InputController {
 
     for (const zoneId in survivorsByZone) {
       const zoneSurvivors = survivorsByZone[zoneId];
-      const layout = this.getZoneLayout(zoneId) || { col: 0, row: 0, w: 1, h: 1 };
-      const zoneX = layout.col * TILE_SIZE;
-      const zoneY = layout.row * TILE_SIZE;
+      const layout = getZoneLayout(zoneId);
+
+      // Use centroid for multi-cell zones (matches renderer's calculatePosition)
+      const centerX = layout.centroidX !== undefined
+        ? layout.centroidX * TILE_SIZE + TILE_SIZE / 2
+        : layout.col * TILE_SIZE + TILE_SIZE / 2;
+      const centerY = layout.centroidY !== undefined
+        ? layout.centroidY * TILE_SIZE + TILE_SIZE / 2
+        : layout.row * TILE_SIZE + TILE_SIZE / 2;
 
       for (let i = 0; i < zoneSurvivors.length; i++) {
-        // Calculate position logic from Renderer
-        // offsetX = 30 + (index % 3) * SPACING
-        // offsetY = 30 + floor(index / 3) * SPACING
-        const offsetX = 30 + (i % 3) * 40; // Hardcoded spacing 40 from config
-        const offsetY = 30 + Math.floor(i / 3) * 40;
-        
-        const cx = zoneX + offsetX;
-        const cy = zoneY + offsetY;
+        const offsetX = -20 + (i % 3) * 40;
+        const offsetY = -20 - Math.floor(i / 3) * 40;
+
+        const cx = centerX + offsetX;
+        const cy = centerY + offsetY;
 
         // Circle hit test
         const dx = x - cx;
@@ -298,36 +316,32 @@ export class InputController {
     return null;
   }
 
-  private getZoneLayout(zoneId: ZoneId): { col: number, row: number, w: number, h: number } | null {
-    // Static layout first
-    if (ZONE_LAYOUT[zoneId]) return ZONE_LAYOUT[zoneId];
-    
-    // Dynamic zone: z_x_y
-    const parts = zoneId.split('_');
-    if (parts.length === 3 && parts[0] === 'z') {
-      return {
-        col: parseInt(parts[1]),
-        row: parseInt(parts[2]),
-        w: 1,
-        h: 1
-      };
-    }
-    return null;
-  }
 
   private hitTestZones(x: number, y: number, state: GameState): ZoneId | null {
-    // Iterate all zones (AABB check) - supports both static and dynamic zones
+    // For multi-cell zones: check exact cell membership, not just bounding box
     for (const zoneId in state.zones) {
-      const layout = this.getZoneLayout(zoneId);
+      const layout = getZoneLayout(zoneId);
       if (!layout) continue;
 
-      const zx = layout.col * TILE_SIZE;
-      const zy = layout.row * TILE_SIZE;
-      const zw = layout.w * TILE_SIZE;
-      const zh = layout.h * TILE_SIZE;
+      if (layout.cells && layout.cells.length > 1) {
+        // Multi-cell zone: check if click is within any constituent cell
+        for (const c of layout.cells) {
+          const cx = c.x * TILE_SIZE;
+          const cy = c.y * TILE_SIZE;
+          if (x >= cx && x <= cx + TILE_SIZE && y >= cy && y <= cy + TILE_SIZE) {
+            return zoneId;
+          }
+        }
+      } else {
+        // Single-cell zone: simple AABB check
+        const zx = layout.col * TILE_SIZE;
+        const zy = layout.row * TILE_SIZE;
+        const zw = layout.w * TILE_SIZE;
+        const zh = layout.h * TILE_SIZE;
 
-      if (x >= zx && x <= zx + zw && y >= zy && y <= zy + zh) {
-        return zoneId;
+        if (x >= zx && x <= zx + zw && y >= zy && y <= zy + zh) {
+          return zoneId;
+        }
       }
     }
     return null;

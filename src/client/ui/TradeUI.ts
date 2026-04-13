@@ -2,513 +2,389 @@
 import { Survivor, EquipmentCard, TradeSession, GameState } from '../../types/GameState';
 import { ActionType } from '../../types/Action';
 import { networkManager } from '../NetworkManager';
+import { renderButton } from './components/Button';
+import { renderItemCard, renderEmptySlot } from './components/ItemCard';
+import { icon } from './components/icons';
+import { modalManager } from './overlays/ModalManager';
 
 export class TradeUI {
-  private container: HTMLElement;
-  
-  // State
+  private modalId: string | null = null;
+
   private mySurvivor: Survivor | null = null;
   private partnerSurvivor: Survivor | null = null;
   private session: TradeSession | null = null;
-  
-  // Local modifications
-  private myInventory: EquipmentCard[] = []; // Current layout of my items
-  private myOffer: string[] = []; // IDs of items I am offering
-  private partnerOffer: EquipmentCard[] = []; // Items partner is offering (Read Only)
-  
-  // Track where I want to put received items
-  private receivedItemSlots: Record<string, string> = {}; // CardId -> SlotName
+
+  private myInventory: EquipmentCard[] = [];
+  private myOffer: string[] = [];
+  private partnerOffer: EquipmentCard[] = [];
+  private receivedItemSlots: Record<string, string> = {};
 
   private draggedItemId: string | null = null;
   private draggedFrom: 'inventory' | 'offer' | 'partner_offer' | null = null;
 
-  constructor() {
-    this.container = document.createElement('div');
-    this.container.id = 'trade-ui-container';
-    this.container.className = 'modal-overlay';
-    this.container.style.display = 'none';
-    document.body.appendChild(this.container);
-  }
+  /** AbortController for per-render drag/drop listeners */
+  private listenerAc: AbortController | null = null;
 
   public sync(mySurvivor: Survivor, session: TradeSession, globalState: GameState): void {
     const isActive = mySurvivor.id === session.activeSurvivorId;
     const partnerId = isActive ? session.targetSurvivorId : session.activeSurvivorId;
     const partner = globalState.survivors[partnerId];
 
-    // Check if state changed significantly to warrant re-init or just re-render
-    // For MVP, we re-sync fully every update.
     this.mySurvivor = mySurvivor;
     this.partnerSurvivor = partner;
     this.session = session;
-
-    // We only update local inventory from server if it's the FIRST sync or if we assume server is truth.
-    // If we want real-time drag without jitter, we need to be careful.
-    // But since `TRADE_OFFER` sends the offer list, and `ORGANIZE` is instant, 
-    // we should trust `mySurvivor.inventory` from server.
-    // The `session.offers` contains the IDs of offered cards.
-    
     this.myInventory = JSON.parse(JSON.stringify(mySurvivor.inventory));
-    
+
     const myOfferIds = session.offers[mySurvivor.id] || [];
-    this.myOffer = [...myOfferIds]; // Clone mutable copy
+    this.myOffer = [...myOfferIds];
 
     const partnerOfferIds = session.offers[partnerId] || [];
-    // Find partner cards from their inventory
     this.partnerOffer = partner.inventory.filter(c => partnerOfferIds.includes(c.id));
 
-    // Sync receive layout
     const myLayout = session.receiveLayouts?.[mySurvivor.id] || {};
     this.receivedItemSlots = { ...myLayout };
 
-    // Clean up receivedItemSlots: remove items no longer in partner offer
+    // Clean stale entries
     Object.keys(this.receivedItemSlots).forEach(id => {
-        if (!partnerOfferIds.includes(id)) {
-            delete this.receivedItemSlots[id];
-        }
+      if (!partnerOfferIds.includes(id)) delete this.receivedItemSlots[id];
     });
 
-    // Auto-Assign New Ghost Items
+    // Auto-assign new ghost items to available slots
+    const allSlots = ['HAND_1', 'HAND_2', 'BACKPACK_0', 'BACKPACK_1', 'BACKPACK_2'] as const;
     this.partnerOffer.forEach(card => {
-        if (!this.receivedItemSlots[card.id]) {
-            // Find a slot
-            const slots = ['HAND_1', 'HAND_2', 'BACKPACK'];
-            let assigned = false;
-            
-            for (const slot of slots) {
-                if (slot === 'BACKPACK') {
-                    // Always valid unless backpack is visually full?
-                    // Game logic allows 3 items.
-                    // Check if current layout + existing items fills it up.
-                    const existingBackpack = this.myInventory.filter(c => c.slot === 'BACKPACK' && !this.myOffer.includes(c.id)).length;
-                    const ghostBackpack = Object.values(this.receivedItemSlots).filter(s => s === 'BACKPACK').length;
-                    if ((existingBackpack + ghostBackpack) < 3) {
-                        this.receivedItemSlots[card.id] = 'BACKPACK';
-                        assigned = true;
-                        break;
-                    }
-                } else {
-                    const existing = this.myInventory.find(c => c.slot === slot && !this.myOffer.includes(c.id));
-                    const ghost = Object.values(this.receivedItemSlots).includes(slot);
-                    if (!existing && !ghost) {
-                        this.receivedItemSlots[card.id] = slot;
-                        assigned = true;
-                        break;
-                    }
-                }
-            }
-            
-            // If full, assign to DISCARD
-            if (!assigned) {
-                this.receivedItemSlots[card.id] = 'DISCARD';
-            }
-        }
+      if (this.receivedItemSlots[card.id]) return;
+      for (const slot of allSlots) {
+        const existing = this.myInventory.find(c => c.slot === slot && !this.myOffer.includes(c.id));
+        const ghost = Object.values(this.receivedItemSlots).includes(slot);
+        if (!existing && !ghost) { this.receivedItemSlots[card.id] = slot; return; }
+      }
+      this.receivedItemSlots[card.id] = 'DISCARD';
     });
 
-    this.container.style.display = 'flex';
-    this.render();
+    if (!this.modalId) {
+      this.modalId = modalManager.open({
+        title: `Trading with ${this.partnerSurvivor.name}`,
+        size: 'lg',
+        persistent: true,
+        className: 'trade-modal--wide',
+        renderBody: () => this.renderBody(),
+        renderFooter: () => this.renderFooter(),
+        onOpen: (el) => this.attachClickListener(el),
+      });
+    } else {
+      this.updateModalContent();
+    }
   }
 
   public hide(): void {
-    this.container.style.display = 'none';
+    this.abortListeners();
+    if (this.modalId) {
+      modalManager.close(this.modalId);
+      this.modalId = null;
+    }
     this.mySurvivor = null;
     this.partnerSurvivor = null;
     this.session = null;
   }
 
-  private render(): void {
-    if (!this.mySurvivor || !this.partnerSurvivor || !this.session) return;
+  // ─── Rendering ───────────────────────────────────────────────
+
+  private updateModalContent(): void {
+    if (!this.modalId) return;
+    // Skip DOM replacement while a drag is in progress — the innerHTML
+    // swap destroys the dragged element and cancels the browser's DnD operation.
+    if (this.draggedItemId) return;
+    modalManager.updateBody(this.modalId, this.renderBody());
+    modalManager.updateFooter(this.modalId, this.renderFooter());
+    this.attachDragListeners();
+  }
+
+  private renderBody(): string {
+    if (!this.mySurvivor || !this.partnerSurvivor || !this.session) return '';
 
     const myStatus = this.session.status[this.mySurvivor.id];
     const partnerStatus = this.session.status[this.partnerSurvivor.id];
 
-    this.container.innerHTML = `
-      <div class="modal trade-modal">
-        <h2>Trading with ${this.partnerSurvivor.name}</h2>
-        <div class="subtitle">You can rearrange your inventory for free</div>
-        
-        <div class="trade-workspace">
-           <!-- My Inventory (Left) -->
-           <div class="trade-panel my-inventory">
-              <h3>My Inventory</h3>
-              ${this.renderInventoryGrid(this.myInventory, this.myOffer)}
-           </div>
-
-           <!-- Trade Table (Center) -->
-           <div class="trade-panel trade-table">
-              <h3>Offers</h3>
-              <div class="offer-box my-offer" data-drop="offer">
-                 <h4>I Give:</h4>
-                 <div class="offer-grid">
-                    ${this.renderOfferList(this.myInventory, this.myOffer, true)}
-                 </div>
-              </div>
-              
-              <div class="exchange-icon">⇄</div>
-
-               <div class="offer-box partner-offer">
-                  <h4>${this.partnerSurvivor.name} Gives:</h4>
-                  <div class="offer-grid">
-                     ${this.renderCardList(this.partnerOffer, true)}
-                  </div>
-               </div>
-            </div>
+    return `
+      <div class="trade-modal__subtitle">Drag items to the offer zone. Rearrange your inventory for free.</div>
+      <div class="trade-columns">
+        <div class="trade-column">
+          <div class="trade-section__label">My Inventory</div>
+          ${this.renderMyInventory()}
         </div>
 
-        <div class="trade-footer">
-           <div class="status-indicators">
-              <div class="status ${myStatus ? 'ready' : ''}">Me: ${myStatus ? 'READY' : 'Not Ready'}</div>
-              <div class="status ${partnerStatus ? 'ready' : ''}">${this.partnerSurvivor.name}: ${partnerStatus ? 'READY' : 'Not Ready'}</div>
-           </div>
-           
-           <div class="button-group">
-             <button id="btn-cancel-trade" class="secondary">Cancel Trade</button>
-             <button id="btn-accept-trade" class="primary ${myStatus ? 'active' : ''}">${myStatus ? 'Unaccept' : 'Accept Trade'}</button>
-           </div>
+        <div class="trade-column">
+          <div class="trade-section__label">Offers</div>
+          ${this.renderOfferZone(myStatus, partnerStatus)}
         </div>
+      </div>`;
+  }
+
+  private renderFooter(): string {
+    if (!this.mySurvivor || !this.partnerSurvivor || !this.session) return '';
+
+    const myStatus = this.session.status[this.mySurvivor.id];
+    const partnerStatus = this.session.status[this.partnerSurvivor.id];
+
+    return `
+      <div class="trade-status">
+        <span class="trade-status__item ${myStatus ? 'trade-status__item--ready' : ''}">Me: ${myStatus ? 'Ready' : 'Not Ready'}</span>
+        <span class="trade-status__item ${partnerStatus ? 'trade-status__item--ready' : ''}">${this.partnerSurvivor.name}: ${partnerStatus ? 'Ready' : 'Not Ready'}</span>
       </div>
-    `;
-
-    this.attachListeners();
+      <div class="trade-modal__footer-actions">
+        ${renderButton({ label: 'Cancel', icon: 'X', variant: 'secondary', size: 'sm', dataAction: 'cancel-trade' })}
+        ${renderButton({ label: myStatus ? 'Unaccept' : 'Accept', icon: myStatus ? 'X' : 'Check', variant: myStatus ? 'secondary' : 'primary', size: 'sm', dataAction: 'accept-trade' })}
+      </div>`;
   }
 
-  private renderInventoryGrid(inventory: EquipmentCard[], offeredIds: string[]): string {
-      // Items I own that I am NOT offering
-      const visibleItems = inventory.filter(c => !offeredIds.includes(c.id));
-      
-      // Items I am receiving that I have assigned a slot
-      const ghostItems = this.partnerOffer.filter(c => this.receivedItemSlots[c.id]);
+  private renderMyInventory(): string {
+    const visibleItems = this.myInventory.filter(c => !this.myOffer.includes(c.id));
+    const ghostItems = this.partnerOffer.filter(c => this.receivedItemSlots[c.id]);
 
-      // Helper to find item at slot (either owned or ghost)
-      const getItemAtSlot = (slot: string, index?: number) => {
-          // Check my inventory first
-          let item = visibleItems.find(c => {
-             if (c.slot === slot) {
-                 // For BACKPACK, we need to handle index if multiple items?
-                 // Current logic just filters by slot=BACKPACK.
-                 // The game doesn't strictly track backpack index position in the model (just list order).
-                 // But for UI slots [0,1,2], we just take the Nth item.
-                 return true; 
-             }
-             return false;
-          });
-          
-          if (slot === 'BACKPACK') {
-              // Get all backpack items
-              const backpackItems = visibleItems.filter(c => c.slot === 'BACKPACK');
-              
-              // Also get ghost items assigned to backpack? 
-              // Wait, receivedItemSlots values are just slot names like 'HAND_1', 'BACKPACK'.
-              // It doesn't track index.
-              // So we just pool them.
-              
-              const allBackpack = [...backpackItems];
-              // Add ghost items for backpack
-              const ghostBackpack = ghostItems.filter(c => this.receivedItemSlots[c.id] === 'BACKPACK');
-              
-              // Combine
-              const combined = [...allBackpack, ...ghostBackpack];
-              return combined[index!] || null;
-          }
+    const getItem = (slot: string): { card: EquipmentCard | null; ghost: boolean } => {
+      const owned = visibleItems.find(c => c.slot === slot);
+      if (owned) return { card: owned, ghost: false };
+      const ghost = ghostItems.find(c => this.receivedItemSlots[c.id] === slot);
+      return { card: ghost || null, ghost: !!ghost };
+    };
 
-          // For Hands
-          if (item) return item;
+    const hand1 = getItem('HAND_1');
+    const hand2 = getItem('HAND_2');
+    const bp0 = getItem('BACKPACK_0');
+    const bp1 = getItem('BACKPACK_1');
+    const bp2 = getItem('BACKPACK_2');
 
-          // Check for ghost item
-          const ghost = ghostItems.find(c => this.receivedItemSlots[c.id] === slot);
-          return ghost || null;
-      };
+    const renderSlot = (data: { card: EquipmentCard | null; ghost: boolean }, slot: string, label?: string) => {
+      const cls = data.ghost ? 'trade-slot trade-slot--ghost' : data.card ? 'trade-slot trade-slot--filled' : 'trade-slot';
+      const labelHtml = label ? `<span class="trade-slot__label">${label}</span>` : '';
+      const content = data.card
+        ? renderItemCard(data.card, { variant: data.ghost ? 'ghost' : 'default', badge: data.ghost ? 'GET' : undefined, draggable: true, showSlot: false })
+        : renderEmptySlot();
+      return `<div class="${cls}" data-slot="${slot}" data-drop="inventory">${labelHtml}${content}</div>`;
+    };
 
-      const hand1 = getItemAtSlot('HAND_1');
-      const hand2 = getItemAtSlot('HAND_2');
-      
-      // For backpack, we need to be careful.
-      // If I have 1 item in backpack, and I assign a ghost item to backpack.
-      // The grid should show 2 items.
-      const backpack0 = getItemAtSlot('BACKPACK', 0);
-      const backpack1 = getItemAtSlot('BACKPACK', 1);
-      const backpack2 = getItemAtSlot('BACKPACK', 2);
-      
-      const isGhost = (card: EquipmentCard | null) => {
-          return !!(card && this.partnerOffer.some(p => p.id === card.id));
-      };
+    const discarded = visibleItems.filter(c => c.slot === 'DISCARD');
+    const ghostDiscarded = ghostItems.filter(c => this.receivedItemSlots[c.id] === 'DISCARD');
+    const discardContent = [...discarded, ...ghostDiscarded].map(c => {
+      const isG = ghostItems.some(g => g.id === c.id);
+      return renderItemCard(c, { variant: isG ? 'ghost' : 'default', badge: isG ? 'GET' : undefined, draggable: true, showSlot: false, discarded: true });
+    }).join('');
 
-      return `
-        <div class="slot-group">
-           <div class="slot-row">
-              <div class="slot hand-slot" data-slot="HAND_1" data-drop="inventory">
-                 <div class="slot-label">Hand 1</div>
-                 ${this.renderCard(hand1, true, isGhost(hand1))}
-              </div>
-              <div class="slot hand-slot" data-slot="HAND_2" data-drop="inventory">
-                 <div class="slot-label">Hand 2</div>
-                 ${this.renderCard(hand2, true, isGhost(hand2))}
-              </div>
-           </div>
-           
-           <div class="inventory-separator"></div>
-
-           <div class="backpack-grid">
-              ${[backpack0, backpack1, backpack2].map((c, i) => `
-                 <div class="slot backpack-slot" data-slot="BACKPACK" data-drop="inventory">
-                    ${this.renderCard(c, true, isGhost(c))}
-                 </div>
-              `).join('')}
-           </div>
-           
-           <div class="discard-zone" data-slot="DISCARD" data-drop="inventory">
-              <div class="slot-label">Discard Zone (Drag here to remove)</div>
-              ${this.renderDiscardList(visibleItems, ghostItems)}
-           </div>
+    return `
+      <div class="trade-slots">
+        <div class="trade-slot-row">
+          ${renderSlot(hand1, 'HAND_1', 'Hand 1')}
+          ${renderSlot(hand2, 'HAND_2', 'Hand 2')}
         </div>
-      `;
+        <div class="trade-backpack-row">
+          ${renderSlot(bp0, 'BACKPACK_0')}
+          ${renderSlot(bp1, 'BACKPACK_1')}
+          ${renderSlot(bp2, 'BACKPACK_2')}
+        </div>
+        <div>
+          <div class="trade-section__label">${icon('X', 'sm')} Drop here to remove</div>
+          <div class="trade-discard" data-slot="DISCARD" data-drop="inventory">
+            ${discardContent || renderEmptySlot()}
+          </div>
+        </div>
+      </div>`;
   }
 
-  private renderDiscardList(inventory: EquipmentCard[], ghostItems: EquipmentCard[]): string {
-      const ownedDiscard = inventory.filter(c => c.slot === 'DISCARD');
-      const ghostDiscard = ghostItems.filter(c => this.receivedItemSlots[c.id] === 'DISCARD');
-      
-      const all = [...ownedDiscard, ...ghostDiscard];
-      
-      const isGhost = (card: EquipmentCard) => {
-          return !!(card && this.partnerOffer.some(p => p.id === card.id));
-      };
-
-      return all.map(c => this.renderCard(c, true, isGhost(c))).join('');
-  }
-
-  private renderOfferList(inventory: EquipmentCard[], offeredIds: string[], draggable: boolean): string {
-      const offeredCards = inventory.filter(c => offeredIds.includes(c.id));
-      return this.renderCardList(offeredCards, draggable);
-  }
-
-  private renderCardList(cards: EquipmentCard[], draggable: boolean): string {
-      return cards.map(c => `
-         <div class="offer-slot">
-            ${this.renderCard(c, draggable, false)}
-         </div>
-      `).join('');
-  }
-
-  private renderCard(card: EquipmentCard | null | undefined, draggable: boolean, isGhost: boolean = false): string {
+  private renderOfferZone(myStatus: boolean, partnerStatus: boolean): string {
+    const myOfferCards = this.myOffer.map(id => {
+      const card = this.myInventory.find(c => c.id === id);
       if (!card) return '';
-      return `
-        <div class="trade-item ${isGhost ? 'ghost-item' : ''}" 
-             draggable="${draggable}" 
-             data-id="${card.id}"
-             data-ghost="${isGhost}">
-           <div class="item-name">${card.name}</div>
-           <div class="item-type">${card.type}</div>
-           ${isGhost ? '<div class="ghost-badge">GET</div>' : ''}
-        </div>
-      `;
+      return renderItemCard(card, { draggable: true, showSlot: false });
+    }).join('');
+
+    const partnerOfferCards = this.partnerOffer.map(card =>
+      renderItemCard(card, { variant: 'ghost', draggable: true, showSlot: false })
+    ).join('');
+
+    return `
+      <div class="trade-offer-box" data-drop="offer">
+        <div class="trade-offer-box__title">I Give</div>
+        <div class="trade-offer-box__items">${myOfferCards || '<span class="text-placeholder">Drag items here to offer</span>'}</div>
+      </div>
+
+      <div class="trade-exchange-arrow">&darr; &uarr;</div>
+
+      <div class="trade-offer-box">
+        <div class="trade-offer-box__title">${this.partnerSurvivor!.name} Gives</div>
+        <div class="trade-offer-box__items">${partnerOfferCards || '<span class="text-placeholder">Nothing offered yet</span>'}</div>
+      </div>`;
   }
 
-  private attachListeners(): void {
-      this.container.querySelector('#btn-cancel-trade')?.addEventListener('click', () => {
+  // ─── Event Handling ──────────────────────────────────────────
+
+  /** Attach click listener once when the modal opens. */
+  private attachClickListener(el: HTMLElement): void {
+    el.addEventListener('click', (e) => {
+      const target = (e.target as HTMLElement).closest('[data-action]') as HTMLElement | null;
+      if (!target) return;
+
+      if (target.dataset.action === 'cancel-trade') {
+        networkManager.sendAction({ playerId: this.mySurvivor!.playerId, survivorId: this.mySurvivor!.id, type: ActionType.TRADE_CANCEL });
+      }
+      if (target.dataset.action === 'accept-trade') {
+        if (this.session!.status[this.mySurvivor!.id]) {
+          this.sendOfferUpdate();
+        } else {
           networkManager.sendAction({
-              playerId: this.mySurvivor!.playerId,
-              survivorId: this.mySurvivor!.id,
-              type: ActionType.TRADE_CANCEL
+            playerId: this.mySurvivor!.playerId, survivorId: this.mySurvivor!.id,
+            type: ActionType.TRADE_ACCEPT, payload: { receiveLayout: this.receivedItemSlots },
           });
-      });
+        }
+      }
+    });
 
-      this.container.querySelector('#btn-accept-trade')?.addEventListener('click', () => {
-          // Toggle accept
-          // If already accepted, maybe sending OFFER update clears it? 
-          // Or we need explicit unaccept?
-          // The handler just sets status=true.
-          // To unaccept, we can re-send the current offer (which resets status).
-          
-          if (this.session!.status[this.mySurvivor!.id]) {
-              // Unaccept by resending offer (hacky but works with current logic)
-              this.sendOfferUpdate();
-          } else {
-              networkManager.sendAction({
-                  playerId: this.mySurvivor!.playerId,
-                  survivorId: this.mySurvivor!.id,
-                  type: ActionType.TRADE_ACCEPT,
-                  payload: {
-                      receiveLayout: this.receivedItemSlots
-                  }
-              });
-          }
-      });
+    this.attachDragListeners();
+  }
 
-      // Drag Logic
-      const items = this.container.querySelectorAll('.trade-item[draggable="true"]');
-      const slots = this.container.querySelectorAll('.slot, .offer-box[data-drop="offer"]');
+  /** Abort previous drag/drop listeners and attach fresh ones. */
+  private abortListeners(): void {
+    this.listenerAc?.abort();
+    this.listenerAc = null;
+  }
 
-      items.forEach(el => {
-          el.addEventListener('dragstart', (e: any) => {
-              this.draggedItemId = e.target.getAttribute('data-id');
-              const isGhost = e.target.getAttribute('data-ghost') === 'true';
-              
-              // Determine source
-              if (isGhost) {
-                  this.draggedFrom = 'partner_offer';
-              } else if (this.myOffer.includes(this.draggedItemId!)) {
-                  this.draggedFrom = 'offer';
-              } else if (this.partnerOffer.some(p => p.id === this.draggedItemId)) {
-                  this.draggedFrom = 'partner_offer';
-              } else {
-                  this.draggedFrom = 'inventory';
-              }
-              e.dataTransfer.effectAllowed = 'move';
-              setTimeout(() => e.target.classList.add('dragging'), 0);
-          });
-          el.addEventListener('dragend', (e: any) => {
-              e.target.classList.remove('dragging');
-              this.draggedItemId = null;
-              this.draggedFrom = null;
-          });
-      });
+  private attachDragListeners(): void {
+    this.abortListeners();
 
-      slots.forEach(el => {
-          el.addEventListener('dragover', (e: any) => {
-              e.preventDefault();
-              e.dataTransfer.dropEffect = 'move';
-              el.classList.add('drag-over');
-          });
-          el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
-          el.addEventListener('drop', (e: any) => {
-              e.preventDefault();
-              el.classList.remove('drag-over');
-              this.handleDrop(el);
-          });
-      });
+    const el = this.modalId ? modalManager.getElement(this.modalId) : null;
+    if (!el) return;
+
+    this.listenerAc = new AbortController();
+    const signal = this.listenerAc.signal;
+
+    const draggables = el.querySelectorAll('[draggable="true"]');
+    const dropTargets = el.querySelectorAll('[data-drop]');
+
+    draggables.forEach(item => {
+      item.addEventListener('dragstart', (e: any) => {
+        const card = e.target.closest('[data-id]');
+        if (!card) return;
+        this.draggedItemId = card.getAttribute('data-id');
+        const isGhost = card.getAttribute('data-ghost') === 'true';
+        if (isGhost) { this.draggedFrom = 'partner_offer'; }
+        else if (this.myOffer.includes(this.draggedItemId!)) { this.draggedFrom = 'offer'; }
+        else { this.draggedFrom = 'inventory'; }
+        e.dataTransfer.effectAllowed = 'move';
+        setTimeout(() => card.classList.add('dragging'), 0);
+      }, { signal });
+      item.addEventListener('dragend', (e: any) => {
+        const card = e.target.closest('[data-id]');
+        card?.classList.remove('dragging');
+        this.draggedItemId = null;
+        this.draggedFrom = null;
+      }, { signal });
+    });
+
+    dropTargets.forEach(dt => {
+      dt.addEventListener('dragover', (e: any) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; dt.classList.add('drag-over'); }, { signal });
+      dt.addEventListener('dragleave', () => dt.classList.remove('drag-over'), { signal });
+      dt.addEventListener('drop', (e: any) => { e.preventDefault(); dt.classList.remove('drag-over'); this.handleDrop(dt); }, { signal });
+    });
+  }
+
+  /** Schedule a re-render after the browser finishes its DnD lifecycle (dragend). */
+  private scheduleRender(): void {
+    // Use setTimeout(0) so the browser fires dragend and cleans up its
+    // internal DnD state before we replace the DOM and re-attach listeners.
+    setTimeout(() => this.updateModalContent(), 0);
   }
 
   private handleDrop(targetEl: Element): void {
-      if (!this.draggedItemId) return;
+    if (!this.draggedItemId) return;
 
-      const dropType = targetEl.getAttribute('data-drop'); // 'inventory' or 'offer'
-      const targetSlot = targetEl.getAttribute('data-slot'); // HAND_1, BACKPACK etc. (only if inventory)
+    const dropType = targetEl.getAttribute('data-drop');
+    const targetSlot = targetEl.getAttribute('data-slot');
 
-      // 1. Move to Offer
-      if (dropType === 'offer') {
-          if (this.draggedFrom === 'partner_offer') return; // Cannot offer what you don't have yet
+    const draggedId = this.draggedItemId;
+    const draggedFrom = this.draggedFrom;
 
-          if (!this.myOffer.includes(this.draggedItemId)) {
-              this.myOffer.push(this.draggedItemId);
-              this.sendOfferUpdate();
-          }
-          return;
+    // Drop into offer zone
+    if (dropType === 'offer') {
+      if (draggedFrom === 'partner_offer') return;
+      if (!this.myOffer.includes(draggedId)) {
+        this.myOffer.push(draggedId);
+        this.sendOfferUpdate();
+        this.scheduleRender();
       }
+      return;
+    }
 
-      // 2. Move to Inventory (or Reorganize)
-      if (dropType === 'inventory') {
-          // Identify if we are dropping onto an existing item to swap
-          let victimId: string | null = null;
-          if (targetSlot !== 'DISCARD') { // Don't swap if discarding
-             const itemEl = targetEl.querySelector('.trade-item');
-             if (itemEl) {
-                 victimId = itemEl.getAttribute('data-id');
-                 // If dropping onto itself, do nothing
-                 if (victimId === this.draggedItemId) return;
-             }
-          }
+    if (dropType !== 'inventory' || !targetSlot) return;
 
-          // Check if we need a Manual Swap (if Ghost items are involved)
-          const isDraggedGhost = this.draggedFrom === 'partner_offer';
-          const isVictimGhost = victimId ? Object.keys(this.receivedItemSlots).includes(victimId) : false;
-          
-          if (victimId && (isDraggedGhost || isVictimGhost)) {
-              // We need to swap manually because Server won't handle Ghost items
-              
-              // 1. Determine Source Slot of Dragged Item
-              let sourceSlot: string | null = null;
-              if (isDraggedGhost) {
-                  sourceSlot = this.receivedItemSlots[this.draggedItemId!] || null;
-              } else {
-                  const c = this.myInventory.find(i => i.id === this.draggedItemId);
-                  sourceSlot = c && c.slot ? c.slot : null;
-              }
-
-              if (sourceSlot) {
-                  // Remove from Offer if present (before moving)
-                  if (this.myOffer.includes(this.draggedItemId)) {
-                       this.myOffer = this.myOffer.filter(id => id !== this.draggedItemId);
-                       this.sendOfferUpdate();
-                  }
-
-                  // 2. Move Victim to Source Slot
-                  if (isVictimGhost) {
-                      this.receivedItemSlots[victimId] = sourceSlot;
-                  } else {
-                      // Victim is Owned -> Send ORGANIZE
-                      networkManager.sendAction({
-                          playerId: this.mySurvivor!.playerId,
-                          survivorId: this.mySurvivor!.id,
-                          type: ActionType.ORGANIZE,
-                          payload: { cardId: victimId, targetSlot: sourceSlot }
-                      });
-                  }
-
-                  // 3. Move Dragged to Target Slot
-                  if (isDraggedGhost) {
-                      this.receivedItemSlots[this.draggedItemId] = targetSlot!; // targetSlot is safe due to drop logic
-                  } else {
-                      // Dragged is Owned -> Send ORGANIZE
-                      networkManager.sendAction({
-                          playerId: this.mySurvivor!.playerId,
-                          survivorId: this.mySurvivor!.id,
-                          type: ActionType.ORGANIZE,
-                          payload: { cardId: this.draggedItemId, targetSlot: targetSlot! }
-                      });
-                  }
-                  
-                  this.render();
-                  return;
-              }
-          }
-
-          // Fallback to standard logic (Owned-vs-Owned OR Empty Slot OR Discard)
-
-          // If came from Partner Offer, we are assigning a slot
-          if (this.draggedFrom === 'partner_offer') {
-               if (targetSlot) {
-                   this.receivedItemSlots[this.draggedItemId] = targetSlot;
-                   // Just re-render locally, will be sent on Accept
-                   this.render(); 
-               }
-               return;
-          }
-
-          // If came from Offer, remove from Offer
-          if (this.myOffer.includes(this.draggedItemId)) {
-              this.myOffer = this.myOffer.filter(id => id !== this.draggedItemId);
-              this.sendOfferUpdate();
-              // We effectively "returned" it.
-              // We ALSO need to set its slot if we dropped on a specific slot.
-          }
-
-          // Handle Slot Change (Reorganize)
-          if (targetSlot) {
-              const card = this.myInventory.find(c => c.id === this.draggedItemId);
-              if (card && card.slot !== targetSlot) {
-                  // Logic: Send ORGANIZE action.
-                  networkManager.sendAction({
-                      playerId: this.mySurvivor!.playerId,
-                      survivorId: this.mySurvivor!.id,
-                      type: ActionType.ORGANIZE,
-                      payload: {
-                          cardId: this.draggedItemId,
-                          targetSlot: targetSlot
-                      }
-                  });
-              }
-          }
+    // Find what's in the target slot
+    let victimId: string | null = null;
+    if (targetSlot !== 'DISCARD') {
+      const itemEl = targetEl.querySelector('.item-card[data-id]');
+      if (itemEl) {
+        victimId = itemEl.getAttribute('data-id');
+        if (victimId === draggedId) return;
       }
+    }
+
+    const isDraggedGhost = draggedFrom === 'partner_offer';
+    const isVictimGhost = victimId ? Object.keys(this.receivedItemSlots).includes(victimId) : false;
+
+    // Swap logic when ghost items are involved
+    if (victimId && (isDraggedGhost || isVictimGhost)) {
+      let sourceSlot: string | null = null;
+      if (isDraggedGhost) { sourceSlot = this.receivedItemSlots[draggedId] || null; }
+      else { sourceSlot = this.myInventory.find(i => i.id === draggedId)?.slot ?? null; }
+
+      if (sourceSlot) {
+        if (this.myOffer.includes(draggedId)) {
+          this.myOffer = this.myOffer.filter(id => id !== draggedId);
+          this.sendOfferUpdate();
+        }
+        if (isVictimGhost) { this.receivedItemSlots[victimId] = sourceSlot; }
+        else { networkManager.sendAction({ playerId: this.mySurvivor!.playerId, survivorId: this.mySurvivor!.id, type: ActionType.ORGANIZE, payload: { cardId: victimId, targetSlot: sourceSlot } }); }
+        if (isDraggedGhost) { this.receivedItemSlots[draggedId] = targetSlot!; }
+        else { networkManager.sendAction({ playerId: this.mySurvivor!.playerId, survivorId: this.mySurvivor!.id, type: ActionType.ORGANIZE, payload: { cardId: draggedId, targetSlot: targetSlot! } }); }
+        this.scheduleRender();
+        return;
+      }
+    }
+
+    // Assigning partner offer item to a slot
+    if (draggedFrom === 'partner_offer' && targetSlot) {
+      this.receivedItemSlots[draggedId] = targetSlot;
+      this.scheduleRender();
+      return;
+    }
+
+    // Returning from offer
+    if (this.myOffer.includes(draggedId)) {
+      this.myOffer = this.myOffer.filter(id => id !== draggedId);
+      this.sendOfferUpdate();
+      this.scheduleRender();
+      return;
+    }
+
+    // Reorganize — optimistically swap in local inventory
+    if (targetSlot) {
+      const card = this.myInventory.find(c => c.id === draggedId);
+      if (card && card.slot !== targetSlot) {
+        const occupant = this.myInventory.find(c => c.slot === targetSlot && c.id !== draggedId);
+        if (occupant) {
+          occupant.slot = card.slot;
+          occupant.inHand = (card.slot === 'HAND_1' || card.slot === 'HAND_2');
+        }
+        card.slot = targetSlot as any;
+        card.inHand = (targetSlot === 'HAND_1' || targetSlot === 'HAND_2');
+
+        networkManager.sendAction({ playerId: this.mySurvivor!.playerId, survivorId: this.mySurvivor!.id, type: ActionType.ORGANIZE, payload: { cardId: draggedId, targetSlot } });
+        this.scheduleRender();
+      }
+    }
   }
 
   private sendOfferUpdate(): void {
-      networkManager.sendAction({
-          playerId: this.mySurvivor!.playerId,
-          survivorId: this.mySurvivor!.id,
-          type: ActionType.TRADE_OFFER,
-          payload: {
-              offerCardIds: this.myOffer
-          }
-      });
+    networkManager.sendAction({
+      playerId: this.mySurvivor!.playerId, survivorId: this.mySurvivor!.id,
+      type: ActionType.TRADE_OFFER, payload: { offerCardIds: this.myOffer },
+    });
   }
 }

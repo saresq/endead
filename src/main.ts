@@ -1,4 +1,5 @@
-import './style.css';
+import './styles/index.css';
+import { notificationManager } from './client/ui/NotificationManager';
 import * as PIXI from 'pixi.js';
 import { gameStore } from './client/GameStore';
 import { PixiBoardRenderer } from './client/PixiBoardRenderer';
@@ -11,6 +12,10 @@ import { MenuUI } from './client/ui/MenuUI';
 import { generateDiff } from './utils/StateDiff';
 import { GamePhase } from './types/GameState';
 import { MapEditor } from './client/editor/MapEditor';
+import { loadTileDefinitionsFromServer } from './config/TileDefinitions';
+import { KeyboardManager } from './client/KeyboardManager';
+import { assetManager } from './client/AssetManager';
+import { audioManager } from './client/AudioManager';
 
 const PLAYER_ID_KEY = 'endead_player_id';
 const NICKNAME_KEY = 'endead_nickname';
@@ -20,6 +25,7 @@ let lobbyUi: LobbyUI | null = null;
 let gameHud: GameHUD | null = null;
 let pixiApp: PIXI.Application | null = null;
 let inputController: InputController | null = null;
+let keyboardManager: KeyboardManager | null = null;
 let unsubscribeStore: (() => void) | null = null;
 let currentRoomId: string | null = null;
 let roomInitToken = 0;
@@ -104,6 +110,11 @@ function cleanupRoomUi(): void {
 
   inputController = null;
 
+  if (keyboardManager) {
+    keyboardManager.destroy();
+    keyboardManager = null;
+  }
+
   if (pixiApp) {
     pixiApp.destroy(true);
     pixiApp = null;
@@ -156,8 +167,23 @@ async function startRoom(roomId: string): Promise<void> {
     document.body.appendChild(app.canvas);
   }
 
+  // Load assets in background (non-blocking — rendering/audio use fallbacks)
+  assetManager.loadAssets();
+
+  // Initialize audio on first click (browser requires user gesture)
+  const initAudio = () => {
+    audioManager.ensureContext();
+    audioManager.loadAssets();
+    document.removeEventListener('click', initAudio);
+    document.removeEventListener('keydown', initAudio);
+  };
+  document.addEventListener('click', initAudio);
+  document.addEventListener('keydown', initAudio);
+
   const renderer = new PixiBoardRenderer(app);
   const animationController = new AnimationController(app, (id) => renderer.getSprite(id));
+  renderer.setAnimationController(animationController);
+  renderer.setAssetManager(assetManager);
 
   lobbyUi = new LobbyUI(playerId, roomId);
   lobbyUi.show();
@@ -177,6 +203,8 @@ async function startRoom(roomId: string): Promise<void> {
     }
   );
 
+  keyboardManager = new KeyboardManager(playerId, inputController, () => gameHud);
+
   unsubscribeStore = gameStore.subscribe((newState, prevState) => {
     if (!inputController) return;
 
@@ -188,6 +216,23 @@ async function startRoom(roomId: string): Promise<void> {
     }
 
     if (lobbyUi) lobbyUi.hide();
+
+    // Music: start gameplay track on first non-lobby state
+    if (!prevState || prevState.phase === GamePhase.Lobby) {
+      audioManager.playMusic('gameplay_low');
+    }
+
+    // Music: switch on danger level change
+    if (prevState && prevState.currentDangerLevel !== newState.currentDangerLevel) {
+      const high = newState.currentDangerLevel === 'ORANGE' || newState.currentDangerLevel === 'RED';
+      audioManager.playMusic(high ? 'gameplay_high' : 'gameplay_low');
+    }
+
+    // Music: game over stings
+    if (newState.gameResult && (!prevState || !prevState.gameResult)) {
+      audioManager.stopMusic();
+      audioManager.playSFX(newState.gameResult === 'VICTORY' ? 'victory' : 'defeat');
+    }
 
     if (!gameHud) {
       gameHud = new GameHUD(inputController, playerId);
@@ -208,6 +253,7 @@ async function startRoom(roomId: string): Promise<void> {
             type: 'SPAWN',
             entityId: op.path[0] as string,
           });
+          audioManager.playSFX('zombie_spawn');
         }
       }
     }
@@ -216,8 +262,17 @@ async function startRoom(roomId: string): Promise<void> {
     gameHud.update(newState, inputController.selection);
   });
 
+  networkManager.onReconnecting = (attempt, maxAttempts) => {
+    showConnectionBanner(`Reconnecting... (${attempt}/${maxAttempts})`);
+  };
+
   networkManager.onConnected = () => {
     networkManager.joinGame(playerId, roomId, nickname);
+    showConnectionBanner('Reconnected!', 2000);
+  };
+
+  networkManager.onDisconnected = () => {
+    showConnectionBanner('Connection lost. Please refresh the page.');
   };
 
   networkManager.onServerError = (error) => {
@@ -238,9 +293,30 @@ async function startRoom(roomId: string): Promise<void> {
     if (error.code === 'SESSION_REPLACED') {
       showMenu('Session replaced by another connection.');
     }
+
+    if (error.code === 'KICKED') {
+      networkManager.disconnect();
+      window.history.pushState({}, '', '/');
+      showMenu('You were kicked by the host.');
+    }
   };
 
   networkManager.connect();
+}
+
+let connectionBannerId: string | null = null;
+
+function showConnectionBanner(message: string, autoDismissMs?: number): void {
+  if (connectionBannerId) {
+    notificationManager.dismiss(connectionBannerId);
+  }
+  connectionBannerId = notificationManager.show({
+    type: 'alert',
+    variant: autoDismissMs ? 'success' : 'warning',
+    message,
+    duration: autoDismissMs ?? 0,
+    priority: autoDismissMs ? 'normal' : 'high',
+  });
 }
 
 async function init(): Promise<void> {
@@ -260,6 +336,7 @@ async function init(): Promise<void> {
     app.canvas.style.left = '0';
     document.body.appendChild(app.canvas);
 
+    await loadTileDefinitionsFromServer();
     new MapEditor(app);
     return;
   }

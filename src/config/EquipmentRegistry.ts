@@ -6,24 +6,28 @@ export const EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'inHand'
   'fire_axe': {
     name: 'Fire Axe',
     type: EquipmentType.Weapon,
+    canOpenDoor: true,
+    openDoorNoise: true,
     stats: {
       range: [0, 0],
       dice: 1,
       accuracy: 4,
       damage: 2,
-      noise: true,
+      noise: false,
       dualWield: false,
     }
   },
   'crowbar': {
     name: 'Crowbar',
     type: EquipmentType.Weapon,
+    canOpenDoor: true,
+    openDoorNoise: true,
     stats: {
       range: [0, 0],
       dice: 1,
       accuracy: 4,
       damage: 1,
-      noise: true,
+      noise: false,
       dualWield: false,
     }
   },
@@ -33,7 +37,7 @@ export const EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'inHand'
     stats: {
       range: [0, 1],
       dice: 1,
-      accuracy: 3,
+      accuracy: 4,
       damage: 1,
       noise: true,
       dualWield: true,
@@ -54,15 +58,17 @@ export const EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'inHand'
   'rifle': {
     name: 'Rifle',
     type: EquipmentType.Weapon,
+    keywords: ['sniper'],
     stats: {
       range: [1, 3],
       dice: 1,
-      accuracy: 3,
-      damage: 1,
+      accuracy: 2,
+      damage: 2,
       noise: true,
       dualWield: false,
     }
   },
+  // Homebrew — not in base Zombicide v2
   'pan': {
     name: 'Frying Pan',
     type: EquipmentType.Weapon,
@@ -99,7 +105,8 @@ export const EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'inHand'
       accuracy: 0,
       damage: 3, // Kills everything
       noise: true,
-      dualWield: false
+      dualWield: false,
+      special: 'molotov'
     }
   },
   'baseball_bat': {
@@ -108,7 +115,7 @@ export const EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'inHand'
     stats: {
       range: [0, 0],
       dice: 2,
-      accuracy: 3,
+      accuracy: 4,
       damage: 1,
       noise: true,
       dualWield: false
@@ -119,9 +126,9 @@ export const EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'inHand'
     type: EquipmentType.Weapon,
     stats: {
       range: [0, 0],
-      dice: 2,
+      dice: 1,
       accuracy: 4,
-      damage: 1,
+      damage: 2,
       noise: false,
       dualWield: true
     }
@@ -132,8 +139,8 @@ export const EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'inHand'
     stats: {
       range: [0, 0],
       dice: 1,
-      accuracy: 3,
-      damage: 2,
+      accuracy: 4,
+      damage: 1,
       noise: false,
       dualWield: true
     }
@@ -155,13 +162,14 @@ export const EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'inHand'
   'sawed_off': {
     name: 'Sawed-Off',
     type: EquipmentType.Weapon,
+    keywords: ['reload'],
     stats: {
       range: [0, 1],
       dice: 2,
-      accuracy: 3,
+      accuracy: 4,
       damage: 1,
       noise: true,
-      dualWield: true
+      dualWield: false
     }
   },
   'sub_mg': {
@@ -173,7 +181,7 @@ export const EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'inHand'
       accuracy: 5,
       damage: 1,
       noise: true,
-      dualWield: true
+      dualWield: false
     }
   },
   'plenty_of_ammo': {
@@ -181,22 +189,53 @@ export const EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'inHand'
     type: EquipmentType.Item,
     stats: undefined
   },
-  'go_hockeys': {
+  'go_hockey': {
     name: 'Goalie Mask',
     type: EquipmentType.Armor,
+    stats: undefined,
+    armorValue: 1
+  },
+  'kukri': {
+    name: 'Kukri',
+    type: EquipmentType.Weapon,
+    stats: {
+      range: [0, 0],
+      dice: 2,
+      accuracy: 4,
+      damage: 1,
+      noise: false,
+      dualWield: true
+    }
+  },
+  'bag_of_rice': {
+    name: 'Bag of Rice',
+    type: EquipmentType.Item,
+    stats: undefined
+  },
+  'plenty_of_shells': {
+    name: 'Plenty of Shells',
+    type: EquipmentType.Item,
+    keywords: ['reload'],
+    stats: undefined
+  },
+  'aaahh': {
+    name: 'Aaahh!!',
+    type: EquipmentType.Item,
+    keywords: ['aaahh'],
     stats: undefined
   }
 };
 
 export const INITIAL_DECK_CONFIG = [
   // Melee
-  'fire_axe', 'fire_axe', 
+  'fire_axe', 'fire_axe',
   'crowbar', 'crowbar',
-  'pan', 'pan', 'pan',
+  'pan', 'pan', 'pan', // Homebrew
   'baseball_bat', 'baseball_bat',
   'katana', 'katana',
   'machete', 'machete',
   'chainsaw',
+  'kukri', 'kukri',
 
   // Ranged
   'pistol', 'pistol', 'pistol',
@@ -204,12 +243,17 @@ export const INITIAL_DECK_CONFIG = [
   'sub_mg', 'sub_mg',
   'shotgun', 'shotgun',
   'rifle', 'rifle',
-  
+
   // Items
   'canned_food', 'canned_food', 'canned_food',
   'water', 'water', 'water',
   'flashlight', 'flashlight',
   'molotov', 'molotov', 'molotov',
   'plenty_of_ammo', 'plenty_of_ammo', 'plenty_of_ammo',
-  'go_hockeys'
+  'plenty_of_shells', 'plenty_of_shells', 'plenty_of_shells',
+  'bag_of_rice', 'bag_of_rice',
+  'go_hockey',
+
+  // Trap cards
+  'aaahh', 'aaahh', 'aaahh', 'aaahh'
 ];

@@ -2,9 +2,14 @@
 
 import { GameState, Survivor, EquipmentCard, EntityId } from '../types/GameState';
 
+const BACKPACK_SLOTS = ['BACKPACK_0', 'BACKPACK_1', 'BACKPACK_2'] as const;
+
+export function isBackpackSlot(slot: string | undefined): boolean {
+  return slot === 'BACKPACK_0' || slot === 'BACKPACK_1' || slot === 'BACKPACK_2' || slot === 'BACKPACK';
+}
+
 export class EquipmentManager {
   private static MAX_HANDS = 2;
-  private static MAX_BODY = 1; // Future expansion (armor/flashlight etc) - handled as backpack for now or slots
   private static MAX_BACKPACK = 3;
 
   /**
@@ -25,26 +30,35 @@ export class EquipmentManager {
    */
   public static addCard(survivor: Survivor, card: EquipmentCard): Survivor {
     const newSurvivor = { ...survivor, inventory: [...survivor.inventory] };
-    
+
     // Auto-assign slot
     // 1. Hands
     // 2. Backpack
     const handCount = newSurvivor.inventory.filter(c => c.slot === 'HAND_1' || c.slot === 'HAND_2').length;
-    
+
     if (handCount < this.MAX_HANDS) {
       // Find empty hand slot
       const hand1 = newSurvivor.inventory.find(c => c.slot === 'HAND_1');
       const hand2 = newSurvivor.inventory.find(c => c.slot === 'HAND_2');
-      
+
       card.slot = !hand1 ? 'HAND_1' : 'HAND_2';
       card.inHand = true;
     } else {
-      card.slot = 'BACKPACK';
+      card.slot = this.firstOpenBackpackSlot(newSurvivor) ?? 'BACKPACK_0';
       card.inHand = false;
     }
 
     newSurvivor.inventory.push(card);
     return newSurvivor;
+  }
+
+  /** Returns the first unoccupied BACKPACK_N slot, or null if all full. */
+  public static firstOpenBackpackSlot(survivor: Survivor): EquipmentCard['slot'] | null {
+    const occupied = new Set(survivor.inventory.map(c => c.slot));
+    for (const slot of BACKPACK_SLOTS) {
+      if (!occupied.has(slot)) return slot;
+    }
+    return null;
   }
 
   /**
@@ -53,7 +67,7 @@ export class EquipmentManager {
   public static discardCard(state: GameState, survivorId: EntityId, cardId: EntityId): GameState {
     const newState = JSON.parse(JSON.stringify(state));
     const survivor = newState.survivors[survivorId];
-    
+
     const cardIndex = survivor.inventory.findIndex((c: EquipmentCard) => c.id === cardId);
     if (cardIndex === -1) {
       // Check if it's the pending drawn card
@@ -67,7 +81,7 @@ export class EquipmentManager {
 
     const [discarded] = survivor.inventory.splice(cardIndex, 1);
     newState.equipmentDiscard.push(discarded);
-    
+
     return newState;
   }
 
@@ -86,17 +100,17 @@ export class EquipmentManager {
     if (discardIndex === -1) throw new Error('Discard target not found');
 
     const [oldCard] = survivor.inventory.splice(discardIndex, 1);
-    
+
     // Add the new card (it takes the old card's slot ideally, or auto-slots)
     const newCard = survivor.drawnCard;
     newCard.slot = oldCard.slot; // Inherit slot
     newCard.inHand = oldCard.inHand;
-    
+
     survivor.inventory.push(newCard);
-    
+
     // Move old to discard pile
     newState.equipmentDiscard.push(oldCard);
-    
+
     // Clear pending
     survivor.drawnCard = undefined;
 
@@ -110,9 +124,9 @@ export class EquipmentManager {
     const newSurvivor = { ...survivor }; // Shallow clone
     // Deep clone inventory to mutate
     newSurvivor.inventory = survivor.inventory.map(c => ({...c}));
-    
+
     const card = newSurvivor.inventory.find(c => c.id === cardId);
-    
+
     if (!card) throw new Error('Card not found');
 
     // Handle DISCARD slot
@@ -122,19 +136,9 @@ export class EquipmentManager {
         return newSurvivor;
     }
 
-    // If target slot is occupied by another item, we might need to swap
-    // But if target is BACKPACK, we just add it to pile (since multiple items can be BACKPACK)
-    if (targetSlot === 'BACKPACK') {
-        card.slot = 'BACKPACK';
-        card.inHand = false;
-        return newSurvivor;
-    }
-
-    // For specific slots (HAND_1, HAND_2), check if occupied
-    const occupant = newSurvivor.inventory.find(c => c.slot === targetSlot);
-    
+    // If target slot is occupied by another item, swap
+    const occupant = newSurvivor.inventory.find(c => c.slot === targetSlot && c.id !== cardId);
     if (occupant) {
-      // Swap slots
       occupant.slot = card.slot;
       occupant.inHand = (card.slot === 'HAND_1' || card.slot === 'HAND_2');
     }
@@ -151,16 +155,16 @@ export class EquipmentManager {
    */
   public static validateLoadout(inventory: { slot?: string }[]): boolean {
     const hands = inventory.filter(c => c.slot === 'HAND_1' || c.slot === 'HAND_2');
-    const backpack = inventory.filter(c => c.slot === 'BACKPACK');
+    const backpack = inventory.filter(c => isBackpackSlot(c.slot));
     const body = inventory.filter(c => c.slot === 'BODY'); // Future proofing
 
     if (hands.length > this.MAX_HANDS) return false;
     if (backpack.length > this.MAX_BACKPACK) return false;
-    
+
     // Check for duplicate specific slots (e.g. two items in HAND_1)
     const hand1 = inventory.filter(c => c.slot === 'HAND_1');
     const hand2 = inventory.filter(c => c.slot === 'HAND_2');
-    
+
     if (hand1.length > 1 || hand2.length > 1) return false;
 
     return true;

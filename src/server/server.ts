@@ -3,11 +3,14 @@ import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { initialGameState, GameState, PlayerId, GamePhase } from '../types/GameState';
 import { processAction } from '../services/ActionProcessor';
-import { ActionRequest, ActionResponse } from '../types/Action';
+import { ActionRequest, ActionResponse, ActionType } from '../types/Action';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { HeartbeatManager } from './HeartbeatManager';
-import fs from 'fs/promises';
+import { persistenceService } from '../services/PersistenceService';
+import { TILE_DEFINITIONS, registerTileDefinitions } from '../config/TileDefinitions';
+import { repairExternalEdges } from '../services/TileDefinitionService';
+import { TileDefinition } from '../types/TileDefinition';
 
 const app = express();
 app.use(express.json());
@@ -20,26 +23,7 @@ const ROOM_IDLE_CLEANUP_MS = 5 * 60 * 1000;
 
 app.get('/api/maps', async (_req, res) => {
   try {
-    const mapsDir = path.resolve(process.cwd(), 'data/maps');
-    try {
-      await fs.access(mapsDir);
-    } catch {
-      await fs.mkdir(mapsDir, { recursive: true });
-    }
-
-    const files = await fs.readdir(mapsDir);
-    const maps = [];
-
-    for (const file of files) {
-      if (!file.endsWith('.json')) continue;
-      const content = await fs.readFile(path.join(mapsDir, file), 'utf-8');
-      try {
-        maps.push(JSON.parse(content));
-      } catch (e) {
-        console.error(`Failed to parse map ${file}:`, e);
-      }
-    }
-
+    const maps = persistenceService.loadAllMaps();
     res.json(maps);
   } catch (error) {
     console.error('Error fetching maps:', error);
@@ -59,21 +43,79 @@ app.post('/api/maps', async (req, res) => {
       mapData.id = `map-${Date.now()}`;
     }
 
-    const mapsDir = path.resolve(process.cwd(), 'data/maps');
-    try {
-      await fs.access(mapsDir);
-    } catch {
-      await fs.mkdir(mapsDir, { recursive: true });
-    }
-
-    const filePath = path.join(mapsDir, `${mapData.id}.json`);
-    await fs.writeFile(filePath, JSON.stringify(mapData, null, 2));
-
+    persistenceService.saveMap(mapData);
     log(`Map saved: ${mapData.name} (${mapData.id})`);
     res.json({ success: true, id: mapData.id });
   } catch (error) {
     console.error('Error saving map:', error);
     res.status(500).json({ error: 'Failed to save map' });
+  }
+});
+
+app.delete('/api/maps/:id', (req, res) => {
+  try {
+    persistenceService.deleteMap(req.params.id);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting map:', error);
+    res.status(500).json({ error: 'Failed to delete map' });
+  }
+});
+
+// --- Tile Definitions ---
+
+// Seed hardcoded defaults into DB if table is empty
+if (persistenceService.tileDefinitionCount() === 0) {
+  for (const [id, def] of Object.entries(TILE_DEFINITIONS)) {
+    persistenceService.saveTileDefinition(id, def);
+  }
+  console.log(`Seeded ${Object.keys(TILE_DEFINITIONS).length} tile definitions into DB`);
+}
+
+// Load user-edited tile definitions from DB into the in-memory registry
+// so that compileScenario uses the correct data (not just hardcoded defaults)
+{
+  const dbDefs = persistenceService.loadAllTileDefinitions() as TileDefinition[];
+  if (dbDefs.length > 0) {
+    for (const def of dbDefs) {
+      repairExternalEdges(def);
+    }
+    registerTileDefinitions(dbDefs);
+    console.log(`Loaded ${dbDefs.length} tile definitions from DB into registry (edges repaired)`);
+  }
+}
+
+app.get('/api/tile-definitions', (_req, res) => {
+  try {
+    res.json(persistenceService.loadAllTileDefinitions());
+  } catch (error) {
+    console.error('Error fetching tile definitions:', error);
+    res.status(500).json({ error: 'Failed to fetch tile definitions' });
+  }
+});
+
+app.delete('/api/tile-definitions', (_req, res) => {
+  try {
+    persistenceService.deleteAllTileDefinitions();
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error wiping tile definitions:', error);
+    res.status(500).json({ error: 'Failed to wipe tile definitions' });
+  }
+});
+
+app.post('/api/tile-definitions', (req, res) => {
+  try {
+    const def = req.body;
+    if (!def || !def.id || !def.cells || !def.edges) {
+      res.status(400).json({ error: 'Invalid tile definition' });
+      return;
+    }
+    persistenceService.saveTileDefinition(def.id, def);
+    res.json({ success: true, id: def.id });
+  } catch (error) {
+    console.error('Error saving tile definition:', error);
+    res.status(500).json({ error: 'Failed to save tile definition' });
   }
 });
 
@@ -114,6 +156,12 @@ const socketSessions = new Map<WebSocket, SocketSession>();
 
 const log = (msg: string) => console.log(`[Server] ${new Date().toISOString()} - ${msg}`);
 
+function sanitizeNickname(raw: string | undefined, fallback: string): string {
+  if (!raw || typeof raw !== 'string') return fallback;
+  const stripped = raw.replace(/<[^>]*>/g, '').trim().slice(0, 24);
+  return stripped || fallback;
+}
+
 function generateRoomId(): string {
   let roomId = '';
   do {
@@ -137,7 +185,25 @@ function createRoom(roomId: string): RoomContext {
 }
 
 function ensureRoom(roomId: string): RoomContext | null {
-  return rooms.get(roomId) || null;
+  const existing = rooms.get(roomId);
+  if (existing) return existing;
+
+  // Try to restore from DB
+  const savedState = persistenceService.loadRoom(roomId);
+  if (savedState) {
+    log(`Restoring room ${roomId} from database.`);
+    const room: RoomContext = {
+      id: roomId,
+      gameState: savedState,
+      clients: new Map(),
+      connections: new Map(),
+      cleanupTimer: null,
+    };
+    rooms.set(roomId, room);
+    return room;
+  }
+
+  return null;
 }
 
 function clearRoomCleanup(room: RoomContext): void {
@@ -159,6 +225,7 @@ function scheduleRoomCleanup(room: RoomContext): void {
     }
 
     rooms.delete(room.id);
+    persistenceService.deleteRoom(room.id);
     log(`Room ${room.id} deleted after 5 minutes idle.`);
   }, ROOM_IDLE_CLEANUP_MS);
 
@@ -181,6 +248,13 @@ function broadcastRoomState(room: RoomContext): void {
       ws.send(message);
     }
   });
+
+  // Persist room state to DB on every change (SQLite WAL mode makes this fast)
+  try {
+    persistenceService.saveRoom(room.id, room.gameState);
+  } catch (e) {
+    console.error(`Failed to persist room ${room.id}:`, e);
+  }
 }
 
 heartbeatManager.start();
@@ -226,11 +300,24 @@ interface ActionMessage {
 type ClientMessage = JoinMessage | ActionMessage;
 
 function handleMessage(ws: WebSocket, message: ClientMessage) {
+  if (!message || typeof message !== 'object' || typeof message.type !== 'string') {
+    sendError(ws, { code: 'INVALID_MESSAGE', message: 'Message must be an object with a "type" string field.' });
+    return;
+  }
+
   switch (message.type) {
     case 'JOIN':
+      if (!message.payload || typeof message.payload !== 'object') {
+        sendError(ws, { code: 'INVALID_PAYLOAD', message: 'JOIN requires a payload with roomId and playerId.' });
+        return;
+      }
       handleJoin(ws, message.payload);
       break;
     case 'ACTION':
+      if (!message.payload || typeof message.payload !== 'object') {
+        sendError(ws, { code: 'INVALID_PAYLOAD', message: 'ACTION requires a payload.' });
+        return;
+      }
       handleAction(ws, message.payload);
       break;
     default:
@@ -275,7 +362,19 @@ function handleJoin(ws: WebSocket, payload: { roomId: string; playerId: PlayerId
   const isLobby = room.gameState.phase === GamePhase.Lobby;
 
   if (!isLobby && !knownPlayer) {
-    sendError(ws, { code: 'GAME_IN_PROGRESS', message: 'Game currently in progress' });
+    // Allow joining as spectator mid-game
+    socketSessions.set(ws, { roomId, playerId });
+    room.clients.set(ws, playerId);
+    room.connections.set(playerId, ws);
+
+    if (!room.gameState.spectators.includes(playerId)) {
+      const newState = JSON.parse(JSON.stringify(room.gameState)) as GameState;
+      newState.spectators.push(playerId);
+      room.gameState = newState;
+    }
+
+    log(`Player ${playerId} joined room ${roomId} as spectator.`);
+    ws.send(JSON.stringify({ type: 'STATE_UPDATE', payload: room.gameState }));
     return;
   }
 
@@ -293,15 +392,15 @@ function handleJoin(ws: WebSocket, payload: { roomId: string; playerId: PlayerId
     if (!lobbyPlayer) {
       room.gameState.lobby.players.push({
         id: playerId,
-        name: (name || playerId).trim().slice(0, 24) || playerId,
+        name: sanitizeNickname(name, playerId),
         ready: false,
-        characterClass: 'Standard',
+        characterClass: '',
       });
       broadcastRoomState(room);
       return;
     }
 
-    const nextName = (name || '').trim().slice(0, 24);
+    const nextName = sanitizeNickname(name, '');
     if (nextName && lobbyPlayer.name !== nextName) {
       lobbyPlayer.name = nextName;
       broadcastRoomState(room);
@@ -332,7 +431,16 @@ function handleDisconnect(ws: WebSocket) {
     log(`Player ${playerId} disconnected from room ${roomId}.`);
 
     if (room.gameState.phase === GamePhase.Lobby) {
-      room.gameState.lobby.players = room.gameState.lobby.players.filter((p) => p.id !== playerId);
+      const newState = JSON.parse(JSON.stringify(room.gameState)) as GameState;
+      newState.lobby.players = newState.lobby.players.filter((p: any) => p.id !== playerId);
+      newState.history.push({
+        playerId,
+        survivorId: '',
+        actionType: 'DISCONNECT',
+        timestamp: Date.now(),
+        payload: { phase: 'lobby' }
+      });
+      room.gameState = newState;
       broadcastRoomState(room);
     }
   }
@@ -342,11 +450,23 @@ function handleDisconnect(ws: WebSocket) {
   }
 }
 
+const VALID_ACTION_TYPES = new Set<string>(Object.values(ActionType));
+
 function handleAction(ws: WebSocket, request: ActionRequest) {
   const session = socketSessions.get(ws);
 
   if (!session) {
     sendError(ws, { code: 'UNAUTHORIZED', message: 'You must JOIN before sending actions.' });
+    return;
+  }
+
+  if (typeof request.playerId !== 'string' || !request.playerId) {
+    sendError(ws, { code: 'INVALID_PAYLOAD', message: 'ACTION payload requires a playerId string.' });
+    return;
+  }
+
+  if (typeof request.type !== 'string' || !VALID_ACTION_TYPES.has(request.type)) {
+    sendError(ws, { code: 'INVALID_ACTION_TYPE', message: `Unknown action type: ${request.type}` });
     return;
   }
 
@@ -364,6 +484,56 @@ function handleAction(ws: WebSocket, request: ActionRequest) {
     return;
   }
 
+  // Block spectators from sending game actions
+  if (room.gameState.spectators.includes(session.playerId)) {
+    sendError(ws, { code: 'SPECTATOR', message: 'Spectators cannot perform actions.' });
+    return;
+  }
+
+  // Handle KICK_PLAYER at server level (requires socket management)
+  if (request.type === ActionType.KICK_PLAYER) {
+    if (room.gameState.phase !== GamePhase.Lobby) {
+      sendError(ws, { code: 'INVALID_PHASE', message: 'Can only kick during lobby.' });
+      return;
+    }
+    // Only host (first player) can kick
+    if (room.gameState.lobby.players.length === 0 || room.gameState.lobby.players[0].id !== session.playerId) {
+      sendError(ws, { code: 'NOT_HOST', message: 'Only the host can kick players.' });
+      return;
+    }
+    const targetPlayerId = request.payload?.targetPlayerId as string;
+    if (!targetPlayerId || targetPlayerId === session.playerId) {
+      sendError(ws, { code: 'INVALID_TARGET', message: 'Invalid kick target.' });
+      return;
+    }
+    // Clone state before mutating
+    const newState = JSON.parse(JSON.stringify(room.gameState)) as GameState;
+    newState.lobby.players = newState.lobby.players.filter((p: any) => p.id !== targetPlayerId);
+    newState.history.push({
+      playerId: session.playerId,
+      survivorId: '',
+      actionType: 'KICK_PLAYER',
+      timestamp: Date.now(),
+      payload: { targetPlayerId }
+    });
+    room.gameState = newState;
+    // Disconnect their socket
+    const targetWs = room.connections.get(targetPlayerId);
+    if (targetWs && targetWs.readyState === WebSocket.OPEN) {
+      targetWs.send(JSON.stringify({
+        type: 'ERROR',
+        payload: { code: 'KICKED', message: 'You were kicked by the host.' }
+      }));
+      targetWs.close(1000, 'Kicked by host');
+    }
+    room.clients.delete(targetWs!);
+    room.connections.delete(targetPlayerId);
+    socketSessions.delete(targetWs!);
+    log(`Player ${targetPlayerId} was kicked from room ${session.roomId} by ${session.playerId}.`);
+    broadcastRoomState(room);
+    return;
+  }
+
   log(`Processing action: ${request.type} from ${session.playerId} in room ${session.roomId}`);
 
   const response: ActionResponse = processAction(room.gameState, request);
@@ -377,6 +547,24 @@ function handleAction(ws: WebSocket, request: ActionRequest) {
   const error = response.error || { code: 'UNKNOWN_ERROR', message: 'Action failed unexpectedly.' };
   sendError(ws, error);
 }
+
+// Cleanup stale DB-persisted rooms on startup and every 30 minutes
+const STALE_ROOM_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
+const STALE_ROOM_CLEANUP_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+
+function runStaleRoomCleanup() {
+  try {
+    const removed = persistenceService.cleanupStaleRooms(STALE_ROOM_MAX_AGE_MS);
+    if (removed > 0) {
+      log(`Cleaned up ${removed} stale room(s) from database.`);
+    }
+  } catch (e) {
+    console.error('Failed to cleanup stale rooms:', e);
+  }
+}
+
+runStaleRoomCleanup();
+setInterval(runStaleRoomCleanup, STALE_ROOM_CLEANUP_INTERVAL_MS);
 
 server.listen(PORT, () => {
   log(`Server started on port ${PORT}`);

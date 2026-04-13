@@ -1,6 +1,7 @@
 
 // src/types/Action.ts
-import type { GameState } from './GameState';
+import type { GameState, EntityId, ZoneId } from './GameState';
+import type { ScenarioMap } from './Map';
 
 export enum ActionType {
   // Lobby Actions
@@ -16,24 +17,135 @@ export enum ActionType {
   SEARCH = 'SEARCH',
   OPEN_DOOR = 'OPEN_DOOR',
   MAKE_NOISE = 'MAKE_NOISE',
-  TRADE = 'TRADE',
   TRADE_START = 'TRADE_START',
   TRADE_OFFER = 'TRADE_OFFER',
   TRADE_ACCEPT = 'TRADE_ACCEPT',
   TRADE_CANCEL = 'TRADE_CANCEL',
   ORGANIZE = 'ORGANIZE',
   CHOOSE_SKILL = 'CHOOSE_SKILL',
-  RESOLVE_SEARCH = 'RESOLVE_SEARCH', // New action for full inventory
-  TAKE_OBJECTIVE = 'TAKE_OBJECTIVE', // Take objective token
-  NOTHING = 'NOTHING', // Keep alive
-  END_TURN = 'END_TURN', // Pass turn / End activation
+  RESOLVE_SEARCH = 'RESOLVE_SEARCH',
+  TAKE_OBJECTIVE = 'TAKE_OBJECTIVE',
+  SPRINT = 'SPRINT',
+  USE_ITEM = 'USE_ITEM',
+  NOTHING = 'NOTHING',
+  END_TURN = 'END_TURN',
+  KICK_PLAYER = 'KICK_PLAYER',
 }
+
+// --- Action Payload Types ---
+
+export interface JoinLobbyPayload {
+  name?: string;
+}
+
+export interface UpdateNicknamePayload {
+  name: string;
+}
+
+export interface SelectCharacterPayload {
+  characterClass: string;
+  name?: string;
+}
+
+export interface StartGamePayload {
+  map?: ScenarioMap;
+}
+
+export interface MovePayload {
+  targetZoneId: ZoneId;
+}
+
+export interface AttackPayload {
+  targetZoneId: ZoneId;
+  weaponId?: EntityId;
+}
+
+export interface OpenDoorPayload {
+  targetZoneId: ZoneId;
+}
+
+export interface SprintPayload {
+  path: ZoneId[];
+}
+
+export interface UseItemPayload {
+  itemId: EntityId;
+}
+
+export interface ChooseSkillPayload {
+  skillId: string;
+}
+
+export interface ResolveSearchPayload {
+  action: 'DISCARD' | 'EQUIP' | 'KEEP';
+  targetSlot?: string;
+  discardCardId?: EntityId;
+}
+
+export interface OrganizePayload {
+  cardId: EntityId;
+  targetSlot: string;
+}
+
+export interface TradeStartPayload {
+  targetSurvivorId: EntityId;
+}
+
+export interface TradeOfferPayload {
+  offerCardIds: string[];
+}
+
+export interface TradeAcceptPayload {
+  receiveLayout?: Record<EntityId, string>;
+}
+
+export interface KickPlayerPayload {
+  targetPlayerId: string;
+}
+
+/** Map from ActionType to its payload type. Actions with no payload map to undefined. */
+export interface ActionPayloadMap {
+  [ActionType.JOIN_LOBBY]: JoinLobbyPayload;
+  [ActionType.UPDATE_NICKNAME]: UpdateNicknamePayload;
+  [ActionType.SELECT_CHARACTER]: SelectCharacterPayload;
+  [ActionType.START_GAME]: StartGamePayload;
+  [ActionType.END_GAME]: undefined;
+  [ActionType.MOVE]: MovePayload;
+  [ActionType.ATTACK]: AttackPayload;
+  [ActionType.SEARCH]: undefined;
+  [ActionType.OPEN_DOOR]: OpenDoorPayload;
+  [ActionType.MAKE_NOISE]: undefined;
+  [ActionType.TRADE_START]: TradeStartPayload;
+  [ActionType.TRADE_OFFER]: TradeOfferPayload;
+  [ActionType.TRADE_ACCEPT]: TradeAcceptPayload;
+  [ActionType.TRADE_CANCEL]: undefined;
+  [ActionType.ORGANIZE]: OrganizePayload;
+  [ActionType.CHOOSE_SKILL]: ChooseSkillPayload;
+  [ActionType.RESOLVE_SEARCH]: ResolveSearchPayload;
+  [ActionType.TAKE_OBJECTIVE]: undefined;
+  [ActionType.SPRINT]: SprintPayload;
+  [ActionType.USE_ITEM]: UseItemPayload;
+  [ActionType.NOTHING]: undefined;
+  [ActionType.END_TURN]: undefined;
+  [ActionType.KICK_PLAYER]: KickPlayerPayload;
+}
+
+export type ActionPayload = ActionPayloadMap[ActionType];
+
+/**
+ * Extract the payload type for a specific action type.
+ * Use in handlers: `const p = intent.payload as ActionPayloadMap[ActionType.MOVE]`
+ */
+export type PayloadFor<T extends ActionType> = ActionPayloadMap[T];
 
 export interface ActionRequest {
   playerId: string;
-  survivorId?: string; // Optional during lobby phase
+  survivorId?: string;
   type: ActionType;
-  payload?: any; // Flexible payload for specific action details (target, zone, etc.)
+  // Typed as a record to allow field access in handlers without narrowing.
+  // Callers should construct payloads matching the ActionPayloadMap for their ActionType.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  payload?: Record<string, any>;
 }
 
 export interface ActionError {

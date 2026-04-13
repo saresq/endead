@@ -1,0 +1,166 @@
+/* ==========================================================================
+   Modals — Backdrop, card shell, sizes, bottom-sheet, animations
+   ========================================================================== */
+
+/* ---------- Backdrop ---------- */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  background: rgba(13, 15, 20, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity var(--duration-slow) var(--ease-in-out);
+}
+
+.modal-backdrop--visible {
+  opacity: 1;
+}
+
+/* ---------- Modal Card ---------- */
+
+/* Scoped under .modal-backdrop so legacy .modal (PickupUI, TradeUI) is unaffected */
+.modal-backdrop > .modal {
+  z-index: var(--z-modal);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  display: flex;
+  flex-direction: column;
+  max-height: 85vh;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+
+  /* Desktop: centered with scale animation */
+  border-radius: var(--radius-xl);
+  transform: scale(0.95);
+  opacity: 0;
+  transition: transform var(--duration-slow) var(--ease-out),
+              opacity var(--duration-slow) var(--ease-out);
+}
+
+.modal-backdrop > .modal.modal--visible {
+  transform: scale(1);
+  opacity: 1;
+}
+
+/* ---------- Sizes ---------- */
+
+.modal-backdrop > .modal--sm { width: 400px; max-width: 95vw; }
+.modal-backdrop > .modal--md { width: 560px; max-width: 95vw; }
+.modal-backdrop > .modal--lg { width: 720px; max-width: 95vw; }
+
+/* ---------- Drag Handle (mobile bottom-sheet) ---------- */
+
+.modal__drag-handle {
+  display: none;
+}
+
+/* ---------- Header ---------- */
+
+.modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--surface-4);
+  flex-shrink: 0;
+}
+
+.modal__header--minimal {
+  border-bottom: none;
+  justify-content: flex-end;
+  padding: var(--space-3) var(--space-3) 0;
+}
+
+.modal__title {
+  font-size: var(--text-lg);
+  font-weight: var(--font-bold);
+  margin: 0;
+  line-height: 1.3;
+}
+
+.modal__close {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* ---------- Body ---------- */
+
+.modal__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-5);
+  overscroll-behavior: contain;
+}
+
+/* ---------- Footer ---------- */
+
+.modal__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--surface-4);
+  flex-shrink: 0;
+}
+
+/* ---------- Mobile Bottom Sheet ---------- */
+
+@media (max-width: 767px) {
+  .modal-backdrop {
+    align-items: flex-end;
+  }
+
+  .modal-backdrop > .modal {
+    width: 100%;
+    max-width: 100%;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    max-height: 85vh;
+
+    /* Slide up animation instead of scale */
+    transform: translateY(100%);
+    opacity: 1;
+    transition: transform var(--duration-slow) var(--ease-out);
+  }
+
+  .modal-backdrop > .modal.modal--visible {
+    transform: translateY(0);
+  }
+
+  .modal__drag-handle {
+    display: flex;
+    justify-content: center;
+    padding: var(--space-2) 0;
+    flex-shrink: 0;
+  }
+
+  .modal__drag-handle span {
+    width: 32px;
+    height: 4px;
+    background: var(--surface-4);
+    border-radius: var(--radius-full);
+  }
+
+  .modal__header {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .modal__body {
+    padding: var(--space-4);
+  }
+
+  .modal__footer {
+    padding: var(--space-3) var(--space-4);
+    padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom));
+  }
+}
+
+/* ---------- Persistent modal (no close button) ---------- */
+
+.modal--persistent .modal__close {
+  display: none;
+}

@@ -3,17 +3,97 @@
 
 import * as PIXI from 'pixi.js';
 import { TileService, tileService } from '../../services/TileService';
-import { TileInstance, ScenarioMap, MapRoom, MapDoor, MapMarker, MarkerType } from '../../types/Map';
+import { TileInstance, ScenarioMap, MapMarker, MarkerType } from '../../types/Map';
 import { PixiBoardRenderer } from '../PixiBoardRenderer';
 import { GameState, initialGameState, Zone, ZoneConnection } from '../../types/GameState';
-import { TILE_SIZE } from '../../config/Layout';
+import { TILE_SIZE, TILE_CELLS_PER_SIDE, TILE_PIXEL_SIZE } from '../../config/Layout';
 import { compileScenario } from '../../services/ScenarioCompiler';
+import { getRotatedTileDefinition, getCellAt } from '../../services/TileDefinitionService';
+import { setZoneGeometry } from '../utils/zoneLayout';
+import { renderButton } from '../ui/components/Button';
+import { TileDefinitionEditor } from './TileDefinitionEditor';
+import { notificationManager } from '../ui/NotificationManager';
+// Zone indicator icons loaded as static assets from /images/icons/
+import { modalManager } from '../ui/overlays/ModalManager';
+
+// --- Editor Color Theme ---
+const EDITOR_THEME = {
+  // Zone overlay fills
+  zone: {
+    streetColors: [
+      0x5588CC, 0xCC7744, 0x55AA66, 0xAA55AA, 0xBBAA33,
+      0x44AABB, 0xCC5577, 0x77BB44, 0x7766CC, 0xCC9944,
+    ],
+    buildingColors: [
+      0x8B6F47, 0x7B5B3A, 0x6B4F2E, 0x9B7F57, 0x5B3F1E,
+      0xA08060, 0x705030, 0x604020, 0x907050, 0x806040,
+    ],
+    streetAlpha: 0.3,
+    buildingAlpha: 0.55,
+  },
+
+  // Edge / wall rendering
+  wall: {
+    color: 0x000000,
+    alpha: 0.9,
+    width: 3,
+  },
+  door: {
+    frameColor: 0x000000,
+    panelColor: 0x8B4513,
+    panelAlpha: 0.85,
+  },
+  crosswalk: {
+    color: 0xFFFFFF,
+    alpha: 0.7,
+  },
+  doorway: {
+    color: 0x44AA44,
+    alpha: 0.6,
+  },
+
+  // Tile boundary grid
+  tileBorder: {
+    color: 0x666666,
+    alpha: 0.3,
+    width: 1,
+  },
+
+  // Marker icons
+  marker: {
+    playerStart: {
+      fill: 0x0088FF,
+      fillAlpha: 0.7,
+      stroke: 0xFFFFFF,
+      strokeWidth: 2,
+    },
+    zombieSpawn: {
+      fill: 0xFF2222,
+      fillAlpha: 0.7,
+      stroke: 0x000000,
+      strokeWidth: 2,
+    },
+    exit: {
+      fill: 0x2244AA,
+      fillAlpha: 0.7,
+      stroke: 0x4488FF,
+      strokeWidth: 2,
+      arrowColor: 0xFFFFFF,
+      arrowWidth: 3,
+    },
+    objective: {
+      fill: 0xFFD700,
+      fillAlpha: 0.8,
+      stroke: 0x000000,
+      strokeWidth: 2,
+      dotColor: 0x000000,
+    },
+  },
+} as const;
 
 // --- Editor Tool Modes ---
 enum EditorTool {
   Tile = 'TILE',
-  Room = 'ROOM',
-  Door = 'DOOR',
   PlayerStart = 'PLAYER_START',
   ZombieSpawn = 'ZOMBIE_SPAWN',
   Exit = 'EXIT',
@@ -21,18 +101,18 @@ enum EditorTool {
   Eraser = 'ERASER',
 }
 
-// Helper: edge key for door lookup
-function doorEdgeKey(x1: number, y1: number, x2: number, y2: number): string {
-  const a = `${x1},${y1}`;
-  const b = `${x2},${y2}`;
-  return a < b ? `${a}|${b}` : `${b}|${a}`;
+interface EditorSnapshot {
+  tiles: TileInstance[];
+  markers: MapMarker[];
 }
+
+const MAX_UNDO = 50;
 
 export class MapEditor {
   private app: PIXI.Application;
   private renderer: PixiBoardRenderer;
   private state: GameState;
-  
+
   // --- Tile tool state ---
   private selectedTileId: string | null = null;
   private currentRotation: 0 | 90 | 180 | 270 = 0;
@@ -42,30 +122,34 @@ export class MapEditor {
 
   // --- Authored scenario data ---
   private tiles: TileInstance[] = [];
-  private rooms: MapRoom[] = [];
-  private doors: MapDoor[] = [];
   private markers: MapMarker[] = [];
 
-  // --- Room painting state ---
-  private activeRoomId: string | null = null; // Room currently being painted
-  private nextRoomIndex = 0;
+  // --- Undo/Redo ---
+  private undoStack: EditorSnapshot[] = [];
+  private redoStack: EditorSnapshot[] = [];
 
-  // --- Door placement state ---
-  private doorStartCell: { x: number; y: number } | null = null;
+  // --- Brush drag state ---
+  private isDragging = false;
+  private dragStartCell: { x: number; y: number } | null = null;
 
   // --- Overlay layer for editor-specific visuals ---
   private overlayLayer: PIXI.Container;
   private overlayGraphics: PIXI.Graphics;
+  private spawnLabelContainer: PIXI.Container;
+  private roomIconContainer: PIXI.Container;
 
   // UI Elements
   private paletteContainer!: HTMLElement;
   private statusText!: HTMLElement;
   private toolButtons: Map<EditorTool, HTMLButtonElement> = new Map();
 
+  // Tile Definition Editor
+  private tileDefEditor: TileDefinitionEditor | null = null;
+
   constructor(app: PIXI.Application) {
     this.app = app;
     this.renderer = new PixiBoardRenderer(app);
-    
+
     // Clone initial state to start fresh
     this.state = JSON.parse(JSON.stringify(initialGameState));
     this.state.tiles = [];
@@ -74,14 +158,23 @@ export class MapEditor {
     // Create overlay layer on top of renderer
     this.overlayLayer = new PIXI.Container();
     this.overlayGraphics = new PIXI.Graphics();
+    this.spawnLabelContainer = new PIXI.Container();
+    this.roomIconContainer = new PIXI.Container();
     this.overlayLayer.addChild(this.overlayGraphics);
-    // We'll add this to the stage after the renderer's container
-    // Access the stage directly
+    this.overlayLayer.addChild(this.spawnLabelContainer);
+    this.overlayLayer.addChild(this.roomIconContainer);
     this.app.stage.addChild(this.overlayLayer);
-    
+
+    // Pre-load icon assets for marker overlays
+    PIXI.Assets.load([
+      '/images/icons/door-open-white.svg',
+      '/images/icons/moon-white.svg',
+      '/images/icons/sun-yellow.svg',
+    ]);
+
     // Setup UI
     this.createUI();
-    
+
     // Draw Editor Grid
     this.renderer.drawEditorGrid(20, 20);
 
@@ -91,129 +184,119 @@ export class MapEditor {
     this.app.ticker.add(this.renderLoop, this);
   }
 
+  private onTileDefSaved = () => {
+    this.rebuildPreviewState();
+    this.updateValidation();
+  };
+
   // =============================================
   // UI CREATION
   // =============================================
 
   private createUI() {
     this.paletteContainer = document.createElement('div');
-    this.paletteContainer.id = 'editor-palette';
-    this.paletteContainer.style.cssText = `
-        position: absolute;
-        top: 0;
-        right: 0;
-        width: 280px;
-        height: 100vh;
-        background: #1a1a2e;
-        color: white;
-        overflow-y: auto;
-        padding: 12px;
-        border-left: 2px solid #333;
-        font-family: monospace;
-        z-index: 1000;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-    `;
+    this.paletteContainer.className = 'editor-sidebar';
     document.body.appendChild(this.paletteContainer);
 
-    // --- Map Name + Save/Clear ---
     this.createToolbar();
-
-    // --- Tool Selection ---
     this.createToolSelector();
 
-    // --- Status ---
+    // Status
     this.statusText = document.createElement('div');
-    this.statusText.style.cssText = 'padding: 6px; background: #111; border-radius: 4px; font-size: 12px; min-height: 20px;';
+    this.statusText.className = 'editor-status';
     this.statusText.innerText = 'Select a tool...';
     this.paletteContainer.appendChild(this.statusText);
 
-    // --- Tile Palette (shown when Tile tool active) ---
     this.createTilePalette();
-
-    // --- Room List (shown when Room tool active) ---
-    this.createRoomPanel();
-
-    // --- Validation Panel ---
     this.createValidationPanel();
-
-    // --- Instructions ---
     this.createInstructions();
   }
 
   private createToolbar() {
     const toolbar = document.createElement('div');
-    toolbar.style.cssText = 'display: flex; flex-direction: column; gap: 6px;';
+    toolbar.className = 'editor-section';
 
     const title = document.createElement('h2');
     title.innerText = 'Map Editor';
-    title.style.cssText = 'margin: 0; font-size: 16px; color: #8af;';
+    title.className = 'editor-sidebar__title';
     toolbar.appendChild(title);
 
     const nameInput = document.createElement('input');
     nameInput.id = 'map-name-input';
+    nameInput.className = 'input';
     nameInput.placeholder = 'Map Name';
-    nameInput.style.cssText = 'padding: 6px; background: #222; color: #fff; border: 1px solid #444; border-radius: 3px;';
+    nameInput.style.height = '32px';
+    nameInput.style.fontSize = 'var(--text-sm)';
     toolbar.appendChild(nameInput);
-    
+
     const btnRow = document.createElement('div');
-    btnRow.style.cssText = 'display: flex; gap: 6px;';
-
-    const saveBtn = document.createElement('button');
-    saveBtn.innerText = 'Save Map';
-    saveBtn.style.cssText = this.actionBtnStyle('#2a6');
-    saveBtn.onclick = () => this.saveMap(nameInput.value);
-    
-    const clearBtn = document.createElement('button');
-    clearBtn.innerText = 'Clear All';
-    clearBtn.style.cssText = this.actionBtnStyle('#a33');
-    clearBtn.onclick = () => this.clearAll();
-
-    const loadBtn = document.createElement('button');
-    loadBtn.innerText = 'Load';
-    loadBtn.style.cssText = this.actionBtnStyle('#36a');
-    loadBtn.onclick = () => this.showLoadDialog();
-
-    btnRow.appendChild(saveBtn);
-    btnRow.appendChild(clearBtn);
-    btnRow.appendChild(loadBtn);
+    btnRow.className = 'editor-btn-row';
+    btnRow.innerHTML = `
+      ${renderButton({ label: 'Save', variant: 'primary', size: 'sm', dataAction: 'map-save' })}
+      ${renderButton({ label: 'Clear', variant: 'destructive', size: 'sm', dataAction: 'map-clear' })}
+      ${renderButton({ label: 'Load', variant: 'secondary', size: 'sm', dataAction: 'map-load' })}
+    `;
     toolbar.appendChild(btnRow);
+
+    // Edit Tiles button
+    const editTilesRow = document.createElement('div');
+    editTilesRow.innerHTML = renderButton({ label: 'Edit Tiles', variant: 'ghost', size: 'sm', fullWidth: true, dataAction: 'edit-tiles', icon: 'Settings' });
+    toolbar.appendChild(editTilesRow);
+
+    // Event delegation for toolbar buttons
+    toolbar.addEventListener('click', (e) => {
+      const action = (e.target as HTMLElement).closest('[data-action]')?.getAttribute('data-action');
+      if (action === 'map-save') this.saveMap(nameInput.value);
+      else if (action === 'map-clear') this.clearAll();
+      else if (action === 'map-load') this.showLoadDialog();
+      else if (action === 'edit-tiles') this.openTileEditor();
+    });
 
     this.paletteContainer.appendChild(toolbar);
   }
 
+  private openTileEditor() {
+    if (this.tileDefEditor) return;
+    // Hide map editor UI
+    this.paletteContainer.style.display = 'none';
+    this.app.canvas.style.display = 'none';
+
+    this.tileDefEditor = new TileDefinitionEditor({
+      onBack: () => {
+        this.tileDefEditor?.destroy();
+        this.tileDefEditor = null;
+        this.paletteContainer.style.display = '';
+        this.app.canvas.style.display = '';
+      },
+      onSave: this.onTileDefSaved,
+    });
+  }
+
   private createToolSelector() {
     const section = document.createElement('div');
-    section.style.cssText = 'display: flex; flex-direction: column; gap: 4px;';
-    
+    section.className = 'editor-section';
+
     const label = document.createElement('div');
     label.innerText = 'Tools';
-    label.style.cssText = 'font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 1px;';
+    label.className = 'editor-section__label';
     section.appendChild(label);
 
     const grid = document.createElement('div');
-    grid.style.cssText = 'display: grid; grid-template-columns: 1fr 1fr; gap: 4px;';
+    grid.className = 'editor-tool-grid';
 
-    const tools: { tool: EditorTool; label: string; color: string; key: string }[] = [
-      { tool: EditorTool.Tile, label: 'Tiles', color: '#555', key: '1' },
-      { tool: EditorTool.Room, label: 'Rooms', color: '#964B00', key: '2' },
-      { tool: EditorTool.Door, label: 'Doors', color: '#8B4513', key: '3' },
-      { tool: EditorTool.PlayerStart, label: 'P. Start', color: '#0af', key: '4' },
-      { tool: EditorTool.ZombieSpawn, label: 'Z. Spawn', color: '#f44', key: '5' },
-      { tool: EditorTool.Exit, label: 'Exit', color: '#28f', key: '6' },
-      { tool: EditorTool.Objective, label: 'Objective', color: '#fd0', key: '7' },
-      { tool: EditorTool.Eraser, label: 'Eraser', color: '#666', key: 'E' },
+    const tools: { tool: EditorTool; label: string; key: string }[] = [
+      { tool: EditorTool.Tile, label: 'Tiles', key: '1' },
+      { tool: EditorTool.PlayerStart, label: 'P. Start', key: '2' },
+      { tool: EditorTool.ZombieSpawn, label: 'Z. Spawn', key: '3' },
+      { tool: EditorTool.Exit, label: 'Exit', key: '4' },
+      { tool: EditorTool.Objective, label: 'Objective', key: '5' },
+      { tool: EditorTool.Eraser, label: 'Eraser', key: 'E' },
     ];
 
-    tools.forEach(({ tool, label, color, key }) => {
+    tools.forEach(({ tool, label, key }) => {
       const btn = document.createElement('button');
       btn.innerText = `[${key}] ${label}`;
-      btn.style.cssText = `
-        padding: 6px 4px; background: ${color}33; color: #ccc; border: 2px solid ${color}66;
-        border-radius: 4px; cursor: pointer; font-size: 11px; font-family: monospace;
-        transition: all 0.15s;
-      `;
+      btn.className = 'editor-tool-btn';
       btn.onclick = () => this.setTool(tool);
       this.toolButtons.set(tool, btn);
       grid.appendChild(btn);
@@ -227,15 +310,15 @@ export class MapEditor {
   private createTilePalette() {
     this.tilePaletteEl = document.createElement('div');
     this.tilePaletteEl.id = 'tile-palette-section';
-    this.tilePaletteEl.style.cssText = 'display: none;';
+    this.tilePaletteEl.style.display = 'none';
 
     const label = document.createElement('div');
     label.innerText = 'Tile Palette';
-    label.style.cssText = 'font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;';
+    label.className = 'editor-section__label';
     this.tilePaletteEl.appendChild(label);
 
     const list = document.createElement('div');
-    list.style.cssText = 'display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px;';
+    list.className = 'editor-tile-list';
 
     const checkAssets = setInterval(() => {
       if (tileService.isReady) {
@@ -248,53 +331,66 @@ export class MapEditor {
     this.paletteContainer.appendChild(this.tilePaletteEl);
   }
 
-  private roomPanelEl!: HTMLElement;
-  private roomListEl!: HTMLElement;
-  private createRoomPanel() {
-    this.roomPanelEl = document.createElement('div');
-    this.roomPanelEl.id = 'room-panel-section';
-    this.roomPanelEl.style.cssText = 'display: none;';
-
-    const label = document.createElement('div');
-    label.innerText = 'Rooms';
-    label.style.cssText = 'font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;';
-    this.roomPanelEl.appendChild(label);
-
-    const newBtn = document.createElement('button');
-    newBtn.innerText = '+ New Room';
-    newBtn.style.cssText = this.actionBtnStyle('#964B00');
-    newBtn.onclick = () => this.createNewRoom();
-    this.roomPanelEl.appendChild(newBtn);
-
-    this.roomListEl = document.createElement('div');
-    this.roomListEl.style.cssText = 'display: flex; flex-direction: column; gap: 4px; margin-top: 6px;';
-    this.roomPanelEl.appendChild(this.roomListEl);
-
-    this.paletteContainer.appendChild(this.roomPanelEl);
-  }
-
   private validationPanelEl!: HTMLElement;
   private createValidationPanel() {
     this.validationPanelEl = document.createElement('div');
     this.validationPanelEl.id = 'validation-panel';
-    this.validationPanelEl.style.cssText = 'padding: 6px; background: #111; border-radius: 4px; font-size: 11px;';
+    this.validationPanelEl.className = 'editor-validation';
     this.paletteContainer.appendChild(this.validationPanelEl);
   }
 
   private createInstructions() {
     const instructions = document.createElement('div');
-    instructions.style.cssText = 'font-size: 11px; color: #666; margin-top: auto; padding-top: 10px; border-top: 1px solid #333;';
+    instructions.className = 'editor-instructions';
     instructions.innerHTML = `
         <b>Controls:</b><br>
         <b>Click</b> to place | <b>Right-click</b> to remove<br>
-        <b>R</b> rotate tile | <b>1-7, E</b> switch tools<br>
-        <b>Scroll</b> zoom | <b>Drag</b> pan
+        <b>R</b> rotate tile | <b>1-5, E</b> switch tools<br>
+        <b>Ctrl+Z</b> undo | <b>Ctrl+Shift+Z</b> redo<br>
+        <b>Shift+Drag</b> brush fill (Tiles)<br>
+        <b>Scroll</b> zoom | <b>Space+Drag</b> pan
     `;
     this.paletteContainer.appendChild(instructions);
   }
 
-  private actionBtnStyle(color: string): string {
-    return `padding: 6px 8px; background: ${color}; color: #fff; border: none; border-radius: 3px; cursor: pointer; font-size: 11px; font-family: monospace; flex: 1;`;
+  // =============================================
+  // UNDO / REDO
+  // =============================================
+
+  private takeSnapshot(): EditorSnapshot {
+    return {
+      tiles: JSON.parse(JSON.stringify(this.tiles)),
+      markers: JSON.parse(JSON.stringify(this.markers)),
+    };
+  }
+
+  private restoreSnapshot(snap: EditorSnapshot): void {
+    this.tiles = JSON.parse(JSON.stringify(snap.tiles));
+    this.markers = JSON.parse(JSON.stringify(snap.markers));
+    this.rebuildPreviewState();
+    this.updateValidation();
+  }
+
+  private pushUndo(): void {
+    this.undoStack.push(this.takeSnapshot());
+    if (this.undoStack.length > MAX_UNDO) this.undoStack.shift();
+    this.redoStack = [];
+  }
+
+  private undo(): void {
+    if (this.undoStack.length === 0) return;
+    this.redoStack.push(this.takeSnapshot());
+    const snap = this.undoStack.pop()!;
+    this.restoreSnapshot(snap);
+    this.statusText.innerText = 'Undo';
+  }
+
+  private redo(): void {
+    if (this.redoStack.length === 0) return;
+    this.undoStack.push(this.takeSnapshot());
+    const snap = this.redoStack.pop()!;
+    this.restoreSnapshot(snap);
+    this.statusText.innerText = 'Redo';
   }
 
   // =============================================
@@ -303,32 +399,22 @@ export class MapEditor {
 
   private setTool(tool: EditorTool) {
     this.activeTool = tool;
-    this.doorStartCell = null; // Reset partial door
 
     // Update button highlights
     this.toolButtons.forEach((btn, t) => {
-      if (t === tool) {
-        btn.style.outline = '2px solid #fff';
-        btn.style.color = '#fff';
-      } else {
-        btn.style.outline = 'none';
-        btn.style.color = '#ccc';
-      }
+      btn.classList.toggle('editor-tool-btn--active', t === tool);
     });
 
     // Show/hide sub-panels
     this.tilePaletteEl.style.display = tool === EditorTool.Tile ? 'block' : 'none';
-    this.roomPanelEl.style.display = tool === EditorTool.Room ? 'block' : 'none';
 
     const hints: Record<EditorTool, string> = {
       [EditorTool.Tile]: 'Click grid to place/replace tiles. R to rotate.',
-      [EditorTool.Room]: 'Select a room, then click zone cells to add/remove.',
-      [EditorTool.Door]: 'Click a zone cell, then click an adjacent cell to place a door between them.',
-      [EditorTool.PlayerStart]: 'Click a zone cell to set the Player Start position.',
-      [EditorTool.ZombieSpawn]: 'Click zone cells to place Zombie Spawn points.',
-      [EditorTool.Exit]: 'Click zone cells to place Exit points.',
-      [EditorTool.Objective]: 'Click zone cells to place Objective tokens.',
-      [EditorTool.Eraser]: 'Click to remove markers/rooms/doors from cells.',
+      [EditorTool.PlayerStart]: 'Click a STREET zone cell to set the Player Start position.',
+      [EditorTool.ZombieSpawn]: 'Click STREET zone cells to place Zombie Spawn points.',
+      [EditorTool.Exit]: 'Click STREET zone cells to place Exit points.',
+      [EditorTool.Objective]: 'Click any zone cell to place Objective tokens.',
+      [EditorTool.Eraser]: 'Click to remove markers from cells.',
     };
     this.statusText.innerText = hints[tool] || '';
   }
@@ -339,80 +425,23 @@ export class MapEditor {
 
   private populateTilePalette(container: HTMLElement) {
     const ids = tileService.getAllIds();
-    
+
     ids.forEach(id => {
       const item = document.createElement('div');
-      item.style.cssText = 'border: 2px solid #333; cursor: pointer; text-align: center; padding: 4px; background: #222; border-radius: 3px; font-size: 12px; font-weight: bold;';
-      item.innerText = id;
-      
+      item.className = 'editor-tile-item';
+      item.textContent = id;
+
       item.onclick = () => {
         this.selectedTileId = id;
         this.statusText.innerText = `Tile: ${id} (${this.currentRotation}\u00B0)`;
-        
-        Array.from(container.children).forEach((c: any) => {
-          c.style.borderColor = '#333';
-          c.style.background = '#222';
+
+        Array.from(container.children).forEach((c) => {
+          c.classList.remove('editor-tile-item--selected');
         });
-        item.style.borderColor = '#0f0';
-        item.style.background = '#363';
+        item.classList.add('editor-tile-item--selected');
       };
 
       container.appendChild(item);
-    });
-  }
-
-  // =============================================
-  // ROOM MANAGEMENT
-  // =============================================
-
-  private createNewRoom() {
-    const roomId = `room-${this.nextRoomIndex++}`;
-    const room: MapRoom = {
-      id: roomId,
-      name: `Room ${this.rooms.length + 1}`,
-      cells: [],
-    };
-    this.rooms.push(room);
-    this.activeRoomId = roomId;
-    this.refreshRoomList();
-    this.statusText.innerText = `Created "${room.name}". Click zone cells to add.`;
-  }
-
-  private refreshRoomList() {
-    this.roomListEl.innerHTML = '';
-
-    this.rooms.forEach(room => {
-      const el = document.createElement('div');
-      const isActive = room.id === this.activeRoomId;
-      el.style.cssText = `
-        padding: 4px 8px; background: ${isActive ? '#553322' : '#222'}; 
-        border: 1px solid ${isActive ? '#a66' : '#444'}; border-radius: 3px; 
-        cursor: pointer; display: flex; justify-content: space-between; align-items: center;
-      `;
-
-      const nameSpan = document.createElement('span');
-      nameSpan.innerText = `${room.name} (${room.cells.length} cells)`;
-      nameSpan.style.fontSize = '11px';
-      el.appendChild(nameSpan);
-
-      const delBtn = document.createElement('button');
-      delBtn.innerText = 'X';
-      delBtn.style.cssText = 'background: #a33; color: #fff; border: none; padding: 2px 6px; cursor: pointer; font-size: 10px; border-radius: 2px;';
-      delBtn.onclick = (e) => {
-        e.stopPropagation();
-        this.rooms = this.rooms.filter(r => r.id !== room.id);
-        if (this.activeRoomId === room.id) this.activeRoomId = null;
-        this.refreshRoomList();
-      };
-      el.appendChild(delBtn);
-
-      el.onclick = () => {
-        this.activeRoomId = room.id;
-        this.refreshRoomList();
-        this.statusText.innerText = `Painting room: ${room.name}`;
-      };
-
-      this.roomListEl.appendChild(el);
     });
   }
 
@@ -423,6 +452,31 @@ export class MapEditor {
   private setupInteraction() {
     // Key bindings
     window.addEventListener('keydown', (e) => {
+      // Don't handle keys when tile definition editor is open
+      if (this.tileDefEditor) return;
+
+      // Spacebar is handled by PixiBoardRenderer for panning
+      if (e.code === 'Space') {
+        e.preventDefault();
+        return;
+      }
+
+      // Undo/Redo
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          this.redo();
+        } else {
+          this.undo();
+        }
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        this.redo();
+        return;
+      }
+
       const key = e.key.toLowerCase();
       if (key === 'r' && this.activeTool === EditorTool.Tile) {
         this.currentRotation = (this.currentRotation + 90) % 360 as any;
@@ -432,16 +486,44 @@ export class MapEditor {
       }
       // Number keys for tool switching
       const toolMap: Record<string, EditorTool> = {
-        '1': EditorTool.Tile, '2': EditorTool.Room, '3': EditorTool.Door,
-        '4': EditorTool.PlayerStart, '5': EditorTool.ZombieSpawn,
-        '6': EditorTool.Exit, '7': EditorTool.Objective, 'e': EditorTool.Eraser,
+        '1': EditorTool.Tile, '2': EditorTool.PlayerStart, '3': EditorTool.ZombieSpawn,
+        '4': EditorTool.Exit, '5': EditorTool.Objective, 'e': EditorTool.Eraser,
       };
       if (toolMap[key]) this.setTool(toolMap[key]);
     });
 
     // Canvas Interaction
     this.app.stage.eventMode = 'static';
+
+    this.app.stage.on('pointerdown', (e) => {
+      // Spacebar pan mode: ignore editor interactions
+      if (this.renderer.spacebarDown) return;
+      if (e.button === 0 && e.shiftKey && this.activeTool === EditorTool.Tile) {
+        const worldPos = this.renderer.screenToWorld(e.global.x, e.global.y);
+        const { tx, ty } = this.worldToTileCoord(worldPos.x, worldPos.y);
+        this.dragStartCell = { x: tx, y: ty };
+        this.isDragging = true;
+      }
+    });
+
     this.app.stage.on('pointerup', (e) => {
+      // Spacebar pan mode: ignore editor interactions
+      if (this.renderer.spacebarDown) return;
+      if (this.isDragging && this.dragStartCell && e.button === 0) {
+        const worldPos = this.renderer.screenToWorld(e.global.x, e.global.y);
+        this.pushUndo();
+        const { tx, ty } = this.worldToTileCoord(worldPos.x, worldPos.y);
+        this.brushFillTiles(this.dragStartCell.x, this.dragStartCell.y, tx, ty);
+        this.isDragging = false;
+        this.dragStartCell = null;
+        this.rebuildPreviewState();
+        this.updateValidation();
+        return;
+      }
+
+      this.isDragging = false;
+      this.dragStartCell = null;
+
       if (this.renderer.wasDragging) return;
 
       const button = e.button;
@@ -458,7 +540,6 @@ export class MapEditor {
   }
 
   private worldToTileCoord(wx: number, wy: number): { tx: number; ty: number } {
-    const TILE_PIXEL_SIZE = TILE_SIZE * 3;
     return {
       tx: Math.floor(wx / TILE_PIXEL_SIZE),
       ty: Math.floor(wy / TILE_PIXEL_SIZE),
@@ -473,22 +554,29 @@ export class MapEditor {
   }
 
   private isZoneCellValid(zx: number, zy: number): boolean {
-    // Check if this zone cell falls within any placed tile
-    const tx = Math.floor(zx / 3);
-    const ty = Math.floor(zy / 3);
+    const tx = Math.floor(zx / TILE_CELLS_PER_SIDE);
+    const ty = Math.floor(zy / TILE_CELLS_PER_SIDE);
     return this.tiles.some(t => t.x === tx && t.y === ty);
   }
 
+  private getCellType(zx: number, zy: number): 'street' | 'building' | null {
+    const tx = Math.floor(zx / TILE_CELLS_PER_SIDE);
+    const ty = Math.floor(zy / TILE_CELLS_PER_SIDE);
+    const tile = this.tiles.find(t => t.x === tx && t.y === ty);
+    if (!tile) return null;
+    const def = getRotatedTileDefinition(tile.tileId, tile.rotation);
+    if (!def) return null;
+    const localX = zx - tx * TILE_CELLS_PER_SIDE;
+    const localY = zy - ty * TILE_CELLS_PER_SIDE;
+    const cell = getCellAt(def, localX, localY);
+    return cell?.type ?? 'street';
+  }
+
   private handleLeftClick(wx: number, wy: number) {
+    this.pushUndo();
     switch (this.activeTool) {
       case EditorTool.Tile:
         this.handleTilePlacement(wx, wy);
-        break;
-      case EditorTool.Room:
-        this.handleRoomPaint(wx, wy);
-        break;
-      case EditorTool.Door:
-        this.handleDoorPlacement(wx, wy);
         break;
       case EditorTool.PlayerStart:
         this.handleMarkerPlacement(wx, wy, MarkerType.PlayerStart, true);
@@ -511,7 +599,7 @@ export class MapEditor {
   }
 
   private handleRightClick(wx: number, wy: number) {
-    // Right-click always erases in current tool context
+    this.pushUndo();
     if (this.activeTool === EditorTool.Tile) {
       this.handleTileRemoval(wx, wy);
     } else {
@@ -529,6 +617,7 @@ export class MapEditor {
     if (tx < 0 || ty < 0) return;
 
     const existingIndex = this.tiles.findIndex(t => t.x === tx && t.y === ty);
+
     const newTile: TileInstance = {
       id: `tile-${tx}-${ty}`,
       tileId: this.selectedTileId,
@@ -548,93 +637,22 @@ export class MapEditor {
     const { tx, ty } = this.worldToTileCoord(wx, wy);
     this.tiles = this.tiles.filter(t => t.x !== tx || t.y !== ty);
 
-    // Also clean up any rooms/doors/markers in the removed tile's zone cells
-    for (let dy = 0; dy < 3; dy++) {
-      for (let dx = 0; dx < 3; dx++) {
-        const zx = tx * 3 + dx;
-        const zy = ty * 3 + dy;
+    for (let dy = 0; dy < TILE_CELLS_PER_SIDE; dy++) {
+      for (let dx = 0; dx < TILE_CELLS_PER_SIDE; dx++) {
+        const zx = tx * TILE_CELLS_PER_SIDE + dx;
+        const zy = ty * TILE_CELLS_PER_SIDE + dy;
         this.removeAllAtCell(zx, zy);
       }
     }
   }
 
-  // --- Room Painting ---
-
-  private handleRoomPaint(wx: number, wy: number) {
-    if (!this.activeRoomId) {
-      this.statusText.innerText = 'Create or select a room first.';
-      return;
-    }
-
-    const { zx, zy } = this.worldToZoneCoord(wx, wy);
-    if (!this.isZoneCellValid(zx, zy)) {
-      this.statusText.innerText = 'Cell outside placed tiles.';
-      return;
-    }
-
-    const room = this.rooms.find(r => r.id === this.activeRoomId);
-    if (!room) return;
-
-    // Check if cell is already in THIS room -> remove it
-    const cellIndex = room.cells.findIndex(c => c.x === zx && c.y === zy);
-    if (cellIndex !== -1) {
-      room.cells.splice(cellIndex, 1);
-      this.statusText.innerText = `Removed cell (${zx},${zy}) from ${room.name}`;
-    } else {
-      // Check if cell belongs to ANOTHER room -> steal it
-      for (const otherRoom of this.rooms) {
-        if (otherRoom.id === room.id) continue;
-        otherRoom.cells = otherRoom.cells.filter(c => c.x !== zx || c.y !== zy);
-      }
-      room.cells.push({ x: zx, y: zy });
-      this.statusText.innerText = `Added cell (${zx},${zy}) to ${room.name}`;
-    }
-    this.refreshRoomList();
-  }
-
-  // --- Door Placement ---
-
-  private handleDoorPlacement(wx: number, wy: number) {
-    const { zx, zy } = this.worldToZoneCoord(wx, wy);
-    if (!this.isZoneCellValid(zx, zy)) return;
-
-    if (!this.doorStartCell) {
-      this.doorStartCell = { x: zx, y: zy };
-      this.statusText.innerText = `Door start: (${zx},${zy}). Click an adjacent cell to complete.`;
-    } else {
-      const dx = Math.abs(zx - this.doorStartCell.x);
-      const dy = Math.abs(zy - this.doorStartCell.y);
-
-      if ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) {
-        // Valid cardinal neighbor
-        const ek = doorEdgeKey(this.doorStartCell.x, this.doorStartCell.y, zx, zy);
-        
-        // Toggle: if door exists, remove it
-        const existingIndex = this.doors.findIndex(d => 
-          doorEdgeKey(d.x1, d.y1, d.x2, d.y2) === ek
-        );
-        
-        if (existingIndex !== -1) {
-          this.doors.splice(existingIndex, 1);
-          this.statusText.innerText = `Removed door between (${this.doorStartCell.x},${this.doorStartCell.y}) and (${zx},${zy})`;
-        } else {
-          this.doors.push({
-            x1: this.doorStartCell.x,
-            y1: this.doorStartCell.y,
-            x2: zx,
-            y2: zy,
-            open: false, // Doors start closed by default
-          });
-          this.statusText.innerText = `Placed door (closed) between (${this.doorStartCell.x},${this.doorStartCell.y}) and (${zx},${zy})`;
-        }
-      } else {
-        this.statusText.innerText = `Cells not adjacent. Try again.`;
-      }
-      this.doorStartCell = null;
-    }
-  }
-
   // --- Marker Placement ---
+
+  private static readonly STREET_ONLY_MARKERS = [
+    MarkerType.PlayerStart,
+    MarkerType.ZombieSpawn,
+    MarkerType.Exit,
+  ];
 
   private handleMarkerPlacement(wx: number, wy: number, type: MarkerType, unique: boolean) {
     const { zx, zy } = this.worldToZoneCoord(wx, wy);
@@ -643,17 +661,41 @@ export class MapEditor {
       return;
     }
 
-    // If unique (e.g. PlayerStart), remove any existing of this type
-    if (unique) {
-      this.markers = this.markers.filter(m => m.type !== type);
+    // Enforce street-only constraint for spawns, starts, and exits
+    if (MapEditor.STREET_ONLY_MARKERS.includes(type)) {
+      const cellType = this.getCellType(zx, zy);
+      if (cellType !== 'street') {
+        this.statusText.innerText = `${type} can only be placed on street zones.`;
+        return;
+      }
     }
 
-    // Toggle: if marker of this type already at this cell, remove it
+    // Resolve which zone this cell belongs to
+    const cellKey = `${zx},${zy}`;
+    const zoneId = this.state.zoneGeometry?.cellToZone[cellKey];
+
+    // Toggle off if clicking same cell
     const existingIndex = this.markers.findIndex(m => m.type === type && m.x === zx && m.y === zy);
     if (existingIndex !== -1) {
       this.markers.splice(existingIndex, 1);
       this.statusText.innerText = `Removed ${type} at (${zx},${zy})`;
     } else {
+      // Check: only one marker of same type per zone
+      if (zoneId) {
+        const sameTypeInZone = this.markers.find(m => {
+          if (m.type !== type) return false;
+          const mk = `${m.x},${m.y}`;
+          return this.state.zoneGeometry?.cellToZone[mk] === zoneId;
+        });
+        if (sameTypeInZone) {
+          this.statusText.innerText = `Zone already has a ${type} marker.`;
+          return;
+        }
+      }
+
+      if (unique) {
+        this.markers = this.markers.filter(m => m.type !== type);
+      }
       this.markers.push({ type, x: zx, y: zy });
       this.statusText.innerText = `Placed ${type} at (${zx},${zy})`;
     }
@@ -668,64 +710,96 @@ export class MapEditor {
   }
 
   private removeAllAtCell(zx: number, zy: number) {
-    // Remove markers at cell
     this.markers = this.markers.filter(m => m.x !== zx || m.y !== zy);
-    // Remove cell from rooms
-    for (const room of this.rooms) {
-      room.cells = room.cells.filter(c => c.x !== zx || c.y !== zy);
+  }
+
+  // =============================================
+  // BRUSH FILL
+  // =============================================
+
+  private brushFillTiles(x1: number, y1: number, x2: number, y2: number): void {
+    if (!this.selectedTileId) return;
+    const minX = Math.min(x1, x2);
+    const maxX = Math.max(x1, x2);
+    const minY = Math.min(y1, y2);
+    const maxY = Math.max(y1, y2);
+
+    for (let ty = minY; ty <= maxY; ty++) {
+      for (let tx = minX; tx <= maxX; tx++) {
+        if (tx < 0 || ty < 0) continue;
+        const existingIndex = this.tiles.findIndex(t => t.x === tx && t.y === ty);
+
+        const newTile: TileInstance = {
+          id: `tile-${tx}-${ty}`,
+          tileId: this.selectedTileId,
+          x: tx,
+          y: ty,
+          rotation: this.currentRotation,
+        };
+        if (existingIndex !== -1) {
+          this.tiles[existingIndex] = newTile;
+        } else {
+          this.tiles.push(newTile);
+        }
+      }
     }
-    // Remove doors touching cell
-    this.doors = this.doors.filter(d => 
-      !((d.x1 === zx && d.y1 === zy) || (d.x2 === zx && d.y2 === zy))
-    );
+    this.statusText.innerText = `Brush filled tiles (${minX},${minY}) to (${maxX},${maxY})`;
   }
 
   // =============================================
   // PREVIEW STATE REBUILD
   // =============================================
 
-  /**
-   * Rebuild the GameState preview from authored data so the renderer shows
-   * zones, doors, markers overlaid on tiles.
-   */
   private rebuildPreviewState() {
     this.state.tiles = [...this.tiles];
 
     if (this.tiles.length === 0) {
       this.state.zones = {};
+      this.state.zoneGeometry = undefined;
+      this.state.edgeClassMap = undefined;
+      this.state.doorPositions = undefined;
+      this.state.cellTypes = undefined;
+      setZoneGeometry(null);
       return;
     }
 
-    // Compile the authored scenario to produce zones
     const scenarioMap: ScenarioMap = {
       id: 'preview',
       name: 'Preview',
       width: Math.max(...this.tiles.map(t => t.x)) + 1,
       height: Math.max(...this.tiles.map(t => t.y)) + 1,
       tiles: this.tiles,
-      rooms: this.rooms,
-      doors: this.doors,
       markers: this.markers,
     };
 
     try {
       const compiled = compileScenario(scenarioMap);
       this.state.zones = compiled.zones;
+      this.state.zoneGeometry = compiled.zoneGeometry;
+      this.state.edgeClassMap = compiled.edgeClassMap;
+      this.state.doorPositions = compiled.doorPositions;
+      this.state.cellTypes = compiled.cellTypes;
+      setZoneGeometry(compiled.zoneGeometry);
     } catch (e) {
       console.warn('Preview compile error:', e);
       this.state.zones = {};
+      this.state.zoneGeometry = undefined;
+      this.state.edgeClassMap = undefined;
+      this.state.doorPositions = undefined;
+      this.state.cellTypes = undefined;
+      setZoneGeometry(null);
     }
   }
 
   // =============================================
-  // OVERLAY RENDERING (editor-specific visuals)
+  // OVERLAY RENDERING — zone-centric visuals
   // =============================================
+
+  // Zone color palettes (reference EDITOR_THEME)
 
   private renderOverlay() {
     this.overlayGraphics.clear();
-    
-    // Sync overlay position with renderer's container
-    // The renderer's container handles pan/zoom; overlay must match
+
     const rendererContainer = this.app.stage.children[0] as PIXI.Container;
     if (rendererContainer) {
       this.overlayLayer.position.copyFrom(rendererContainer.position);
@@ -733,95 +807,219 @@ export class MapEditor {
     }
 
     const g = this.overlayGraphics;
+    const geo = this.state.zoneGeometry;
+    const edgeMap = this.state.edgeClassMap;
 
-    // --- Draw Room cell highlights ---
-    const ROOM_COLORS = [0x964B00, 0x8B0000, 0x006400, 0x00008B, 0x4B0082, 0x800080];
-    this.rooms.forEach((room, ri) => {
-      const color = ROOM_COLORS[ri % ROOM_COLORS.length];
-      room.cells.forEach(cell => {
-        const px = cell.x * TILE_SIZE;
-        const py = cell.y * TILE_SIZE;
-        g.rect(px + 2, py + 2, TILE_SIZE - 4, TILE_SIZE - 4);
-        g.fill({ color, alpha: 0.25 });
-        g.stroke({ width: 2, color, alpha: 0.6 });
-      });
-    });
+    // --- 1. Zone fills (primary visual) ---
+    if (geo) {
+      let streetIdx = 0;
+      let buildingIdx = 0;
 
-    // --- Draw Door indicators on edges ---
-    this.doors.forEach(door => {
-      const cx1 = door.x1 * TILE_SIZE + TILE_SIZE / 2;
-      const cy1 = door.y1 * TILE_SIZE + TILE_SIZE / 2;
-      const cx2 = door.x2 * TILE_SIZE + TILE_SIZE / 2;
-      const cy2 = door.y2 * TILE_SIZE + TILE_SIZE / 2;
-      
-      const mx = (cx1 + cx2) / 2;
-      const my = (cy1 + cy2) / 2;
-      
-      const doorColor = door.open ? 0x00FF00 : 0x8B4513;
-      
-      // Door icon: small rectangle on edge midpoint
-      if (door.x1 === door.x2) {
-        // Vertical neighbors: horizontal edge
-        g.rect(mx - 20, my - 5, 40, 10);
-      } else {
-        // Horizontal neighbors: vertical edge
-        g.rect(mx - 5, my - 20, 10, 40);
+      for (const [zoneId, cells] of Object.entries(geo.zoneCells)) {
+        const zone = this.state.zones[zoneId];
+        if (!zone) continue;
+
+        let color: number;
+        let alpha: number;
+        if (zone.isBuilding) {
+          color = EDITOR_THEME.zone.buildingColors[buildingIdx % EDITOR_THEME.zone.buildingColors.length];
+          buildingIdx++;
+          alpha = EDITOR_THEME.zone.buildingAlpha;
+        } else {
+          color = EDITOR_THEME.zone.streetColors[streetIdx % EDITOR_THEME.zone.streetColors.length];
+          streetIdx++;
+          alpha = EDITOR_THEME.zone.streetAlpha;
+        }
+
+        for (const c of cells) {
+          g.rect(c.x * TILE_SIZE, c.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+          g.fill({ color, alpha });
+        }
       }
-      g.fill({ color: doorColor, alpha: 0.8 });
-      g.stroke({ width: 1, color: 0x000000 });
-    });
+    }
 
-    // --- Draw Marker icons ---
+    // --- 2. Edge rendering from compiled edge classification ---
+    if (edgeMap) {
+      const W = EDITOR_THEME.wall.width; // wall thickness
+      for (const [ek, cls] of Object.entries(edgeMap)) {
+        if (cls === 'open') continue;
+
+        const [partA, partB] = ek.split('|');
+        const [x1, y1] = partA.split(',').map(Number);
+        const [x2, y2] = partB.split(',').map(Number);
+
+        const isVertical = x1 !== x2;
+
+        if (cls === 'wall') {
+          // Solid wall as filled rect
+          if (isVertical) {
+            const ex = Math.max(x1, x2) * TILE_SIZE;
+            g.rect(ex - W / 2, y1 * TILE_SIZE, W, TILE_SIZE);
+          } else {
+            const ey = Math.max(y1, y2) * TILE_SIZE;
+            g.rect(x1 * TILE_SIZE, ey - W / 2, TILE_SIZE, W);
+          }
+          g.fill({ color: EDITOR_THEME.wall.color, alpha: EDITOR_THEME.wall.alpha });
+        } else if (cls === 'door') {
+          if (isVertical) {
+            const ex = Math.max(x1, x2) * TILE_SIZE;
+            const ey = y1 * TILE_SIZE;
+            g.rect(ex - W / 2, ey, W, 3);
+            g.fill({ color: EDITOR_THEME.door.frameColor });
+            g.rect(ex - W / 2, ey + TILE_SIZE - 3, W, 3);
+            g.fill({ color: EDITOR_THEME.door.frameColor });
+            g.rect(ex - 3, ey + 3, 6, TILE_SIZE - 6);
+            g.fill({ color: EDITOR_THEME.door.panelColor, alpha: EDITOR_THEME.door.panelAlpha });
+          } else {
+            const ex = x1 * TILE_SIZE;
+            const ey = Math.max(y1, y2) * TILE_SIZE;
+            g.rect(ex, ey - W / 2, 3, W);
+            g.fill({ color: EDITOR_THEME.door.frameColor });
+            g.rect(ex + TILE_SIZE - 3, ey - W / 2, 3, W);
+            g.fill({ color: EDITOR_THEME.door.frameColor });
+            g.rect(ex + 3, ey - 3, TILE_SIZE - 6, 6);
+            g.fill({ color: EDITOR_THEME.door.panelColor, alpha: EDITOR_THEME.door.panelAlpha });
+          }
+        } else if (cls === 'crosswalk') {
+          // Dashed white crosswalk line
+          if (isVertical) {
+            const ex = Math.max(x1, x2) * TILE_SIZE;
+            const ey = y1 * TILE_SIZE;
+            for (let dy = 2; dy < TILE_SIZE; dy += 6) {
+              g.rect(ex - 1, ey + dy, 2, 3);
+              g.fill({ color: EDITOR_THEME.crosswalk.color, alpha: EDITOR_THEME.crosswalk.alpha });
+            }
+          } else {
+            const ex = x1 * TILE_SIZE;
+            const ey = Math.max(y1, y2) * TILE_SIZE;
+            for (let dx = 2; dx < TILE_SIZE; dx += 6) {
+              g.rect(ex + dx, ey - 1, 3, 2);
+              g.fill({ color: EDITOR_THEME.crosswalk.color, alpha: EDITOR_THEME.crosswalk.alpha });
+            }
+          }
+        } else if (cls === 'doorway') {
+          // Building passage — green gap indicator
+          if (isVertical) {
+            const ex = Math.max(x1, x2) * TILE_SIZE;
+            const ey = y1 * TILE_SIZE;
+            g.rect(ex - 2, ey + 4, 4, TILE_SIZE - 8);
+            g.fill({ color: EDITOR_THEME.doorway.color, alpha: EDITOR_THEME.doorway.alpha });
+          } else {
+            const ex = x1 * TILE_SIZE;
+            const ey = Math.max(y1, y2) * TILE_SIZE;
+            g.rect(ex + 4, ey - 2, TILE_SIZE - 8, 4);
+            g.fill({ color: EDITOR_THEME.doorway.color, alpha: EDITOR_THEME.doorway.alpha });
+          }
+        }
+        // 'open' edges: no visual needed
+      }
+    }
+
+    // --- 3. Tile boundary grid (subtle) ---
+    for (const tile of this.tiles) {
+      const px = tile.x * TILE_PIXEL_SIZE;
+      const py = tile.y * TILE_PIXEL_SIZE;
+      g.rect(px, py, TILE_PIXEL_SIZE, TILE_PIXEL_SIZE);
+      g.stroke({ width: EDITOR_THEME.tileBorder.width, color: EDITOR_THEME.tileBorder.color, alpha: EDITOR_THEME.tileBorder.alpha });
+    }
+
+    // --- 4. Marker icons ---
     this.markers.forEach(marker => {
       const cx = marker.x * TILE_SIZE + TILE_SIZE / 2;
       const cy = marker.y * TILE_SIZE + TILE_SIZE / 2;
 
       switch (marker.type) {
         case MarkerType.PlayerStart:
-          // Blue circle with P
           g.circle(cx, cy, 18);
-          g.fill({ color: 0x0088FF, alpha: 0.7 });
-          g.stroke({ width: 2, color: 0xFFFFFF });
+          g.fill({ color: EDITOR_THEME.marker.playerStart.fill, alpha: EDITOR_THEME.marker.playerStart.fillAlpha });
+          g.stroke({ width: EDITOR_THEME.marker.playerStart.strokeWidth, color: EDITOR_THEME.marker.playerStart.stroke });
           break;
         case MarkerType.ZombieSpawn:
-          // Red diamond
           g.moveTo(cx, cy - 18);
           g.lineTo(cx + 14, cy);
           g.lineTo(cx, cy + 18);
           g.lineTo(cx - 14, cy);
           g.closePath();
-          g.fill({ color: 0xFF2222, alpha: 0.7 });
-          g.stroke({ width: 2, color: 0x000000 });
+          g.fill({ color: EDITOR_THEME.marker.zombieSpawn.fill, alpha: EDITOR_THEME.marker.zombieSpawn.fillAlpha });
+          g.stroke({ width: EDITOR_THEME.marker.zombieSpawn.strokeWidth, color: EDITOR_THEME.marker.zombieSpawn.stroke });
           break;
         case MarkerType.Exit:
-          // Blue square with arrow
-          g.rect(cx - 16, cy - 16, 32, 32);
-          g.fill({ color: 0x2244AA, alpha: 0.7 });
-          g.stroke({ width: 2, color: 0x4488FF });
-          // Arrow
-          g.moveTo(cx - 6, cy + 6);
-          g.lineTo(cx + 8, cy);
-          g.lineTo(cx - 6, cy - 6);
-          g.stroke({ width: 3, color: 0xFFFFFF });
+          g.rect(cx - 14, cy - 14, 28, 28);
+          g.fill({ color: 0x22AA44, alpha: 0.85 });
+          g.stroke({ width: 2, color: 0x44DD66 });
           break;
         case MarkerType.Objective:
-          // Gold circle
           g.circle(cx, cy, 14);
-          g.fill({ color: 0xFFD700, alpha: 0.8 });
-          g.stroke({ width: 2, color: 0x000000 });
+          g.fill({ color: EDITOR_THEME.marker.objective.fill, alpha: EDITOR_THEME.marker.objective.fillAlpha });
+          g.stroke({ width: EDITOR_THEME.marker.objective.strokeWidth, color: EDITOR_THEME.marker.objective.stroke });
           g.circle(cx, cy, 5);
-          g.fill({ color: 0x000000 });
+          g.fill({ color: EDITOR_THEME.marker.objective.dotColor });
           break;
       }
     });
 
-    // --- Door placement preview (first cell selected) ---
-    if (this.doorStartCell && this.activeTool === EditorTool.Door) {
-      const px = this.doorStartCell.x * TILE_SIZE;
-      const py = this.doorStartCell.y * TILE_SIZE;
-      g.rect(px, py, TILE_SIZE, TILE_SIZE);
-      g.stroke({ width: 3, color: 0xFFAA00, alpha: 0.8 });
+    // --- 5. Spawn number labels ---
+    // Remove old labels
+    this.spawnLabelContainer.removeChildren();
+    // Count spawn markers in array order to assign numbers
+    let spawnNum = 1;
+    for (const marker of this.markers) {
+      if (marker.type !== MarkerType.ZombieSpawn) continue;
+      const cx = marker.x * TILE_SIZE + TILE_SIZE / 2;
+      const cy = marker.y * TILE_SIZE + TILE_SIZE / 2;
+      const label = new PIXI.Text({
+        text: String(spawnNum),
+        style: {
+          fontFamily: 'Arial',
+          fontSize: 14,
+          fontWeight: 'bold',
+          fill: 0xFFFFFF,
+          stroke: { color: 0x000000, width: 3 },
+        },
+      });
+      label.anchor.set(0.5, 0.5);
+      label.position.set(cx, cy);
+      this.spawnLabelContainer.addChild(label);
+      spawnNum++;
     }
+
+    // --- 6. Room dark/lit icons (moon/sun via PIXI.Graphics) ---
+    this.roomIconContainer.removeChildren();
+    if (geo) {
+      const seenZones = new Set<string>();
+      for (const [zoneId, cells] of Object.entries(geo.zoneCells)) {
+        const zone = this.state.zones[zoneId];
+        if (!zone || !zone.isBuilding || seenZones.has(zoneId)) continue;
+        seenZones.add(zoneId);
+
+        // Calculate zone centroid
+        let sumX = 0, sumY = 0;
+        for (const c of cells) { sumX += c.x; sumY += c.y; }
+        const cx = (sumX / cells.length) * TILE_SIZE + TILE_SIZE / 2;
+        const cy = (sumY / cells.length) * TILE_SIZE + TILE_SIZE / 2;
+
+        const iconPath = zone.isDark ? '/images/icons/moon-white.svg' : '/images/icons/sun-yellow.svg';
+        const sprite = PIXI.Sprite.from(iconPath);
+        sprite.width = 24;
+        sprite.height = 24;
+        sprite.anchor.set(0.5, 0.5);
+        sprite.position.set(cx, cy);
+        this.roomIconContainer.addChild(sprite);
+      }
+    }
+
+    // --- 7. Exit marker icons (after roomIconContainer clear) ---
+    this.markers.forEach(marker => {
+      if (marker.type === MarkerType.Exit) {
+        const cx = marker.x * TILE_SIZE + TILE_SIZE / 2;
+        const cy = marker.y * TILE_SIZE + TILE_SIZE / 2;
+        const exitSprite = PIXI.Sprite.from('/images/icons/door-open-white.svg');
+        exitSprite.width = 24;
+        exitSprite.height = 24;
+        exitSprite.position.set(cx - 12, cy - 12);
+        this.roomIconContainer.addChild(exitSprite);
+      }
+    });
   }
 
   // =============================================
@@ -835,8 +1033,8 @@ export class MapEditor {
       warnings.push('No tiles placed');
     }
 
-    const hasPlayerStart = this.markers.some(m => m.type === MarkerType.PlayerStart);
-    if (!hasPlayerStart) warnings.push('Missing: Player Start');
+    const playerStart = this.markers.find(m => m.type === MarkerType.PlayerStart);
+    if (!playerStart) warnings.push('Missing: Player Start');
 
     const hasSpawn = this.markers.some(m => m.type === MarkerType.ZombieSpawn);
     if (!hasSpawn) warnings.push('Missing: Zombie Spawn');
@@ -844,24 +1042,109 @@ export class MapEditor {
     const hasExit = this.markers.some(m => m.type === MarkerType.Exit);
     if (!hasExit) warnings.push('Optional: No Exit point');
 
-    // Check for rooms with 0 cells
-    this.rooms.forEach(r => {
-      if (r.cells.length === 0) warnings.push(`Empty room: "${r.name}"`);
-    });
-
-    // Check for orphaned markers (on cells not belonging to tiles)
     this.markers.forEach(m => {
       if (!this.isZoneCellValid(m.x, m.y)) {
         warnings.push(`Marker ${m.type} at (${m.x},${m.y}) outside tiles`);
+      } else if (MapEditor.STREET_ONLY_MARKERS.includes(m.type)) {
+        const ct = this.getCellType(m.x, m.y);
+        if (ct && ct !== 'street') {
+          warnings.push(`${m.type} at (${m.x},${m.y}) must be on a street zone`);
+        }
       }
     });
 
+    if (playerStart && Object.keys(this.state.zones).length > 0) {
+      const cellKey = `${playerStart.x},${playerStart.y}`;
+      const startZoneId = this.state.zoneGeometry?.cellToZone[cellKey] || `z_${playerStart.x}_${playerStart.y}`;
+      if (this.state.zones[startZoneId]) {
+        const visited = new Set<string>();
+        const queue = [startZoneId];
+        visited.add(startZoneId);
+
+        while (queue.length > 0) {
+          const current = queue.shift()!;
+          const zone = this.state.zones[current];
+          if (!zone) continue;
+          for (const neighbor of zone.connections.map(c => c.toZoneId)) {
+            if (!visited.has(neighbor)) {
+              visited.add(neighbor);
+              queue.push(neighbor);
+            }
+          }
+        }
+
+        const allZoneIds = Object.keys(this.state.zones);
+        const unreachable = allZoneIds.filter(id => !visited.has(id));
+        if (unreachable.length > 0) {
+          warnings.push(`${unreachable.length} zone(s) unreachable from Player Start`);
+        }
+      }
+    }
+
+    // Check tile edge compatibility at shared boundaries
+    this.checkTileEdgeCompatibility(warnings);
+
+    // Zone count summary
+    const zoneCount = Object.keys(this.state.zones).length;
+    if (zoneCount > 0) {
+      const streetZones = Object.values(this.state.zones).filter(z => !z.isBuilding).length;
+      const buildingZones = Object.values(this.state.zones).filter(z => z.isBuilding).length;
+      warnings.push(`Optional: ${zoneCount} zones (${streetZones} street, ${buildingZones} building)`);
+    }
+
     if (warnings.length === 0) {
-      this.validationPanelEl.innerHTML = '<span style="color: #0f0;">Map valid</span>';
+      this.validationPanelEl.innerHTML = '<span class="editor-validation__ok">Map valid</span>';
     } else {
-      this.validationPanelEl.innerHTML = warnings.map(w => 
-        `<div style="color: ${w.startsWith('Optional') ? '#fa0' : '#f44'};">${w}</div>`
+      this.validationPanelEl.innerHTML = warnings.map(w =>
+        `<div class="${w.startsWith('Optional') ? 'editor-validation__warn' : 'editor-validation__error'}">${w}</div>`
       ).join('');
+    }
+  }
+
+  private checkTileEdgeCompatibility(warnings: string[]) {
+    const tileMap = new Map<string, TileInstance>();
+    for (const t of this.tiles) {
+      tileMap.set(`${t.x},${t.y}`, t);
+    }
+
+    const checked = new Set<string>();
+
+    for (const tile of this.tiles) {
+      const neighbors: { dx: number; dy: number; sideA: 'north' | 'south' | 'east' | 'west'; sideB: 'north' | 'south' | 'east' | 'west' }[] = [
+        { dx: 1, dy: 0, sideA: 'east', sideB: 'west' },
+        { dx: 0, dy: 1, sideA: 'south', sideB: 'north' },
+      ];
+
+      for (const { dx, dy, sideA, sideB } of neighbors) {
+        const neighborKey = `${tile.x + dx},${tile.y + dy}`;
+        const neighbor = tileMap.get(neighborKey);
+        if (!neighbor) continue;
+
+        const pairKey = `${tile.x},${tile.y}|${neighborKey}`;
+        if (checked.has(pairKey)) continue;
+        checked.add(pairKey);
+
+        const defA = getRotatedTileDefinition(tile.tileId, tile.rotation);
+        const defB = getRotatedTileDefinition(neighbor.tileId, neighbor.rotation);
+        if (!defA || !defB) continue;
+
+        // Check a sample of edge positions for mismatches
+        let mismatches = 0;
+        for (let i = 0; i < TILE_CELLS_PER_SIDE; i++) {
+          const edgeA = defA.edges.find(e => e.side === sideA && e.localIndex === i);
+          const edgeB = defB.edges.find(e => e.side === sideB && e.localIndex === i);
+          if (!edgeA || !edgeB) continue;
+
+          // Mismatch: one side is street, other is wall
+          if (edgeA.type !== edgeB.type) {
+            mismatches++;
+          }
+        }
+
+        if (mismatches > 0) {
+          warnings.push(`Edge mismatch: tile (${tile.x},${tile.y}) ${sideA} ↔ tile (${neighbor.x},${neighbor.y}) ${sideB}: ${mismatches} cells`);
+        }
+      }
     }
   }
 
@@ -870,41 +1153,49 @@ export class MapEditor {
   // =============================================
 
   private clearAll() {
-    if (!confirm('Clear everything?')) return;
-    this.tiles = [];
-    this.rooms = [];
-    this.doors = [];
-    this.markers = [];
-    this.activeRoomId = null;
-    this.nextRoomIndex = 0;
-    this.state.tiles = [];
-    this.state.zones = {};
-    this.refreshRoomList();
-    this.updateValidation();
+    modalManager.open({
+      title: 'Clear Everything?',
+      size: 'sm',
+      renderBody: () => '<p class="text-secondary">This will remove all tiles and markers.</p>',
+      renderFooter: () => `
+        ${renderButton({ label: 'Cancel', variant: 'secondary', dataAction: 'modal-close' })}
+        ${renderButton({ label: 'Clear', variant: 'destructive', dataAction: 'confirm-clear' })}
+      `,
+      onOpen: (el) => {
+        el.addEventListener('click', (ev) => {
+          if ((ev.target as HTMLElement).closest('[data-action="confirm-clear"]')) {
+            modalManager.close();
+            this.tiles = [];
+            this.markers = [];
+            this.state.tiles = [];
+            this.state.zones = {};
+            this.state.zoneGeometry = undefined;
+            setZoneGeometry(null);
+            this.updateValidation();
+          }
+        });
+      },
+    });
   }
 
   private async saveMap(name: string) {
     if (!name) {
-      alert('Please enter a map name');
+      notificationManager.show({ variant: 'warning', message: 'Please enter a map name' });
       return;
     }
 
     if (this.tiles.length === 0) {
-      alert('Map is empty!');
+      notificationManager.show({ variant: 'warning', message: 'Map is empty!' });
       return;
     }
-
-    // Clean empty rooms
-    const cleanRooms = this.rooms.filter(r => r.cells.length > 0);
 
     const mapData: ScenarioMap = {
       id: `map-${Date.now()}`,
       name: name,
       width: Math.max(...this.tiles.map(t => t.x)) + 1,
       height: Math.max(...this.tiles.map(t => t.y)) + 1,
+      gridSize: TILE_CELLS_PER_SIDE,
       tiles: this.tiles,
-      rooms: cleanRooms,
-      doors: this.doors,
       markers: this.markers,
     };
 
@@ -916,14 +1207,13 @@ export class MapEditor {
       });
 
       if (response.ok) {
-        const result = await response.json();
-        alert(`Map saved! ID: ${result.id}`);
+        notificationManager.show({ variant: 'success', message: `Map "${name}" saved` });
       } else {
-        alert('Failed to save map');
+        notificationManager.show({ variant: 'danger', message: 'Failed to save map' });
       }
     } catch (e) {
       console.error(e);
-      alert('Error saving map');
+      notificationManager.show({ variant: 'danger', message: 'Error saving map' });
     }
   }
 
@@ -934,38 +1224,104 @@ export class MapEditor {
       const maps = await res.json();
 
       if (maps.length === 0) {
-        alert('No saved maps found.');
+        notificationManager.show({ variant: 'info', message: 'No saved maps found.' });
         return;
       }
 
-      const names = maps.map((m: any, i: number) => `${i + 1}. ${m.name} (${m.id})`).join('\n');
-      const choice = prompt(`Select map number to load:\n\n${names}`);
-      if (!choice) return;
-
-      const idx = parseInt(choice) - 1;
-      if (idx < 0 || idx >= maps.length) return;
-
-      this.loadMap(maps[idx]);
+      modalManager.open({
+        title: 'Load Map',
+        size: 'md',
+        renderBody: () => `
+          <div class="stack stack--sm">
+            ${maps.map((m: any, i: number) => `
+              <div style="display:flex;align-items:center;gap:4px">
+                ${renderButton({
+                  label: `${m.name} (${m.id})`,
+                  variant: 'ghost',
+                  fullWidth: true,
+                  dataAction: 'load-map',
+                  dataId: String(i),
+                })}
+                ${renderButton({
+                  icon: 'Trash2',
+                  variant: 'destructive',
+                  size: 'sm',
+                  dataAction: 'delete-map',
+                  dataId: String(i),
+                  title: 'Delete map',
+                })}
+              </div>
+            `).join('')}
+          </div>`,
+        onOpen: (el) => {
+          el.addEventListener('click', async (ev) => {
+            const loadBtn = (ev.target as HTMLElement).closest('[data-action="load-map"]') as HTMLElement | null;
+            if (loadBtn) {
+              const idx = parseInt(loadBtn.dataset.id || '');
+              if (idx >= 0 && idx < maps.length) {
+                modalManager.close();
+                this.loadMap(maps[idx]);
+              }
+              return;
+            }
+            const delBtn = (ev.target as HTMLElement).closest('[data-action="delete-map"]') as HTMLElement | null;
+            if (delBtn) {
+              const idx = parseInt(delBtn.dataset.id || '');
+              if (idx >= 0 && idx < maps.length) {
+                const map = maps[idx];
+                modalManager.close();
+                modalManager.open({
+                  title: 'Delete Map',
+                  size: 'sm',
+                  renderBody: () => `<p>Delete map "<strong>${map.name}</strong>"? This cannot be undone.</p>`,
+                  renderFooter: () => `
+                    ${renderButton({ label: 'Cancel', variant: 'secondary', dataAction: 'modal-close' })}
+                    ${renderButton({ label: 'Delete', icon: 'Trash2', variant: 'destructive', dataAction: 'confirm-delete' })}`,
+                  onOpen: (el) => {
+                    el.addEventListener('click', async (e) => {
+                      if (!(e.target as HTMLElement).closest('[data-action="confirm-delete"]')) return;
+                      try {
+                        await fetch(`/api/maps/${encodeURIComponent(map.id)}`, { method: 'DELETE' });
+                        maps.splice(idx, 1);
+                        modalManager.close();
+                        if (maps.length > 0) {
+                          this.showLoadDialog();
+                        } else {
+                          notificationManager.show({ variant: 'info', message: 'No saved maps found.' });
+                        }
+                      } catch (e) {
+                        console.error('Failed to delete map:', e);
+                      }
+                    });
+                  },
+                });
+              }
+            }
+          });
+        },
+      });
     } catch (e) {
       console.error('Failed to load maps:', e);
     }
   }
 
   private loadMap(mapData: any) {
+    // Migrate legacy coordinates to current grid size
+    const isLegacy = !mapData.gridSize || mapData.gridSize !== TILE_CELLS_PER_SIDE;
+    const scale = isLegacy ? TILE_CELLS_PER_SIDE / (mapData.gridSize || 3) : 1;
+
     this.tiles = mapData.tiles || [];
-    this.rooms = mapData.rooms || [];
-    this.doors = mapData.doors || [];
-    this.markers = mapData.markers || [];
-    this.nextRoomIndex = this.rooms.length;
-    this.activeRoomId = this.rooms.length > 0 ? this.rooms[0].id : null;
+    this.markers = (mapData.markers || []).map((m: any) => ({
+      ...m,
+      x: m.x * scale, y: m.y * scale,
+    }));
 
     const nameInput = document.getElementById('map-name-input') as HTMLInputElement;
     if (nameInput) nameInput.value = mapData.name || '';
 
-    this.refreshRoomList();
     this.rebuildPreviewState();
     this.updateValidation();
-    this.statusText.innerText = `Loaded: ${mapData.name}`;
+    this.statusText.innerText = `Loaded: ${mapData.name}${isLegacy ? ' (migrated from 3x3)' : ''}`;
   }
 
   // =============================================
@@ -976,12 +1332,13 @@ export class MapEditor {
     if (this.paletteContainer) {
       this.paletteContainer.remove();
     }
+    this.tileDefEditor?.destroy();
     this.app.ticker.remove(this.renderLoop, this);
     this.app.stage.removeChildren();
   }
-  
+
   private renderLoop = () => {
-    this.renderer.render(this.state);
+    this.renderer.render(this.state, { editorMode: true });
     this.renderOverlay();
   };
 }

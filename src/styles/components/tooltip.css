@@ -1,0 +1,44 @@
+/* ==========================================================================
+   Tooltip — Hover tooltip overlay for board entities
+   ========================================================================== */
+
+.board-tooltip {
+  position: fixed;
+  z-index: var(--z-toast);
+  pointer-events: none;
+  max-width: 200px;
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--surface-4);
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-out);
+  white-space: nowrap;
+}
+
+.board-tooltip.visible {
+  opacity: 1;
+}
+
+.board-tooltip .tooltip-title {
+  font-weight: var(--font-semibold);
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-1);
+}
+
+.board-tooltip .tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  color: var(--text-secondary);
+}
+
+.board-tooltip .tooltip-row .tooltip-value {
+  color: var(--text-primary);
+  font-weight: var(--font-semibold);
+}

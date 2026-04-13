@@ -1,3 +1,5 @@
+import { renderButton } from './components/Button';
+
 export class MenuUI {
   private container: HTMLElement;
   private onCreateRoom: (nickname: string) => void;
@@ -26,33 +28,28 @@ export class MenuUI {
     this.container.innerHTML = `
       <div class="menu-card">
         <h1>Endead</h1>
-        ${options.infoMessage ? `<div class="menu-message">${options.infoMessage}</div>` : ''}
+        ${options.infoMessage ? `<div class="menu-message">${escapeHtml(options.infoMessage)}</div>` : ''}
 
-        <div class="menu-field">
-          <label for="menu-nickname">Nickname</label>
-          <input id="menu-nickname" type="text" maxlength="24" value="${escapeHtml(options.nickname)}" placeholder="Enter nickname" />
+        <div class="form-group">
+          <label class="form-label" for="menu-nickname">Nickname</label>
+          <input id="menu-nickname" class="input" type="text" maxlength="24" value="${escapeHtml(options.nickname)}" placeholder="Enter nickname" />
         </div>
 
-        <div class="menu-actions">
-          <button id="menu-create-room" class="menu-primary">Create Room</button>
-        </div>
+        ${renderButton({ label: 'Create Room', icon: 'Play', variant: 'primary', size: 'lg', fullWidth: true, dataAction: 'create-room' })}
 
         <div class="menu-divider">or join by room id</div>
 
         <div class="menu-join-row">
-          <input id="menu-room-id" type="text" value="${escapeHtml(options.roomIdPrefill || '')}" placeholder="room id" />
-          <button id="menu-join-room">Join Game</button>
+          <input id="menu-room-id" class="input" type="text" value="${escapeHtml(options.roomIdPrefill || '')}" placeholder="room id" />
+          ${renderButton({ label: 'Join', variant: 'secondary', dataAction: 'join-room' })}
         </div>
 
-        ${options.infoMessage ? '<button id="menu-back" class="menu-secondary">Go Back</button>' : ''}
+        ${options.infoMessage ? renderButton({ label: 'Go Back', icon: 'ArrowLeft', variant: 'ghost', fullWidth: true, dataAction: 'go-back' }) : ''}
       </div>
     `;
 
     const nicknameInput = this.container.querySelector('#menu-nickname') as HTMLInputElement;
     const roomInput = this.container.querySelector('#menu-room-id') as HTMLInputElement;
-    const createButton = this.container.querySelector('#menu-create-room');
-    const joinButton = this.container.querySelector('#menu-join-room');
-    const backButton = this.container.querySelector('#menu-back');
 
     nicknameInput?.addEventListener('input', () => {
       options.onNicknameChange(nicknameInput.value);
@@ -65,17 +62,25 @@ export class MenuUI {
       this.onJoinRoom(roomId, nickname);
     };
 
-    createButton?.addEventListener('click', () => {
-      const nickname = (nicknameInput?.value || '').trim();
-      this.onCreateRoom(nickname);
+    // Delegated clicks
+    this.container.addEventListener('click', (e) => {
+      const target = (e.target as HTMLElement).closest('[data-action]') as HTMLElement | null;
+      if (!target) return;
+      const action = target.dataset.action;
+
+      if (action === 'create-room') {
+        const nickname = (nicknameInput?.value || '').trim();
+        this.onCreateRoom(nickname);
+      } else if (action === 'join-room') {
+        submitJoin();
+      } else if (action === 'go-back') {
+        this.onBack();
+      }
     });
 
-    joinButton?.addEventListener('click', submitJoin);
     roomInput?.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') submitJoin();
     });
-
-    backButton?.addEventListener('click', () => this.onBack());
   }
 
   public destroy(): void {

@@ -13,9 +13,11 @@ type Unsubscribe = () => void;
 export class GameStore {
   private _state: GameState;
   private listeners: Set<StateListener> = new Set();
+  private readonly shouldFreeze: boolean;
 
   constructor(initialState: GameState = initialGameState) {
-    this._state = this.freezeDeep(initialState);
+    this.shouldFreeze = import.meta.env.DEV;
+    this._state = this.shouldFreeze ? this.freezeDeep(initialState) : initialState;
   }
 
   /**
@@ -35,8 +37,8 @@ export class GameStore {
     if (newState === this._state) return;
 
     const prevState = this._state;
-    // Freeze the new state before storing to prevent accidental mutation by UI
-    this._state = this.freezeDeep(newState);
+    // Freeze in dev to catch accidental mutation; skip in production for performance
+    this._state = this.shouldFreeze ? this.freezeDeep(newState) : newState;
     
     this.notify(prevState);
   }

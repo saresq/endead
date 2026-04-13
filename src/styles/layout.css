@@ -1,0 +1,121 @@
+/* ==========================================================================
+   Layout — Breakpoints, containers, grid/flex primitives, safe areas
+   ========================================================================== */
+
+/*
+  Breakpoints (mobile-first, min-width queries):
+    sm: 480px    — large phones landscape
+    md: 768px    — tablets, small laptops
+    lg: 1024px   — desktop
+    xl: 1280px   — wide desktop
+*/
+
+/* ---------- Containers ---------- */
+
+.container {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: var(--space-4);
+  padding-right: var(--space-4);
+}
+
+@media (min-width: 768px) {
+  .container {
+    padding-left: var(--space-6);
+    padding-right: var(--space-6);
+  }
+}
+
+.container--sm { max-width: 480px; }
+.container--md { max-width: 640px; }
+.container--lg { max-width: 960px; }
+
+/* ---------- Stack (vertical spacing) ---------- */
+
+.stack {
+  display: flex;
+  flex-direction: column;
+}
+
+.stack--sm { gap: var(--space-2); }
+.stack--md { gap: var(--space-4); }
+.stack--lg { gap: var(--space-6); }
+
+/* ---------- Row (horizontal layout) ---------- */
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.row--between {
+  justify-content: space-between;
+}
+
+.row--center {
+  align-items: center;
+}
+
+.row--nowrap {
+  flex-wrap: nowrap;
+}
+
+/* ---------- Grid ---------- */
+
+.grid {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.grid--2 { grid-template-columns: repeat(2, 1fr); }
+.grid--3 { grid-template-columns: repeat(2, 1fr); }
+
+@media (min-width: 768px) {
+  .grid--3 { grid-template-columns: repeat(3, 1fr); }
+}
+
+.grid--auto {
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+}
+
+/* ---------- Safe Area Handling ---------- */
+
+.safe-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-horizontal {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* ---------- Touch / Scroll Behavior ---------- */
+
+/* Game area — no double-tap zoom, no pull-to-refresh */
+.game-area {
+  touch-action: manipulation;
+}
+
+html.in-game {
+  overscroll-behavior: none;
+}
+
+/* Full-viewport base for screens */
+.screen {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+/* Centered screen content (lobby, menu) */
+.screen--centered {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

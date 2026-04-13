@@ -82,3 +82,18 @@ export function rollDice(currentSeed: string, count: number, threshold: number):
     newSeed: seed,
   };
 }
+
+/**
+ * Rolls dice twice and keeps the better result (Lucky skill).
+ * Both rolls consume seed state so newSeed always advances by 2*count,
+ * preserving deterministic replay regardless of which result is kept.
+ */
+export function rollDiceWithReroll(currentSeed: string, count: number, threshold: number): DiceResult {
+  const first = rollDice(currentSeed, count, threshold);
+  const second = rollDice(first.newSeed, count, threshold);
+  // Keep the result with more hits; always use the final seed
+  if (second.hits >= first.hits) {
+    return second;
+  }
+  return { hits: first.hits, rolls: first.rolls, newSeed: second.newSeed };
+}

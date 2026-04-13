@@ -12,15 +12,21 @@ export interface AnimationEvent {
 
 export class AnimationController {
   private app: PIXI.Application;
-  
+
   // Registry of sprites managed by the Renderer (we access them to animate)
-  // The renderer needs to expose these or we need a shared registry.
-  // For now, we will assume we can get them via a callback or shared map.
   private getSprite: (id: EntityId) => PIXI.Container | undefined;
+
+  /** Entities currently being animated — the renderer should not snap their position. */
+  private animatingEntities: Set<EntityId> = new Set();
 
   constructor(app: PIXI.Application, getSprite: (id: EntityId) => PIXI.Container | undefined) {
     this.app = app;
     this.getSprite = getSprite;
+  }
+
+  /** Returns true if the entity is mid-animation (renderer should skip position snap). */
+  public isAnimating(entityId: EntityId): boolean {
+    return this.animatingEntities.has(entityId);
   }
 
   public handleEvent(event: AnimationEvent): void {
@@ -29,15 +35,59 @@ export class AnimationController {
         this.animateSpawn(event.entityId);
         break;
       case 'MOVE':
-        // Move animation requires previous position, usually handled by 
-        // the sprite simply being at the old pos and tweening to new.
-        // If the renderer updates the position immediately, we need to intercept or interpolate.
-        // For MVP, we might just flash or highlight.
+        if (event.payload?.fromX != null && event.payload?.toX != null) {
+          this.animateMove(
+            event.entityId,
+            event.payload.fromX, event.payload.fromY,
+            event.payload.toX, event.payload.toY
+          );
+        }
         break;
       case 'DEATH':
         this.animateDeath(event.entityId);
         break;
     }
+  }
+
+  /**
+   * Tween an entity from one screen position to another over ~300ms.
+   */
+  public animateMove(
+    entityId: EntityId,
+    fromX: number, fromY: number,
+    toX: number, toY: number
+  ): void {
+    const sprite = this.getSprite(entityId);
+    if (!sprite) return;
+
+    this.animatingEntities.add(entityId);
+
+    // Start at the old position
+    sprite.position.set(fromX, fromY);
+
+    const duration = 300; // ms
+    const startTime = performance.now();
+
+    const animate = () => {
+      const elapsed = performance.now() - startTime;
+      const t = Math.min(elapsed / duration, 1);
+
+      // Ease-out quadratic
+      const ease = 1 - (1 - t) * (1 - t);
+
+      sprite.position.set(
+        fromX + (toX - fromX) * ease,
+        fromY + (toY - fromY) * ease,
+      );
+
+      if (t >= 1) {
+        sprite.position.set(toX, toY);
+        this.app.ticker.remove(animate);
+        this.animatingEntities.delete(entityId);
+      }
+    };
+
+    this.app.ticker.add(animate);
   }
 
   private animateSpawn(entityId: EntityId): void {
@@ -62,7 +112,7 @@ export class AnimationController {
         sprite.alpha = progress;
       }
     };
-    
+
     this.app.ticker.add(animate);
   }
 
@@ -82,7 +132,7 @@ export class AnimationController {
         sprite.scale.set(1 + progress * 0.5); // Expand and fade
       }
     };
-    
+
     this.app.ticker.add(animate);
   }
 

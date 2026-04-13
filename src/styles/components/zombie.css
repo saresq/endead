@@ -1,0 +1,68 @@
+/* ==========================================================================
+   Zombie — Badge, chip, and spawn summary components
+   ========================================================================== */
+
+/* ---------- Zombie Badge (inline) ---------- */
+
+.zombie-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  white-space: nowrap;
+}
+
+.zombie-badge__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.zombie-badge__label {
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+
+.zombie-badge__count {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-weight: var(--font-semibold);
+}
+
+/* ---------- Zombie Chip (compact pill) ---------- */
+
+.zombie-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid;
+  white-space: nowrap;
+}
+
+/* Type-specific muted backgrounds */
+.zombie-chip--walker  { background: var(--zombie-walker-muted); }
+.zombie-chip--runner  { background: var(--zombie-runner-muted); }
+.zombie-chip--brute   { background: var(--zombie-brute-muted); }
+.zombie-chip--abomination { background: var(--zombie-abom-muted); }
+
+.zombie-chip__icon {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.zombie-chip__label {
+  font-size: var(--text-xs);
+  color: var(--text-primary);
+  font-weight: var(--font-semibold);
+}
+
+/* ---------- Spawn Summary ---------- */
+
+.zombie-spawn-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}

@@ -11,7 +11,7 @@ export interface TileInstance {
   rotation: 0 | 90 | 180 | 270;
 }
 
-// --- Scenario Map V2: Authored map with full game mechanics ---
+// --- Scenario Map: Authored map with full game mechanics ---
 
 /** Zone-level cell coordinate key: "x,y" in zone grid (not tile grid) */
 export type ZoneCellKey = string; // e.g. "3,5"
@@ -31,28 +31,13 @@ export interface MapMarker {
   y: number; // Zone grid Y
 }
 
-/**
- * A door placed on an edge between two adjacent zone cells.
- * Convention: edges are stored as "x1,y1|x2,y2" where (x1,y1) < (x2,y2) lexicographically.
- * The cells must be cardinal neighbors.
- */
-export interface MapDoor {
+/** A crosswalk override on an edge between two adjacent zone cells */
+export interface CrosswalkOverride {
   x1: number;
   y1: number;
   x2: number;
   y2: number;
-  open: boolean; // Initial state: true = starts open, false = starts closed
-}
-
-/**
- * A room is a named group of zone cells that forms a building interior.
- * All cells in a room are treated as isBuilding=true, searchable=true.
- * Internal connections within a room are open passages (no doors unless explicitly placed).
- */
-export interface MapRoom {
-  id: string;       // e.g. "room-0"
-  name: string;     // e.g. "Police Station", "Kitchen"
-  cells: { x: number; y: number }[]; // Zone cells belonging to this room
+  hasCrosswalk: boolean; // true = force crosswalk, false = remove crosswalk
 }
 
 /** The full authored scenario map */
@@ -61,28 +46,14 @@ export interface ScenarioMap {
   name: string;
   width: number;  // In tiles (not zones)
   height: number;
+  gridSize?: number; // absent or 3 = legacy 3x3 cell coords, 30 = current 30x30
   tiles: TileInstance[];
 
   // --- Authored game logic ---
-  rooms: MapRoom[];      // Building rooms (cells not in any room are streets)
-  doors: MapDoor[];      // Doors on edges between cells
   markers: MapMarker[];  // All placed markers (spawns, exits, objectives, player starts)
-}
 
-// --- Legacy compat: old map format detection ---
-export interface LegacyScenarioMap {
-  id: string;
-  name: string;
-  width: number;
-  height: number;
-  tiles: TileInstance[];
-  zones: any;
-  spawns: any[];
-  exits: any[];
-}
-
-export function isLegacyMap(map: any): map is LegacyScenarioMap {
-  return map && !map.rooms && !map.markers;
+  // --- Crosswalk overrides ---
+  crosswalkOverrides?: CrosswalkOverride[];  // Override crosswalk edges from tile definitions
 }
 
 // --- Constants ---

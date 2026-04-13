@@ -1,0 +1,62 @@
+/* ==========================================================================
+   Base — Global element styles using design tokens
+   ========================================================================== */
+
+html {
+  font-size: 16px;
+}
+
+@media (max-width: 767px) {
+  html {
+    font-size: 14px;
+  }
+}
+
+body {
+  font-family: var(--font-sans);
+  font-weight: var(--font-normal);
+  color: var(--text-primary);
+  background-color: var(--surface-0);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--surface-1);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--surface-4);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* Selection highlight */
+::selection {
+  background: var(--accent);
+  color: var(--text-inverse);
+}
+
+/* Focus visible — accessible keyboard focus ring */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Monospace text */
+code,
+pre,
+kbd {
+  font-family: var(--font-mono);
+}

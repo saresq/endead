@@ -93,6 +93,9 @@ export class DeckService {
     }
 
     const card = newState.spawnDeck.shift();
+    if (card) {
+      newState.spawnDiscard.push(card);
+    }
     return { card: card || null, newState };
   }
 

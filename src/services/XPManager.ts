@@ -17,7 +17,7 @@ export class XPManager {
    * Does NOT auto-select Orange/Red skills to allow for player choice.
    */
   public static addXP(survivor: Survivor, amount: number): Survivor {
-    const newSurvivor = { ...survivor };
+    let newSurvivor = { ...survivor };
     newSurvivor.experience += amount;
 
     // Recalculate Danger Level
@@ -28,11 +28,11 @@ export class XPManager {
       newSurvivor.dangerLevel = newLevel;
       
       // Auto-unlock skills for levels passed that have NO choice (Blue, Yellow usually)
-      const progression = SURVIVOR_CLASSES[newSurvivor.characterClass] || SURVIVOR_CLASSES['Standard'];
+      const progression = SURVIVOR_CLASSES[newSurvivor.characterClass] || SURVIVOR_CLASSES['Wanda'];
       
       // Check Blue (0 XP) - usually set at start, but just in case
       if (!newSurvivor.skills.includes(progression[DangerLevel.Blue][0])) {
-         this.unlockSkill(newSurvivor, progression[DangerLevel.Blue][0]);
+         newSurvivor = this.unlockSkill(newSurvivor, progression[DangerLevel.Blue][0]);
       }
 
       // Check Yellow (7 XP)
@@ -40,7 +40,7 @@ export class XPManager {
         const yellowSkill = progression[DangerLevel.Yellow][0];
         // Only unlock if it's the ONLY option (size 1)
         if (progression[DangerLevel.Yellow].length === 1 && !newSurvivor.skills.includes(yellowSkill)) {
-           this.unlockSkill(newSurvivor, yellowSkill);
+           newSurvivor = this.unlockSkill(newSurvivor, yellowSkill);
         }
       }
     }
@@ -52,7 +52,7 @@ export class XPManager {
    * Validates if a survivor CAN choose a specific skill at their current level.
    */
   public static canChooseSkill(survivor: Survivor, skillId: string): boolean {
-    const progression = SURVIVOR_CLASSES[survivor.characterClass] || SURVIVOR_CLASSES['Standard'];
+    const progression = SURVIVOR_CLASSES[survivor.characterClass] || SURVIVOR_CLASSES['Wanda'];
     const level = survivor.dangerLevel;
 
     // 1. Check if already known
@@ -88,20 +88,24 @@ export class XPManager {
 
   /**
    * Unlocks a skill and applies immediate stat bonuses (like +1 Action).
+   * Returns a new survivor object (immutable).
    */
-  public static unlockSkill(survivor: Survivor, skillId: string): void {
-    if (!survivor.skills.includes(skillId)) {
-      survivor.skills.push(skillId);
-      
-      // Apply immediate effects
-      if (skillId === 'plus_1_action') {
-        survivor.actionsPerTurn += 1;
-        // Also give the action point *now* if it's mid-turn? 
-        // Zombicide rules: "Immediately gains the benefit". 
-        // So yes, +1 action for this turn too if active.
-        survivor.actionsRemaining += 1;
-      }
+  public static unlockSkill(survivor: Survivor, skillId: string): Survivor {
+    if (survivor.skills.includes(skillId)) return survivor;
+
+    const updated = {
+      ...survivor,
+      skills: [...survivor.skills, skillId],
+    };
+
+    // Apply immediate effects
+    if (skillId === 'plus_1_action') {
+      updated.actionsPerTurn = survivor.actionsPerTurn + 1;
+      // Zombicide rules: "Immediately gains the benefit".
+      updated.actionsRemaining = survivor.actionsRemaining + 1;
     }
+
+    return updated;
   }
 
   public static getDangerLevel(xp: number): DangerLevel {
