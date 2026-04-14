@@ -15,7 +15,7 @@ export class InputController {
   private selectedSurvivorId: EntityId | null = null;
   private pendingMoveZoneId: ZoneId | null = null;
   private localPlayerId: PlayerId;
-  private interactionMode: 'DEFAULT' | 'ATTACK' | 'OPEN_DOOR' = 'DEFAULT';
+  private interactionMode: 'DEFAULT' | 'ATTACK' | 'OPEN_DOOR' | 'SPRINT' | 'CHARGE' | 'BLOODLUST_MELEE' | 'LIFESAVER' = 'DEFAULT';
   private selectedWeaponId: EntityId | null = null;
   
   // Callback for when selection changes (so the Renderer can highlight)
@@ -36,7 +36,7 @@ export class InputController {
     return this.selectedSurvivorId;
   }
 
-  public setMode(mode: 'DEFAULT' | 'ATTACK' | 'OPEN_DOOR', weaponId?: EntityId): void {
+  public setMode(mode: 'DEFAULT' | 'ATTACK' | 'OPEN_DOOR' | 'SPRINT' | 'CHARGE' | 'BLOODLUST_MELEE' | 'LIFESAVER', weaponId?: EntityId): void {
     this.interactionMode = mode;
     this.selectedWeaponId = weaponId || null;
     if (mode !== 'DEFAULT') {
@@ -133,6 +133,18 @@ export class InputController {
           this.setMode('DEFAULT');
         } else if (this.interactionMode === 'OPEN_DOOR') {
           this.sendOpenDoorAction(clickedZoneId);
+          this.setMode('DEFAULT');
+        } else if (this.interactionMode === 'SPRINT') {
+          this.sendSkillZoneAction(ActionType.SPRINT, clickedZoneId);
+          this.setMode('DEFAULT');
+        } else if (this.interactionMode === 'CHARGE') {
+          this.sendSkillZoneAction(ActionType.CHARGE, clickedZoneId);
+          this.setMode('DEFAULT');
+        } else if (this.interactionMode === 'BLOODLUST_MELEE') {
+          this.sendSkillZoneAction(ActionType.BLOODLUST_MELEE, clickedZoneId);
+          this.setMode('DEFAULT');
+        } else if (this.interactionMode === 'LIFESAVER') {
+          this.sendLifesaverAction(clickedZoneId, currentState);
           this.setMode('DEFAULT');
         } else {
           // DEFAULT = MOVE (tap once to preview, tap again to confirm)
@@ -262,6 +274,34 @@ export class InputController {
       survivorId: this.selectedSurvivorId,
       type: ActionType.OPEN_DOOR,
       payload: { targetZoneId },
+    });
+  }
+
+  /** Send Sprint/Charge/Bloodlust — uses path=[targetZoneId] for single-zone targeting */
+  private sendSkillZoneAction(actionType: ActionType, targetZoneId: ZoneId): void {
+    if (!this.selectedSurvivorId) return;
+
+    networkManager.sendAction({
+      playerId: this.localPlayerId,
+      survivorId: this.selectedSurvivorId,
+      type: actionType,
+      payload: { path: [targetZoneId] },
+    });
+  }
+
+  /** Send Lifesaver — rescues all survivors in the target zone */
+  private sendLifesaverAction(targetZoneId: ZoneId, state: GameState): void {
+    if (!this.selectedSurvivorId) return;
+
+    const survivorIds = Object.values(state.survivors)
+      .filter(s => s.position.zoneId === targetZoneId && s.id !== this.selectedSurvivorId && s.wounds < s.maxHealth)
+      .map(s => s.id);
+
+    networkManager.sendAction({
+      playerId: this.localPlayerId,
+      survivorId: this.selectedSurvivorId,
+      type: ActionType.LIFESAVER,
+      payload: { targetZoneId, targetSurvivorIds: survivorIds },
     });
   }
 

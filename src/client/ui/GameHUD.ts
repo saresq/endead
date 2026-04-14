@@ -1,5 +1,5 @@
 
-import { GameState, PlayerId, EntityId, Survivor, GameResult, ZombieType } from '../../types/GameState';
+import { GameState, PlayerId, EntityId, Survivor, GameResult, ZombieType, EquipmentCard } from '../../types/GameState';
 import { ActionType } from '../../types/Action';
 import { networkManager } from '../NetworkManager';
 import { InputController } from '../InputController';
@@ -18,6 +18,7 @@ import { renderItemCard } from './components/ItemCard';
 import { modalManager } from './overlays/ModalManager';
 import { notificationManager } from './NotificationManager';
 import { formatZoneId, formatActionType } from '../utils/zoneFormat';
+import { SKILL_DEFINITIONS } from '../../config/SkillRegistry';
 
 export class GameHUD {
   private container: HTMLElement;
@@ -30,6 +31,8 @@ export class GameHUD {
   private backpackModalId: string | null = null;
   private endGameModalId: string | null = null;
   private historyModalId: string | null = null;
+  private woundPickerModalId: string | null = null;
+  private woundPickerSelected: Set<string> = new Set();
   private dismissedFeedTimestamp: number | null = null;
   private boundDelegateHandler: (e: Event) => void;
 
@@ -125,6 +128,12 @@ export class GameHUD {
       return;
     }
 
+    // --- Wound picker (not turn-gated — can resolve during any phase) ---
+    if (action === 'resolve-wounds' && activeSurvivor) {
+      this.openWoundPicker(activeSurvivor);
+      return;
+    }
+
     // --- Turn-gated actions ---
     if (!isMyTurn || !isOwner || !activeSurvivor) return;
 
@@ -155,6 +164,32 @@ export class GameHUD {
     }
     if (id === 'btn-end-turn') {
       networkManager.sendAction({ playerId: this.localPlayerId, survivorId: activeSurvivor.id, type: ActionType.END_TURN });
+      return;
+    }
+
+    // --- Skill action buttons ---
+    if (id === 'btn-sprint') {
+      this.inputController.setMode('SPRINT');
+      notificationManager.show({ variant: 'info', message: 'Select a zone to Sprint to (up to 3 zones).', duration: 5000 });
+      return;
+    }
+    if (id === 'btn-charge') {
+      this.inputController.setMode('CHARGE');
+      notificationManager.show({ variant: 'info', message: 'Select a zone with zombies to Charge into (up to 2 zones).', duration: 5000 });
+      return;
+    }
+    if (id === 'btn-born-leader') {
+      this.openBornLeaderPicker(activeSurvivor);
+      return;
+    }
+    if (id === 'btn-bloodlust') {
+      this.inputController.setMode('BLOODLUST_MELEE');
+      notificationManager.show({ variant: 'info', message: 'Select a zone with zombies (up to 2 zones away).', duration: 5000 });
+      return;
+    }
+    if (id === 'btn-lifesaver') {
+      this.inputController.setMode('LIFESAVER');
+      notificationManager.show({ variant: 'info', message: 'Select a zone at Range 1 with zombies and survivors.', duration: 5000 });
       return;
     }
 
@@ -194,6 +229,13 @@ export class GameHUD {
     `;
 
     this.syncTradeAndPickup(activeSurvivor);
+
+    // Auto-open wound picker if survivor has pending wounds
+    if (activeSurvivor && activeSurvivor.pendingWounds && activeSurvivor.pendingWounds > 0
+        && activeSurvivor.playerId === this.localPlayerId
+        && !this.woundPickerModalId) {
+      this.openWoundPicker(activeSurvivor);
+    }
   }
 
   private renderTopBar(isMyTurn: boolean): string {
@@ -287,6 +329,26 @@ export class GameHUD {
     const canTakeObjective = currentZone?.hasObjective === true;
     const noAP = survivor.actionsRemaining < 1;
 
+    // --- Skills panel ---
+    const skillsHtml = this.renderSkillBadges(survivor);
+
+    // --- Free action indicators ---
+    const freeActions = this.renderFreeActionIndicators(survivor);
+
+    // --- Pending wounds alert ---
+    const woundAlert = survivor.pendingWounds && survivor.pendingWounds > 0
+      ? `<button class="hud-wound-alert" data-action="resolve-wounds">
+          ${icon('AlertTriangle', 'sm')}
+          <span>${survivor.pendingWounds} pending wound${survivor.pendingWounds > 1 ? 's' : ''} — tap to resolve</span>
+        </button>`
+      : '';
+
+    // --- Once-per-turn skill action buttons ---
+    const skillActions = this.renderSkillActionButtons(survivor, isMyTurn, noAP);
+
+    // --- Weapon stat boosts from skills ---
+    const weaponBoosts = this.getWeaponBoosts(survivor);
+
     return `
       <div class="hud-bottom">
         <div>
@@ -300,23 +362,30 @@ export class GameHUD {
           <div class="hud-stats mt-2">
             ${hp}${xp}${ap}
           </div>
+          ${freeActions}
+          ${woundAlert}
+          ${skillsHtml}
         </div>
 
         <div class="hud-actions">
-          ${renderActionButton({ id: 'btn-search', icon: 'Search', label: 'Search', kbd: 'S', cost: '1 AP', disabled: !isMyTurn || survivor.hasSearched || noAP })}
+          ${renderActionButton({ id: 'btn-search', icon: 'Search', label: 'Search', kbd: 'S', cost: survivor.freeSearchesRemaining > 0 ? 'FREE' : '1 AP', disabled: !isMyTurn || survivor.hasSearched || (noAP && survivor.freeSearchesRemaining <= 0) })}
           ${renderActionButton({ id: 'btn-noise', icon: 'Volume2', label: 'Noise', kbd: 'N', cost: '1 AP', disabled: !isMyTurn || noAP })}
           ${renderActionButton({ id: 'btn-door', icon: 'DoorOpen', label: 'Door', kbd: 'D', cost: '1 AP', disabled: !isMyTurn || noAP || !canOpenDoor })}
           ${renderActionButton({ id: 'btn-objective', icon: 'Target', label: 'Objective', kbd: 'O', cost: '1 AP', disabled: !isMyTurn || noAP || !canTakeObjective, highlight: canTakeObjective && isMyTurn && !noAP })}
           ${renderActionButton({ id: 'btn-trade', icon: 'Handshake', label: 'Trade', kbd: 'T', cost: '1 AP', disabled: !isMyTurn || noAP })}
           ${renderActionButton({ id: 'btn-end-turn', icon: 'SkipForward', label: 'End Turn', kbd: 'E', disabled: !isMyTurn })}
+          ${skillActions}
         </div>
 
         <div class="hud-weapons">
           ${weapons.length > 0
-            ? weapons.map(w => `
-                <button class="hud-weapon-btn" data-id="${w.id}" ${!isMyTurn || noAP ? 'disabled' : ''}>
-                  ${renderItemCard(w, { variant: 'weapon', showSlot: false })}
-                </button>`).join('')
+            ? weapons.map(w => {
+                const boosts = weaponBoosts.get(w.id) || { dice: 0, damage: 0 };
+                return `
+                <button class="hud-weapon-btn" data-id="${w.id}" ${!isMyTurn || (noAP && survivor.freeCombatsRemaining <= 0 && survivor.freeMeleeRemaining <= 0 && survivor.freeRangedRemaining <= 0) ? 'disabled' : ''}>
+                  ${renderItemCard(w, { variant: 'weapon', showSlot: false, bonusDice: boosts.dice, bonusDamage: boosts.damage })}
+                </button>`;
+              }).join('')
             : `<div class="text-muted-sm">No weapon equipped</div>`}
         </div>
       </div>`;
@@ -329,6 +398,286 @@ export class GameHUD {
         ${icon('Backpack', 'lg')}
         <span class="hud-backpack-fab__badge">${count}</span>
       </button>`;
+  }
+
+  // ─── Skill Visual Indicators ──────────────────────────────────
+
+  private renderSkillBadges(survivor: Survivor): string {
+    if (!survivor.skills || survivor.skills.length === 0) return '';
+
+    const badges = survivor.skills.map(skillId => {
+      const def = SKILL_DEFINITIONS[skillId];
+      if (!def) return '';
+
+      // Check if once-per-turn skill is used
+      let used = false;
+      if (skillId === 'sprint') used = survivor.sprintUsedThisTurn;
+      else if (skillId === 'charge') used = survivor.chargeUsedThisTurn;
+      else if (skillId === 'born_leader') used = survivor.bornLeaderUsedThisTurn;
+      else if (skillId === 'bloodlust_melee') used = survivor.bloodlustUsedThisTurn;
+      else if (skillId === 'lifesaver') used = survivor.lifesaverUsedThisTurn;
+      else if (skillId === 'tough') used = survivor.toughUsedZombieAttack && survivor.toughUsedFriendlyFire;
+
+      const typeClass = def.type === 'PASSIVE' ? 'passive' : def.type === 'ACTION' ? 'action' : 'stat-mod';
+      const usedClass = used ? ' skill-badge--used' : '';
+
+      return `<span class="skill-badge skill-badge--${typeClass}${usedClass}" title="${def.description}">${def.name}</span>`;
+    }).filter(Boolean).join('');
+
+    return `<div class="hud-skills">${badges}</div>`;
+  }
+
+  private renderFreeActionIndicators(survivor: Survivor): string {
+    const indicators: string[] = [];
+
+    if (survivor.freeMovesRemaining > 0) {
+      indicators.push(`<span class="free-action-pip" title="Free Move">${icon('Footprints', 'sm')}<span class="free-action-pip__count">${survivor.freeMovesRemaining}</span></span>`);
+    }
+    if (survivor.freeCombatsRemaining > 0) {
+      indicators.push(`<span class="free-action-pip" title="Free Combat">${icon('Crosshair', 'sm')}<span class="free-action-pip__count">${survivor.freeCombatsRemaining}</span></span>`);
+    }
+    if (survivor.freeMeleeRemaining > 0) {
+      indicators.push(`<span class="free-action-pip" title="Free Melee">${icon('Swords', 'sm')}<span class="free-action-pip__count">${survivor.freeMeleeRemaining}</span></span>`);
+    }
+    if (survivor.freeRangedRemaining > 0) {
+      indicators.push(`<span class="free-action-pip" title="Free Ranged">${icon('Crosshair', 'sm')}<span class="free-action-pip__count">${survivor.freeRangedRemaining}</span></span>`);
+    }
+    if (survivor.freeSearchesRemaining > 0) {
+      indicators.push(`<span class="free-action-pip" title="Free Search">${icon('Search', 'sm')}<span class="free-action-pip__count">${survivor.freeSearchesRemaining}</span></span>`);
+    }
+
+    if (indicators.length === 0) return '';
+    return `<div class="hud-free-actions">${indicators.join('')}</div>`;
+  }
+
+  private renderSkillActionButtons(survivor: Survivor, isMyTurn: boolean, noAP: boolean): string {
+    const buttons: string[] = [];
+
+    if (survivor.skills.includes('sprint')) {
+      buttons.push(renderActionButton({
+        id: 'btn-sprint', icon: 'Zap', label: 'Sprint',
+        cost: '1 AP', disabled: !isMyTurn || noAP || survivor.sprintUsedThisTurn,
+      }));
+    }
+    if (survivor.skills.includes('charge')) {
+      buttons.push(renderActionButton({
+        id: 'btn-charge', icon: 'Swords', label: 'Charge',
+        cost: 'FREE', disabled: !isMyTurn || survivor.chargeUsedThisTurn,
+      }));
+    }
+    if (survivor.skills.includes('born_leader')) {
+      buttons.push(renderActionButton({
+        id: 'btn-born-leader', icon: 'Crown', label: 'Born Leader',
+        cost: 'FREE', disabled: !isMyTurn || survivor.bornLeaderUsedThisTurn,
+      }));
+    }
+    if (survivor.skills.includes('bloodlust_melee')) {
+      buttons.push(renderActionButton({
+        id: 'btn-bloodlust', icon: 'Flame', label: 'Bloodlust',
+        cost: '1 AP', disabled: !isMyTurn || noAP || survivor.bloodlustUsedThisTurn,
+      }));
+    }
+    if (survivor.skills.includes('lifesaver')) {
+      buttons.push(renderActionButton({
+        id: 'btn-lifesaver', icon: 'HeartHandshake', label: 'Lifesaver',
+        cost: 'FREE', disabled: !isMyTurn || survivor.lifesaverUsedThisTurn,
+      }));
+    }
+
+    return buttons.join('');
+  }
+
+  private getWeaponBoosts(survivor: Survivor): Map<string, { dice: number; damage: number }> {
+    const boosts = new Map<string, { dice: number; damage: number }>();
+    const weapons = survivor.inventory.filter(c => c.type === 'WEAPON' && c.inHand);
+
+    for (const w of weapons) {
+      if (!w.stats) continue;
+      const isMelee = w.stats.range[1] === 0;
+      const isRanged = !isMelee;
+      let bonusDice = 0;
+      let bonusDamage = 0;
+
+      if (isMelee && survivor.skills.includes('plus_1_die_melee')) bonusDice++;
+      if (isRanged && survivor.skills.includes('plus_1_die_ranged')) bonusDice++;
+      if (survivor.skills.includes('plus_1_die_combat')) bonusDice++;
+      if (isMelee && survivor.skills.includes('plus_1_damage_melee')) bonusDamage++;
+      if (isRanged && survivor.skills.includes('plus_1_damage_ranged')) bonusDamage++;
+      if (survivor.skills.includes('plus_1_damage_combat')) bonusDamage++;
+      if (isMelee && survivor.skills.includes('super_strength')) {
+        bonusDamage = Math.max(bonusDamage, 3 - w.stats.damage);
+      }
+
+      // Plenty of Ammo
+      if (isRanged && survivor.inventory.some(c => c.name === 'Plenty of Ammo' && c.inHand)) {
+        bonusDice++;
+      }
+
+      if (bonusDice > 0 || bonusDamage > 0) {
+        boosts.set(w.id, { dice: bonusDice, damage: bonusDamage });
+      }
+    }
+
+    return boosts;
+  }
+
+  // ─── Wound Picker Modal ──────────────────────────────────────
+
+  private openWoundPicker(survivor: Survivor): void {
+    if (this.woundPickerModalId && modalManager.isOpen(this.woundPickerModalId)) return;
+    if (!survivor.pendingWounds || survivor.pendingWounds <= 0) return;
+
+    this.woundPickerSelected = new Set();
+    const pendingCount = survivor.pendingWounds;
+
+    this.woundPickerModalId = modalManager.open({
+      title: `Is That All You've Got?`,
+      size: 'md',
+      persistent: true,
+      renderBody: () => {
+        const desc = `<p class="text-secondary mb-3">You have <strong>${pendingCount}</strong> incoming wound${pendingCount > 1 ? 's' : ''}. Discard equipment to negate wounds (1 card = 1 wound negated).</p>`;
+        const negated = Math.min(this.woundPickerSelected.size, pendingCount);
+        const remaining = pendingCount - negated;
+        const summary = `<div class="wound-picker__summary">
+          <span>Negated: <strong class="text-success">${negated}</strong></span>
+          <span>Wounds taken: <strong class="${remaining > 0 ? 'text-danger' : 'text-success'}">${remaining}</strong></span>
+        </div>`;
+
+        const cards = survivor.inventory.map(card => {
+          const selected = this.woundPickerSelected.has(card.id);
+          return `<div class="wound-picker__card ${selected ? 'wound-picker__card--selected' : ''}" data-action="toggle-wound-card" data-card-id="${card.id}">
+            ${renderItemCard(card, { variant: selected ? 'ghost' : 'default', showSlot: true })}
+          </div>`;
+        }).join('');
+
+        return `${desc}${summary}<div class="grid grid--2 gap-2 mt-3">${cards}</div>`;
+      },
+      renderFooter: () => {
+        const negated = Math.min(this.woundPickerSelected.size, pendingCount);
+        const remaining = pendingCount - negated;
+        return `
+          ${renderButton({ label: `Take ${remaining} Wound${remaining !== 1 ? 's' : ''}`, variant: remaining > 0 ? 'destructive' : 'primary', dataAction: 'confirm-wounds' })}
+        `;
+      },
+      onOpen: (el) => {
+        el.addEventListener('click', (e) => {
+          const cardEl = (e.target as HTMLElement).closest('[data-action="toggle-wound-card"]') as HTMLElement;
+          if (cardEl) {
+            const cardId = cardEl.dataset.cardId;
+            if (cardId) {
+              if (this.woundPickerSelected.has(cardId)) {
+                this.woundPickerSelected.delete(cardId);
+              } else if (this.woundPickerSelected.size < pendingCount) {
+                this.woundPickerSelected.add(cardId);
+              }
+              // Re-render modal content
+              modalManager.updateBody(this.woundPickerModalId!, modalManager.getElement(this.woundPickerModalId!)?.querySelector('.modal__body')?.innerHTML
+                ? this.renderWoundPickerBody(survivor, pendingCount) : '');
+              modalManager.updateBody(this.woundPickerModalId!, this.renderWoundPickerBody(survivor, pendingCount));
+              modalManager.updateFooter(this.woundPickerModalId!, this.renderWoundPickerFooter(pendingCount));
+            }
+            return;
+          }
+
+          const confirmBtn = (e.target as HTMLElement).closest('[data-action="confirm-wounds"]');
+          if (confirmBtn) {
+            networkManager.sendAction({
+              playerId: this.localPlayerId,
+              survivorId: survivor.id,
+              type: ActionType.RESOLVE_WOUNDS,
+              payload: { discardCardIds: [...this.woundPickerSelected] },
+            });
+            modalManager.close(this.woundPickerModalId!);
+            this.woundPickerModalId = null;
+            this.woundPickerSelected = new Set();
+          }
+        });
+      },
+      onClose: () => {
+        this.woundPickerModalId = null;
+        this.woundPickerSelected = new Set();
+      },
+    });
+  }
+
+  private renderWoundPickerBody(survivor: Survivor, pendingCount: number): string {
+    const negated = Math.min(this.woundPickerSelected.size, pendingCount);
+    const remaining = pendingCount - negated;
+    const desc = `<p class="text-secondary mb-3">You have <strong>${pendingCount}</strong> incoming wound${pendingCount > 1 ? 's' : ''}. Discard equipment to negate wounds (1 card = 1 wound negated).</p>`;
+    const summary = `<div class="wound-picker__summary">
+      <span>Negated: <strong class="text-success">${negated}</strong></span>
+      <span>Wounds taken: <strong class="${remaining > 0 ? 'text-danger' : 'text-success'}">${remaining}</strong></span>
+    </div>`;
+
+    const cards = survivor.inventory.map(card => {
+      const selected = this.woundPickerSelected.has(card.id);
+      return `<div class="wound-picker__card ${selected ? 'wound-picker__card--selected' : ''}" data-action="toggle-wound-card" data-card-id="${card.id}">
+        ${renderItemCard(card, { variant: selected ? 'ghost' : 'default', showSlot: true })}
+      </div>`;
+    }).join('');
+
+    return `${desc}${summary}<div class="grid grid--2 gap-2 mt-3">${cards}</div>`;
+  }
+
+  private renderWoundPickerFooter(pendingCount: number): string {
+    const negated = Math.min(this.woundPickerSelected.size, pendingCount);
+    const remaining = pendingCount - negated;
+    return renderButton({ label: `Take ${remaining} Wound${remaining !== 1 ? 's' : ''}`, variant: remaining > 0 ? 'destructive' : 'primary', dataAction: 'confirm-wounds' });
+  }
+
+  // ─── Born Leader Picker ───────────────────────────────────────
+
+  private openBornLeaderPicker(survivor: Survivor): void {
+    if (!this.state) return;
+    const zoneId = survivor.position.zoneId;
+    const others = Object.values(this.state.survivors).filter(
+      s => s.position.zoneId === zoneId && s.id !== survivor.id && s.wounds < s.maxHealth
+    );
+
+    if (others.length === 0) {
+      notificationManager.show({ variant: 'warning', message: 'No one else here to give an action to.', duration: 3000 });
+      return;
+    }
+
+    if (others.length === 1) {
+      networkManager.sendAction({
+        playerId: this.localPlayerId, survivorId: survivor.id,
+        type: ActionType.BORN_LEADER, payload: { targetSurvivorId: others[0].id },
+      });
+      return;
+    }
+
+    modalManager.open({
+      title: 'Born Leader — Give Free Action',
+      size: 'sm',
+      renderBody: () => `
+        <div class="stack stack--sm">
+          ${others.map(t => {
+            const identity = getPlayerIdentity(this.state!, t.playerId);
+            const avatar = renderAvatar(t.name, identity, 'md');
+            return `
+              <button class="action-btn" data-action="select-bl-target" data-id="${t.id}" style="width:100%">
+                ${avatar}
+                <span class="action-btn__label">${t.name} (${t.characterClass})</span>
+              </button>`;
+          }).join('')}
+        </div>`,
+      onOpen: (el) => {
+        el.addEventListener('click', (e) => {
+          const t = (e.target as HTMLElement).closest('[data-action="select-bl-target"]') as HTMLElement | null;
+          if (t) {
+            const targetId = t.dataset.id;
+            if (targetId) {
+              networkManager.sendAction({
+                playerId: this.localPlayerId, survivorId: survivor.id,
+                type: ActionType.BORN_LEADER, payload: { targetSurvivorId: targetId },
+              });
+              modalManager.closeAll();
+            }
+          }
+        });
+      },
+    });
   }
 
   // ─── Game Over ───────────────────────────────────────────────

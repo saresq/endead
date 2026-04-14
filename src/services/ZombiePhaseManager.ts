@@ -1,8 +1,9 @@
 
-import { GameState, GamePhase, DangerLevel, Zombie, ZombieType, ZoneId, SpawnCard, SpawnDetail } from '../types/GameState';
+import { GameState, GamePhase, DangerLevel, Zombie, ZombieType, ZoneId, SpawnCard, SpawnDetail, Survivor } from '../types/GameState';
 import { ZombieAI, ZombieAction } from './ZombieAI';
 import { DeckService } from './DeckService';
 import { nextRandom } from './DiceService';
+import { XPManager } from './XPManager';
 
 const DANGER_VALUES: Record<DangerLevel, number> = {
   [DangerLevel.Blue]: 0,
@@ -118,9 +119,9 @@ export class ZombiePhaseManager {
     const survivor = state.survivors[targetId];
     if (!survivor || survivor.wounds >= survivor.maxHealth) return;
 
-    // Tough skill: ignore first wound per turn
-    if (survivor.skills?.includes('tough') && !survivor.toughUsedThisTurn) {
-      survivor.toughUsedThisTurn = true;
+    // Tough skill: ignore first wound per zombie Attack Step (independent from FF)
+    if (survivor.skills?.includes('tough') && !survivor.toughUsedZombieAttack) {
+      survivor.toughUsedZombieAttack = true;
       return; // Wound absorbed
     }
 
@@ -134,15 +135,16 @@ export class ZombiePhaseManager {
       return; // Wound absorbed by armor (armor destroyed per Zombicide rules)
     }
 
+    // "Is That All You've Got?" — survivor can discard equipment to negate wounds
+    if (survivor.skills?.includes('is_that_all_youve_got') && survivor.inventory.length > 0) {
+      survivor.pendingWounds = (survivor.pendingWounds || 0) + 1;
+      return; // Defer wound application until player resolves via UI picker
+    }
+
     survivor.wounds += 1;
 
-    // TODO: Wound equipment discard — per Zombicide rules, when a survivor takes a wound,
-    // they must discard 1 equipment card of their choice. This requires a UI modal
-    // (wound-discard picker) so the player can choose which card to drop.
-    // Coordinate with 07-ui-cleanup task for the modal implementation.
-    // For now, auto-discard the last backpack item if available (fallback).
+    // Wound equipment discard: prefer backpack items, then any item
     if (survivor.wounds < survivor.maxHealth && survivor.inventory.length > 0) {
-      // Auto-discard: prefer backpack items, then any item
       const backpackIdx = survivor.inventory.findIndex((c: any) => !c.inHand);
       const discardIdx = backpackIdx >= 0 ? backpackIdx : survivor.inventory.length - 1;
       const [discarded] = survivor.inventory.splice(discardIdx, 1);
@@ -392,12 +394,13 @@ export class ZombiePhaseManager {
     }
 
     // 2b. Medic Healing — free during End Phase
+    // Medic earns 1 AP per wound healed
     for (const survivorId in newState.survivors) {
       const survivor = newState.survivors[survivorId];
       if (survivor.wounds >= survivor.maxHealth) continue; // Dead
       if (!survivor.skills.includes('medic')) continue;
 
-      // Heal self and all survivors in same zone
+      let woundsHealed = 0;
       const zoneId = survivor.position.zoneId;
       for (const otherId in newState.survivors) {
         const other = newState.survivors[otherId];
@@ -405,7 +408,12 @@ export class ZombiePhaseManager {
         if (other.position.zoneId !== zoneId) continue;
         if (other.wounds > 0) {
           other.wounds = Math.max(0, other.wounds - 1);
+          woundsHealed++;
         }
+      }
+
+      if (woundsHealed > 0) {
+        newState.survivors[survivorId] = XPManager.addXP(survivor, woundsHealed);
       }
     }
 
@@ -419,14 +427,17 @@ export class ZombiePhaseManager {
       survivor.freeMovesRemaining = survivor.skills.includes('plus_1_free_move') ? 1 : 0;
       survivor.freeSearchesRemaining = survivor.skills.includes('plus_1_free_search') ? 1 : 0;
       survivor.freeCombatsRemaining = survivor.skills.includes('plus_1_free_combat') ? 1 : 0;
-      survivor.toughUsedThisTurn = false;
+      survivor.toughUsedZombieAttack = false;
+      survivor.toughUsedFriendlyFire = false;
       // Free melee/ranged actions
       survivor.freeMeleeRemaining = survivor.skills.includes('plus_1_free_melee') ? 1 : 0;
       survivor.freeRangedRemaining = survivor.skills.includes('plus_1_free_ranged') ? 1 : 0;
       // Once-per-turn skills
+      survivor.sprintUsedThisTurn = false;
       survivor.chargeUsedThisTurn = false;
       survivor.bornLeaderUsedThisTurn = false;
       survivor.bloodlustUsedThisTurn = false;
+      survivor.lifesaverUsedThisTurn = false;
       survivor.hitAndRunFreeMove = false;
     }
 

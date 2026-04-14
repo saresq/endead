@@ -32,6 +32,8 @@ export enum ActionType {
   CHARGE = 'CHARGE',
   BORN_LEADER = 'BORN_LEADER',
   BLOODLUST_MELEE = 'BLOODLUST_MELEE',
+  LIFESAVER = 'LIFESAVER',
+  RESOLVE_WOUNDS = 'RESOLVE_WOUNDS',
   KICK_PLAYER = 'KICK_PLAYER',
 }
 
@@ -102,6 +104,10 @@ export interface TradeAcceptPayload {
   receiveLayout?: Record<EntityId, string>;
 }
 
+export interface ResolveWoundsPayload {
+  discardCardIds: string[];  // Equipment card IDs to discard (each negates 1 wound)
+}
+
 export interface KickPlayerPayload {
   targetPlayerId: string;
 }
@@ -133,6 +139,8 @@ export interface ActionPayloadMap {
   [ActionType.CHARGE]: undefined;
   [ActionType.BORN_LEADER]: undefined;
   [ActionType.BLOODLUST_MELEE]: undefined;
+  [ActionType.LIFESAVER]: undefined;
+  [ActionType.RESOLVE_WOUNDS]: ResolveWoundsPayload;
   [ActionType.KICK_PLAYER]: KickPlayerPayload;
 }
 

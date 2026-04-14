@@ -19,12 +19,14 @@ import { icon } from '../components/icons';
 export interface ModalOptions {
   size?: 'sm' | 'md' | 'lg';
   title?: string;
+  subtitle?: string;          // Muted text below the title
   persistent?: boolean;       // Can't dismiss via backdrop/escape
   onClose?: () => void;
   onOpen?: (el: HTMLElement) => void;  // Called after modal is in the DOM
   renderBody: () => string;
   renderFooter?: () => string;
   className?: string;         // Extra class on the modal card
+  bodyClassName?: string;     // Extra class on the modal body
 }
 
 interface ModalEntry {
@@ -67,12 +69,16 @@ class ModalManagerImpl {
     const closeBtn = options.persistent
       ? ''
       : `<button class="btn btn--icon btn--sm modal__close" data-action="modal-close" title="Close" aria-label="Close">${icon('X', 'sm')}</button>`;
+    const subtitleHtml = options.subtitle
+      ? `<div class="modal__subtitle">${options.subtitle}</div>`
+      : '';
     const header = options.title
-      ? `<div class="modal__header"><h2 class="modal__title">${options.title}</h2>${closeBtn}</div>`
+      ? `<div class="modal__header"><div class="modal__header-text"><h2 class="modal__title">${options.title}</h2>${subtitleHtml}</div>${closeBtn}</div>`
       : (options.persistent ? '' : `<div class="modal__header modal__header--minimal">${closeBtn}</div>`);
 
     // Body
-    const body = `<div class="modal__body">${options.renderBody()}</div>`;
+    const bodyClass = options.bodyClassName ? ` ${options.bodyClassName}` : '';
+    const body = `<div class="modal__body${bodyClass}">${options.renderBody()}</div>`;
 
     // Footer
     const footer = options.renderFooter
@@ -208,6 +214,23 @@ class ModalManagerImpl {
   isOpen(id?: string): boolean {
     if (id) return this.stack.some((e) => e.id === id);
     return this.stack.length > 0;
+  }
+
+  /**
+   * Update the subtitle text of an open modal.
+   */
+  updateSubtitle(id: string, text: string): void {
+    const entry = this.stack.find((e) => e.id === id);
+    if (!entry) return;
+    let subtitle = entry.card.querySelector('.modal__subtitle');
+    if (!subtitle) {
+      const headerText = entry.card.querySelector('.modal__header-text');
+      if (!headerText) return;
+      subtitle = document.createElement('div');
+      subtitle.className = 'modal__subtitle';
+      headerText.appendChild(subtitle);
+    }
+    subtitle.textContent = text;
   }
 
   /**

@@ -119,18 +119,24 @@ export interface Survivor extends Entity {
   freeSearchesRemaining: number;
   freeCombatsRemaining: number;
 
-  // Tough skill tracking
-  toughUsedThisTurn: boolean;
+  // Tough skill tracking (per-source: zombie attacks vs friendly fire are independent)
+  toughUsedZombieAttack: boolean;
+  toughUsedFriendlyFire: boolean;
 
   // Free melee/ranged action tracking (reset each turn in endRound)
   freeMeleeRemaining: number;
   freeRangedRemaining: number;
 
   // Once-per-turn skill tracking (additional)
+  sprintUsedThisTurn: boolean;
   chargeUsedThisTurn: boolean;
   bornLeaderUsedThisTurn: boolean;
   bloodlustUsedThisTurn: boolean;
+  lifesaverUsedThisTurn: boolean;
   hitAndRunFreeMove: boolean;
+
+  // Pending wounds for "Is That All You've Got?" resolution
+  pendingWounds?: number;
 }
 
 export interface Zombie extends Entity {
@@ -323,6 +329,13 @@ export interface GameState {
     hits?: number;
     description?: string;
     timestamp: number;
+    // Combat feedback metadata
+    luckyRerollOriginal?: number[];  // Original dice before Lucky reroll
+    bonusDice?: number;              // Skill bonus dice applied
+    bonusDamage?: number;            // Skill bonus damage applied
+    damagePerHit?: number;           // Effective damage per hit
+    usedFreeAction?: boolean;        // Whether a free action was consumed
+    freeActionType?: string;         // Which free action type was used
   };
   
   spawnContext?: {
@@ -340,6 +353,8 @@ export interface GameState {
 
   // Transient: extra AP cost stashed by a handler for the dispatcher to consume
   _extraAPCost?: number;
+  // Transient: whether current attack is melee (for free melee/ranged action deduction)
+  _attackIsMelee?: boolean;
 }
 
 // --- Example Initial State ---

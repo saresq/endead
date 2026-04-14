@@ -91,3 +91,19 @@
 .text-warning {
   color: var(--warning);
 }
+
+.text-success {
+  color: var(--success);
+}
+
+.text-danger {
+  color: var(--danger);
+}
+
+.mb-3 {
+  margin-bottom: var(--space-3);
+}
+
+.mt-3 {
+  margin-top: var(--space-3);
+}

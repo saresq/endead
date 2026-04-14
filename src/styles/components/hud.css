@@ -653,6 +653,178 @@ button.hud-pill--clickable:focus-visible {
   color: var(--text-primary);
 }
 
+/* ---------- Skill Badges ---------- */
+
+.hud-skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.skill-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: var(--font-semibold);
+  white-space: nowrap;
+  cursor: default;
+  transition: opacity var(--duration-fast) var(--ease-in-out);
+}
+
+.skill-badge--passive {
+  background: rgba(74, 158, 255, 0.12);
+  color: var(--accent);
+  border: 1px solid rgba(74, 158, 255, 0.25);
+}
+
+.skill-badge--action {
+  background: rgba(251, 191, 36, 0.12);
+  color: var(--warning);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+}
+
+.skill-badge--stat-mod {
+  background: rgba(52, 211, 153, 0.12);
+  color: var(--success);
+  border: 1px solid rgba(52, 211, 153, 0.25);
+}
+
+.skill-badge--used {
+  opacity: 0.35;
+  filter: grayscale(0.6);
+}
+
+/* ---------- Free Action Indicators ---------- */
+
+.hud-free-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.free-action-pip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px var(--space-2);
+  background: rgba(52, 211, 153, 0.12);
+  border: 1px solid rgba(52, 211, 153, 0.25);
+  border-radius: var(--radius-full);
+  color: var(--success);
+  font-size: 11px;
+  font-weight: var(--font-bold);
+}
+
+.free-action-pip__count {
+  font-family: var(--font-mono);
+}
+
+/* ---------- Wound Alert ---------- */
+
+.hud-wound-alert {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  border-radius: var(--radius-md);
+  color: var(--danger);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  cursor: pointer;
+  animation: wound-pulse 1.5s ease-in-out infinite;
+}
+
+.hud-wound-alert:hover {
+  background: rgba(248, 113, 113, 0.2);
+}
+
+@keyframes wound-pulse {
+  0%, 100% { border-color: rgba(248, 113, 113, 0.4); }
+  50% { border-color: rgba(248, 113, 113, 0.8); }
+}
+
+/* ---------- Wound Picker Modal ---------- */
+
+.wound-picker__summary {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-3);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+}
+
+.wound-picker__card {
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  transition: transform var(--duration-fast) var(--ease-in-out);
+}
+
+.wound-picker__card:hover {
+  transform: scale(1.02);
+}
+
+.wound-picker__card--selected {
+  box-shadow: 0 0 0 2px var(--accent);
+  border-radius: var(--radius-md);
+}
+
+/* ---------- Event Entry Enhancements ---------- */
+
+.event-entry__free {
+  display: inline-block;
+  padding: 1px 6px;
+  margin-right: var(--space-1);
+  background: rgba(52, 211, 153, 0.15);
+  color: var(--success);
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+  font-weight: var(--font-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  vertical-align: middle;
+}
+
+.event-entry__boosts {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: 2px;
+}
+
+.event-entry__boost {
+  font-size: var(--text-xs);
+  color: var(--success);
+  font-weight: var(--font-semibold);
+}
+
+.event-entry__lucky {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
+  flex-wrap: wrap;
+}
+
+.event-entry__lucky-label {
+  font-size: var(--text-xs);
+  color: var(--warning);
+  font-weight: var(--font-semibold);
+}
+
+.event-die--discarded {
+  background: var(--surface-3);
+  color: var(--text-muted);
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+
 /* ---------- Keyboard Shortcuts Modal ---------- */
 
 .shortcut-list {

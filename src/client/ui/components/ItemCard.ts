@@ -17,11 +17,14 @@ export type ItemCardVariant = 'default' | 'ghost' | 'featured' | 'weapon';
 export interface ItemCardOptions {
   variant?: ItemCardVariant;
   badge?: string;           // "NEW", "GET", "PLACED" — floats top-right
-  draggable?: boolean;
+  tappable?: boolean;       // Adds pointer cursor for tap-to-select UIs
   showSlot?: boolean;       // Show "WEAPON · Hand 1" line (default true)
   showStats?: boolean;      // Show stats inline with name (default true)
   placed?: boolean;         // Grayed-out state for featured items that have been placed
   discarded?: boolean;      // Subtle red tint for items in the discard zone
+  // Skill-boosted stat modifiers (shown in green)
+  bonusDice?: number;
+  bonusDamage?: number;
 }
 
 function getTypeIconName(card: EquipmentCard): string {
@@ -36,22 +39,32 @@ export function renderItemCard(card: EquipmentCard | null | undefined, opts?: It
   const {
     variant = 'default',
     badge,
-    draggable = false,
+    tappable = false,
     showSlot = true,
     showStats = true,
     placed = false,
     discarded = false,
+    bonusDice = 0,
+    bonusDamage = 0,
   } = opts ?? {};
 
   const variantClass = variant !== 'default' ? ` item-card--${variant}` : '';
   const placedClass = placed ? ' item-card--placed' : '';
   const discardedClass = discarded ? ' item-card--discarded' : '';
+  const tappableClass = tappable ? ' item-card--tappable' : '';
   const typeIcon = icon(getTypeIconName(card), 'sm');
 
-  // Stats inline with name: "Shotgun 4+ · 2d6 · 2 dmg"
-  const statsInline = showStats && card.stats
-    ? `<span class="item-card__stats">${card.stats.accuracy}+ · ${card.stats.dice}d6 · ${card.stats.damage} dmg</span>`
-    : '';
+  // Stats inline with name: "Shotgun 4+ · 2d6 · 2 dmg" with optional green boosts
+  let statsInline = '';
+  if (showStats && card.stats) {
+    const diceStr = bonusDice > 0
+      ? `${card.stats.dice}<span class="item-card__boosted">+${bonusDice}</span>d6`
+      : `${card.stats.dice}d6`;
+    const dmgStr = bonusDamage > 0
+      ? `${card.stats.damage}<span class="item-card__boosted">+${bonusDamage}</span> dmg`
+      : `${card.stats.damage} dmg`;
+    statsInline = `<span class="item-card__stats">${card.stats.accuracy}+ · ${diceStr} · ${dmgStr}</span>`;
+  }
 
   // Secondary line: "WEAPON · Hand 1"
   const slotLabel = card.slot || 'Backpack';
@@ -64,8 +77,7 @@ export function renderItemCard(card: EquipmentCard | null | undefined, opts?: It
     : '';
 
   return `
-    <div class="item-card${variantClass}${placedClass}${discardedClass}"
-         ${draggable ? 'draggable="true"' : ''}
+    <div class="item-card${variantClass}${placedClass}${discardedClass}${tappableClass}"
          data-id="${card.id}"
          data-ghost="${variant === 'ghost' || variant === 'featured'}">
       ${badgeHtml}

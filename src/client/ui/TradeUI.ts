@@ -7,6 +7,8 @@ import { renderItemCard, renderEmptySlot } from './components/ItemCard';
 import { icon } from './components/icons';
 import { modalManager } from './overlays/ModalManager';
 
+// Icons used: Backpack, ArrowLeftRight, Trash2
+
 export class TradeUI {
   private modalId: string | null = null;
 
@@ -19,11 +21,9 @@ export class TradeUI {
   private partnerOffer: EquipmentCard[] = [];
   private receivedItemSlots: Record<string, string> = {};
 
-  private draggedItemId: string | null = null;
-  private draggedFrom: 'inventory' | 'offer' | 'partner_offer' | null = null;
-
-  /** AbortController for per-render drag/drop listeners */
-  private listenerAc: AbortController | null = null;
+  // Tap-to-select state
+  private tapSelectedId: string | null = null;
+  private tapSelectedFrom: 'inventory' | 'offer' | 'partner_offer' | null = null;
 
   public sync(mySurvivor: Survivor, session: TradeSession, globalState: GameState): void {
     const isActive = mySurvivor.id === session.activeSurvivorId;
@@ -64,20 +64,23 @@ export class TradeUI {
     if (!this.modalId) {
       this.modalId = modalManager.open({
         title: `Trading with ${this.partnerSurvivor.name}`,
-        size: 'lg',
+        subtitle: 'Tap an item to select, then tap where to move it.',
+        size: 'md',
         persistent: true,
-        className: 'trade-modal--wide',
+        bodyClassName: 'modal__body--stack',
         renderBody: () => this.renderBody(),
         renderFooter: () => this.renderFooter(),
-        onOpen: (el) => this.attachClickListener(el),
+        onOpen: (el) => {
+          this.attachClickHandler(el);
+          this.attachTapListeners(el);
+        },
       });
     } else {
-      this.updateModalContent();
+      this.rerender();
     }
   }
 
   public hide(): void {
-    this.abortListeners();
     if (this.modalId) {
       modalManager.close(this.modalId);
       this.modalId = null;
@@ -85,18 +88,21 @@ export class TradeUI {
     this.mySurvivor = null;
     this.partnerSurvivor = null;
     this.session = null;
+    this.tapSelectedId = null;
+    this.tapSelectedFrom = null;
   }
 
   // ─── Rendering ───────────────────────────────────────────────
 
-  private updateModalContent(): void {
+  private rerender(): void {
     if (!this.modalId) return;
-    // Skip DOM replacement while a drag is in progress — the innerHTML
-    // swap destroys the dragged element and cancels the browser's DnD operation.
-    if (this.draggedItemId) return;
+    const hint = this.tapSelectedId
+      ? 'Now tap a slot or the offer zone to move the item.'
+      : 'Tap an item to select, then tap where to move it.';
+    modalManager.updateSubtitle(this.modalId, hint);
     modalManager.updateBody(this.modalId, this.renderBody());
     modalManager.updateFooter(this.modalId, this.renderFooter());
-    this.attachDragListeners();
+    this.attachTapListeners();
   }
 
   private renderBody(): string {
@@ -106,18 +112,9 @@ export class TradeUI {
     const partnerStatus = this.session.status[this.partnerSurvivor.id];
 
     return `
-      <div class="trade-modal__subtitle">Drag items to the offer zone. Rearrange your inventory for free.</div>
-      <div class="trade-columns">
-        <div class="trade-column">
-          <div class="trade-section__label">My Inventory</div>
-          ${this.renderMyInventory()}
-        </div>
-
-        <div class="trade-column">
-          <div class="trade-section__label">Offers</div>
-          ${this.renderOfferZone(myStatus, partnerStatus)}
-        </div>
-      </div>`;
+      ${this.renderMyInventory()}
+      ${this.renderOfferZone(myStatus, partnerStatus)}
+      ${this.renderDiscardZone()}`;
   }
 
   private renderFooter(): string {
@@ -128,10 +125,14 @@ export class TradeUI {
 
     return `
       <div class="trade-status">
-        <span class="trade-status__item ${myStatus ? 'trade-status__item--ready' : ''}">Me: ${myStatus ? 'Ready' : 'Not Ready'}</span>
-        <span class="trade-status__item ${partnerStatus ? 'trade-status__item--ready' : ''}">${this.partnerSurvivor.name}: ${partnerStatus ? 'Ready' : 'Not Ready'}</span>
+        <span class="trade-status__item ${myStatus ? 'trade-status__item--ready' : ''}">
+          <span class="trade-status__dot"></span>Me: ${myStatus ? 'Ready' : 'Not Ready'}
+        </span>
+        <span class="trade-status__item ${partnerStatus ? 'trade-status__item--ready' : ''}">
+          <span class="trade-status__dot"></span>${this.partnerSurvivor.name}: ${partnerStatus ? 'Ready' : 'Not Ready'}
+        </span>
       </div>
-      <div class="trade-modal__footer-actions">
+      <div class="trade-footer__actions">
         ${renderButton({ label: 'Cancel', icon: 'X', variant: 'secondary', size: 'sm', dataAction: 'cancel-trade' })}
         ${renderButton({ label: myStatus ? 'Unaccept' : 'Accept', icon: myStatus ? 'X' : 'Check', variant: myStatus ? 'secondary' : 'primary', size: 'sm', dataAction: 'accept-trade' })}
       </div>`;
@@ -148,44 +149,43 @@ export class TradeUI {
       return { card: ghost || null, ghost: !!ghost };
     };
 
+    const renderSlot = (data: { card: EquipmentCard | null; ghost: boolean }, slot: string, label?: string) => {
+      const isItemSelected = data.card && this.tapSelectedId === data.card.id;
+      const isTargetable = this.tapSelectedId && !isItemSelected;
+      const cls = [
+        'inv-slot',
+        data.ghost ? 'inv-slot--ghost' : data.card ? 'inv-slot--filled' : '',
+        isItemSelected ? 'tap-selected' : '',
+        isTargetable ? 'tap-target' : '',
+      ].filter(Boolean).join(' ');
+      const labelHtml = label ? `<span class="inv-slot__label">${label}</span>` : '';
+      const tapFrom = data.ghost ? 'partner_offer' : 'inventory';
+      const tapAttrs = data.card
+        ? `data-tap-item="${data.card.id}" data-tap-from="${tapFrom}"`
+        : '';
+      const content = data.card
+        ? renderItemCard(data.card, { variant: data.ghost ? 'ghost' : 'default', badge: data.ghost ? 'GET' : undefined, tappable: true, showSlot: false })
+        : renderEmptySlot();
+      return `<div class="${cls}" data-tap-slot="${slot}" ${tapAttrs}>${labelHtml}${content}</div>`;
+    };
+
     const hand1 = getItem('HAND_1');
     const hand2 = getItem('HAND_2');
     const bp0 = getItem('BACKPACK_0');
     const bp1 = getItem('BACKPACK_1');
     const bp2 = getItem('BACKPACK_2');
 
-    const renderSlot = (data: { card: EquipmentCard | null; ghost: boolean }, slot: string, label?: string) => {
-      const cls = data.ghost ? 'trade-slot trade-slot--ghost' : data.card ? 'trade-slot trade-slot--filled' : 'trade-slot';
-      const labelHtml = label ? `<span class="trade-slot__label">${label}</span>` : '';
-      const content = data.card
-        ? renderItemCard(data.card, { variant: data.ghost ? 'ghost' : 'default', badge: data.ghost ? 'GET' : undefined, draggable: true, showSlot: false })
-        : renderEmptySlot();
-      return `<div class="${cls}" data-slot="${slot}" data-drop="inventory">${labelHtml}${content}</div>`;
-    };
-
-    const discarded = visibleItems.filter(c => c.slot === 'DISCARD');
-    const ghostDiscarded = ghostItems.filter(c => this.receivedItemSlots[c.id] === 'DISCARD');
-    const discardContent = [...discarded, ...ghostDiscarded].map(c => {
-      const isG = ghostItems.some(g => g.id === c.id);
-      return renderItemCard(c, { variant: isG ? 'ghost' : 'default', badge: isG ? 'GET' : undefined, draggable: true, showSlot: false, discarded: true });
-    }).join('');
-
     return `
-      <div class="trade-slots">
-        <div class="trade-slot-row">
+      <div class="inv-panel">
+        <div class="inv-panel__header">${icon('Backpack', 'sm')} Your Equipment</div>
+        <div class="slot-row slot-row--hands">
           ${renderSlot(hand1, 'HAND_1', 'Hand 1')}
           ${renderSlot(hand2, 'HAND_2', 'Hand 2')}
         </div>
-        <div class="trade-backpack-row">
+        <div class="slot-row slot-row--backpack">
           ${renderSlot(bp0, 'BACKPACK_0')}
           ${renderSlot(bp1, 'BACKPACK_1')}
           ${renderSlot(bp2, 'BACKPACK_2')}
-        </div>
-        <div>
-          <div class="trade-section__label">${icon('X', 'sm')} Drop here to remove</div>
-          <div class="trade-discard" data-slot="DISCARD" data-drop="inventory">
-            ${discardContent || renderEmptySlot()}
-          </div>
         </div>
       </div>`;
   }
@@ -194,31 +194,56 @@ export class TradeUI {
     const myOfferCards = this.myOffer.map(id => {
       const card = this.myInventory.find(c => c.id === id);
       if (!card) return '';
-      return renderItemCard(card, { draggable: true, showSlot: false });
+      const isSelected = this.tapSelectedId === card.id;
+      return `<div class="${isSelected ? 'tap-selected' : ''}" data-tap-item="${card.id}" data-tap-from="offer">${renderItemCard(card, { tappable: true, showSlot: false })}</div>`;
     }).join('');
 
-    const partnerOfferCards = this.partnerOffer.map(card =>
-      renderItemCard(card, { variant: 'ghost', draggable: true, showSlot: false })
-    ).join('');
+    const partnerOfferCards = this.partnerOffer.map(card => {
+      const isSelected = this.tapSelectedId === card.id;
+      return `<div class="${isSelected ? 'tap-selected' : ''}" data-tap-item="${card.id}" data-tap-from="partner_offer">${renderItemCard(card, { variant: 'ghost', tappable: true, showSlot: false })}</div>`;
+    }).join('');
+
+    const offerTargetable = this.tapSelectedId && this.tapSelectedFrom === 'inventory';
 
     return `
-      <div class="trade-offer-box" data-drop="offer">
-        <div class="trade-offer-box__title">I Give</div>
-        <div class="trade-offer-box__items">${myOfferCards || '<span class="text-placeholder">Drag items here to offer</span>'}</div>
-      </div>
+      <div class="offer-panel">
+        <div class="offer-section ${offerTargetable ? 'tap-target' : ''}" data-tap-slot="OFFER">
+          <div class="offer-section__title">${icon('ArrowLeftRight', 'sm')} I Give</div>
+          <div class="offer-section__items">${myOfferCards || '<span class="text-placeholder">Tap an item then tap here to offer</span>'}</div>
+        </div>
+        <div class="offer-divider">${icon('ArrowLeftRight', 'sm')}</div>
+        <div class="offer-section">
+          <div class="offer-section__title">${this.partnerSurvivor!.name} Gives</div>
+          <div class="offer-section__items">${partnerOfferCards || '<span class="text-placeholder">Nothing offered yet</span>'}</div>
+        </div>
+      </div>`;
+  }
 
-      <div class="trade-exchange-arrow">&darr; &uarr;</div>
+  private renderDiscardZone(): string {
+    const visibleItems = this.myInventory.filter(c => !this.myOffer.includes(c.id));
+    const ghostItems = this.partnerOffer.filter(c => this.receivedItemSlots[c.id]);
+    const discarded = visibleItems.filter(c => c.slot === 'DISCARD');
+    const ghostDiscarded = ghostItems.filter(c => this.receivedItemSlots[c.id] === 'DISCARD');
+    const discardContent = [...discarded, ...ghostDiscarded].map(c => {
+      const isG = ghostItems.some(g => g.id === c.id);
+      const isSelected = this.tapSelectedId === c.id;
+      const tapFrom = isG ? 'partner_offer' : 'inventory';
+      return `<div class="${isSelected ? 'tap-selected' : ''}" data-tap-item="${c.id}" data-tap-from="${tapFrom}">${renderItemCard(c, { variant: isG ? 'ghost' : 'default', badge: isG ? 'GET' : undefined, tappable: true, showSlot: false, discarded: true })}</div>`;
+    }).join('');
 
-      <div class="trade-offer-box">
-        <div class="trade-offer-box__title">${this.partnerSurvivor!.name} Gives</div>
-        <div class="trade-offer-box__items">${partnerOfferCards || '<span class="text-placeholder">Nothing offered yet</span>'}</div>
+    return `
+      <div class="inv-panel">
+        <div class="inv-panel__header">${icon('Trash2', 'sm')} Discard</div>
+        <div class="discard-zone ${this.tapSelectedId && !discarded.some(c => c.id === this.tapSelectedId) && !ghostDiscarded.some(c => c.id === this.tapSelectedId) ? 'tap-target' : ''}" data-tap-slot="DISCARD">
+          ${discardContent || renderEmptySlot()}
+        </div>
       </div>`;
   }
 
   // ─── Event Handling ──────────────────────────────────────────
 
-  /** Attach click listener once when the modal opens. */
-  private attachClickListener(el: HTMLElement): void {
+  /** Attach persistent click handler for action buttons (once on modal open). */
+  private attachClickHandler(el: HTMLElement): void {
     el.addEventListener('click', (e) => {
       const target = (e.target as HTMLElement).closest('[data-action]') as HTMLElement | null;
       if (!target) return;
@@ -237,147 +262,185 @@ export class TradeUI {
         }
       }
     });
-
-    this.attachDragListeners();
   }
 
-  /** Abort previous drag/drop listeners and attach fresh ones. */
-  private abortListeners(): void {
-    this.listenerAc?.abort();
-    this.listenerAc = null;
-  }
-
-  private attachDragListeners(): void {
-    this.abortListeners();
-
-    const el = this.modalId ? modalManager.getElement(this.modalId) : null;
+  /** Attach tap-to-select listeners to current DOM (called after each render). */
+  private attachTapListeners(directEl?: HTMLElement): void {
+    const el = directEl ?? (this.modalId ? modalManager.getElement(this.modalId) : null);
     if (!el) return;
 
-    this.listenerAc = new AbortController();
-    const signal = this.listenerAc.signal;
+    el.querySelectorAll('[data-tap-item], [data-tap-slot]').forEach(tapEl => {
+      tapEl.addEventListener('click', (e: Event) => {
+        const target = e.currentTarget as HTMLElement;
+        if ((e.target as HTMLElement).closest('[data-action]')) return;
 
-    const draggables = el.querySelectorAll('[draggable="true"]');
-    const dropTargets = el.querySelectorAll('[data-drop]');
+        // Stop bubbling so a parent [data-tap-slot] doesn't also fire
+        e.stopPropagation();
 
-    draggables.forEach(item => {
-      item.addEventListener('dragstart', (e: any) => {
-        const card = e.target.closest('[data-id]');
-        if (!card) return;
-        this.draggedItemId = card.getAttribute('data-id');
-        const isGhost = card.getAttribute('data-ghost') === 'true';
-        if (isGhost) { this.draggedFrom = 'partner_offer'; }
-        else if (this.myOffer.includes(this.draggedItemId!)) { this.draggedFrom = 'offer'; }
-        else { this.draggedFrom = 'inventory'; }
-        e.dataTransfer.effectAllowed = 'move';
-        setTimeout(() => card.classList.add('dragging'), 0);
-      }, { signal });
-      item.addEventListener('dragend', (e: any) => {
-        const card = e.target.closest('[data-id]');
-        card?.classList.remove('dragging');
-        this.draggedItemId = null;
-        this.draggedFrom = null;
-      }, { signal });
-    });
+        const tapItemId = target.dataset.tapItem;
+        const tapSlot = target.dataset.tapSlot;
+        const tapFrom = target.dataset.tapFrom as typeof this.tapSelectedFrom;
 
-    dropTargets.forEach(dt => {
-      dt.addEventListener('dragover', (e: any) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; dt.classList.add('drag-over'); }, { signal });
-      dt.addEventListener('dragleave', () => dt.classList.remove('drag-over'), { signal });
-      dt.addEventListener('drop', (e: any) => { e.preventDefault(); dt.classList.remove('drag-over'); this.handleDrop(dt); }, { signal });
+        // Phase 1: Item tapped — select it
+        if (tapItemId && !this.tapSelectedId) {
+          this.tapSelectedId = tapItemId;
+          this.tapSelectedFrom = tapFrom || 'inventory';
+          this.rerender();
+          return;
+        }
+
+        // Tapping same item — deselect
+        if (tapItemId && this.tapSelectedId === tapItemId) {
+          this.tapSelectedId = null;
+          this.tapSelectedFrom = null;
+          this.rerender();
+          return;
+        }
+
+        // Phase 2: Slot/zone tapped while item is selected — move
+        if (this.tapSelectedId && tapSlot) {
+          const id = this.tapSelectedId;
+          const from = this.tapSelectedFrom;
+          this.tapSelectedId = null;
+          this.tapSelectedFrom = null;
+          this.handleMove(tapSlot, id, from);
+          return;
+        }
+
+        // Tapping a different item — switch selection or move to its slot
+        if (tapItemId && this.tapSelectedId && tapItemId !== this.tapSelectedId) {
+          if (tapSlot) {
+            const id = this.tapSelectedId;
+            const from = this.tapSelectedFrom;
+            this.tapSelectedId = null;
+            this.tapSelectedFrom = null;
+            this.handleMove(tapSlot, id, from);
+          } else {
+            this.tapSelectedId = tapItemId;
+            this.tapSelectedFrom = tapFrom || 'inventory';
+            this.rerender();
+          }
+          return;
+        }
+      });
     });
   }
 
-  /** Schedule a re-render after the browser finishes its DnD lifecycle (dragend). */
-  private scheduleRender(): void {
-    // Use setTimeout(0) so the browser fires dragend and cleans up its
-    // internal DnD state before we replace the DOM and re-attach listeners.
-    setTimeout(() => this.updateModalContent(), 0);
-  }
+  /** Move the currently selected item to the target slot/zone. */
+  private handleMove(targetSlot: string, passedId?: string, passedFrom?: typeof this.tapSelectedFrom): void {
+    const selectedId = passedId ?? this.tapSelectedId;
+    const selectedFrom = passedFrom ?? this.tapSelectedFrom;
+    if (!selectedId) return;
 
-  private handleDrop(targetEl: Element): void {
-    if (!this.draggedItemId) return;
-
-    const dropType = targetEl.getAttribute('data-drop');
-    const targetSlot = targetEl.getAttribute('data-slot');
-
-    const draggedId = this.draggedItemId;
-    const draggedFrom = this.draggedFrom;
-
-    // Drop into offer zone
-    if (dropType === 'offer') {
-      if (draggedFrom === 'partner_offer') return;
-      if (!this.myOffer.includes(draggedId)) {
-        this.myOffer.push(draggedId);
+    // ── Move to offer zone ──
+    if (targetSlot === 'OFFER') {
+      if (selectedFrom === 'partner_offer') { this.rerender(); return; }
+      if (!this.myOffer.includes(selectedId)) {
+        this.myOffer.push(selectedId);
         this.sendOfferUpdate();
-        this.scheduleRender();
       }
+      this.rerender();
       return;
     }
 
-    if (dropType !== 'inventory' || !targetSlot) return;
-
-    // Find what's in the target slot
+    // ── Find what's in the target slot ──
     let victimId: string | null = null;
     if (targetSlot !== 'DISCARD') {
-      const itemEl = targetEl.querySelector('.item-card[data-id]');
-      if (itemEl) {
-        victimId = itemEl.getAttribute('data-id');
-        if (victimId === draggedId) return;
+      const visibleItems = this.myInventory.filter(c => !this.myOffer.includes(c.id));
+      const occupant = visibleItems.find(c => c.slot === targetSlot);
+      if (occupant) victimId = occupant.id;
+      if (!victimId) {
+        const ghostOccupant = this.partnerOffer.find(c => this.receivedItemSlots[c.id] === targetSlot);
+        if (ghostOccupant) victimId = ghostOccupant.id;
       }
+      if (victimId === selectedId) { this.rerender(); return; }
     }
 
-    const isDraggedGhost = draggedFrom === 'partner_offer';
+    const isSelectedGhost = selectedFrom === 'partner_offer';
     const isVictimGhost = victimId ? Object.keys(this.receivedItemSlots).includes(victimId) : false;
 
     // Swap logic when ghost items are involved
-    if (victimId && (isDraggedGhost || isVictimGhost)) {
+    if (victimId && (isSelectedGhost || isVictimGhost)) {
       let sourceSlot: string | null = null;
-      if (isDraggedGhost) { sourceSlot = this.receivedItemSlots[draggedId] || null; }
-      else { sourceSlot = this.myInventory.find(i => i.id === draggedId)?.slot ?? null; }
+      if (isSelectedGhost) { sourceSlot = this.receivedItemSlots[selectedId] || null; }
+      else { sourceSlot = this.myInventory.find(i => i.id === selectedId)?.slot ?? null; }
 
       if (sourceSlot) {
-        if (this.myOffer.includes(draggedId)) {
-          this.myOffer = this.myOffer.filter(id => id !== draggedId);
+        if (this.myOffer.includes(selectedId)) {
+          this.myOffer = this.myOffer.filter(id => id !== selectedId);
           this.sendOfferUpdate();
         }
         if (isVictimGhost) { this.receivedItemSlots[victimId] = sourceSlot; }
-        else { networkManager.sendAction({ playerId: this.mySurvivor!.playerId, survivorId: this.mySurvivor!.id, type: ActionType.ORGANIZE, payload: { cardId: victimId, targetSlot: sourceSlot } }); }
-        if (isDraggedGhost) { this.receivedItemSlots[draggedId] = targetSlot!; }
-        else { networkManager.sendAction({ playerId: this.mySurvivor!.playerId, survivorId: this.mySurvivor!.id, type: ActionType.ORGANIZE, payload: { cardId: draggedId, targetSlot: targetSlot! } }); }
-        this.scheduleRender();
+        else if (sourceSlot !== 'DISCARD') { networkManager.sendAction({ playerId: this.mySurvivor!.playerId, survivorId: this.mySurvivor!.id, type: ActionType.ORGANIZE, payload: { cardId: victimId, targetSlot: sourceSlot } }); }
+        if (isSelectedGhost) { this.receivedItemSlots[selectedId] = targetSlot; }
+        else if (targetSlot !== 'DISCARD') { networkManager.sendAction({ playerId: this.mySurvivor!.playerId, survivorId: this.mySurvivor!.id, type: ActionType.ORGANIZE, payload: { cardId: selectedId, targetSlot } }); }
+        this.rerender();
         return;
       }
     }
 
     // Assigning partner offer item to a slot
-    if (draggedFrom === 'partner_offer' && targetSlot) {
-      this.receivedItemSlots[draggedId] = targetSlot;
-      this.scheduleRender();
+    if (selectedFrom === 'partner_offer') {
+      this.receivedItemSlots[selectedId] = targetSlot;
+      this.rerender();
       return;
     }
 
-    // Returning from offer
-    if (this.myOffer.includes(draggedId)) {
-      this.myOffer = this.myOffer.filter(id => id !== draggedId);
+    // Returning from offer — un-offer and place at the target slot
+    if (this.myOffer.includes(selectedId)) {
+      this.myOffer = this.myOffer.filter(id => id !== selectedId);
       this.sendOfferUpdate();
-      this.scheduleRender();
+
+      const card = this.myInventory.find(c => c.id === selectedId);
+      if (card && card.slot !== targetSlot) {
+        if (targetSlot === 'DISCARD') {
+          // Local-only — don't send ORGANIZE+DISCARD to server
+          card.slot = 'DISCARD' as any;
+          card.inHand = false;
+        } else {
+          const occupant = this.myInventory.find(c => c.slot === targetSlot && c.id !== selectedId && !this.myOffer.includes(c.id));
+          if (occupant) {
+            occupant.slot = card.slot;
+            occupant.inHand = (card.slot === 'HAND_1' || card.slot === 'HAND_2');
+            networkManager.sendAction({ playerId: this.mySurvivor!.playerId, survivorId: this.mySurvivor!.id, type: ActionType.ORGANIZE, payload: { cardId: occupant.id, targetSlot: card.slot } });
+          }
+          card.slot = targetSlot as any;
+          card.inHand = (targetSlot === 'HAND_1' || targetSlot === 'HAND_2');
+          networkManager.sendAction({ playerId: this.mySurvivor!.playerId, survivorId: this.mySurvivor!.id, type: ActionType.ORGANIZE, payload: { cardId: selectedId, targetSlot } });
+        }
+      }
+
+      this.rerender();
       return;
     }
 
-    // Reorganize — optimistically swap in local inventory
-    if (targetSlot) {
-      const card = this.myInventory.find(c => c.id === draggedId);
-      if (card && card.slot !== targetSlot) {
-        const occupant = this.myInventory.find(c => c.slot === targetSlot && c.id !== draggedId);
+    // Reorganize — swap in local inventory
+    const card = this.myInventory.find(c => c.id === selectedId);
+    if (card && card.slot !== targetSlot) {
+      if (targetSlot === 'DISCARD') {
+        // DISCARD in trade is local-only staging — don't send to server
+        // (server ORGANIZE+DISCARD permanently deletes the card)
+        card.slot = 'DISCARD' as any;
+        card.inHand = false;
+      } else {
+        const oldSlot = card.slot;
+        const occupant = this.myInventory.find(c => c.slot === targetSlot && c.id !== selectedId);
         if (occupant) {
-          occupant.slot = card.slot;
-          occupant.inHand = (card.slot === 'HAND_1' || card.slot === 'HAND_2');
+          occupant.slot = oldSlot;
+          occupant.inHand = (oldSlot === 'HAND_1' || oldSlot === 'HAND_2');
+          // Don't send ORGANIZE to DISCARD — it permanently deletes on the server
+          if (oldSlot !== 'DISCARD') {
+            networkManager.sendAction({ playerId: this.mySurvivor!.playerId, survivorId: this.mySurvivor!.id, type: ActionType.ORGANIZE, payload: { cardId: occupant.id, targetSlot: oldSlot } });
+          }
         }
         card.slot = targetSlot as any;
         card.inHand = (targetSlot === 'HAND_1' || targetSlot === 'HAND_2');
-
-        networkManager.sendAction({ playerId: this.mySurvivor!.playerId, survivorId: this.mySurvivor!.id, type: ActionType.ORGANIZE, payload: { cardId: draggedId, targetSlot } });
-        this.scheduleRender();
+        // Moving out of DISCARD is local-only (card was locally staged there)
+        if (oldSlot !== 'DISCARD') {
+          networkManager.sendAction({ playerId: this.mySurvivor!.playerId, survivorId: this.mySurvivor!.id, type: ActionType.ORGANIZE, payload: { cardId: selectedId, targetSlot } });
+        }
       }
+      this.rerender();
     }
   }
 

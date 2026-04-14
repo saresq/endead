@@ -81,6 +81,11 @@ const handlers: Partial<Record<ActionType, ActionHandler>> = {
   [ActionType.USE_ITEM]: handleUseItem,
   [ActionType.NOTHING]: handleNothing,
   [ActionType.END_TURN]: handleEndTurn,
+  [ActionType.CHARGE]: handleCharge,
+  [ActionType.BORN_LEADER]: handleBornLeader,
+  [ActionType.BLOODLUST_MELEE]: handleBloodlustMelee,
+  [ActionType.LIFESAVER]: handleLifesaver,
+  [ActionType.RESOLVE_WOUNDS]: handleResolveWounds,
 };
 
 /**
@@ -94,19 +99,36 @@ function deductAPWithFreeCheck(state: GameState, survivorId: string, actionType:
   const survivor = { ...newSurvivors[survivorId] };
 
   let usedFree = false;
+  let freeType = '';
 
   if (actionType === ActionType.MOVE && survivor.freeMovesRemaining > 0) {
     survivor.freeMovesRemaining--;
     usedFree = true;
+    freeType = 'Free Move';
   } else if (actionType === ActionType.SEARCH && survivor.freeSearchesRemaining > 0) {
     survivor.freeSearchesRemaining--;
     usedFree = true;
+    freeType = 'Free Search';
   } else if (actionType === ActionType.ATTACK && survivor.freeCombatsRemaining > 0) {
     survivor.freeCombatsRemaining--;
     usedFree = true;
+    freeType = 'Free Combat';
+  } else if (actionType === ActionType.ATTACK && survivor.freeMeleeRemaining > 0 && state._attackIsMelee) {
+    survivor.freeMeleeRemaining--;
+    usedFree = true;
+    freeType = 'Free Melee';
+  } else if (actionType === ActionType.ATTACK && survivor.freeRangedRemaining > 0 && state._attackIsMelee === false) {
+    survivor.freeRangedRemaining--;
+    usedFree = true;
+    freeType = 'Free Ranged';
   }
 
   if (usedFree) {
+    // Tag lastAction with free action info
+    if (newState.lastAction) {
+      newState.lastAction.usedFreeAction = true;
+      newState.lastAction.freeActionType = freeType;
+    }
     // Free action covers the base cost; only apply extra cost (e.g. zombie zone penalty)
     if (extraCost > 0) {
       survivor.actionsRemaining = Math.max(0, survivor.actionsRemaining - extraCost);
@@ -144,7 +166,10 @@ export function processAction(state: GameState, intent: ActionRequest): ActionRe
       let turnError: ActionError | null = validateTurn(state, intent);
 
       // Special Cases
-      if ((intent.type === ActionType.CHOOSE_SKILL || intent.type === ActionType.RESOLVE_SEARCH) 
+      if ((intent.type === ActionType.CHOOSE_SKILL || intent.type === ActionType.RESOLVE_SEARCH
+          || intent.type === ActionType.CHARGE || intent.type === ActionType.BORN_LEADER
+          || intent.type === ActionType.LIFESAVER || intent.type === ActionType.RESOLVE_WOUNDS
+          || intent.type === ActionType.END_TURN)
           && turnError && turnError.code === 'NO_ACTIONS') {
         turnError = null;
       }
@@ -172,7 +197,8 @@ export function processAction(state: GameState, intent: ActionRequest): ActionRe
         ActionType.OPEN_DOOR, ActionType.MAKE_NOISE, ActionType.ORGANIZE,
         ActionType.TAKE_OBJECTIVE,
         ActionType.TRADE_START, ActionType.TRADE_OFFER,
-        ActionType.TRADE_ACCEPT, ActionType.TRADE_CANCEL, ActionType.END_TURN
+        ActionType.TRADE_ACCEPT, ActionType.TRADE_CANCEL, ActionType.END_TURN,
+        ActionType.CHARGE, ActionType.BORN_LEADER, ActionType.BLOODLUST_MELEE, ActionType.LIFESAVER
     ];
 
     if (gameActions.includes(intent.type)) {
@@ -194,15 +220,23 @@ export function processAction(state: GameState, intent: ActionRequest): ActionRe
        else if (intent.type === ActionType.ORGANIZE && newState.survivors[intent.survivorId!]?.drawnCard) {
            // Free Organize during Pickup/Search Resolution
        }
+       else if (intent.type === ActionType.CHARGE || intent.type === ActionType.BORN_LEADER || intent.type === ActionType.LIFESAVER) {
+           // Charge, Born Leader, and Lifesaver are free actions — no AP cost
+           newState = checkEndTurn(newState);
+       }
        else {
            // Consume transient extra AP cost (e.g. zombie zone control penalty on MOVE)
            const extraCost = newState._extraAPCost || 0;
            delete newState._extraAPCost;
+           delete (newState as any)._attackIsMelee;
            newState = deductAPWithFreeCheck(newState, intent.survivorId!, intent.type, extraCost);
        }
     } else if (intent.type === ActionType.RESOLVE_SEARCH) {
         // Since RESOLVE_SEARCH doesn't cost AP (cost was paid in SEARCH),
         // we only need to check if the turn should end now that the blocking condition (drawnCard) is cleared.
+        newState = checkEndTurn(newState);
+    } else if (intent.type === ActionType.RESOLVE_WOUNDS) {
+        // No AP cost — resolving pending wounds from ITAYG skill
         newState = checkEndTurn(newState);
     }
 
@@ -360,10 +394,19 @@ function handleStartGame(state: GameState, intent: ActionRequest): GameState {
                 hasMoved: false,
                 hasSearched: false,
                 freeMovesRemaining: startingSkills.includes('start_move') ? 1 : 0,
-                freeSearchesRemaining: 0,
-                freeCombatsRemaining: 0,
-                toughUsedThisTurn: false,
-            };
+                freeSearchesRemaining: startingSkills.includes('plus_1_free_search') ? 1 : 0,
+                freeCombatsRemaining: startingSkills.includes('plus_1_free_combat') ? 1 : 0,
+                freeMeleeRemaining: 0,
+                freeRangedRemaining: 0,
+                sprintUsedThisTurn: false,
+                chargeUsedThisTurn: false,
+                bornLeaderUsedThisTurn: false,
+                bloodlustUsedThisTurn: false,
+                lifesaverUsedThisTurn: false,
+                hitAndRunFreeMove: false,
+                toughUsedZombieAttack: false,
+                toughUsedFriendlyFire: false,
+            } as Survivor;
             newState.survivors[survivorId] = survivor;
         });
 
@@ -412,10 +455,19 @@ function handleStartGame(state: GameState, intent: ActionRequest): GameState {
                 hasMoved: false,
                 hasSearched: false,
                 freeMovesRemaining: startingSkills.includes('start_move') ? 1 : 0,
-                freeSearchesRemaining: 0,
-                freeCombatsRemaining: 0,
-                toughUsedThisTurn: false,
-            };
+                freeSearchesRemaining: startingSkills.includes('plus_1_free_search') ? 1 : 0,
+                freeCombatsRemaining: startingSkills.includes('plus_1_free_combat') ? 1 : 0,
+                freeMeleeRemaining: 0,
+                freeRangedRemaining: 0,
+                sprintUsedThisTurn: false,
+                chargeUsedThisTurn: false,
+                bornLeaderUsedThisTurn: false,
+                bloodlustUsedThisTurn: false,
+                lifesaverUsedThisTurn: false,
+                hitAndRunFreeMove: false,
+                toughUsedZombieAttack: false,
+                toughUsedFriendlyFire: false,
+            } as Survivor;
             newState.survivors[survivorId] = survivor;
         });
     }
@@ -514,34 +566,73 @@ function handleMove(state: GameState, intent: ActionRequest): GameState {
   const newState = JSON.parse(JSON.stringify(state));
   const survivor = newState.survivors[intent.survivorId!];
   const targetId = intent.payload?.targetZoneId;
+  const path: string[] = intent.payload?.path; // Optional 2-zone path
 
-  if (!targetId) throw new Error('Target zone required');
+  if (!targetId && (!path || path.length === 0)) throw new Error('Target zone required');
 
-  const currentZone = newState.zones[survivor.position.zoneId];
-  if (!currentZone) throw new Error('Current zone invalid');
-  
-  const targetZone = newState.zones[targetId];
-  if (!targetZone) throw new Error('Target zone invalid');
-  
-  if (!getConnection(currentZone, targetId)) {
-    throw new Error(`Zones not connected: ${currentZone.id} -> ${targetId}`);
+  const hasExtraZone = survivor.skills.includes('plus_1_zone_per_move');
+
+  // Build the movement path
+  let movePath: string[];
+  if (path && path.length > 0) {
+    movePath = path;
+  } else {
+    movePath = [targetId];
   }
 
-  // Edge-level door check
-  if (isDoorBlocked(currentZone, targetId)) {
-    throw new Error('Door is closed. You must open it first.');
+  if (movePath.length > 2) throw new Error('Cannot move more than 2 zones');
+  if (movePath.length > 1 && !hasExtraZone) throw new Error('Survivor cannot move 2 zones');
+
+  let currentZoneId = survivor.position.zoneId;
+  let extraAPCost = 0;
+
+  for (let i = 0; i < movePath.length; i++) {
+    const nextZoneId = movePath[i];
+    const currentZone = newState.zones[currentZoneId];
+    if (!currentZone) throw new Error('Current zone invalid');
+
+    const nextZone = newState.zones[nextZoneId];
+    if (!nextZone) throw new Error('Target zone invalid');
+
+    if (!getConnection(currentZone, nextZoneId)) {
+      throw new Error(`Zones not connected: ${currentZoneId} -> ${nextZoneId}`);
+    }
+
+    if (isDoorBlocked(currentZone, nextZoneId)) {
+      throw new Error('Door is closed. You must open it first.');
+    }
+
+    // Zombie zone control: leaving a zone with zombies costs +1 AP
+    const hasZombiesInZone = Object.values(newState.zombies)
+      .some((z: any) => z.position.zoneId === currentZoneId);
+    if (hasZombiesInZone && !survivor.skills.includes('slippery')) {
+      extraAPCost += 1;
+    }
+
+    currentZoneId = nextZoneId;
+
+    // Entering a zone with zombies stops movement (unless Slippery)
+    if (i < movePath.length - 1) {
+      const hasZombiesInNext = Object.values(newState.zombies)
+        .some((z: any) => z.position.zoneId === nextZoneId);
+      if (hasZombiesInNext && !survivor.skills.includes('slippery')) {
+        // Stop here — can't continue to second zone
+        break;
+      }
+    }
   }
 
-  // Zombie zone control: leaving a zone with zombies costs +1 AP
-  const hasZombiesInZone = Object.values(newState.zombies)
-    .some((z: any) => z.position.zoneId === survivor.position.zoneId);
-
-  if (hasZombiesInZone && !survivor.skills.includes('slippery')) {
-    // Store extra AP cost for the dispatcher to consume
-    newState._extraAPCost = 1;
+  if (extraAPCost > 0) {
+    newState._extraAPCost = extraAPCost;
   }
 
-  survivor.position.zoneId = targetId;
+  // Hit & Run free move: no zombie zone penalty
+  if (survivor.hitAndRunFreeMove) {
+    delete newState._extraAPCost;
+    survivor.hitAndRunFreeMove = false;
+  }
+
+  survivor.position.zoneId = currentZoneId;
   survivor.hasMoved = true;
 
   return newState;
@@ -553,6 +644,9 @@ function handleSprint(state: GameState, intent: ActionRequest): GameState {
 
   if (!survivor.skills.includes('sprint')) {
     throw new Error('Survivor does not have Sprint skill');
+  }
+  if (survivor.sprintUsedThisTurn) {
+    throw new Error('Sprint already used this turn');
   }
 
   const path: string[] = intent.payload?.path;
@@ -603,6 +697,7 @@ function handleSprint(state: GameState, intent: ActionRequest): GameState {
 
   survivor.position.zoneId = currentZoneId;
   survivor.hasMoved = true;
+  survivor.sprintUsedThisTurn = true;
 
   return newState;
 }
@@ -753,7 +848,9 @@ function handleSearch(state: GameState, intent: ActionRequest): GameState {
   const preSurvivor = state.survivors[intent.survivorId!];
   const preZone = state.zones[preSurvivor.position.zoneId];
 
-  if (preSurvivor.hasSearched) throw new Error('Already searched this turn');
+  if (preSurvivor.hasSearched && !preSurvivor.skills.includes('can_search_more_than_once')) {
+    throw new Error('Already searched this turn');
+  }
   if (!preZone.searchable && !preSurvivor.skills.includes('search_anywhere')) {
     throw new Error('Can only search inside buildings');
   }
@@ -771,11 +868,12 @@ function handleSearch(state: GameState, intent: ActionRequest): GameState {
       newState.seed = deckResult.newSeed;
   }
 
-  // Flashlight: draw 2 cards instead of 1 (works from backpack)
+  // Flashlight or Search: +1 Card skill: draw 2 cards instead of 1
   const hasFlashlight = newState.survivors[intent.survivorId!].inventory.some(
     (c: EquipmentCard) => c.name === 'Flashlight'
   );
-  const cardsToDraw = hasFlashlight ? 2 : 1;
+  const hasSearchPlus1 = newState.survivors[intent.survivorId!].skills.includes('search_plus_1');
+  const cardsToDraw = (hasFlashlight || hasSearchPlus1) ? 2 : 1;
 
   const drawnCards: EquipmentCard[] = [];
   for (let i = 0; i < cardsToDraw; i++) {
@@ -799,6 +897,24 @@ function handleSearch(state: GameState, intent: ActionRequest): GameState {
     } else {
       equipCards.push(card);
     }
+  }
+
+  // Matching Set: if drawn card is a Dual weapon, auto-take second copy from deck
+  if (survivor.skills.includes('matching_set')) {
+    const matchingCards: EquipmentCard[] = [];
+    for (const card of equipCards) {
+      if (card.stats?.dualWield) {
+        // Find another copy by name in equipment deck
+        const deckIndex = newState.equipmentDeck.findIndex(
+          (d: EquipmentCard) => d.name === card.name
+        );
+        if (deckIndex >= 0) {
+          const [matchCard] = newState.equipmentDeck.splice(deckIndex, 1);
+          matchingCards.push(matchCard);
+        }
+      }
+    }
+    equipCards.push(...matchingCards);
   }
 
   // Give non-trap cards to survivor
@@ -891,6 +1007,12 @@ function handleEndTurn(state: GameState, intent: ActionRequest): GameState {
   const newState = JSON.parse(JSON.stringify(state));
   const survivor = newState.survivors[intent.survivorId!];
   survivor.actionsRemaining = 0;
+  survivor.freeMovesRemaining = 0;
+  survivor.freeSearchesRemaining = 0;
+  survivor.freeCombatsRemaining = 0;
+  survivor.freeMeleeRemaining = 0;
+  survivor.freeRangedRemaining = 0;
+  survivor.hitAndRunFreeMove = false;
   return newState;
 }
 
@@ -926,12 +1048,26 @@ function handleAttack(state: GameState, intent: ActionRequest): GameState {
      if (distance === Infinity) throw new Error('Target zone not reachable');
   }
   
-  if (distance < stats.range[0] || distance > stats.range[1]) {
+  // Point-Blank: ranged weapons can fire at Range 0, bypassing min range
+  const hasPointBlank = survivor.skills.includes('point_blank');
+  let effectiveMinRange = stats.range[0];
+  let effectiveMaxRange = stats.range[1];
+  if (hasPointBlank && distance === 0) {
+    effectiveMinRange = 0;
+  }
+
+  // +1 Max Range skill
+  if (survivor.skills.includes('plus_1_max_range')) {
+    effectiveMaxRange += 1;
+  }
+
+  if (distance < effectiveMinRange || distance > effectiveMaxRange) {
       throw new Error(`Target out of range (${distance}). Weapon range: ${stats.range.join('-')}`);
   }
 
   // Melee attacks can only target the attacker's own zone
   const isMelee = stats.range[1] === 0;
+  (newState as any)._attackIsMelee = isMelee;
   if (isMelee && targetZoneId !== currentZoneId) {
       throw new Error('Melee attacks can only target your own zone');
   }
@@ -973,12 +1109,15 @@ function handleAttack(state: GameState, intent: ActionRequest): GameState {
           s => s.position.zoneId === targetZoneId && s.wounds < s.maxHealth
       );
       for (const target of survivorsInZone) {
+          // "Is That All You've Got?" — defer wounds to player choice
+          if (target.skills?.includes('is_that_all_youve_got') && target.inventory.length > 0) {
+              target.pendingWounds = (target.pendingWounds || 0) + 1;
+              continue;
+          }
           target.wounds += 1;
           if (target.wounds >= target.maxHealth) {
               handleSurvivorDeath(newState, target.id);
           } else if (target.inventory.length > 0) {
-              // TODO: Wound equipment discard — should be player's choice via UI modal.
-              // Auto-discard fallback: prefer backpack items, then any item.
               const backpackIdx = target.inventory.findIndex((c: EquipmentCard) => !c.inHand);
               const discardIdx = backpackIdx >= 0 ? backpackIdx : target.inventory.length - 1;
               const [discarded] = target.inventory.splice(discardIdx, 1);
@@ -1023,15 +1162,24 @@ function handleAttack(state: GameState, intent: ActionRequest): GameState {
   // +1 Die skills (matching weapon type only)
   if (isMelee && survivor.skills.includes('plus_1_die_melee')) bonusDice++;
   if (isRangedWeapon && survivor.skills.includes('plus_1_die_ranged')) bonusDice++;
+  if (survivor.skills.includes('plus_1_die_combat')) bonusDice++;
 
   // +1 Damage skills
   if (isMelee && survivor.skills.includes('plus_1_damage_melee')) bonusDamage++;
   if (isRangedWeapon && survivor.skills.includes('plus_1_damage_ranged')) bonusDamage++;
+  if (survivor.skills.includes('plus_1_damage_combat')) bonusDamage++;
 
-  // Dual-wield check: both hands hold same weapon with dualWield flag
-  // Per rules, dual wielding = two separate attacks, not bonus dice
+  // Super Strength: melee weapons deal Damage 3
+  if (isMelee && survivor.skills.includes('super_strength')) {
+    bonusDamage = Math.max(bonusDamage, 3 - stats.damage); // Override to at least 3
+  }
+
+  // Dual-wield check: both hands hold weapons capable of dual-wielding
   let isDualWielding = false;
-  if (stats.dualWield) {
+  const canDual = stats.dualWield ||
+    survivor.skills.includes('ambidextrous') ||
+    (isMelee && survivor.skills.includes('swordmaster'));
+  if (canDual) {
     const hand1 = survivor.inventory.find((c: EquipmentCard) => c.slot === 'HAND_1' && c.type === 'WEAPON');
     const hand2 = survivor.inventory.find((c: EquipmentCard) => c.slot === 'HAND_2' && c.type === 'WEAPON');
     if (hand1 && hand2 && hand1.name === hand2.name) {
@@ -1051,13 +1199,21 @@ function handleAttack(state: GameState, intent: ActionRequest): GameState {
 
   const hasLucky = survivor.skills.includes('lucky');
 
-  const diceCount = stats.dice + bonusDice;
+  // Barbarian: substitute weapon dice with zombie count in zone (melee only)
+  let baseDice = stats.dice;
+  if (isMelee && survivor.skills.includes('barbarian') && intent.payload?.useBarbarian) {
+    const zombieCountInZone = Object.values(newState.zombies).filter((z: any) => z.position.zoneId === targetZoneId).length;
+    baseDice = zombieCountInZone;
+  }
+
+  const diceCount = baseDice + bonusDice;
   // Minimum accuracy is always 2+ (per rulebook §4, §10)
   const threshold = Math.max(2, stats.accuracy);
 
   // Perform attack(s) — dual wield = two separate attacks
   const attackCount = isDualWielding ? 2 : 1;
   let allRolls: number[] = [];
+  let luckyOriginalRolls: number[] = [];
   let totalHits = 0;
   let totalMisses = 0;
 
@@ -1067,6 +1223,9 @@ function handleAttack(state: GameState, intent: ActionRequest): GameState {
       : rollDice(newState.seed, diceCount, threshold);
     newState.seed = result.newSeed;
     allRolls = allRolls.concat(result.rolls);
+    if (result.luckyOriginal) {
+      luckyOriginalRolls = luckyOriginalRolls.concat(result.luckyOriginal);
+    }
     totalHits += result.hits;
     totalMisses += (diceCount - result.hits);
   }
@@ -1078,7 +1237,11 @@ function handleAttack(state: GameState, intent: ActionRequest): GameState {
       dice: allRolls,
       hits: totalHits,
       timestamp: Date.now(),
-      description: `Attacked with ${weapon.name}${isDualWielding ? ' (Dual Wield)' : ''} (Need ${threshold}+)`
+      description: `Attacked with ${weapon.name}${isDualWielding ? ' (Dual Wield)' : ''} (Need ${threshold}+)`,
+      luckyRerollOriginal: luckyOriginalRolls.length > 0 ? luckyOriginalRolls : undefined,
+      bonusDice: bonusDice > 0 ? bonusDice : undefined,
+      bonusDamage: bonusDamage > 0 ? bonusDamage : undefined,
+      damagePerHit: stats.damage + bonusDamage,
   };
 
   // Targeting priority: lowest toughness first (Walker → Runner → Brute → Abomination)
@@ -1093,6 +1256,39 @@ function handleAttack(state: GameState, intent: ActionRequest): GameState {
 
   zombiesInZone.sort((a, b) => priorityMap[a.type] - priorityMap[b.type]);
 
+  // Sniper: free target choice — player specifies target order
+  const hasSniper = survivor.skills.includes('sniper');
+  if (hasSniper && intent.payload?.targetZombieIds?.length > 0) {
+    const targetIds: string[] = intent.payload!.targetZombieIds;
+    const orderedZombies: Zombie[] = [];
+    for (const tid of targetIds) {
+      const z = zombiesInZone.find(zz => zz.id === tid);
+      if (z) orderedZombies.push(z);
+    }
+    // Append any remaining zombies not in the list
+    for (const z of zombiesInZone) {
+      if (!orderedZombies.includes(z)) orderedZombies.push(z);
+    }
+    zombiesInZone = orderedZombies;
+  }
+
+  // Point-Blank at Range 0: no friendly fire + free target choice
+  const isPointBlankShot = hasPointBlank && distance === 0;
+
+  // Point-Blank at Range 0: free target choice (same as sniper)
+  if (isPointBlankShot && intent.payload?.targetZombieIds?.length > 0) {
+    const targetIds: string[] = intent.payload!.targetZombieIds;
+    const orderedZombies: Zombie[] = [];
+    for (const tid of targetIds) {
+      const z = zombiesInZone.find(zz => zz.id === tid);
+      if (z) orderedZombies.push(z);
+    }
+    for (const z of zombiesInZone) {
+      if (!orderedZombies.includes(z)) orderedZombies.push(z);
+    }
+    zombiesInZone = orderedZombies;
+  }
+
   let hits = totalHits;
   let xpGained = 0;
 
@@ -1100,24 +1296,39 @@ function handleAttack(state: GameState, intent: ActionRequest): GameState {
   // Hits go to zombies. Only applies to ranged attacks with friendlies present.
   // Melee (range 0) is never subject to friendly fire.
   const isRanged = stats.range[1] >= 1;
-  const hasSniper = survivor.skills.includes('sniper');
-  const friendliesInZone = isRanged && newState.config.friendlyFire
+  const friendliesInZone = isRanged && newState.config.friendlyFire && !isPointBlankShot
       ? (Object.values(newState.survivors) as Survivor[]).filter(
             s => s.position.zoneId === targetZoneId && s.id !== survivor.id && s.wounds < s.maxHealth
         )
       : [];
 
+  // Low Profile: survivors with this skill can't be hit by FF (Molotov still applies — handled separately above)
+  const ffAfterLowProfile = friendliesInZone.filter(f => !f.skills?.includes('low_profile'));
+
+  // Steady Hand: shooter can protect specific survivors from FF
+  const hasSteadyHand = survivor.skills.includes('steady_hand');
+  const protectedIds: string[] = intent.payload?.protectedSurvivorIds || [];
+  const ffTargets = hasSteadyHand
+    ? ffAfterLowProfile.filter(f => !protectedIds.includes(f.id))
+    : ffAfterLowProfile;
+
   // Misses wound friendly survivors (each miss = weapon damage in wounds)
-  if (friendliesInZone.length > 0 && !hasSniper) {
+  if (ffTargets.length > 0 && !hasSniper) {
       let missesToApply = totalMisses;
       const effectiveDamageFF = stats.damage + bonusDamage;
-      for (const friendly of friendliesInZone) {
+      for (const friendly of ffTargets) {
           if (missesToApply <= 0) break;
-          // Tough skill: absorb first wound per turn
-          if (friendly.skills?.includes('tough') && !friendly.toughUsedThisTurn) {
-              friendly.toughUsedThisTurn = true;
+          // Tough skill: absorb first FF wound independently from zombie attacks
+          if (friendly.skills?.includes('tough') && !friendly.toughUsedFriendlyFire) {
+              friendly.toughUsedFriendlyFire = true;
               missesToApply--;
               continue; // Wound absorbed
+          }
+          // "Is That All You've Got?" — defer wounds to player choice
+          if (friendly.skills?.includes('is_that_all_youve_got') && friendly.inventory.length > 0) {
+              friendly.pendingWounds = (friendly.pendingWounds || 0) + effectiveDamageFF;
+              missesToApply--;
+              continue;
           }
           friendly.wounds += effectiveDamageFF;
           missesToApply--;
@@ -1125,8 +1336,6 @@ function handleAttack(state: GameState, intent: ActionRequest): GameState {
           if (friendly.wounds >= friendly.maxHealth) {
               handleSurvivorDeath(newState, friendly.id);
           } else if (friendly.inventory.length > 0) {
-              // TODO: Wound equipment discard — should be player's choice via UI modal.
-              // Auto-discard fallback: prefer backpack items, then any item.
               const backpackIdx = friendly.inventory.findIndex((c: EquipmentCard) => !c.inHand);
               const discardIdx = backpackIdx >= 0 ? backpackIdx : friendly.inventory.length - 1;
               const [discarded] = friendly.inventory.splice(discardIdx, 1);
@@ -1136,6 +1345,8 @@ function handleAttack(state: GameState, intent: ActionRequest): GameState {
   }
 
   // Hits go to zombies in targeting priority order
+  let reaperUsed = false; // Reaper: max 1 bonus kill per Action
+  let firstKilledType: ZombieType | null = null;
   for (const zombie of zombiesInZone) {
       if (hits <= 0) break;
 
@@ -1159,13 +1370,66 @@ function handleAttack(state: GameState, intent: ActionRequest): GameState {
                   }
               });
           }
+
+          // Track first kill type for Reaper
+          if (!firstKilledType) firstKilledType = zombie.type;
       } else {
           hits--;
       }
   }
 
+  // Reaper: auto-kill 1 additional identical zombie (once per Action, not per hit)
+  const hasReaperCombat = survivor.skills.includes('reaper_combat');
+  const hasReaperMelee = survivor.skills.includes('reaper_melee');
+  if (!reaperUsed && firstKilledType && (hasReaperCombat || (hasReaperMelee && isMelee))) {
+    const sameTypeZombie = Object.values(newState.zombies).find(
+      (z: any) => z.position.zoneId === targetZoneId && z.type === firstKilledType
+    ) as Zombie | undefined;
+    if (sameTypeZombie) {
+      delete newState.zombies[sameTypeZombie.id];
+      xpGained += getZombieXP(sameTypeZombie.type);
+      reaperUsed = true;
+      if (newState.objectives) {
+        newState.objectives.forEach((obj: Objective) => {
+          if (obj.type === ObjectiveType.KillZombie && !obj.completed) {
+            if (!obj.targetId || obj.targetId === sameTypeZombie.type) {
+              obj.amountCurrent += 1;
+              if (obj.amountCurrent >= obj.amountRequired) obj.completed = true;
+            }
+          }
+        });
+      }
+    }
+  }
+
   if (xpGained > 0) {
     newState.survivors[intent.survivorId!] = XPManager.addXP(newState.survivors[intent.survivorId!], xpGained);
+  }
+
+  // Hold Your Nose: draw equipment card when last zombie in zone eliminated
+  if (survivor.skills.includes('hold_your_nose')) {
+    const remainingZombies = Object.values(newState.zombies).filter(
+      (z: any) => z.position.zoneId === targetZoneId
+    );
+    if (remainingZombies.length === 0 && zombiesInZone.length > 0) {
+      // Zone was cleared — draw 1 equipment card (not a search action)
+      const drawResult = DeckService.drawCard(newState);
+      if (drawResult.card) {
+        if (!EquipmentManager.isHandFull(survivor) && EquipmentManager.hasSpace(survivor)) {
+          newState.survivors[intent.survivorId!] = EquipmentManager.addCard(survivor, drawResult.card);
+        } else {
+          survivor.drawnCard = drawResult.card;
+        }
+      }
+      newState.equipmentDeck = drawResult.newState.equipmentDeck;
+      newState.equipmentDiscard = drawResult.newState.equipmentDiscard;
+      newState.seed = drawResult.newState.seed;
+    }
+  }
+
+  // Hit & Run: if any kill occurred, grant 1 free move
+  if (survivor.skills.includes('hit_and_run') && xpGained > 0) {
+    survivor.freeMovesRemaining = (survivor.freeMovesRemaining || 0) + 1;
   }
 
   if (stats.noise) {
@@ -1173,6 +1437,239 @@ function handleAttack(state: GameState, intent: ActionRequest): GameState {
       zone.noiseTokens = (zone.noiseTokens || 0) + 1;
       newState.noiseTokens = (newState.noiseTokens || 0) + 1;
   }
+
+  return newState;
+}
+
+// --- Skill Action Handlers ---
+
+function handleCharge(state: GameState, intent: ActionRequest): GameState {
+  const newState = JSON.parse(JSON.stringify(state));
+  const survivor = newState.survivors[intent.survivorId!];
+
+  if (!survivor.skills.includes('charge')) {
+    throw new Error('Survivor does not have Charge skill');
+  }
+  if (survivor.chargeUsedThisTurn) {
+    throw new Error('Charge already used this turn');
+  }
+
+  const path: string[] = intent.payload?.path;
+  if (!path || !Array.isArray(path) || path.length < 1 || path.length > 2) {
+    throw new Error('Charge requires a path of 1-2 zones');
+  }
+
+  // Validate path
+  let currentZoneId = survivor.position.zoneId;
+  for (const nextZoneId of path) {
+    const currentZone = newState.zones[currentZoneId];
+    if (!currentZone) throw new Error(`Zone ${currentZoneId} invalid`);
+    if (!getConnection(currentZone, nextZoneId)) {
+      throw new Error(`Zones not connected: ${currentZoneId} -> ${nextZoneId}`);
+    }
+    if (isDoorBlocked(currentZone, nextZoneId)) {
+      throw new Error('Door is closed along charge path');
+    }
+    currentZoneId = nextZoneId;
+  }
+
+  // Destination must have at least 1 zombie
+  const destZombies = Object.values(newState.zombies).filter(
+    (z: any) => z.position.zoneId === currentZoneId
+  );
+  if (destZombies.length === 0) {
+    throw new Error('Charge destination must contain at least 1 zombie');
+  }
+
+  survivor.position.zoneId = currentZoneId;
+  survivor.chargeUsedThisTurn = true;
+
+  return newState;
+}
+
+function handleBornLeader(state: GameState, intent: ActionRequest): GameState {
+  const newState = JSON.parse(JSON.stringify(state));
+  const survivor = newState.survivors[intent.survivorId!];
+  const targetSurvivorId = intent.payload?.targetSurvivorId;
+
+  if (!survivor.skills.includes('born_leader')) {
+    throw new Error('Survivor does not have Born Leader skill');
+  }
+  if (survivor.bornLeaderUsedThisTurn) {
+    throw new Error('Born Leader already used this turn');
+  }
+  if (!targetSurvivorId) throw new Error('Target survivor required');
+
+  const target = newState.survivors[targetSurvivorId];
+  if (!target) throw new Error('Target survivor not found');
+  if (target.wounds >= target.maxHealth) throw new Error('Target survivor is dead');
+  if (target.position.zoneId !== survivor.position.zoneId) {
+    throw new Error('Target must be in the same zone');
+  }
+  if (target.id === survivor.id) {
+    throw new Error('Cannot give action to yourself');
+  }
+
+  target.actionsRemaining += 1;
+  survivor.bornLeaderUsedThisTurn = true;
+
+  return newState;
+}
+
+function handleBloodlustMelee(state: GameState, intent: ActionRequest): GameState {
+  const newState = JSON.parse(JSON.stringify(state));
+  const survivor = newState.survivors[intent.survivorId!];
+
+  if (!survivor.skills.includes('bloodlust_melee')) {
+    throw new Error('Survivor does not have Bloodlust: Melee skill');
+  }
+  if (survivor.bloodlustUsedThisTurn) {
+    throw new Error('Bloodlust: Melee already used this turn');
+  }
+
+  const path: string[] = intent.payload?.path;
+  if (!path || !Array.isArray(path) || path.length < 1 || path.length > 2) {
+    throw new Error('Bloodlust requires a path of 1-2 zones');
+  }
+
+  // Validate path
+  let currentZoneId = survivor.position.zoneId;
+  for (const nextZoneId of path) {
+    const currentZone = newState.zones[currentZoneId];
+    if (!currentZone) throw new Error(`Zone ${currentZoneId} invalid`);
+    if (!getConnection(currentZone, nextZoneId)) {
+      throw new Error(`Zones not connected: ${currentZoneId} -> ${nextZoneId}`);
+    }
+    if (isDoorBlocked(currentZone, nextZoneId)) {
+      throw new Error('Door is closed along path');
+    }
+    currentZoneId = nextZoneId;
+  }
+
+  // Destination must have at least 1 zombie
+  const destZombies = Object.values(newState.zombies).filter(
+    (z: any) => z.position.zoneId === currentZoneId
+  );
+  if (destZombies.length === 0) {
+    throw new Error('Bloodlust destination must contain at least 1 zombie');
+  }
+
+  survivor.position.zoneId = currentZoneId;
+  survivor.bloodlustUsedThisTurn = true;
+  // Grant 1 free melee action
+  survivor.freeMeleeRemaining = (survivor.freeMeleeRemaining || 0) + 1;
+
+  return newState;
+}
+
+function handleLifesaver(state: GameState, intent: ActionRequest): GameState {
+  const newState = JSON.parse(JSON.stringify(state));
+  const survivor = newState.survivors[intent.survivorId!];
+
+  if (!survivor.skills.includes('lifesaver')) {
+    throw new Error('Survivor does not have Lifesaver skill');
+  }
+  if (survivor.lifesaverUsedThisTurn) {
+    throw new Error('Lifesaver already used this turn');
+  }
+
+  const targetZoneId = intent.payload?.targetZoneId;
+  if (!targetZoneId) throw new Error('Target zone required');
+
+  // Must be at Range 1 with LOS and clear path
+  const distance = getDistance(state, survivor.position.zoneId, targetZoneId);
+  if (distance !== 1) throw new Error('Target zone must be at Range 1');
+  if (!hasLineOfSight(newState, survivor.position.zoneId, targetZoneId)) {
+    throw new Error('No line of sight to target zone');
+  }
+
+  // Check path is not blocked by door
+  const currentZone = newState.zones[survivor.position.zoneId];
+  if (isDoorBlocked(currentZone, targetZoneId)) {
+    throw new Error('Path blocked by closed door');
+  }
+
+  // Target zone must have at least 1 zombie AND at least 1 survivor
+  const zombiesInTarget = Object.values(newState.zombies).filter(
+    (z: any) => z.position.zoneId === targetZoneId
+  );
+  if (zombiesInTarget.length === 0) {
+    throw new Error('Target zone must contain at least 1 zombie');
+  }
+
+  const survivorIds: string[] = intent.payload?.targetSurvivorIds || [];
+  if (survivorIds.length === 0) throw new Error('Must select at least 1 survivor to rescue');
+
+  const survivorsInTarget = (Object.values(newState.survivors) as Survivor[]).filter(
+    s => s.position.zoneId === targetZoneId && s.id !== survivor.id && s.wounds < s.maxHealth
+  );
+  if (survivorsInTarget.length === 0) {
+    throw new Error('Target zone must contain at least 1 other survivor');
+  }
+
+  // Move selected survivors to Lifesaver's zone (not a Move Action — no penalties)
+  for (const sid of survivorIds) {
+    const target = newState.survivors[sid];
+    if (!target) continue;
+    if (target.position.zoneId !== targetZoneId) continue;
+    if (target.wounds >= target.maxHealth) continue;
+    target.position.zoneId = survivor.position.zoneId;
+  }
+
+  survivor.lifesaverUsedThisTurn = true;
+
+  return newState;
+}
+
+// --- Wound Resolution Handler ---
+
+function handleResolveWounds(state: GameState, intent: ActionRequest): GameState {
+  const newState = JSON.parse(JSON.stringify(state));
+  const survivor = newState.survivors[intent.survivorId!];
+
+  if (!survivor.pendingWounds || survivor.pendingWounds <= 0) {
+    throw new Error('No pending wounds to resolve');
+  }
+
+  const discardIds: string[] = intent.payload?.discardCardIds || [];
+
+  // Validate all cards are in inventory
+  for (const cardId of discardIds) {
+    if (!survivor.inventory.some((c: EquipmentCard) => c.id === cardId)) {
+      throw new Error(`Card ${cardId} not in inventory`);
+    }
+  }
+
+  // Cannot discard more cards than pending wounds
+  const negated = Math.min(discardIds.length, survivor.pendingWounds);
+
+  // Discard chosen cards
+  for (let i = 0; i < negated; i++) {
+    const idx = survivor.inventory.findIndex((c: EquipmentCard) => c.id === discardIds[i]);
+    if (idx >= 0) {
+      const [discarded] = survivor.inventory.splice(idx, 1);
+      newState.equipmentDiscard.push(discarded);
+    }
+  }
+
+  // Apply remaining wounds
+  const remainingWounds = survivor.pendingWounds - negated;
+  for (let w = 0; w < remainingWounds; w++) {
+    survivor.wounds += 1;
+    if (survivor.wounds >= survivor.maxHealth) {
+      handleSurvivorDeath(newState, survivor.id);
+      break;
+    }
+    // Standard wound equipment discard for each wound taken
+    if (survivor.inventory.length > 0) {
+      const backpackIdx = survivor.inventory.findIndex((c: EquipmentCard) => !c.inHand);
+      const discardIdx = backpackIdx >= 0 ? backpackIdx : survivor.inventory.length - 1;
+      const [discarded] = survivor.inventory.splice(discardIdx, 1);
+      newState.equipmentDiscard.push(discarded);
+    }
+  }
+
+  survivor.pendingWounds = 0;
 
   return newState;
 }

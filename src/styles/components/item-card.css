@@ -17,16 +17,13 @@
               border-color var(--duration-fast) var(--ease-in-out);
 }
 
-.item-card[draggable="true"] {
-  cursor: grab;
+.item-card--tappable {
+  cursor: pointer;
 }
 
-.item-card[draggable="true"]:active {
-  cursor: grabbing;
-}
-
-.item-card.dragging {
-  opacity: 0.4;
+.item-card--tappable:active {
+  transform: scale(0.97);
+  transition: transform 0.1s ease;
 }
 
 /* ---------- Icon ---------- */
@@ -112,13 +109,17 @@
 /* ---------- Variant: ghost (incoming item) ---------- */
 
 .item-card--ghost {
-  background: var(--accent-muted);
-  border: 1px dashed var(--accent);
+  background: var(--success-muted);
+  border: 1px dashed var(--success);
 }
 
 .item-card--ghost .item-card__icon {
-  background: var(--accent);
+  background: var(--success);
   color: var(--text-inverse);
+}
+
+.item-card--ghost .item-card__badge {
+  background: var(--success);
 }
 
 /* ---------- Variant: featured (prominent new item) ---------- */
@@ -181,4 +182,11 @@
 .item-card--weapon[disabled] {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* ---------- Boosted stats (skill bonuses in green) ---------- */
+
+.item-card__boosted {
+  color: var(--success);
+  font-weight: var(--font-bold);
 }

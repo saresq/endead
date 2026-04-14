@@ -4,6 +4,8 @@ export interface DiceResult {
   hits: number;
   rolls: number[];
   newSeed: string;
+  /** When Lucky reroll was used, the original (discarded) dice rolls */
+  luckyOriginal?: number[];
 }
 
 // LCG parameters (MINSTD)
@@ -93,7 +95,7 @@ export function rollDiceWithReroll(currentSeed: string, count: number, threshold
   const second = rollDice(first.newSeed, count, threshold);
   // Keep the result with more hits; always use the final seed
   if (second.hits >= first.hits) {
-    return second;
+    return { ...second, luckyOriginal: first.rolls };
   }
-  return { hits: first.hits, rolls: first.rolls, newSeed: second.newSeed };
+  return { hits: first.hits, rolls: first.rolls, newSeed: second.newSeed, luckyOriginal: second.rolls };
 }
