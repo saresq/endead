@@ -102,6 +102,18 @@ export const SKILL_DEFINITIONS: Record<string, SkillDefinition> = {
     description: 'The Survivor does not spend extra Actions to move out of a Zone with Zombies.',
     type: 'PASSIVE'
   },
+  'plus_1_max_range': {
+    id: 'plus_1_max_range',
+    name: '+1 Max Range',
+    description: 'The Survivor gets +1 to the maximum Range of all Ranged weapons.',
+    type: 'STAT_MOD'
+  },
+  'steady_hand': {
+    id: 'steady_hand',
+    name: 'Steady Hand',
+    description: 'When resolving Friendly Fire, the Survivor may choose which survivors are safe.',
+    type: 'PASSIVE'
+  },
   'search_anywhere': {
     id: 'search_anywhere',
     name: 'Search: Anywhere',

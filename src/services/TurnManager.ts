@@ -75,7 +75,7 @@ export function validateTurn(state: GameState, request: ActionRequest): ActionEr
       const hasFreeAction = (
         (request.type === 'MOVE' && survivor.freeMovesRemaining > 0) ||
         (request.type === 'SEARCH' && survivor.freeSearchesRemaining > 0) ||
-        (request.type === 'ATTACK' && survivor.freeCombatsRemaining > 0)
+        (request.type === 'ATTACK' && (survivor.freeCombatsRemaining > 0 || survivor.freeMeleeRemaining > 0 || survivor.freeRangedRemaining > 0))
       );
 
       if (survivor.actionsRemaining <= 0 && !isTradeException && !isPickupException && !hasFreeAction) {
@@ -134,7 +134,14 @@ export function checkEndTurn(state: GameState): GameState {
   );
 
   // Check if ANY living survivor has actions remaining
-  const hasActionsLeft = playerSurvivors.some((s) => s.actionsRemaining > 0);
+  const hasActionsLeft = playerSurvivors.some((s) =>
+    s.actionsRemaining > 0 ||
+    s.freeMovesRemaining > 0 ||
+    s.freeSearchesRemaining > 0 ||
+    s.freeCombatsRemaining > 0 ||
+    s.freeMeleeRemaining > 0 ||
+    s.freeRangedRemaining > 0
+  );
 
   if (!hasActionsLeft) {
     // Player is done, move to next player (wrap around)

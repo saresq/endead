@@ -29,6 +29,9 @@ export enum ActionType {
   USE_ITEM = 'USE_ITEM',
   NOTHING = 'NOTHING',
   END_TURN = 'END_TURN',
+  CHARGE = 'CHARGE',
+  BORN_LEADER = 'BORN_LEADER',
+  BLOODLUST_MELEE = 'BLOODLUST_MELEE',
   KICK_PLAYER = 'KICK_PLAYER',
 }
 
@@ -127,6 +130,9 @@ export interface ActionPayloadMap {
   [ActionType.USE_ITEM]: UseItemPayload;
   [ActionType.NOTHING]: undefined;
   [ActionType.END_TURN]: undefined;
+  [ActionType.CHARGE]: undefined;
+  [ActionType.BORN_LEADER]: undefined;
+  [ActionType.BLOODLUST_MELEE]: undefined;
   [ActionType.KICK_PLAYER]: KickPlayerPayload;
 }
 

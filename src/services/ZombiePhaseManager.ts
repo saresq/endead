@@ -391,6 +391,24 @@ export class ZombiePhaseManager {
       newState.zombies[zombieId].activated = false;
     }
 
+    // 2b. Medic Healing — free during End Phase
+    for (const survivorId in newState.survivors) {
+      const survivor = newState.survivors[survivorId];
+      if (survivor.wounds >= survivor.maxHealth) continue; // Dead
+      if (!survivor.skills.includes('medic')) continue;
+
+      // Heal self and all survivors in same zone
+      const zoneId = survivor.position.zoneId;
+      for (const otherId in newState.survivors) {
+        const other = newState.survivors[otherId];
+        if (other.wounds >= other.maxHealth) continue; // Dead
+        if (other.position.zoneId !== zoneId) continue;
+        if (other.wounds > 0) {
+          other.wounds = Math.max(0, other.wounds - 1);
+        }
+      }
+    }
+
     // 3. Reset Survivors
     for (const survivorId in newState.survivors) {
       const survivor = newState.survivors[survivorId];
@@ -402,6 +420,14 @@ export class ZombiePhaseManager {
       survivor.freeSearchesRemaining = survivor.skills.includes('plus_1_free_search') ? 1 : 0;
       survivor.freeCombatsRemaining = survivor.skills.includes('plus_1_free_combat') ? 1 : 0;
       survivor.toughUsedThisTurn = false;
+      // Free melee/ranged actions
+      survivor.freeMeleeRemaining = survivor.skills.includes('plus_1_free_melee') ? 1 : 0;
+      survivor.freeRangedRemaining = survivor.skills.includes('plus_1_free_ranged') ? 1 : 0;
+      // Once-per-turn skills
+      survivor.chargeUsedThisTurn = false;
+      survivor.bornLeaderUsedThisTurn = false;
+      survivor.bloodlustUsedThisTurn = false;
+      survivor.hitAndRunFreeMove = false;
     }
 
     // 4. Rotate First Player (index-based, no array mutation)

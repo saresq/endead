@@ -121,6 +121,16 @@ export interface Survivor extends Entity {
 
   // Tough skill tracking
   toughUsedThisTurn: boolean;
+
+  // Free melee/ranged action tracking (reset each turn in endRound)
+  freeMeleeRemaining: number;
+  freeRangedRemaining: number;
+
+  // Once-per-turn skill tracking (additional)
+  chargeUsedThisTurn: boolean;
+  bornLeaderUsedThisTurn: boolean;
+  bloodlustUsedThisTurn: boolean;
+  hitAndRunFreeMove: boolean;
 }
 
 export interface Zombie extends Entity {
