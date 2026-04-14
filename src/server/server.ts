@@ -13,7 +13,7 @@ import { repairExternalEdges } from '../services/TileDefinitionService';
 import { TileDefinition } from '../types/TileDefinition';
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 const server = createServer(app);
 const PORT = process.env.PORT || 8080;
 const wss = new WebSocketServer({ server });
@@ -116,6 +116,31 @@ app.post('/api/tile-definitions', (req, res) => {
   } catch (error) {
     console.error('Error saving tile definition:', error);
     res.status(500).json({ error: 'Failed to save tile definition' });
+  }
+});
+
+app.post('/api/tile-definitions/import', (req, res) => {
+  try {
+    const defs = req.body;
+    if (!Array.isArray(defs)) {
+      res.status(400).json({ error: 'Expected an array of tile definitions' });
+      return;
+    }
+    let imported = 0;
+    for (const def of defs) {
+      if (!def?.id || !def?.cells || !def?.edges) continue;
+      repairExternalEdges(def);
+      persistenceService.saveTileDefinition(def.id, def);
+      imported++;
+    }
+    // Reload into in-memory registry
+    const dbDefs = persistenceService.loadAllTileDefinitions() as TileDefinition[];
+    for (const d of dbDefs) repairExternalEdges(d);
+    registerTileDefinitions(dbDefs);
+    res.json({ success: true, imported });
+  } catch (error) {
+    console.error('Error importing tile definitions:', error);
+    res.status(500).json({ error: 'Failed to import tile definitions' });
   }
 });
 

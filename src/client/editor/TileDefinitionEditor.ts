@@ -231,12 +231,15 @@ function regenerateExternalEdges(def: TileDefinition): void {
       const cellType = cell?.type ?? 'street';
       const existing = existingEdges.get(`${side}:${i}`);
 
+      const preserveDoorway = existing?.doorway ?? false;
       newEdges.push({
         side,
         localIndex: i,
-        type: cellType === 'street' ? 'street' : 'wall',
+        // A doorway implies passage — keep type 'street' so rendering
+        // doesn't mask the doorway flag behind a wall check.
+        type: preserveDoorway ? 'street' : (cellType === 'street' ? 'street' : 'wall'),
         crosswalk: false, // External edges never carry crosswalk
-        doorway: existing?.doorway,
+        doorway: preserveDoorway,
       });
     }
   }
@@ -308,6 +311,38 @@ export class TileDefinitionEditor {
         this.spaceHeld = true;
         this.container.classList.add('tde--panning');
       }
+      if (!this.state) return;
+      const key = e.key;
+
+      // Mode hotkeys: 1=Cells, 2=Edges, 3=Doors
+      if (key === '1') { this.state.mode = 'cells'; this.updateAll(); return; }
+      if (key === '2') { this.state.mode = 'edges'; this.updateAll(); return; }
+      if (key === '3') { this.state.mode = 'doors'; this.updateAll(); return; }
+
+      // Cells-mode sub-hotkeys
+      if (this.state.mode === 'cells') {
+        if (key === 's' || key === 'S') {
+          const used = getUsedZones(this.state.def);
+          for (let i = 1; i <= 9; i++) {
+            if (!used.includes(`S${i}`)) { this.state.activeZoneId = `S${i}`; this.updateHeader(); return; }
+          }
+        }
+        if (key === 'r' || key === 'R') {
+          const used = getUsedZones(this.state.def);
+          for (let i = 0; i < 26; i++) {
+            const letter = String.fromCharCode(65 + i);
+            if (!used.includes(letter)) { this.state.activeZoneId = letter; this.updateAll(); return; }
+          }
+        }
+      }
+
+      // Edges-mode sub-hotkeys
+      if (this.state.mode === 'edges') {
+        if (key === 'o' || key === 'O') { this.state.activeEdgeBrush = 'open'; this.updateHeader(); return; }
+        if (key === 'd' || key === 'D') { this.state.activeEdgeBrush = 'doorway'; this.updateHeader(); return; }
+        if (key === 'c' || key === 'C') { this.state.activeEdgeBrush = 'crosswalk'; this.updateHeader(); return; }
+        if (key === 'w' || key === 'W') { this.state.activeEdgeBrush = 'wall'; this.updateHeader(); return; }
+      }
     };
     this.keyupHandler = (e: KeyboardEvent) => {
       if (e.code === 'Space') {
@@ -368,6 +403,23 @@ export class TileDefinitionEditor {
       if ((e.target as HTMLElement).closest('[data-action="tde-back"]')) this.options.onBack();
     });
     listHeader.appendChild(backBtn);
+
+    const ioRow = document.createElement('div');
+    ioRow.className = 'tde-list-header__io';
+    ioRow.style.display = 'flex';
+    ioRow.style.gap = '4px';
+    ioRow.style.padding = '0 8px 8px';
+    ioRow.innerHTML = `
+      ${renderButton({ label: 'Export All', variant: 'secondary', size: 'sm', dataAction: 'tde-export', icon: 'Download' })}
+      ${renderButton({ label: 'Import', variant: 'secondary', size: 'sm', dataAction: 'tde-import', icon: 'Upload' })}
+    `;
+    ioRow.addEventListener('click', (e) => {
+      const action = (e.target as HTMLElement).closest('[data-action]')?.getAttribute('data-action');
+      if (action === 'tde-export') this.exportAll();
+      if (action === 'tde-import') this.triggerImport();
+    });
+    listHeader.appendChild(ioRow);
+
     listPanel.appendChild(listHeader);
 
     this.tileListEl = document.createElement('div');
@@ -786,7 +838,7 @@ export class TileDefinitionEditor {
           div.style.background = 'rgba(180, 80, 20, 0.9)';
           div.title = `Door (${info.roomA}↔${info.roomB})`;
         } else if (type === 'wall') {
-          div.style.background = subtle ? 'rgba(139, 69, 19, 0.4)' : 'rgba(139, 69, 19, 0.8)';
+          div.style.background = subtle ? 'rgba(60, 60, 60, 0.4)' : 'rgba(60, 60, 60, 0.85)';
           div.title = `Wall (${info.roomA}↔${info.roomB})`;
         } else if (type === 'crosswalk') {
           div.style.background = subtle ? 'rgba(0, 100, 200, 0.35)' : 'rgba(0, 100, 200, 0.7)';
@@ -856,7 +908,7 @@ export class TileDefinitionEditor {
 
         // Style based on edge type
         if (!edgeDef || edgeDef.type === 'wall') {
-          div.style.background = interactive ? 'rgba(139, 69, 19, 0.8)' : 'rgba(139, 69, 19, 0.4)';
+          div.style.background = interactive ? 'rgba(60, 60, 60, 0.85)' : 'rgba(60, 60, 60, 0.4)';
           div.title = `Wall (${side} ${i})`;
         } else if (edgeDef.crosswalk) {
           div.style.background = interactive ? 'rgba(0, 100, 200, 0.7)' : 'rgba(0, 100, 200, 0.35)';
@@ -883,26 +935,55 @@ export class TileDefinitionEditor {
     }
   }
 
+  /** Find all contiguous edge indices along `side` that share the same perimeter zone as `idx`. */
+  private getPerimeterZoneRun(side: EdgeSide, idx: number): number[] {
+    const def = this.state!.def;
+    const perimeterCell = (i: number) => {
+      if (side === 'north') return getCellDef(def, i, 0);
+      if (side === 'south') return getCellDef(def, i, GRID - 1);
+      if (side === 'west') return getCellDef(def, 0, i);
+      return getCellDef(def, GRID - 1, i); // east
+    };
+
+    const targetZone = perimeterCell(idx)?.roomId ?? '__empty';
+    const indices: number[] = [idx];
+
+    // Expand left/up
+    for (let i = idx - 1; i >= 0; i--) {
+      if ((perimeterCell(i)?.roomId ?? '__empty') === targetZone) indices.push(i);
+      else break;
+    }
+    // Expand right/down
+    for (let i = idx + 1; i < GRID; i++) {
+      if ((perimeterCell(i)?.roomId ?? '__empty') === targetZone) indices.push(i);
+      else break;
+    }
+    return indices;
+  }
+
   private applyExternalEdgeBrush(side: EdgeSide, idx: number) {
     if (!this.state) return;
-    const edge = getEdgeDef(this.state.def, side, idx);
-    if (!edge) return;
     const brush = this.state.activeEdgeBrush;
-    // External edges only allow: open, wall, doorway.
-    // Crosswalk on external edges is not allowed — crosswalks are internal only.
-    if (brush === 'open' || brush === 'crosswalk') {
-      // Treat crosswalk brush as open for external edges
-      edge.type = 'street';
-      edge.crosswalk = false;
-      edge.doorway = false;
-    } else if (brush === 'doorway') {
-      edge.type = 'street';
-      edge.crosswalk = false;
-      edge.doorway = true;
-    } else {
-      edge.type = 'wall';
-      edge.crosswalk = false;
-      edge.doorway = false;
+    const indices = this.getPerimeterZoneRun(side, idx);
+
+    for (const i of indices) {
+      const edge = getEdgeDef(this.state.def, side, i);
+      if (!edge) continue;
+      // External edges only allow: open, wall, doorway.
+      // Crosswalk on external edges is not allowed — crosswalks are internal only.
+      if (brush === 'open' || brush === 'crosswalk') {
+        edge.type = 'street';
+        edge.crosswalk = false;
+        edge.doorway = false;
+      } else if (brush === 'doorway') {
+        edge.type = 'street';
+        edge.crosswalk = false;
+        edge.doorway = true;
+      } else {
+        edge.type = 'wall';
+        edge.crosswalk = false;
+        edge.doorway = false;
+      }
     }
   }
 
@@ -1169,21 +1250,6 @@ export class TileDefinitionEditor {
       label.textContent = zid;
       item.appendChild(label);
 
-      // Rename input
-      const nameInput = document.createElement('input');
-      nameInput.className = 'tde-room-name-input';
-      nameInput.type = 'text';
-      nameInput.placeholder = zid;
-      nameInput.value = roomProps[zid]?.displayName ?? '';
-      nameInput.title = `Rename ${zid}`;
-      nameInput.addEventListener('change', () => {
-        if (!this.state!.def.roomProperties) this.state!.def.roomProperties = {};
-        if (!this.state!.def.roomProperties[zid]) this.state!.def.roomProperties[zid] = { isDark: false };
-        const trimmed = nameInput.value.trim();
-        this.state!.def.roomProperties[zid].displayName = trimmed || undefined;
-      });
-      item.appendChild(nameInput);
-
       if (!isStreet) {
         const darkBtn = document.createElement('button');
         darkBtn.className = `tde-dark-toggle${isDark ? ' tde-dark-toggle--dark' : ''}`;
@@ -1250,5 +1316,59 @@ export class TileDefinitionEditor {
         });
       },
     });
+  }
+
+  private async exportAll() {
+    try {
+      const res = await fetch('/api/tile-definitions');
+      if (!res.ok) { notificationManager.show({ variant: 'danger', message: 'Failed to fetch definitions' }); return; }
+      const defs = await res.json();
+      const blob = new Blob([JSON.stringify(defs, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'tile-definitions.json';
+      a.click();
+      URL.revokeObjectURL(url);
+      notificationManager.show({ variant: 'success', message: `Exported ${defs.length} tile definitions` });
+    } catch (e) {
+      console.error('Export error:', e);
+      notificationManager.show({ variant: 'danger', message: 'Error exporting tile definitions' });
+    }
+  }
+
+  private triggerImport() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.addEventListener('change', async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const defs = JSON.parse(text);
+        if (!Array.isArray(defs)) { notificationManager.show({ variant: 'danger', message: 'JSON must be an array of tile definitions' }); return; }
+        const res = await fetch('/api/tile-definitions/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: text,
+        });
+        if (!res.ok) { notificationManager.show({ variant: 'danger', message: 'Server rejected import' }); return; }
+        const result = await res.json();
+        // Reload client-side registry
+        const freshRes = await fetch('/api/tile-definitions');
+        if (freshRes.ok) {
+          const freshDefs = await freshRes.json();
+          registerTileDefinitions(freshDefs);
+        }
+        notificationManager.show({ variant: 'success', message: `Imported ${result.imported} tile definitions` });
+        // Re-select current tile to refresh
+        if (this.state) this.selectTile(this.state.tileId);
+      } catch (e) {
+        console.error('Import error:', e);
+        notificationManager.show({ variant: 'danger', message: 'Error importing — check JSON format' });
+      }
+    });
+    input.click();
   }
 }

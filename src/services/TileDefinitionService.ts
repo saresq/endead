@@ -183,12 +183,14 @@ export function repairExternalEdges(def: TileDefinition): void {
       const cellType = cell?.type ?? 'street';
       const existing = existingEdges.get(`${side}:${i}`);
 
+      const preserveDoorway = existing?.doorway ?? false;
       newEdges.push({
         side,
         localIndex: i,
-        type: cellType === 'street' ? 'street' : 'wall',
+        // A doorway implies passage — keep type 'street' so it isn't masked as wall
+        type: preserveDoorway ? 'street' : (cellType === 'street' ? 'street' : 'wall'),
         crosswalk: false, // External edges never carry crosswalk
-        doorway: existing?.doorway,
+        doorway: preserveDoorway,
       });
     }
   }
