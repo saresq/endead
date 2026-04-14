@@ -86,6 +86,7 @@ const handlers: Partial<Record<ActionType, ActionHandler>> = {
   [ActionType.BLOODLUST_MELEE]: handleBloodlustMelee,
   [ActionType.LIFESAVER]: handleLifesaver,
   [ActionType.RESOLVE_WOUNDS]: handleResolveWounds,
+  [ActionType.DISTRIBUTE_ZOMBIE_WOUNDS]: handleDistributeZombieWounds,
 };
 
 /**
@@ -158,9 +159,10 @@ export function processAction(state: GameState, intent: ActionRequest): ActionRe
     intent.type === ActionType.UPDATE_NICKNAME ||
     intent.type === ActionType.SELECT_CHARACTER ||
     intent.type === ActionType.START_GAME ||
-    intent.type === ActionType.END_GAME
+    intent.type === ActionType.END_GAME ||
+    intent.type === ActionType.DISTRIBUTE_ZOMBIE_WOUNDS
   ) {
-      // Allow through
+      // Allow through (lobby actions + cooperative wound distribution)
   } else {
       // 1. Validate Turn Ownership
       let turnError: ActionError | null = validateTurn(state, intent);
@@ -238,6 +240,9 @@ export function processAction(state: GameState, intent: ActionRequest): ActionRe
     } else if (intent.type === ActionType.RESOLVE_WOUNDS) {
         // No AP cost — resolving pending wounds from ITAYG skill
         newState = checkEndTurn(newState);
+    } else if (intent.type === ActionType.DISTRIBUTE_ZOMBIE_WOUNDS) {
+        // No AP cost — distributing zombie wounds among survivors
+        newState = checkEndTurn(newState);
     }
 
     // 5. Check for Zombie Phase Transition
@@ -254,17 +259,38 @@ export function processAction(state: GameState, intent: ActionRequest): ActionRe
         }
     }
 
-    // 6. Log History
+    // 6. Log History — merge lastAction feedback into history entry for rich display
     if (intent.type !== ActionType.SELECT_CHARACTER && intent.type !== ActionType.UPDATE_NICKNAME) {
-        newState.history = [
-          ...(newState.history || []),
-          {
+        const historyEntry: any = {
             playerId: intent.playerId,
             survivorId: intent.survivorId || 'system',
             actionType: intent.type,
             timestamp: Date.now(),
             payload: intent.payload,
-          }
+            turn: newState.turn,
+        };
+
+        // Capture rich combat/action feedback from lastAction
+        if (newState.lastAction) {
+            historyEntry.description = newState.lastAction.description;
+            historyEntry.dice = newState.lastAction.dice;
+            historyEntry.hits = newState.lastAction.hits;
+            historyEntry.damagePerHit = newState.lastAction.damagePerHit;
+            historyEntry.bonusDice = newState.lastAction.bonusDice;
+            historyEntry.bonusDamage = newState.lastAction.bonusDamage;
+            historyEntry.luckyRerollOriginal = newState.lastAction.luckyRerollOriginal;
+            historyEntry.usedFreeAction = newState.lastAction.usedFreeAction;
+            historyEntry.freeActionType = newState.lastAction.freeActionType;
+        }
+
+        // Capture spawn context for zombie phase entries
+        if (newState.spawnContext?.cards?.length) {
+            historyEntry.spawnContext = newState.spawnContext;
+        }
+
+        newState.history = [
+          ...(newState.history || []),
+          historyEntry,
         ];
     }
 
@@ -632,8 +658,17 @@ function handleMove(state: GameState, intent: ActionRequest): GameState {
     survivor.hitAndRunFreeMove = false;
   }
 
+  const fromZoneId = state.survivors[intent.survivorId!].position.zoneId;
   survivor.position.zoneId = currentZoneId;
   survivor.hasMoved = true;
+
+  newState.lastAction = {
+    type: ActionType.MOVE,
+    playerId: intent.playerId,
+    survivorId: intent.survivorId,
+    timestamp: Date.now(),
+    description: `Moved from ${fromZoneId} to ${currentZoneId}`,
+  };
 
   return newState;
 }
@@ -814,6 +849,15 @@ function handleOpenDoor(state: GameState, intent: ActionRequest): GameState {
     }
   }
 
+  const spawned = behindDoor && behindDoor.isBuilding && behindDoor.isDark;
+  newState.lastAction = {
+    type: ActionType.OPEN_DOOR,
+    playerId: intent.playerId,
+    survivorId: intent.survivorId,
+    timestamp: Date.now(),
+    description: `Opened door to ${targetZoneId}${spawned ? ' — zombies spawned!' : ''}`,
+  };
+
   return newState;
 }
 
@@ -935,6 +979,18 @@ function handleSearch(state: GameState, intent: ActionRequest): GameState {
   }
 
   newState.survivors[intent.survivorId!].hasSearched = true;
+
+  const foundNames = equipCards.map(c => c.name).join(', ');
+  const trapCount = drawnCards.length - equipCards.length;
+  const trapNote = trapCount > 0 ? ` (${trapCount} Aaahh!!)` : '';
+  newState.lastAction = {
+    type: ActionType.SEARCH,
+    playerId: intent.playerId,
+    survivorId: intent.survivorId,
+    timestamp: Date.now(),
+    description: foundNames ? `Found: ${foundNames}${trapNote}` : `Aaahh!! — zombie spawned!`,
+  };
+
   return newState;
 }
 
@@ -1670,6 +1726,89 @@ function handleResolveWounds(state: GameState, intent: ActionRequest): GameState
   }
 
   survivor.pendingWounds = 0;
+
+  return newState;
+}
+
+// --- Zombie Wound Distribution Handler ---
+
+function handleDistributeZombieWounds(state: GameState, intent: ActionRequest): GameState {
+  const newState = JSON.parse(JSON.stringify(state));
+  const zoneId: string = intent.payload?.zoneId;
+  const assignments: Record<string, number> = intent.payload?.assignments;
+
+  if (!zoneId || !assignments) throw new Error('Missing zoneId or assignments');
+
+  const pending = newState.pendingZombieWounds as GameState['pendingZombieWounds'];
+  if (!pending || pending.length === 0) throw new Error('No pending zombie wounds');
+
+  const entryIndex = pending.findIndex((p: any) => p.zoneId === zoneId);
+  if (entryIndex < 0) throw new Error(`No pending wounds for zone ${zoneId}`);
+
+  const entry = pending[entryIndex];
+
+  // Validate: total assigned must equal totalWounds
+  const totalAssigned = Object.values(assignments).reduce((sum, n) => sum + n, 0);
+  if (totalAssigned !== entry.totalWounds) {
+    throw new Error(`Must assign exactly ${entry.totalWounds} wounds (got ${totalAssigned})`);
+  }
+
+  // Validate: all survivor IDs must be valid and in the zone
+  for (const survivorId of Object.keys(assignments)) {
+    if (!entry.survivorIds.includes(survivorId)) {
+      throw new Error(`Survivor ${survivorId} is not in the affected zone`);
+    }
+    if (assignments[survivorId] < 0) {
+      throw new Error('Cannot assign negative wounds');
+    }
+  }
+
+  // Apply wounds to each survivor
+  for (const [survivorId, woundCount] of Object.entries(assignments)) {
+    for (let i = 0; i < woundCount; i++) {
+      const survivor = newState.survivors[survivorId];
+      if (!survivor || survivor.wounds >= survivor.maxHealth) continue;
+
+      // Tough skill: ignore first wound per zombie Attack Step
+      if (survivor.skills?.includes('tough') && !survivor.toughUsedZombieAttack) {
+        survivor.toughUsedZombieAttack = true;
+        continue;
+      }
+
+      // Armor check
+      const armorIndex = survivor.inventory.findIndex(
+        (c: EquipmentCard) => c.type === 'ARMOR' && c.inHand && c.armorValue && c.armorValue > 0
+      );
+      if (armorIndex >= 0) {
+        const armor = survivor.inventory.splice(armorIndex, 1)[0];
+        newState.equipmentDiscard.push(armor);
+        continue;
+      }
+
+      // "Is That All You've Got?" — defer to equipment discard choice
+      if (survivor.skills?.includes('is_that_all_youve_got') && survivor.inventory.length > 0) {
+        survivor.pendingWounds = (survivor.pendingWounds || 0) + 1;
+        continue;
+      }
+
+      survivor.wounds += 1;
+
+      if (survivor.wounds >= survivor.maxHealth) {
+        handleSurvivorDeath(newState, survivor.id);
+      } else if (survivor.inventory.length > 0) {
+        const backpackIdx = survivor.inventory.findIndex((c: EquipmentCard) => !c.inHand);
+        const discardIdx = backpackIdx >= 0 ? backpackIdx : survivor.inventory.length - 1;
+        const [discarded] = survivor.inventory.splice(discardIdx, 1);
+        newState.equipmentDiscard.push(discarded);
+      }
+    }
+  }
+
+  // Remove the resolved entry
+  pending.splice(entryIndex, 1);
+  if (pending.length === 0) {
+    delete newState.pendingZombieWounds;
+  }
 
   return newState;
 }

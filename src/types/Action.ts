@@ -34,6 +34,7 @@ export enum ActionType {
   BLOODLUST_MELEE = 'BLOODLUST_MELEE',
   LIFESAVER = 'LIFESAVER',
   RESOLVE_WOUNDS = 'RESOLVE_WOUNDS',
+  DISTRIBUTE_ZOMBIE_WOUNDS = 'DISTRIBUTE_ZOMBIE_WOUNDS',
   KICK_PLAYER = 'KICK_PLAYER',
 }
 
@@ -108,6 +109,11 @@ export interface ResolveWoundsPayload {
   discardCardIds: string[];  // Equipment card IDs to discard (each negates 1 wound)
 }
 
+export interface DistributeZombieWoundsPayload {
+  zoneId: string;
+  assignments: Record<string, number>;  // survivorId -> number of wounds assigned
+}
+
 export interface KickPlayerPayload {
   targetPlayerId: string;
 }
@@ -141,6 +147,7 @@ export interface ActionPayloadMap {
   [ActionType.BLOODLUST_MELEE]: undefined;
   [ActionType.LIFESAVER]: undefined;
   [ActionType.RESOLVE_WOUNDS]: ResolveWoundsPayload;
+  [ActionType.DISTRIBUTE_ZOMBIE_WOUNDS]: DistributeZombieWoundsPayload;
   [ActionType.KICK_PLAYER]: KickPlayerPayload;
 }
 

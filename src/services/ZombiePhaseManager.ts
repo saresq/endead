@@ -53,6 +53,10 @@ export class ZombiePhaseManager {
    * Pass 1: ALL zombie attacks (including Runners' first action)
    * Pass 2: ALL zombie moves (zombies that couldn't attack)
    * Pass 3: Runner second actions (after ALL zombies complete first action)
+   *
+   * Per rules: players choose how to distribute wounds among survivors in a zone.
+   * When only 1 survivor is present, wounds apply directly. When multiple survivors
+   * share a zone, wounds are deferred to pendingZombieWounds for player resolution.
    */
   private static processActivations(state: GameState): GameState {
     // We are mutating 'state' (which is already a copy from executeZombiePhase)
@@ -66,14 +70,16 @@ export class ZombiePhaseManager {
     // Track which zombies attacked (they don't move in pass 2)
     const attackedSet = new Set<string>();
 
-    // Pass 1: ALL attacks
+    // Pass 1: ALL attacks — accumulate per zone
+    const pass1Attacks: Record<string, number> = {};
     for (const zombie of getActiveZombies()) {
       const action: ZombieAction = ZombieAI.getAction(state, zombie);
-      if (action.type === 'ATTACK' && action.targetId) {
-        this.applyZombieAttack(state, action.targetId);
+      if (action.type === 'ATTACK') {
+        pass1Attacks[zombie.position.zoneId] = (pass1Attacks[zombie.position.zoneId] || 0) + 1;
         attackedSet.add(zombie.id);
       }
     }
+    this.distributeZoneWounds(state, pass1Attacks);
 
     // Pass 2: ALL moves (only zombies that didn't attack)
     for (const zombie of getActiveZombies()) {
@@ -94,12 +100,13 @@ export class ZombiePhaseManager {
     }
 
     // Pass 3: Runner second actions (after ALL first actions complete)
+    const pass3Attacks: Record<string, number> = {};
     for (const zombie of getActiveZombies()) {
       if (zombie.type !== ZombieType.Runner) continue;
 
       const action: ZombieAction = ZombieAI.getAction(state, zombie);
-      if (action.type === 'ATTACK' && action.targetId) {
-        this.applyZombieAttack(state, action.targetId);
+      if (action.type === 'ATTACK') {
+        pass3Attacks[zombie.position.zoneId] = (pass3Attacks[zombie.position.zoneId] || 0) + 1;
       } else if (action.type === 'MOVE' && action.toZoneId) {
         zombie.position.zoneId = action.toZoneId;
         state.zombies[zombie.id] = zombie;
@@ -107,8 +114,48 @@ export class ZombiePhaseManager {
         this.breakDoor(state, zombie.position.zoneId, action.toZoneId);
       }
     }
+    this.distributeZoneWounds(state, pass3Attacks);
 
     return state;
+  }
+
+  /**
+   * Distributes accumulated zombie attacks per zone.
+   * Single-survivor zones: apply wounds directly.
+   * Multi-survivor zones: defer to player via pendingZombieWounds.
+   */
+  private static distributeZoneWounds(state: GameState, zoneAttacks: Record<string, number>): void {
+    for (const [zoneId, attackCount] of Object.entries(zoneAttacks)) {
+      if (attackCount <= 0) continue;
+
+      const survivorsInZone = Object.values(state.survivors).filter(
+        (s: Survivor) => s.position.zoneId === zoneId && s.wounds < s.maxHealth
+      );
+
+      if (survivorsInZone.length === 0) continue;
+
+      if (survivorsInZone.length === 1) {
+        // Only one survivor — apply all wounds directly (no player choice needed)
+        for (let i = 0; i < attackCount; i++) {
+          this.applyZombieAttack(state, survivorsInZone[0].id);
+        }
+      } else {
+        // Multiple survivors — players choose how to distribute wounds
+        if (!state.pendingZombieWounds) {
+          state.pendingZombieWounds = [];
+        }
+        const existing = state.pendingZombieWounds.find(p => p.zoneId === zoneId);
+        if (existing) {
+          existing.totalWounds += attackCount;
+        } else {
+          state.pendingZombieWounds.push({
+            zoneId,
+            totalWounds: attackCount,
+            survivorIds: survivorsInZone.map(s => s.id),
+          });
+        }
+      }
+    }
   }
 
   /**
@@ -278,14 +325,16 @@ export class ZombiePhaseManager {
          // Extra activation also uses two-pass: attacks first, then moves
          const extraAttacked = new Set<string>();
 
-         // Pass 1: attacks
+         // Pass 1: attacks — accumulate per zone
+         const extraPass1: Record<string, number> = {};
          for (const zombie of getZombiesOfType()) {
            const action = ZombieAI.getAction(state, zombie);
-           if (action.type === 'ATTACK' && action.targetId) {
-             this.applyZombieAttack(state, action.targetId);
+           if (action.type === 'ATTACK') {
+             extraPass1[zombie.position.zoneId] = (extraPass1[zombie.position.zoneId] || 0) + 1;
              extraAttacked.add(zombie.id);
            }
          }
+         this.distributeZoneWounds(state, extraPass1);
 
          // Pass 2: moves (only zombies that didn't attack)
          for (const zombie of getZombiesOfType()) {
@@ -306,10 +355,11 @@ export class ZombiePhaseManager {
 
          // Runner second actions during extra activation
          if (targetType === ZombieType.Runner) {
+           const extraRunnerAttacks: Record<string, number> = {};
            for (const zombie of getZombiesOfType()) {
              const action = ZombieAI.getAction(state, zombie);
-             if (action.type === 'ATTACK' && action.targetId) {
-               this.applyZombieAttack(state, action.targetId);
+             if (action.type === 'ATTACK') {
+               extraRunnerAttacks[zombie.position.zoneId] = (extraRunnerAttacks[zombie.position.zoneId] || 0) + 1;
              } else if (action.type === 'MOVE' && action.toZoneId) {
                zombie.position.zoneId = action.toZoneId;
                state.zombies[zombie.id] = zombie;
@@ -317,6 +367,7 @@ export class ZombiePhaseManager {
                this.breakDoor(state, zombie.position.zoneId, action.toZoneId);
              }
            }
+           this.distributeZoneWounds(state, extraRunnerAttacks);
          }
 
          return;

@@ -647,10 +647,83 @@ button.hud-pill--clickable:focus-visible {
   color: var(--text-secondary);
   font-weight: var(--font-semibold);
   flex-shrink: 0;
+  min-width: 5ch;
+}
+
+.history-entry__content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
 }
 
 .history-entry__action {
   color: var(--text-primary);
+}
+
+.history-entry__free {
+  display: inline-block;
+  padding: 0 4px;
+  margin-right: 2px;
+  font-size: var(--text-xs);
+  font-weight: var(--font-bold);
+  color: var(--accent);
+  background: rgba(var(--accent-rgb, 99, 102, 241), 0.15);
+  border-radius: var(--radius-sm);
+}
+
+.history-entry__dice {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+
+.history-entry__hits {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  margin-left: 4px;
+}
+
+.history-entry__boosts {
+  font-size: var(--text-xs);
+  color: var(--accent);
+}
+
+.history-entry__lucky {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.history-entry__detail,
+.history-entry__spawn {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.history-die {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: var(--font-bold);
+  background: var(--surface-3);
+  color: var(--text-secondary);
+}
+
+.history-die--hit {
+  background: var(--success);
+  color: var(--surface-1);
+}
+
+.history-die--discarded {
+  background: transparent;
+  color: var(--text-tertiary);
+  text-decoration: line-through;
 }
 
 /* ---------- Skill Badges ---------- */
@@ -858,4 +931,51 @@ button.hud-pill--clickable:focus-visible {
 .shortcut-desc {
   font-size: var(--text-sm);
   color: var(--text-secondary);
+}
+
+/* ---------- Wound Distribution Modal ---------- */
+
+.wound-dist__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.wound-dist__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-2);
+  border-radius: var(--radius-md);
+}
+
+.wound-dist__info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.wound-dist__name {
+  font-weight: var(--font-semibold);
+  font-size: var(--text-sm);
+}
+
+.wound-dist__hp {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.wound-dist__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.wound-dist__count {
+  font-size: var(--text-lg);
+  font-weight: var(--font-bold);
+  min-width: 2ch;
+  text-align: center;
 }

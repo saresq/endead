@@ -317,7 +317,20 @@ export interface GameState {
     survivorId: string;
     actionType: string;
     timestamp: number;
+    turn?: number;
     payload?: any;
+    // Rich action feedback (captured from lastAction)
+    description?: string;
+    dice?: number[];
+    hits?: number;
+    damagePerHit?: number;
+    bonusDice?: number;
+    bonusDamage?: number;
+    luckyRerollOriginal?: number[];
+    usedFreeAction?: boolean;
+    freeActionType?: string;
+    // Spawn context for END_TURN entries
+    spawnContext?: GameState['spawnContext'];
   }>;
 
   // UI / Feedback State
@@ -347,6 +360,13 @@ export interface GameState {
       }[];
       timestamp: number;
   };
+
+  // Pending zombie wound distributions (player must assign wounds among survivors)
+  pendingZombieWounds?: Array<{
+    zoneId: string;
+    totalWounds: number;
+    survivorIds: string[];
+  }>;
 
   // Monotonic counter for unique zombie IDs
   nextZombieId: number;

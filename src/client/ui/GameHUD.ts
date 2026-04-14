@@ -33,6 +33,8 @@ export class GameHUD {
   private historyModalId: string | null = null;
   private woundPickerModalId: string | null = null;
   private woundPickerSelected: Set<string> = new Set();
+  private woundDistModalId: string | null = null;
+  private woundDistAssignments: Record<string, number> = {};
   private dismissedFeedTimestamp: number | null = null;
   private boundDelegateHandler: (e: Event) => void;
 
@@ -230,10 +232,17 @@ export class GameHUD {
 
     this.syncTradeAndPickup(activeSurvivor);
 
+    // Auto-open wound distribution modal if there are pending zombie wounds (host only)
+    const isHost = this.state?.players[0] === this.localPlayerId;
+    if (isHost && this.state?.pendingZombieWounds && this.state.pendingZombieWounds.length > 0
+        && !this.woundDistModalId) {
+      this.openWoundDistribution(this.state.pendingZombieWounds[0]);
+    }
+
     // Auto-open wound picker if survivor has pending wounds
     if (activeSurvivor && activeSurvivor.pendingWounds && activeSurvivor.pendingWounds > 0
         && activeSurvivor.playerId === this.localPlayerId
-        && !this.woundPickerModalId) {
+        && !this.woundPickerModalId && !this.woundDistModalId) {
       this.openWoundPicker(activeSurvivor);
     }
   }
@@ -625,6 +634,115 @@ export class GameHUD {
     return renderButton({ label: `Take ${remaining} Wound${remaining !== 1 ? 's' : ''}`, variant: remaining > 0 ? 'destructive' : 'primary', dataAction: 'confirm-wounds' });
   }
 
+  // ─── Wound Distribution Modal ─────────────────────────────────
+
+  private openWoundDistribution(entry: { zoneId: string; totalWounds: number; survivorIds: string[] }): void {
+    if (this.woundDistModalId && modalManager.isOpen(this.woundDistModalId)) return;
+    if (!this.state) return;
+
+    // Initialize assignments: all wounds to first survivor by default
+    this.woundDistAssignments = {};
+    for (const sid of entry.survivorIds) {
+      this.woundDistAssignments[sid] = 0;
+    }
+    // Assign all to first survivor as starting point
+    this.woundDistAssignments[entry.survivorIds[0]] = entry.totalWounds;
+
+    this.woundDistModalId = modalManager.open({
+      title: 'Distribute Zombie Wounds',
+      size: 'md',
+      persistent: true,
+      renderBody: () => this.renderWoundDistBody(entry),
+      renderFooter: () => this.renderWoundDistFooter(entry),
+      onOpen: (el) => {
+        el.addEventListener('click', (e) => {
+          const btn = (e.target as HTMLElement).closest('[data-action]') as HTMLElement;
+          if (!btn) return;
+          const action = btn.dataset.action;
+          const sid = btn.dataset.survivorId;
+
+          if (action === 'wound-dist-plus' && sid) {
+            const total = Object.values(this.woundDistAssignments).reduce((s, n) => s + n, 0);
+            if (total < entry.totalWounds) {
+              this.woundDistAssignments[sid] = (this.woundDistAssignments[sid] || 0) + 1;
+              modalManager.updateBody(this.woundDistModalId!, this.renderWoundDistBody(entry));
+              modalManager.updateFooter(this.woundDistModalId!, this.renderWoundDistFooter(entry));
+            }
+          } else if (action === 'wound-dist-minus' && sid) {
+            if ((this.woundDistAssignments[sid] || 0) > 0) {
+              this.woundDistAssignments[sid]--;
+              modalManager.updateBody(this.woundDistModalId!, this.renderWoundDistBody(entry));
+              modalManager.updateFooter(this.woundDistModalId!, this.renderWoundDistFooter(entry));
+            }
+          } else if (action === 'confirm-wound-dist') {
+            const total = Object.values(this.woundDistAssignments).reduce((s, n) => s + n, 0);
+            if (total !== entry.totalWounds) return;
+
+            networkManager.sendAction({
+              playerId: this.localPlayerId,
+              type: ActionType.DISTRIBUTE_ZOMBIE_WOUNDS,
+              payload: { zoneId: entry.zoneId, assignments: { ...this.woundDistAssignments } },
+            });
+            modalManager.close(this.woundDistModalId!);
+            this.woundDistModalId = null;
+            this.woundDistAssignments = {};
+          }
+        });
+      },
+      onClose: () => {
+        this.woundDistModalId = null;
+        this.woundDistAssignments = {};
+      },
+    });
+  }
+
+  private renderWoundDistBody(entry: { zoneId: string; totalWounds: number; survivorIds: string[] }): string {
+    if (!this.state) return '';
+    const assigned = Object.values(this.woundDistAssignments).reduce((s, n) => s + n, 0);
+    const remaining = entry.totalWounds - assigned;
+
+    const desc = `<p class="text-secondary mb-3"><strong>${entry.totalWounds}</strong> zombie wound${entry.totalWounds > 1 ? 's' : ''} in ${formatZoneId(entry.zoneId)}. Distribute among survivors.</p>`;
+    const summary = `<div class="wound-picker__summary mb-3">
+      <span>Assigned: <strong>${assigned}</strong> / ${entry.totalWounds}</span>
+      <span>Remaining: <strong class="${remaining > 0 ? 'text-warning' : 'text-success'}">${remaining}</strong></span>
+    </div>`;
+
+    const rows = entry.survivorIds.map(sid => {
+      const survivor = this.state!.survivors[sid];
+      if (!survivor) return '';
+      const count = this.woundDistAssignments[sid] || 0;
+      const hp = survivor.maxHealth - survivor.wounds;
+      const identity = getPlayerIdentity(this.state!, survivor.playerId);
+      const avatar = renderAvatar(survivor.name, identity, 'sm');
+
+      return `<div class="wound-dist__row">
+        ${avatar}
+        <div class="wound-dist__info">
+          <span class="wound-dist__name">${survivor.name}</span>
+          <span class="wound-dist__hp">${hp} HP</span>
+        </div>
+        <div class="wound-dist__controls">
+          <button class="btn btn--sm btn--icon" data-action="wound-dist-minus" data-survivor-id="${sid}" ${count <= 0 ? 'disabled' : ''}>${icon('Minus', 'sm')}</button>
+          <span class="wound-dist__count ${count > 0 ? 'text-danger' : ''}">${count}</span>
+          <button class="btn btn--sm btn--icon" data-action="wound-dist-plus" data-survivor-id="${sid}" ${remaining <= 0 ? 'disabled' : ''}>${icon('Plus', 'sm')}</button>
+        </div>
+      </div>`;
+    }).join('');
+
+    return `${desc}${summary}<div class="wound-dist__list">${rows}</div>`;
+  }
+
+  private renderWoundDistFooter(entry: { zoneId: string; totalWounds: number; survivorIds: string[] }): string {
+    const assigned = Object.values(this.woundDistAssignments).reduce((s, n) => s + n, 0);
+    const isValid = assigned === entry.totalWounds;
+    return renderButton({
+      label: `Confirm Distribution`,
+      variant: isValid ? 'primary' : 'secondary',
+      dataAction: 'confirm-wound-dist',
+      disabled: !isValid,
+    });
+  }
+
   // ─── Born Leader Picker ───────────────────────────────────────
 
   private openBornLeaderPicker(survivor: Survivor): void {
@@ -808,27 +926,30 @@ export class GameHUD {
           return '<div class="text-center-muted">No actions yet.</div>';
         }
 
-        // Group entries by turn — we infer turn from END_TURN boundaries
-        // or simply group by consecutive entries. Since history doesn't store
-        // turn numbers, we walk backwards and detect END_TURN to mark boundaries.
         const entries = [...this.state.history];
 
-        // Build turn groups: walk forward, splitting on END_TURN
-        const turnGroups: { turn: number; actions: typeof entries }[] = [];
-        let currentTurn = 1;
-        let currentGroup: typeof entries = [];
+        // Filter out non-display actions
+        const displayEntries = entries.filter(e =>
+          e.actionType !== 'JOIN_LOBBY' && e.actionType !== 'START_GAME'
+          && e.actionType !== 'RESOLVE_SEARCH' && e.actionType !== 'CHOOSE_SKILL'
+          && e.actionType !== 'KICK_PLAYER'
+        );
 
-        for (const entry of entries) {
+        // Group entries by turn using stored turn number or END_TURN boundaries
+        const turnGroups: { turn: number; actions: typeof displayEntries }[] = [];
+        let currentTurn = 1;
+        let currentGroup: typeof displayEntries = [];
+
+        for (const entry of displayEntries) {
           currentGroup.push(entry);
           if (entry.actionType === 'END_TURN') {
-            turnGroups.push({ turn: currentTurn, actions: currentGroup });
+            turnGroups.push({ turn: entry.turn || currentTurn, actions: currentGroup });
             currentGroup = [];
-            currentTurn++;
+            currentTurn = (entry.turn || currentTurn) + 1;
           }
         }
-        // Remaining actions (current turn, not ended yet)
         if (currentGroup.length > 0) {
-          turnGroups.push({ turn: currentTurn, actions: currentGroup });
+          turnGroups.push({ turn: currentGroup[0]?.turn || currentTurn, actions: currentGroup });
         }
 
         // Render most recent first
@@ -841,32 +962,7 @@ export class GameHUD {
             : `<div class="history-turn-header">Turn ${group.turn}</div>`;
 
           const actionRows = group.actions.map(entry => {
-            const survivor = entry.survivorId && this.state
-              ? this.state.survivors[entry.survivorId]
-              : null;
-            const survivorName = survivor?.name ?? '—';
-            const actionLabel = formatActionType(entry.actionType);
-
-            // Format payload details
-            let detail = '';
-            if (entry.payload) {
-              if (entry.payload.targetZoneId) {
-                detail = ` → ${formatZoneId(entry.payload.targetZoneId)}`;
-              } else if (entry.payload.weaponId) {
-                detail = ` (weapon)`;
-              } else if (entry.payload.targetSurvivorId && this.state) {
-                const target = this.state.survivors[entry.payload.targetSurvivorId];
-                detail = target ? ` with ${target.name}` : '';
-              }
-            }
-
-            const time = new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-
-            return `<div class="history-entry">
-              <span class="history-entry__time">${time}</span>
-              <span class="history-entry__actor">${survivorName}</span>
-              <span class="history-entry__action">${actionLabel}${detail}</span>
-            </div>`;
+            return this.renderHistoryEntry(entry);
           }).join('');
 
           return `${header}${actionRows}`;
@@ -875,6 +971,143 @@ export class GameHUD {
       renderFooter: () => renderButton({ label: 'Close', variant: 'secondary', dataAction: 'modal-close' }),
       onClose: () => { this.historyModalId = null; },
     });
+  }
+
+  private renderHistoryEntry(entry: GameState['history'][0]): string {
+    const survivor = entry.survivorId && entry.survivorId !== 'system' && this.state
+      ? this.state.survivors[entry.survivorId]
+      : null;
+    const survivorName = survivor?.name ?? '';
+    const actionLabel = formatActionType(entry.actionType);
+
+    // Free action label
+    const freeLabel = entry.usedFreeAction
+      ? `<span class="history-entry__free">${entry.freeActionType || 'FREE'}</span> `
+      : '';
+
+    // Build detail string based on action type
+    let detail = '';
+    let subDetail = '';
+
+    switch (entry.actionType) {
+      case 'ATTACK': {
+        const targetZone = entry.payload?.targetZoneId
+          ? formatZoneId(entry.payload.targetZoneId)
+          : '';
+        detail = entry.description || (targetZone ? `→ ${targetZone}` : '');
+
+        // Dice details
+        if (entry.dice && entry.dice.length > 0) {
+          const diceStr = entry.dice.map(d =>
+            `<span class="history-die ${d >= 4 ? 'history-die--hit' : ''}">${d}</span>`
+          ).join('');
+          const hitsStr = entry.hits !== undefined ? `${entry.hits} hit${entry.hits !== 1 ? 's' : ''}` : '';
+          const dmgStr = entry.damagePerHit && entry.damagePerHit > 1 ? ` (${entry.damagePerHit} dmg each)` : '';
+          subDetail = `<div class="history-entry__dice">${diceStr} <span class="history-entry__hits">${hitsStr}${dmgStr}</span></div>`;
+        }
+
+        // Lucky reroll
+        if (entry.luckyRerollOriginal && entry.luckyRerollOriginal.length > 0) {
+          const origDice = entry.luckyRerollOriginal.map(d =>
+            `<span class="history-die history-die--discarded">${d}</span>`
+          ).join('');
+          subDetail = `<div class="history-entry__lucky">Lucky rerolled: ${origDice}</div>${subDetail}`;
+        }
+
+        // Boost info
+        const boosts: string[] = [];
+        if (entry.bonusDice && entry.bonusDice > 0) boosts.push(`+${entry.bonusDice} dice`);
+        if (entry.bonusDamage && entry.bonusDamage > 0) boosts.push(`+${entry.bonusDamage} dmg`);
+        if (boosts.length > 0) {
+          subDetail = `<div class="history-entry__boosts">${boosts.join(', ')}</div>${subDetail}`;
+        }
+        break;
+      }
+      case 'MOVE':
+      case 'SPRINT':
+      case 'CHARGE': {
+        if (entry.description) {
+          detail = entry.description;
+        } else if (entry.payload?.targetZoneId) {
+          detail = `→ ${formatZoneId(entry.payload.targetZoneId)}`;
+        } else if (entry.payload?.path) {
+          const path = entry.payload.path as string[];
+          detail = `→ ${path.map(formatZoneId).join(' → ')}`;
+        }
+        break;
+      }
+      case 'SEARCH': {
+        detail = entry.description || '';
+        break;
+      }
+      case 'OPEN_DOOR': {
+        if (entry.description) {
+          detail = entry.description;
+        } else if (entry.payload?.targetZoneId) {
+          detail = `→ ${formatZoneId(entry.payload.targetZoneId)}`;
+        }
+        break;
+      }
+      case 'TRADE_START': {
+        if (entry.payload?.targetSurvivorId && this.state) {
+          const target = this.state.survivors[entry.payload.targetSurvivorId];
+          detail = target ? `with ${target.name}` : '';
+        }
+        break;
+      }
+      case 'END_TURN': {
+        detail = '';
+        // Show zombie phase summary if spawn context available
+        if (entry.spawnContext?.cards?.length) {
+          const spawnSummary = entry.spawnContext.cards.map((c: any) => {
+            if (c.detail.extraActivation) return `Extra ${c.detail.extraActivation} activation`;
+            if (c.detail.zombies) {
+              const zombieList = Object.entries(c.detail.zombies)
+                .filter(([, n]) => n && (n as number) > 0)
+                .map(([type, n]) => `${n} ${type}`)
+                .join(', ');
+              return `${formatZoneId(c.zoneId)}: ${zombieList}`;
+            }
+            return '';
+          }).filter(Boolean);
+          if (spawnSummary.length > 0) {
+            subDetail = `<div class="history-entry__spawn">${spawnSummary.map(s => `<div>${s}</div>`).join('')}</div>`;
+          }
+        }
+        break;
+      }
+      case 'DISTRIBUTE_ZOMBIE_WOUNDS': {
+        if (entry.payload?.zoneId) {
+          const assignments = entry.payload.assignments as Record<string, number>;
+          const parts = Object.entries(assignments || {})
+            .filter(([, n]) => n > 0)
+            .map(([sid, n]) => {
+              const s = this.state?.survivors[sid];
+              return s ? `${s.name}: ${n}` : `${n}`;
+            });
+          detail = `${formatZoneId(entry.payload.zoneId)}`;
+          if (parts.length > 0) {
+            subDetail = `<div class="history-entry__detail">${parts.join(', ')}</div>`;
+          }
+        }
+        break;
+      }
+      default: {
+        if (entry.description) {
+          detail = entry.description;
+        } else if (entry.payload?.targetZoneId) {
+          detail = `→ ${formatZoneId(entry.payload.targetZoneId)}`;
+        }
+      }
+    }
+
+    return `<div class="history-entry">
+      <span class="history-entry__actor">${survivorName}</span>
+      <div class="history-entry__content">
+        <span class="history-entry__action">${freeLabel}${actionLabel}${detail ? ` ${detail}` : ''}</span>
+        ${subDetail}
+      </div>
+    </div>`;
   }
 
   // ─── Trade Logic ─────────────────────────────────────────────
