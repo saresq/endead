@@ -37,6 +37,12 @@ export class GameHUD {
   private woundDistAssignments: Record<string, number> = {};
   private dismissedFeedTimestamp: number | null = null;
   private boundDelegateHandler: (e: Event) => void;
+  // Stable shell elements — created once, updated per-section
+  private elTopBar: HTMLDivElement | null = null;
+  private elFeed: HTMLDivElement | null = null;
+  private elDashboard: HTMLDivElement | null = null;
+  private elFab: HTMLDivElement | null = null;
+  private shellBuilt = false;
 
   constructor(inputController: InputController, playerId: PlayerId) {
     this.inputController = inputController;
@@ -209,26 +215,48 @@ export class GameHUD {
 
   // ─── Rendering ───────────────────────────────────────────────
 
+  private buildShell(): void {
+    if (this.shellBuilt) return;
+    this.container.innerHTML = '';
+
+    this.elTopBar = document.createElement('div');
+    this.elTopBar.style.display = 'contents';
+
+    this.elFeed = document.createElement('div');
+    this.elFeed.style.display = 'contents';
+
+    this.elDashboard = document.createElement('div');
+    this.elDashboard.style.display = 'contents';
+
+    this.elFab = document.createElement('div');
+    this.elFab.style.display = 'contents';
+
+    this.container.append(this.elTopBar, this.elFeed, this.elDashboard, this.elFab);
+    this.shellBuilt = true;
+  }
+
   private render(): void {
     if (!this.state) {
       this.container.innerHTML = '';
+      this.shellBuilt = false;
       return;
     }
 
     if (this.state.gameResult) {
+      this.shellBuilt = false;
       this.renderGameOver();
       return;
     }
 
+    this.buildShell();
+
     const isMyTurn = this.state.players[this.state.activePlayerIndex] === this.localPlayerId;
     const activeSurvivor = this.selectedSurvivorId ? this.state.survivors[this.selectedSurvivorId] : null;
 
-    this.container.innerHTML = `
-      ${this.renderTopBar(isMyTurn)}
-      ${this.renderFeed()}
-      ${activeSurvivor ? this.renderBottomDashboard(activeSurvivor, isMyTurn) : ''}
-      ${activeSurvivor ? this.renderBackpackFab(activeSurvivor) : ''}
-    `;
+    this.elTopBar!.innerHTML = this.renderTopBar(isMyTurn);
+    this.elFeed!.innerHTML = this.renderFeed();
+    this.elDashboard!.innerHTML = activeSurvivor ? this.renderBottomDashboard(activeSurvivor, isMyTurn) : '';
+    this.elFab!.innerHTML = activeSurvivor ? this.renderBackpackFab(activeSurvivor) : '';
 
     this.syncTradeAndPickup(activeSurvivor);
 
@@ -701,7 +729,7 @@ export class GameHUD {
     const assigned = Object.values(this.woundDistAssignments).reduce((s, n) => s + n, 0);
     const remaining = entry.totalWounds - assigned;
 
-    const desc = `<p class="text-secondary mb-3"><strong>${entry.totalWounds}</strong> zombie wound${entry.totalWounds > 1 ? 's' : ''} in ${formatZoneId(entry.zoneId)}. Distribute among survivors.</p>`;
+    const desc = `<p class="text-secondary mb-3"><strong>${entry.totalWounds}</strong> zombie wound${entry.totalWounds > 1 ? 's' : ''} in ${formatZoneId(entry.zoneId, this.state!)}. Distribute among survivors.</p>`;
     const summary = `<div class="wound-picker__summary mb-3">
       <span>Assigned: <strong>${assigned}</strong> / ${entry.totalWounds}</span>
       <span>Remaining: <strong class="${remaining > 0 ? 'text-warning' : 'text-success'}">${remaining}</strong></span>
@@ -992,7 +1020,7 @@ export class GameHUD {
     switch (entry.actionType) {
       case 'ATTACK': {
         const targetZone = entry.payload?.targetZoneId
-          ? formatZoneId(entry.payload.targetZoneId)
+          ? formatZoneId(entry.payload.targetZoneId, this.state!)
           : '';
         detail = entry.description || (targetZone ? `→ ${targetZone}` : '');
 
@@ -1029,10 +1057,10 @@ export class GameHUD {
         if (entry.description) {
           detail = entry.description;
         } else if (entry.payload?.targetZoneId) {
-          detail = `→ ${formatZoneId(entry.payload.targetZoneId)}`;
+          detail = `→ ${formatZoneId(entry.payload.targetZoneId, this.state!)}`;
         } else if (entry.payload?.path) {
           const path = entry.payload.path as string[];
-          detail = `→ ${path.map(formatZoneId).join(' → ')}`;
+          detail = `→ ${path.map(id => formatZoneId(id, this.state!)).join(' → ')}`;
         }
         break;
       }
@@ -1044,7 +1072,7 @@ export class GameHUD {
         if (entry.description) {
           detail = entry.description;
         } else if (entry.payload?.targetZoneId) {
-          detail = `→ ${formatZoneId(entry.payload.targetZoneId)}`;
+          detail = `→ ${formatZoneId(entry.payload.targetZoneId, this.state!)}`;
         }
         break;
       }
@@ -1066,7 +1094,7 @@ export class GameHUD {
                 .filter(([, n]) => n && (n as number) > 0)
                 .map(([type, n]) => `${n} ${type}`)
                 .join(', ');
-              return `${formatZoneId(c.zoneId)}: ${zombieList}`;
+              return `${formatZoneId(c.zoneId, this.state!)}: ${zombieList}`;
             }
             return '';
           }).filter(Boolean);
@@ -1085,7 +1113,7 @@ export class GameHUD {
               const s = this.state?.survivors[sid];
               return s ? `${s.name}: ${n}` : `${n}`;
             });
-          detail = `${formatZoneId(entry.payload.zoneId)}`;
+          detail = `${formatZoneId(entry.payload.zoneId, this.state!)}`;
           if (parts.length > 0) {
             subDetail = `<div class="history-entry__detail">${parts.join(', ')}</div>`;
           }
@@ -1096,7 +1124,7 @@ export class GameHUD {
         if (entry.description) {
           detail = entry.description;
         } else if (entry.payload?.targetZoneId) {
-          detail = `→ ${formatZoneId(entry.payload.targetZoneId)}`;
+          detail = `→ ${formatZoneId(entry.payload.targetZoneId, this.state!)}`;
         }
       }
     }

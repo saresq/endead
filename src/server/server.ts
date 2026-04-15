@@ -11,6 +11,7 @@ import { persistenceService } from '../services/PersistenceService';
 import { TILE_DEFINITIONS, registerTileDefinitions } from '../config/TileDefinitions';
 import { repairExternalEdges } from '../services/TileDefinitionService';
 import { TileDefinition } from '../types/TileDefinition';
+import { generateDiff } from '../utils/StateDiff';
 
 const app = express();
 app.use(express.json({ limit: '50mb' }));
@@ -166,6 +167,7 @@ if (process.env.NODE_ENV === 'production') {
 interface RoomContext {
   id: string;
   gameState: GameState;
+  previousState: GameState | null;
   clients: Map<WebSocket, PlayerId>;
   connections: Map<PlayerId, WebSocket>;
   cleanupTimer: NodeJS.Timeout | null;
@@ -196,13 +198,14 @@ function generateRoomId(): string {
 }
 
 function createRoom(roomId: string): RoomContext {
-  const gameState = JSON.parse(JSON.stringify(initialGameState)) as GameState;
+  const gameState = structuredClone(initialGameState) as GameState;
   gameState.id = roomId;
   gameState.seed = `seed-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
 
   return {
     id: roomId,
     gameState,
+    previousState: null,
     clients: new Map(),
     connections: new Map(),
     cleanupTimer: null,
@@ -220,6 +223,7 @@ function ensureRoom(roomId: string): RoomContext | null {
     const room: RoomContext = {
       id: roomId,
       gameState: savedState,
+      previousState: null,
       clients: new Map(),
       connections: new Map(),
       cleanupTimer: null,
@@ -263,10 +267,19 @@ function sendError(ws: WebSocket, error: { code: string; message: string }) {
 }
 
 function broadcastRoomState(room: RoomContext): void {
-  const message = JSON.stringify({
-    type: 'STATE_UPDATE',
-    payload: room.gameState,
-  });
+  let message: string;
+
+  if (room.previousState) {
+    const patch = generateDiff(room.previousState, room.gameState);
+    const patchMsg = JSON.stringify({ type: 'STATE_PATCH', payload: patch });
+    const fullMsg = JSON.stringify({ type: 'STATE_UPDATE', payload: room.gameState });
+    // Send whichever is smaller
+    message = patchMsg.length < fullMsg.length ? patchMsg : fullMsg;
+  } else {
+    message = JSON.stringify({ type: 'STATE_UPDATE', payload: room.gameState });
+  }
+
+  room.previousState = structuredClone(room.gameState);
 
   room.clients.forEach((_playerId, ws) => {
     if (ws.readyState === WebSocket.OPEN) {
@@ -393,7 +406,7 @@ function handleJoin(ws: WebSocket, payload: { roomId: string; playerId: PlayerId
     room.connections.set(playerId, ws);
 
     if (!room.gameState.spectators.includes(playerId)) {
-      const newState = JSON.parse(JSON.stringify(room.gameState)) as GameState;
+      const newState = structuredClone(room.gameState) as GameState;
       newState.spectators.push(playerId);
       room.gameState = newState;
     }
@@ -456,7 +469,7 @@ function handleDisconnect(ws: WebSocket) {
     log(`Player ${playerId} disconnected from room ${roomId}.`);
 
     if (room.gameState.phase === GamePhase.Lobby) {
-      const newState = JSON.parse(JSON.stringify(room.gameState)) as GameState;
+      const newState = structuredClone(room.gameState) as GameState;
       newState.lobby.players = newState.lobby.players.filter((p: any) => p.id !== playerId);
       newState.history.push({
         playerId,
@@ -532,7 +545,7 @@ function handleAction(ws: WebSocket, request: ActionRequest) {
       return;
     }
     // Clone state before mutating
-    const newState = JSON.parse(JSON.stringify(room.gameState)) as GameState;
+    const newState = structuredClone(room.gameState) as GameState;
     newState.lobby.players = newState.lobby.players.filter((p: any) => p.id !== targetPlayerId);
     newState.history.push({
       playerId: session.playerId,
@@ -571,6 +584,10 @@ function handleAction(ws: WebSocket, request: ActionRequest) {
 
   const error = response.error || { code: 'UNKNOWN_ERROR', message: 'Action failed unexpectedly.' };
   sendError(ws, error);
+  // Resync client state after rejection to prevent drift
+  if (ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: 'STATE_UPDATE', payload: room.gameState }));
+  }
 }
 
 // Cleanup stale DB-persisted rooms on startup and every 30 minutes

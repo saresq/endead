@@ -2,7 +2,7 @@
 
 import * as PIXI from 'pixi.js';
 import { GameState, ZoneId, EntityId, Survivor, Zombie, ZombieType } from '../types/GameState';
-import { TILE_SIZE, TILE_CELLS_PER_SIDE, TILE_PIXEL_SIZE, ENTITY_RADIUS, ENTITY_SPACING } from '../config/Layout';
+import { TILE_SIZE, TILE_CELLS_PER_SIDE, TILE_PIXEL_SIZE, ENTITY_RADIUS, ENTITY_SPACING, MIN_ENTITY_RADIUS, GROUP_BADGE_RADIUS } from '../config/Layout';
 import { tileService } from '../services/TileService';
 import { TileInstance } from '../types/Map';
 import { getPlayerColorNumeric } from './config/PlayerIdentities';
@@ -18,6 +18,9 @@ export interface RenderOptions {
   activeSurvivorId?: EntityId;
   validMoveZones?: ZoneId[];
   pendingMoveZoneId?: ZoneId;
+  moveCostByZone?: Record<ZoneId, number>;
+  availableDoorZones?: ZoneId[];
+  sprintZones?: ZoneId[];
   editorMode?: boolean;
 }
 
@@ -47,6 +50,8 @@ export class PixiBoardRenderer {
 
   // State-tracking cache for reconciliation
   private entitySprites: Map<EntityId, PIXI.Container> = new Map();
+  private groupBadges: Map<string, PIXI.Container> = new Map(); // keyed by `${zoneId}:${type}`
+  private groupedRepresentatives = new Map<EntityId, { zoneId: ZoneId; type: ZombieType }>();
   private tileSprites: PIXI.Container[] = [];
   private _lastTileHash: string = '';
   private _lastState: GameState | null = null;
@@ -59,6 +64,7 @@ export class PixiBoardRenderer {
   private boardGraphics: PIXI.Graphics;  // One Graphics object for all zone visuals
   private iconContainer: PIXI.Container; // Lucide icon sprites (cleared each frame)
   private layerEntities: PIXI.Container;
+  private layerBadges: PIXI.Container;
 
   constructor(app: PIXI.Application) {
     this.app = app;
@@ -75,15 +81,23 @@ export class PixiBoardRenderer {
     this.layerBoard.addChild(this.boardGraphics);
     this.layerBoard.addChild(this.iconContainer);
     this.layerEntities = new PIXI.Container();
+    this.layerBadges = new PIXI.Container();
 
     this.container.addChild(this.layerGrid);
     this.container.addChild(this.layerTiles);
     this.container.addChild(this.layerSeams);
     this.container.addChild(this.layerBoard);
     this.container.addChild(this.layerEntities);
+    this.container.addChild(this.layerBadges);
 
-    // Ensure tiles loaded
-    tileService.loadAssets();
+    // Load tiles, then re-render if state arrived before tiles were ready
+    tileService.loadAssets().then(() => {
+      if (this._lastState?.tiles) {
+        this._lastTileHash = '';  // force redraw
+        this.renderTiles(this._lastState.tiles);
+        this.renderSeams(this._lastState);
+      }
+    });
 
     // Pre-load Lucide icon textures for zone indicators
     PIXI.Assets.load([
@@ -91,6 +105,7 @@ export class PixiBoardRenderer {
       '/images/icons/search-white.svg',
       '/images/icons/skull-red.svg',
       '/images/icons/door-open-white.svg',
+      '/images/icons/sport-shoe-lightblue.svg',
     ]);
 
     this.setupCameraControls();
@@ -449,7 +464,7 @@ export class PixiBoardRenderer {
     }
 
     // 2. Board overlay (zones + edges + indicators — single pass)
-    this.drawBoard(state, options.validMoveZones || [], options.pendingMoveZoneId, options.editorMode);
+    this.drawBoard(state, options.validMoveZones || [], options.pendingMoveZoneId, options.editorMode, options.availableDoorZones || [], options.moveCostByZone, options.sprintZones || []);
 
     // 3. Entities (Survivors & Zombies)
     this._lastState = state;
@@ -568,7 +583,7 @@ export class PixiBoardRenderer {
    * Single-pass board overlay: draws zone fills, edges, and indicators
    * on one PIXI.Graphics object. Matches the proven MapEditor overlay pattern.
    */
-  private drawBoard(state: GameState, validZones: ZoneId[], pendingMoveZoneId?: ZoneId, editorMode?: boolean): void {
+  private drawBoard(state: GameState, validZones: ZoneId[], pendingMoveZoneId?: ZoneId, editorMode?: boolean, doorHighlightZones: ZoneId[] = [], moveCostByZone?: Record<ZoneId, number>, sprintZones: ZoneId[] = []): void {
     const g = this.boardGraphics;
     g.clear();
     this.iconContainer.removeChildren();
@@ -633,6 +648,64 @@ export class PixiBoardRenderer {
           g.fill({ color });
         }
       }
+    }
+
+    // --- 1b. AP cost labels on movement-highlighted zones ---
+    if (moveCostByZone) {
+      for (const zoneId of validZones) {
+        const cost = moveCostByZone[zoneId];
+        if (cost === undefined || cost <= 1) continue;
+        const cells = geo.zoneCells[zoneId];
+        if (!cells || cells.length === 0) continue;
+        // Compute centroid
+        let cx = 0, cy = 0;
+        for (const c of cells) { cx += c.x; cy += c.y; }
+        cx = (cx / cells.length) * TILE_SIZE + TILE_SIZE / 2;
+        cy = (cy / cells.length) * TILE_SIZE + TILE_SIZE / 2;
+
+        const label = new PIXI.Text({
+          text: `${cost} AP`,
+          style: {
+            fontFamily: 'Arial',
+            fontSize: 14,
+            fontWeight: 'bold',
+            fill: 0xffffff,
+            stroke: { color: 0x000000, width: 3 },
+          },
+        });
+        label.anchor.set(0.5);
+        label.position.set(cx, cy);
+        this.iconContainer.addChild(label);
+      }
+    }
+
+    // --- 1c. Sprint zone highlights (light blue fill + shoe icon) ---
+    for (const zoneId of sprintZones) {
+      if (validZones.includes(zoneId)) continue; // already highlighted as move zone
+      const cells = geo.zoneCells[zoneId];
+      if (!cells || cells.length === 0) continue;
+
+      if (hasTiles) {
+        for (const c of cells) {
+          g.rect(c.x * TILE_SIZE, c.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+          g.fill({ color: 0x87CEEB, alpha: 0.3 });
+        }
+      }
+
+      // Shoe icon at centroid
+      let cx = 0, cy = 0;
+      for (const c of cells) { cx += c.x; cy += c.y; }
+      cx = (cx / cells.length) * TILE_SIZE + TILE_SIZE / 2;
+      cy = (cy / cells.length) * TILE_SIZE + TILE_SIZE / 2;
+
+      const iconSize = 20;
+      const texture = PIXI.Texture.from('/images/icons/sport-shoe-lightblue.svg');
+      const sprite = new PIXI.Sprite(texture);
+      sprite.width = iconSize;
+      sprite.height = iconSize;
+      sprite.anchor.set(0.5);
+      sprite.position.set(cx, cy);
+      this.iconContainer.addChild(sprite);
     }
 
     // --- 2. Edges from compiled edgeClassMap ---
@@ -807,6 +880,18 @@ export class PixiBoardRenderer {
       }
     }
 
+    // --- 3c. Highlight zones with openable doors ---
+    if (doorHighlightZones.length > 0) {
+      for (const zoneId of doorHighlightZones) {
+        const cells = geo.zoneCells[zoneId];
+        if (!cells) continue;
+        for (const c of cells) {
+          g.rect(c.x * TILE_SIZE, c.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+          g.fill({ color: BOARD_THEME.door.highlightColor, alpha: BOARD_THEME.door.highlightAlpha });
+        }
+      }
+    }
+
     // --- 4. Zone indicators (skip in editor mode — editor draws its own) ---
     if (editorMode) return;
 
@@ -826,31 +911,64 @@ export class PixiBoardRenderer {
       const cy = (layout.centroidY ?? layout.row) * TILE_SIZE + TILE_SIZE / 2;
 
       if (zone.noiseTokens > 0) {
-        // Lucide AlertTriangle at zone top-right corner
-        const ox = (layout.col + layout.w) * TILE_SIZE - 24;
-        const oy = layout.row * TILE_SIZE;
-        addIcon('/images/icons/alert-triangle.svg', ox, oy);
+        // Noise indicator at zone top-right corner: triangle + count
+        const iconSize = 24;
+        const ox = (layout.col + layout.w) * TILE_SIZE - iconSize - 2;
+        const oy = layout.row * TILE_SIZE + 2;
+        addIcon('/images/icons/alert-triangle.svg', ox, oy, iconSize);
+
+        // Noise count text overlaid on the triangle
+        const numText = new PIXI.Text({
+          text: String(zone.noiseTokens),
+          style: {
+            fontFamily: 'Arial',
+            fontSize: 11,
+            fontWeight: 'bold',
+            fill: BOARD_THEME.noise.markColor,
+            stroke: { color: BOARD_THEME.noise.triangleFill, width: 2 },
+          },
+        });
+        numText.anchor.set(0.5);
+        numText.position.set(ox + iconSize / 2, oy + iconSize / 2 + 2);
+        this.iconContainer.addChild(numText);
       }
 
       if (zone.searchable && zone.isBuilding) {
-        // Lucide Search at zone bottom-right corner
-        const ox = (layout.col + layout.w) * TILE_SIZE - 24;
-        const oy = (layout.row + layout.h) * TILE_SIZE - 24;
-        addIcon('/images/icons/search-white.svg', ox, oy);
+        // Magnifying glass at zone bottom-right corner
+        const iconSize = 28;
+        const ox = (layout.col + layout.w) * TILE_SIZE - iconSize - 2;
+        const oy = (layout.row + layout.h) * TILE_SIZE - iconSize - 2;
+        // Circle background for visibility
+        g.circle(ox + iconSize / 2, oy + iconSize / 2, iconSize / 2 + 2);
+        g.fill({ color: BOARD_THEME.searchable.circleColor, alpha: 0.5 });
+        g.stroke({ width: 1, color: BOARD_THEME.searchable.strokeColor });
+        addIcon('/images/icons/search-white.svg', ox + 2, oy + 2, iconSize - 4);
       }
 
       if (zone.spawnPoint) {
-        // Lucide Skull at zone center
-        addIcon('/images/icons/skull-red.svg', cx - 12, cy - 12);
-        // Spawn number
+        const sp = BOARD_THEME.spawn;
         const spawnNum = spawnNumberMap.get(zone.id);
+        const halfW = sp.bgWidth / 2;
+        const halfH = sp.bgHeight / 2;
+
+        // Dark red rectangle background
+        g.roundRect(cx - halfW, cy - halfH, sp.bgWidth, sp.bgHeight, sp.bgRadius);
+        g.fill({ color: sp.bgColor, alpha: sp.bgAlpha });
+        g.stroke({ width: sp.strokeWidth, color: sp.strokeColor });
+
+        // Larger skull icon inside the rectangle
+        const skullOff = sp.skullSize / 2;
+        const skullX = spawnNum !== undefined ? cx - skullOff - 2 : cx - skullOff;
+        addIcon('/images/icons/skull-red.svg', skullX, cy - skullOff, sp.skullSize);
+
+        // Spawn number to the right of skull
         if (spawnNum !== undefined) {
           const numText = new PIXI.Text({
             text: String(spawnNum),
-            style: { fontFamily: 'Arial', fontSize: 10, fontWeight: 'bold', fill: BOARD_THEME.spawn.numberColor, stroke: { color: BOARD_THEME.spawn.numberStroke, width: 2 } },
+            style: { fontFamily: 'Arial', fontSize: sp.numberFontSize, fontWeight: 'bold', fill: sp.numberColor, stroke: { color: sp.numberStroke, width: 2 } },
           });
           numText.anchor.set(0.5);
-          numText.position.set(cx + 12, cy - 3);
+          numText.position.set(cx + halfW - 8, cy);
           this.iconContainer.addChild(numText);
         }
       }
@@ -876,6 +994,63 @@ export class PixiBoardRenderer {
     }
   }
 
+  private computeZoneEntityLayout(
+    zoneId: ZoneId,
+    zombieCount: number,
+    survivorCount: number,
+    zombies: Zombie[]
+  ): { scale: number; spacing: number; maxVisible: number; showGroupBadge: boolean } {
+    if (zombieCount === 0) {
+      return { scale: 1, spacing: ENTITY_SPACING, maxVisible: 0, showGroupBadge: false };
+    }
+
+    const layout = getZoneLayout(zoneId);
+    const zonePixelWidth = layout.w * TILE_SIZE;
+    const zonePixelHeight = layout.h * TILE_SIZE;
+    // Zombies use the bottom half of the zone
+    const halfZoneHeight = zonePixelHeight / 2;
+
+    // Compute effective count weighted by area (boardScale^2)
+    let effectiveCount = 0;
+    for (const z of zombies) {
+      const display = getZombieTypeDisplay(z.type);
+      effectiveCount += display.boardScale * display.boardScale;
+    }
+
+    // Check if entities fit at a given spacing
+    const fitsAtSpacing = (spacing: number): boolean => {
+      const cols = Math.max(1, Math.floor(zonePixelWidth / spacing));
+      const rows = Math.max(1, Math.floor(halfZoneHeight / spacing));
+      return effectiveCount <= cols * rows;
+    };
+
+    // Level 1: fits at normal spacing
+    if (fitsAtSpacing(ENTITY_SPACING)) {
+      return { scale: 1, spacing: ENTITY_SPACING, maxVisible: zombieCount, showGroupBadge: false };
+    }
+
+    // Level 2: try to shrink spacing and scale proportionally
+    // Find the spacing that fits
+    const cols = Math.max(1, Math.floor(zonePixelWidth / ENTITY_SPACING));
+    const rows = Math.max(1, Math.floor(halfZoneHeight / ENTITY_SPACING));
+    const normalCapacity = cols * rows;
+
+    if (normalCapacity > 0) {
+      const scaleFactor = Math.sqrt(normalCapacity / effectiveCount);
+      const clampedScale = Math.max(0.5, Math.min(1.0, scaleFactor));
+      const reducedSpacing = ENTITY_SPACING * clampedScale;
+
+      // Check if smallest zombie (Runner 0.9) would still be visible
+      const smallestRadius = ENTITY_RADIUS * 0.9 * clampedScale;
+      if (smallestRadius >= MIN_ENTITY_RADIUS && fitsAtSpacing(reducedSpacing)) {
+        return { scale: clampedScale, spacing: reducedSpacing, maxVisible: zombieCount, showGroupBadge: false };
+      }
+    }
+
+    // Level 3: group mode — show 1 representative + badge above
+    return { scale: 1, spacing: ENTITY_SPACING, maxVisible: 1, showGroupBadge: true };
+  }
+
   private reconcileEntities(state: GameState, activeId?: EntityId): void {
     const currentIds = new Set<EntityId>();
     
@@ -888,45 +1063,220 @@ export class PixiBoardRenderer {
     // Group for layout
     const entitiesByZone = this.groupEntitiesByZone(allEntities);
 
+    // Pre-compute zone layouts for overflow handling
+    const zoneLayouts = new Map<ZoneId, ReturnType<typeof this.computeZoneEntityLayout>>();
+    for (const [zoneId, entities] of Object.entries(entitiesByZone)) {
+      const zombies = entities.filter(e => this.isZombie(e)) as Zombie[];
+      const survivors = entities.filter(e => !this.isZombie(e));
+      zoneLayouts.set(zoneId as ZoneId, this.computeZoneEntityLayout(zoneId as ZoneId, zombies.length, survivors.length, zombies));
+    }
+
+    // Track which zone+type combos need group badges this frame
+    const activeBadgeKeys = new Set<string>();
+
+    // Rebuild grouped representatives: when grouping, pick first zombie of each type per zone
+    this.groupedRepresentatives.clear();
+
+    // Pre-compute per-zone type representatives for grouped zones
+    const zoneTypeReps = new Map<ZoneId, Map<ZombieType, { repId: EntityId; count: number }>>();
+    for (const [zoneId, entities] of Object.entries(entitiesByZone)) {
+      const zid = zoneId as ZoneId;
+      const zLayout = zoneLayouts.get(zid);
+      if (!zLayout?.showGroupBadge) continue;
+
+      const typeMap = new Map<ZombieType, { repId: EntityId; count: number }>();
+      for (const e of entities) {
+        if (!this.isZombie(e)) continue;
+        const z = e as Zombie;
+        if (!typeMap.has(z.type)) {
+          typeMap.set(z.type, { repId: z.id, count: 1 });
+          this.groupedRepresentatives.set(z.id, { zoneId: zid, type: z.type });
+        } else {
+          typeMap.get(z.type)!.count++;
+        }
+      }
+      zoneTypeReps.set(zid, typeMap);
+    }
+
     for (const entity of allEntities) {
       currentIds.add(entity.id);
-      
+
       let sprite = this.entitySprites.get(entity.id);
       if (!sprite) {
         sprite = this.createEntitySprite(entity);
-        this.container.addChild(sprite);
+        this.layerEntities.addChild(sprite);
         this.entitySprites.set(entity.id, sprite);
-        // Note: New sprites appear instantly unless AnimationController intervenes via Events
       }
 
-      // Update Visuals (Highlight, Wounds)
-      this.updateEntityVisuals(sprite, entity, state, activeId);
+      const zoneId = entity.position.zoneId;
+      const zoneEntities = entitiesByZone[zoneId] || [];
+      const isZomb = this.isZombie(entity);
+      const zoneLayout = zoneLayouts.get(zoneId);
 
-      // Update Position (Layout Logic)
-      const zoneEntities = entitiesByZone[entity.position.zoneId] || [];
-      const index = zoneEntities.indexOf(entity); // Inefficient O(N^2) total, but N is small per zone
-      
-      const pos = this.calculatePosition(entity.position.zoneId, index, this.isZombie(entity));
+      if (isZomb && zoneLayout) {
+        if (zoneLayout.showGroupBadge) {
+          // Group mode: only type representatives are visible
+          const repInfo = this.groupedRepresentatives.get(entity.id);
+          if (!repInfo) {
+            // Not a representative — hidden
+            sprite.visible = false;
+            continue;
+          }
 
-      // Animate movement if entity has moved zones and is not mid-animation
-      if (this._animationController && !this._animationController.isAnimating(entity.id)) {
-        const oldX = sprite.position.x;
-        const oldY = sprite.position.y;
-        const moved = (oldX !== 0 || oldY !== 0) && (Math.abs(oldX - pos.x) > 1 || Math.abs(oldY - pos.y) > 1);
-        if (moved) {
-          this._animationController.animateMove(entity.id, oldX, oldY, pos.x, pos.y);
+          sprite.visible = true;
+          this.updateEntityVisuals(sprite, entity, state, activeId, zoneLayout.scale);
+
+          // Position: representatives are indexed by type order in the zone
+          const typeReps = zoneTypeReps.get(zoneId)!;
+          const typeKeys = [...typeReps.keys()];
+          const repIndex = typeKeys.indexOf(repInfo.type);
+          const pos = this.calculatePosition(zoneId, repIndex, true, zoneLayout.scale, zoneLayout.spacing);
+
+          if (this._animationController && !this._animationController.isAnimating(entity.id)) {
+            const oldX = sprite.position.x;
+            const oldY = sprite.position.y;
+            const moved = Math.abs(oldX - pos.x) > 1 || Math.abs(oldY - pos.y) > 1;
+            if (moved) {
+              this._animationController.animateMove(entity.id, oldX, oldY, pos.x, pos.y);
+            } else {
+              sprite.position.set(pos.x, pos.y);
+            }
+          } else if (!this._animationController || !this._animationController.isAnimating(entity.id)) {
+            sprite.position.set(pos.x, pos.y);
+          }
+
+          // Mark badge for this type
+          const badgeKey = `${zoneId}:${repInfo.type}`;
+          activeBadgeKeys.add(badgeKey);
         } else {
+          // Normal mode: all zombies visible
+          sprite.visible = true;
+          this.updateEntityVisuals(sprite, entity, state, activeId, zoneLayout.scale);
+
+          const zombiesInZone = zoneEntities.filter(e => this.isZombie(e));
+          const zombieIndex = zombiesInZone.indexOf(entity);
+          const pos = this.calculatePosition(zoneId, zombieIndex, true, zoneLayout.scale, zoneLayout.spacing);
+
+          if (this._animationController && !this._animationController.isAnimating(entity.id)) {
+            const oldX = sprite.position.x;
+            const oldY = sprite.position.y;
+            const moved = Math.abs(oldX - pos.x) > 1 || Math.abs(oldY - pos.y) > 1;
+            if (moved) {
+              this._animationController.animateMove(entity.id, oldX, oldY, pos.x, pos.y);
+            } else {
+              sprite.position.set(pos.x, pos.y);
+            }
+          } else if (!this._animationController || !this._animationController.isAnimating(entity.id)) {
+            sprite.position.set(pos.x, pos.y);
+          }
+        }
+      } else {
+        // Survivor — always visible, normal layout
+        sprite.visible = true;
+        this.updateEntityVisuals(sprite, entity, state, activeId);
+
+        const survivorsInZone = zoneEntities.filter(e => !this.isZombie(e));
+        const survivorIndex = survivorsInZone.indexOf(entity);
+        const pos = this.calculatePosition(zoneId, survivorIndex, false, 1, ENTITY_SPACING);
+
+        if (this._animationController && !this._animationController.isAnimating(entity.id)) {
+          const oldX = sprite.position.x;
+          const oldY = sprite.position.y;
+          const moved = Math.abs(oldX - pos.x) > 1 || Math.abs(oldY - pos.y) > 1;
+          if (moved) {
+            this._animationController.animateMove(entity.id, oldX, oldY, pos.x, pos.y);
+          } else {
+            sprite.position.set(pos.x, pos.y);
+          }
+        } else if (!this._animationController || !this._animationController.isAnimating(entity.id)) {
           sprite.position.set(pos.x, pos.y);
         }
-      } else if (!this._animationController || !this._animationController.isAnimating(entity.id)) {
-        sprite.position.set(pos.x, pos.y);
       }
     }
 
-    // Cleanup Removed Entities
+    // --- Group badges (one per zone+type) ---
+    for (const [zoneId, typeReps] of zoneTypeReps) {
+      const zLayout = zoneLayouts.get(zoneId)!;
+      const typeKeys = [...typeReps.keys()];
+
+      for (const [typeIdx, [type, { count }]] of [...typeReps.entries()].entries()) {
+        const badgeKey = `${zoneId}:${type}`;
+
+        // Compute badge position: top-right of the representative for this type
+        const repPos = this.calculatePosition(zoneId, typeIdx, true, zLayout.scale, zLayout.spacing);
+        const r = ENTITY_RADIUS * zLayout.scale;
+        const badgePos = { x: repPos.x + r * 0.6, y: repPos.y - r * 0.6 };
+
+        let badge = this.groupBadges.get(badgeKey);
+        const prevCount = (badge as any)?._cachedZombieCount as number | undefined;
+
+        if (!badge) {
+          badge = new PIXI.Container();
+          badge.eventMode = 'static';
+          badge.cursor = 'pointer';
+          badge.hitArea = new PIXI.Circle(0, 0, GROUP_BADGE_RADIUS + 2);
+
+          const capturedZoneId = zoneId;
+          const capturedType = type;
+          badge.on('pointerover', (e: PIXI.FederatedPointerEvent) => {
+            if (this._spacebarDown || this.isDragging) return;
+            const html = this.buildTypeTooltipContent(capturedZoneId, capturedType);
+            if (html) tooltip.show(e.clientX, e.clientY, html);
+          });
+          badge.on('pointermove', (e: PIXI.FederatedPointerEvent) => {
+            if (this._spacebarDown || this.isDragging) { tooltip.hide(); return; }
+            const html = this.buildTypeTooltipContent(capturedZoneId, capturedType);
+            if (html) tooltip.show(e.clientX, e.clientY, html);
+          });
+          badge.on('pointerout', () => tooltip.hide());
+
+          this.layerBadges.addChild(badge);
+          this.groupBadges.set(badgeKey, badge);
+        }
+
+        // Only rebuild badge visuals if count changed
+        if (prevCount !== count) {
+          while (badge.children.length > 0) badge.removeChildAt(0);
+
+          const bg = new PIXI.Graphics();
+          bg.circle(0, 0, GROUP_BADGE_RADIUS);
+          bg.fill({ color: BOARD_THEME.groupBadge.bgColor, alpha: BOARD_THEME.groupBadge.bgAlpha });
+          bg.stroke({ width: BOARD_THEME.groupBadge.strokeWidth, color: BOARD_THEME.groupBadge.strokeColor });
+          badge.addChild(bg);
+
+          const text = new PIXI.Text({
+            text: `\u00d7${count}`,
+            style: {
+              fontFamily: 'Arial',
+              fontSize: BOARD_THEME.groupBadge.fontSize,
+              fontWeight: 'bold',
+              fill: BOARD_THEME.groupBadge.textColor,
+            },
+          });
+          text.anchor.set(0.5);
+          badge.addChild(text);
+
+          (badge as any)._cachedZombieCount = count;
+        }
+
+        badge.position.set(badgePos.x, badgePos.y);
+      }
+    }
+
+    // Cleanup stale badges
+    for (const [key, badge] of this.groupBadges) {
+      if (!activeBadgeKeys.has(key)) {
+        this.layerBadges.removeChild(badge);
+        badge.destroy({ children: true });
+        this.groupBadges.delete(key);
+      }
+    }
+
+    // Cleanup removed entities
     for (const [id, sprite] of this.entitySprites) {
       if (!currentIds.has(id)) {
-        this.container.removeChild(sprite);
+        this.layerEntities.removeChild(sprite);
+        sprite.destroy({ children: true });
         this.entitySprites.delete(id);
       }
     }
@@ -946,7 +1296,10 @@ export class PixiBoardRenderer {
 
     container.on('pointerover', (e: PIXI.FederatedPointerEvent) => {
       if (this._spacebarDown || this.isDragging) return;
-      const html = this.buildTooltipContent(entity.id);
+      const repInfo = this.groupedRepresentatives.get(entity.id);
+      const html = repInfo
+        ? this.buildTypeTooltipContent(repInfo.zoneId, repInfo.type)
+        : this.buildTooltipContent(entity.id);
       if (html) {
         tooltip.show(e.clientX, e.clientY, html);
       }
@@ -957,7 +1310,10 @@ export class PixiBoardRenderer {
         tooltip.hide();
         return;
       }
-      const html = this.buildTooltipContent(entity.id);
+      const repInfo = this.groupedRepresentatives.get(entity.id);
+      const html = repInfo
+        ? this.buildTypeTooltipContent(repInfo.zoneId, repInfo.type)
+        : this.buildTooltipContent(entity.id);
       if (html) {
         tooltip.show(e.clientX, e.clientY, html);
       }
@@ -988,18 +1344,56 @@ export class PixiBoardRenderer {
     const zombie = state.zombies[entityId];
     if (zombie) {
       const display = getZombieTypeDisplay(zombie.type);
-      return `<div class="tooltip-title" style="color:${display.colorHex}">${display.label}</div>`
-        + `<div class="tooltip-row"><span>Wounds</span><span class="tooltip-value">${zombie.wounds}</span></div>`;
+      const toughness = PixiBoardRenderer.ZOMBIE_TOUGHNESS[zombie.type];
+      const remaining = toughness - zombie.wounds;
+      let html = `<div class="tooltip-title" style="color:${display.colorHex}">${display.label}</div>`;
+      html += this.buildHealthBar(remaining, toughness, display.colorHex);
+      return html;
     }
 
     return null;
+  }
+
+  private buildHealthBar(current: number, max: number, color: string): string {
+    const pct = max > 0 ? (current / max) * 100 : 0;
+    return `<div class="tooltip-health-row">`
+      + `<span class="tooltip-heart">&#9829;</span>`
+      + `<span class="tooltip-hp-track"><span class="tooltip-hp-fill" style="width:${pct}%;background:${color}"></span></span>`
+      + `<span class="tooltip-hp-text">${current}/${max}</span>`
+      + `</div>`;
+  }
+
+  private static ZOMBIE_TOUGHNESS: Record<ZombieType, number> = {
+    [ZombieType.Walker]: 1,
+    [ZombieType.Runner]: 1,
+    [ZombieType.Brute]: 2,
+    [ZombieType.Abomination]: 3,
+  };
+
+  private buildTypeTooltipContent(zoneId: ZoneId, type: ZombieType): string | null {
+    const state = this._lastState;
+    if (!state) return null;
+
+    const zombies = Object.values(state.zombies)
+      .filter(z => z.position.zoneId === zoneId && z.type === type);
+    if (zombies.length === 0) return null;
+
+    const display = getZombieTypeDisplay(type);
+    const toughness = PixiBoardRenderer.ZOMBIE_TOUGHNESS[type];
+
+    let html = `<div class="tooltip-title" style="color:${display.colorHex}">${display.label} <span class="tooltip-count">\u00d7${zombies.length}</span></div>`;
+    for (const z of zombies) {
+      const remaining = toughness - z.wounds;
+      html += this.buildHealthBar(remaining, toughness, display.colorHex);
+    }
+    return html;
   }
 
   private getPlayerColor(playerId: string, state: GameState): number {
     return getPlayerColorNumeric(state, playerId);
   }
 
-  private updateEntityVisuals(container: PIXI.Container, entity: Survivor | Zombie, state: GameState, activeId?: EntityId): void {
+  private updateEntityVisuals(container: PIXI.Container, entity: Survivor | Zombie, state: GameState, activeId?: EntityId, entityScale = 1): void {
     const graphics = container.children[0] as PIXI.Graphics;
     graphics.clear();
 
@@ -1011,14 +1405,14 @@ export class PixiBoardRenderer {
       if (zombieTex) {
         const sprite = new PIXI.Sprite(zombieTex);
         sprite.anchor.set(0.5);
-        sprite.width = ENTITY_RADIUS * 2;
-        sprite.height = ENTITY_RADIUS * 2;
+        sprite.width = ENTITY_RADIUS * 2 * entityScale;
+        sprite.height = ENTITY_RADIUS * 2 * entityScale;
         container.addChild(sprite);
-        graphics.circle(0, 0, ENTITY_RADIUS);
+        graphics.circle(0, 0, ENTITY_RADIUS * entityScale);
         graphics.stroke({ width: 2, color: 0x000000 });
       } else {
         const display = getZombieTypeDisplay(entity.type);
-        const r = ENTITY_RADIUS * display.boardScale;
+        const r = ENTITY_RADIUS * display.boardScale * entityScale;
         const sides = display.boardSides;
 
         // Draw polygon shape
@@ -1034,11 +1428,14 @@ export class PixiBoardRenderer {
         // Draw initial letter
         const text = new PIXI.Text({
           text: display.initial,
-          style: { fontFamily: 'Arial', fontSize: BOARD_THEME.zombie.initialFontSize * display.boardScale, fontWeight: 'bold', fill: BOARD_THEME.zombie.initialColor },
+          style: { fontFamily: 'Arial', fontSize: BOARD_THEME.zombie.initialFontSize * display.boardScale * entityScale, fontWeight: 'bold', fill: BOARD_THEME.zombie.initialColor },
         });
         text.anchor.set(0.5);
         container.addChild(text);
       }
+
+      // Update hitArea to match scaled radius
+      container.hitArea = new PIXI.Circle(0, 0, (ENTITY_RADIUS + 4) * entityScale);
     } else {
       // Survivor
       const survivor = entity as Survivor;
@@ -1085,7 +1482,7 @@ export class PixiBoardRenderer {
     }
   }
 
-  private calculatePosition(zoneId: ZoneId, index: number, isZombie: boolean): { x: number, y: number } {
+  private calculatePosition(zoneId: ZoneId, index: number, isZombie: boolean, scale = 1, spacing = ENTITY_SPACING): { x: number, y: number } {
     const layout = getZoneLayout(zoneId);
 
     // Use centroid for multi-cell zones, top-left corner for single-cell
@@ -1096,17 +1493,38 @@ export class PixiBoardRenderer {
       ? layout.centroidY * TILE_SIZE + TILE_SIZE / 2
       : layout.row * TILE_SIZE + TILE_SIZE / 2;
 
+    // Zone bounding box for clamping
+    const margin = ENTITY_RADIUS * scale;
+    const zoneLeft = layout.col * TILE_SIZE + margin;
+    const zoneRight = (layout.col + layout.w) * TILE_SIZE - margin;
+    const zoneTop = layout.row * TILE_SIZE + margin;
+    const zoneBottom = (layout.row + layout.h) * TILE_SIZE - margin;
+
+    let x: number, y: number;
+
     if (isZombie) {
       // Bottom of zone center
-      const offsetX = -30 + (index % 4) * ENTITY_SPACING;
-      const offsetY = 20 + Math.floor(index / 4) * ENTITY_SPACING;
-      return { x: centerX + offsetX, y: centerY + offsetY };
+      const cols = Math.max(1, Math.floor((layout.w * TILE_SIZE) / spacing));
+      const startX = -(cols - 1) * spacing / 2;
+      const offsetX = startX + (index % cols) * spacing;
+      const offsetY = 20 * scale + Math.floor(index / cols) * spacing;
+      x = centerX + offsetX;
+      y = centerY + offsetY;
+      // Clamp to zone bounds
+      x = Math.max(zoneLeft, Math.min(zoneRight, x));
+      y = Math.max(zoneTop, Math.min(zoneBottom, y));
     } else {
-      // Top of zone center
+      // Top of zone center — survivors always use normal spacing
       const offsetX = -20 + (index % 3) * ENTITY_SPACING;
       const offsetY = -20 - Math.floor(index / 3) * ENTITY_SPACING;
-      return { x: centerX + offsetX, y: centerY + offsetY };
+      x = centerX + offsetX;
+      y = centerY + offsetY;
+      // Clamp to zone bounds (with softer margin for survivors)
+      x = Math.max(zoneLeft, Math.min(zoneRight, x));
+      y = Math.max(zoneTop, Math.min(zoneBottom, y));
     }
+
+    return { x, y };
   }
 
   private isZombie(entity: any): entity is Zombie {
@@ -1135,7 +1553,16 @@ export class PixiBoardRenderer {
     tooltip.hide();
 
     // Clear sprite caches
+    for (const [, sprite] of this.entitySprites) {
+      this.layerEntities.removeChild(sprite);
+      sprite.destroy({ children: true });
+    }
     this.entitySprites.clear();
+    for (const [, badge] of this.groupBadges) {
+      this.layerBadges.removeChild(badge);
+      badge.destroy({ children: true });
+    }
+    this.groupBadges.clear();
     this.tileSprites = [];
 
     // Destroy the container tree (recursively destroys children)

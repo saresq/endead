@@ -15,7 +15,7 @@ const DANGER_VALUES: Record<DangerLevel, number> = {
 export class ZombiePhaseManager {
 
   public static executeZombiePhase(state: GameState): GameState {
-    let newState = JSON.parse(JSON.stringify(state)); // Deep clone to start
+    let newState = structuredClone(state);
 
     if (newState.phase !== GamePhase.Zombies) {
       newState.phase = GamePhase.Zombies;
@@ -307,78 +307,147 @@ export class ZombiePhaseManager {
     return newState;
   }
 
+  /**
+   * Counts living zombies of a given type currently on the board.
+   */
+  private static countZombiesOfType(state: GameState, type: ZombieType): number {
+    return Object.values(state.zombies).filter(z => z.type === type && !this.isZombieDead(z)).length;
+  }
+
+  /**
+   * Runs a two-pass activation (attack then move) for a specific set of zombies.
+   * Used by both extra activation cards and rush card logic.
+   */
+  private static activateZombieSet(state: GameState, zombieIds: string[]): void {
+    const getZombies = () => zombieIds
+      .map(id => state.zombies[id])
+      .filter(z => z && !this.isZombieDead(z))
+      .sort((a, b) => a.id.localeCompare(b.id));
+
+    // Reset activated flags
+    for (const zombie of getZombies()) {
+      zombie.activated = false;
+    }
+
+    const attackedSet = new Set<string>();
+
+    // Pass 1: attacks
+    const pass1Attacks: Record<string, number> = {};
+    for (const zombie of getZombies()) {
+      const action = ZombieAI.getAction(state, zombie);
+      if (action.type === 'ATTACK') {
+        pass1Attacks[zombie.position.zoneId] = (pass1Attacks[zombie.position.zoneId] || 0) + 1;
+        attackedSet.add(zombie.id);
+      }
+    }
+    this.distributeZoneWounds(state, pass1Attacks);
+
+    // Pass 2: moves (only non-attackers)
+    for (const zombie of getZombies()) {
+      if (attackedSet.has(zombie.id)) continue;
+      const action = ZombieAI.getAction(state, zombie);
+      if (action.type === 'MOVE' && action.toZoneId) {
+        zombie.position.zoneId = action.toZoneId;
+        state.zombies[zombie.id] = zombie;
+      } else if (action.type === 'BREAK_DOOR' && action.toZoneId) {
+        this.breakDoor(state, zombie.position.zoneId, action.toZoneId);
+      }
+    }
+
+    // Mark activated
+    for (const zombie of getZombies()) {
+      zombie.activated = true;
+    }
+
+    // Runner second actions
+    const hasRunners = getZombies().some(z => z.type === ZombieType.Runner);
+    if (hasRunners) {
+      const runnerAttacks: Record<string, number> = {};
+      for (const zombie of getZombies()) {
+        if (zombie.type !== ZombieType.Runner) continue;
+        const action = ZombieAI.getAction(state, zombie);
+        if (action.type === 'ATTACK') {
+          runnerAttacks[zombie.position.zoneId] = (runnerAttacks[zombie.position.zoneId] || 0) + 1;
+        } else if (action.type === 'MOVE' && action.toZoneId) {
+          zombie.position.zoneId = action.toZoneId;
+          state.zombies[zombie.id] = zombie;
+        } else if (action.type === 'BREAK_DOOR' && action.toZoneId) {
+          this.breakDoor(state, zombie.position.zoneId, action.toZoneId);
+        }
+      }
+      this.distributeZoneWounds(state, runnerAttacks);
+    }
+  }
+
   private static applySpawnDetail(state: GameState, zoneId: ZoneId, detail: SpawnDetail) {
       // Handle Extra Activation: re-activate ALL zombies of that type
       // Per rulebook §9/§15: Extra Activation cards have no effect at Blue Danger Level
       if (detail.extraActivation) {
          if (state.currentDangerLevel === DangerLevel.Blue) return;
          const targetType = detail.extraActivation;
-         const getZombiesOfType = () => Object.values(state.zombies)
+         const zombieIds = Object.values(state.zombies)
            .filter(z => z.type === targetType && !this.isZombieDead(z))
-           .sort((a, b) => a.id.localeCompare(b.id)); // Deterministic order
-
-         // Reset activated flags
-         for (const zombie of getZombiesOfType()) {
-           zombie.activated = false;
-         }
-
-         // Extra activation also uses two-pass: attacks first, then moves
-         const extraAttacked = new Set<string>();
-
-         // Pass 1: attacks — accumulate per zone
-         const extraPass1: Record<string, number> = {};
-         for (const zombie of getZombiesOfType()) {
-           const action = ZombieAI.getAction(state, zombie);
-           if (action.type === 'ATTACK') {
-             extraPass1[zombie.position.zoneId] = (extraPass1[zombie.position.zoneId] || 0) + 1;
-             extraAttacked.add(zombie.id);
-           }
-         }
-         this.distributeZoneWounds(state, extraPass1);
-
-         // Pass 2: moves (only zombies that didn't attack)
-         for (const zombie of getZombiesOfType()) {
-           if (extraAttacked.has(zombie.id)) continue;
-           const action = ZombieAI.getAction(state, zombie);
-           if (action.type === 'MOVE' && action.toZoneId) {
-             zombie.position.zoneId = action.toZoneId;
-             state.zombies[zombie.id] = zombie;
-           } else if (action.type === 'BREAK_DOOR' && action.toZoneId) {
-             this.breakDoor(state, zombie.position.zoneId, action.toZoneId);
-           }
-         }
-
-         // Mark activated
-         for (const zombie of getZombiesOfType()) {
-           zombie.activated = true;
-         }
-
-         // Runner second actions during extra activation
-         if (targetType === ZombieType.Runner) {
-           const extraRunnerAttacks: Record<string, number> = {};
-           for (const zombie of getZombiesOfType()) {
-             const action = ZombieAI.getAction(state, zombie);
-             if (action.type === 'ATTACK') {
-               extraRunnerAttacks[zombie.position.zoneId] = (extraRunnerAttacks[zombie.position.zoneId] || 0) + 1;
-             } else if (action.type === 'MOVE' && action.toZoneId) {
-               zombie.position.zoneId = action.toZoneId;
-               state.zombies[zombie.id] = zombie;
-             } else if (action.type === 'BREAK_DOOR' && action.toZoneId) {
-               this.breakDoor(state, zombie.position.zoneId, action.toZoneId);
-             }
-           }
-           this.distributeZoneWounds(state, extraRunnerAttacks);
-         }
-
+           .map(z => z.id);
+         this.activateZombieSet(state, zombieIds);
          return;
       }
 
-      // Normal Spawn
+      // Normal Spawn (with Abomination rules and pool exhaustion)
       if (detail.zombies) {
+         const spawnedIds: string[] = [];
+
          for (const [type, count] of Object.entries(detail.zombies)) {
-            for (let i = 0; i < (count as number); i++) {
-               this.spawnZombie(state, zoneId, type as ZombieType);
+            const zombieType = type as ZombieType;
+
+            // Abomination spawn rules
+            if (zombieType === ZombieType.Abomination) {
+              const activeAbomCount = this.countZombiesOfType(state, ZombieType.Abomination);
+
+              if (activeAbomCount > 0) {
+                // Extra activation of all existing Abominations
+                const abomIds = Object.values(state.zombies)
+                  .filter(z => z.type === ZombieType.Abomination && !this.isZombieDead(z))
+                  .map(z => z.id);
+                this.activateZombieSet(state, abomIds);
+
+                // Abomination Fest: also spawn the new one after activation
+                if (!state.config.abominationFest) continue;
+              }
             }
+
+            // Pool exhaustion check
+            const poolLimit = state.config.zombiePool?.[zombieType] ?? Infinity;
+            const currentCount = this.countZombiesOfType(state, zombieType);
+            const available = Math.max(0, poolLimit - currentCount);
+
+            if (available === 0) {
+              // Pool exhausted: extra activation of all zombies of that type instead
+              const typeIds = Object.values(state.zombies)
+                .filter(z => z.type === zombieType && !this.isZombieDead(z))
+                .map(z => z.id);
+              this.activateZombieSet(state, typeIds);
+              continue;
+            }
+
+            // Spawn up to available pool count
+            const toSpawn = Math.min(count as number, available);
+            for (let i = 0; i < toSpawn; i++) {
+               this.spawnZombie(state, zoneId, zombieType);
+               spawnedIds.push(`zombie-${state.nextZombieId - 1}`);
+            }
+
+            // If we couldn't place all, trigger extra activation for that type
+            if (toSpawn < (count as number)) {
+              const typeIds = Object.values(state.zombies)
+                .filter(z => z.type === zombieType && !this.isZombieDead(z))
+                .map(z => z.id);
+              this.activateZombieSet(state, typeIds);
+            }
+         }
+
+         // Rush: the just-spawned zombies immediately activate
+         if (detail.rush && spawnedIds.length > 0) {
+           this.activateZombieSet(state, spawnedIds);
          }
       }
   }

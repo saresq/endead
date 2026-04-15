@@ -106,7 +106,8 @@
 .toast__dismiss {
   flex-shrink: 0;
   color: var(--text-muted);
-  margin: -4px -4px 0 0;
+  align-self: flex-start;
+  margin: -2px -6px 0 0;
 }
 
 .toast__dismiss:hover {
@@ -213,6 +214,8 @@
 .alert-banner__dismiss {
   flex-shrink: 0;
   color: var(--text-muted);
+  align-self: flex-start;
+  margin: -2px -6px 0 0;
 }
 
 .alert-banner__dismiss:hover {

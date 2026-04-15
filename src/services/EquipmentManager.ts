@@ -65,7 +65,7 @@ export class EquipmentManager {
    * Discards a specific card from the survivor's inventory.
    */
   public static discardCard(state: GameState, survivorId: EntityId, cardId: EntityId): GameState {
-    const newState = JSON.parse(JSON.stringify(state));
+    const newState = structuredClone(state);
     const survivor = newState.survivors[survivorId];
 
     const cardIndex = survivor.inventory.findIndex((c: EquipmentCard) => c.id === cardId);
@@ -90,7 +90,7 @@ export class EquipmentManager {
    * effectively "Equip New, Discard Old".
    */
   public static swapDrawnCard(state: GameState, survivorId: EntityId, discardCardId: EntityId): GameState {
-    const newState = JSON.parse(JSON.stringify(state));
+    const newState = structuredClone(state);
     const survivor = newState.survivors[survivorId];
 
     if (!survivor.drawnCard) throw new Error('No pending card to resolve');

@@ -43,6 +43,11 @@ export const CHARACTER_DEFINITIONS: Record<string, CharacterDefinition> = {
     startingEquipmentKey: 'fire_axe',
     color: '#911eb4', // purple
   },
+  // 'H4x0r': {
+  //   name: 'H4x0r',
+  //   startingEquipmentKey: 'fire_axe',
+  //   color: '#00ff00', // hacker green
+  // },
 };
 
 /**

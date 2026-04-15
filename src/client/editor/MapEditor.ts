@@ -307,6 +307,7 @@ export class MapEditor {
   }
 
   private tilePaletteEl!: HTMLElement;
+  private tilePreviewEl!: HTMLCanvasElement;
   private createTilePalette() {
     this.tilePaletteEl = document.createElement('div');
     this.tilePaletteEl.id = 'tile-palette-section';
@@ -316,6 +317,14 @@ export class MapEditor {
     label.innerText = 'Tile Palette';
     label.className = 'editor-section__label';
     this.tilePaletteEl.appendChild(label);
+
+    // Tile preview canvas
+    this.tilePreviewEl = document.createElement('canvas');
+    this.tilePreviewEl.className = 'editor-tile-preview';
+    this.tilePreviewEl.width = 180;
+    this.tilePreviewEl.height = 180;
+    this.tilePreviewEl.style.display = 'none';
+    this.tilePaletteEl.appendChild(this.tilePreviewEl);
 
     const list = document.createElement('div');
     list.className = 'editor-tile-list';
@@ -439,10 +448,39 @@ export class MapEditor {
           c.classList.remove('editor-tile-item--selected');
         });
         item.classList.add('editor-tile-item--selected');
+        this.updateTilePreview(id);
       };
 
       container.appendChild(item);
     });
+  }
+
+  private updateTilePreview(tileId: string) {
+    const texture = tileService.getTexture(tileId);
+    if (!texture || !this.tilePreviewEl) return;
+
+    const canvas = this.tilePreviewEl;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Extract image from PIXI texture source
+    const source = texture.source?.resource;
+    if (!source) {
+      canvas.style.display = 'none';
+      return;
+    }
+
+    canvas.style.display = 'block';
+    const size = canvas.width;
+    ctx.clearRect(0, 0, size, size);
+
+    // Draw the tile image scaled to fit the preview canvas
+    const frame = texture.frame;
+    ctx.drawImage(
+      source as CanvasImageSource,
+      frame.x, frame.y, frame.width, frame.height,
+      0, 0, size, size,
+    );
   }
 
   // =============================================

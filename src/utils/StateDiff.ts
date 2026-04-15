@@ -22,7 +22,7 @@ export function applyPatch<T>(state: T, patch: StatePatch): T {
   if (!patch || patch.length === 0) return state;
 
   // Deep clone start
-  const newState = JSON.parse(JSON.stringify(state));
+  const newState = structuredClone(state);
 
   for (const op of patch) {
     applyOperation(newState, op);

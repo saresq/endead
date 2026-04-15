@@ -2,6 +2,7 @@
 
 import { ActionRequest } from '../types/Action';
 import { gameStore } from './GameStore';
+import { applyPatch, StatePatch } from '../utils/StateDiff';
 
 export class NetworkManager {
   private ws: WebSocket | null = null;
@@ -53,6 +54,9 @@ export class NetworkManager {
         const message = JSON.parse(event.data);
         if (message.type === 'STATE_UPDATE') {
           gameStore.update(message.payload);
+        } else if (message.type === 'STATE_PATCH') {
+          const patched = applyPatch(gameStore.state, message.payload as StatePatch);
+          gameStore.update(patched);
         } else if (message.type === 'ERROR') {
           console.error('Server Error:', message.payload);
           if (this.onServerError) this.onServerError(message.payload);

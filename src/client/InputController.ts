@@ -56,10 +56,23 @@ export class InputController {
       this.pendingMoveZoneId = null;
     }
 
+    const availableDoorZones = this.getAvailableDoorZones(state);
+
+    // Compute AP cost per move zone (base 1 + zombie penalty)
+    const moveCostByZone = this.getMoveCostByZone(state, validMoveZones);
+
+    const sprintZones = this.interactionMode === 'SPRINT' ? this.getValidSprintZones(state) : [];
+    if (this.interactionMode === 'SPRINT') {
+      console.log('[Sprint] mode=SPRINT, sprintZones:', sprintZones.length, sprintZones);
+    }
+
     return {
       activeSurvivorId: this.selectedSurvivorId || undefined,
       validMoveZones,
       pendingMoveZoneId: pendingMoveZoneId || undefined,
+      moveCostByZone,
+      availableDoorZones,
+      sprintZones,
     };
   }
 
@@ -135,7 +148,15 @@ export class InputController {
           this.sendOpenDoorAction(clickedZoneId);
           this.setMode('DEFAULT');
         } else if (this.interactionMode === 'SPRINT') {
-          this.sendSkillZoneAction(ActionType.SPRINT, clickedZoneId);
+          const sprintPath = this.findSprintPath(currentState, survivor.position.zoneId, clickedZoneId);
+          if (sprintPath) {
+            networkManager.sendAction({
+              playerId: this.localPlayerId,
+              survivorId: this.selectedSurvivorId!,
+              type: ActionType.SPRINT,
+              payload: { path: sprintPath },
+            });
+          }
           this.setMode('DEFAULT');
         } else if (this.interactionMode === 'CHARGE') {
           this.sendSkillZoneAction(ActionType.CHARGE, clickedZoneId);
@@ -148,16 +169,17 @@ export class InputController {
           this.setMode('DEFAULT');
         } else {
           // DEFAULT = MOVE (tap once to preview, tap again to confirm)
-          if (currentZone && currentZone.connections.some(c => c.toZoneId === clickedZoneId)) {
+          const validMoveZones = this.getValidMoveZones(currentState);
+          if (currentZone && validMoveZones.includes(clickedZoneId)) {
             if (this.pendingMoveZoneId === clickedZoneId) {
-              this.sendMoveAction(clickedZoneId);
+              this.sendMoveAction(clickedZoneId, currentState);
               this.pendingMoveZoneId = null;
             } else {
               this.pendingMoveZoneId = clickedZoneId;
             }
             this.requestRender();
           } else {
-            console.warn('InputController: Target zone not connected.');
+            console.warn('InputController: Target zone not reachable.');
             this.clearPendingMove();
           }
         }
@@ -211,6 +233,24 @@ export class InputController {
     }
   }
 
+  private getMoveCostForZone(state: GameState): number {
+    if (!this.selectedSurvivorId) return 1;
+    const survivor = state.survivors[this.selectedSurvivorId];
+    if (!survivor || survivor.skills.includes('slippery')) return 1;
+
+    const zombiesInZone = Object.values(state.zombies)
+      .filter((z: any) => z.position.zoneId === survivor.position.zoneId).length;
+    return 1 + zombiesInZone;
+  }
+
+  private getMoveCostByZone(state: GameState, validZones: ZoneId[]): Record<ZoneId, number> | undefined {
+    const cost = this.getMoveCostForZone(state);
+    if (cost <= 1 || validZones.length === 0) return undefined;
+    const map: Record<ZoneId, number> = {};
+    for (const z of validZones) map[z] = cost;
+    return map;
+  }
+
   private getValidMoveZones(state: GameState): ZoneId[] {
     if (!this.selectedSurvivorId || this.interactionMode !== 'DEFAULT') return [];
 
@@ -223,9 +263,147 @@ export class InputController {
     const currentZone = state.zones[survivor.position.zoneId];
     if (!currentZone) return [];
 
-    // Filter out zones blocked by closed doors
+    const moveCost = this.getMoveCostForZone(state);
+    if (survivor.actionsRemaining < moveCost) return [];
+
+    const hasExtraZone = survivor.skills.includes('plus_1_zone_per_move');
+    const maxDepth = hasExtraZone ? 2 : 1;
+    const isSlippery = survivor.skills.includes('slippery');
+    const reachable: ZoneId[] = [];
+
+    // Depth-1: immediate adjacent zones (not blocked by doors)
+    for (const conn of currentZone.connections) {
+      if (conn.hasDoor && !conn.doorOpen) continue;
+      reachable.push(conn.toZoneId);
+    }
+
+    // Depth-2: zones reachable through an intermediate zone (plus_1_zone_per_move only)
+    if (maxDepth >= 2) {
+      for (const conn of currentZone.connections) {
+        if (conn.hasDoor && !conn.doorOpen) continue;
+        const midZone = state.zones[conn.toZoneId];
+        if (!midZone) continue;
+
+        // Entering a zone with zombies stops movement (unless slippery)
+        if (!isSlippery) {
+          const hasZombies = Object.values(state.zombies)
+            .some((z: any) => z.position.zoneId === conn.toZoneId);
+          if (hasZombies) continue;
+        }
+
+        for (const conn2 of midZone.connections) {
+          if (conn2.hasDoor && !conn2.doorOpen) continue;
+          if (conn2.toZoneId === survivor.position.zoneId) continue;
+          if (!reachable.includes(conn2.toZoneId)) {
+            reachable.push(conn2.toZoneId);
+          }
+        }
+      }
+    }
+
+    return reachable;
+  }
+
+  private getValidSprintZones(state: GameState): ZoneId[] {
+    if (!this.selectedSurvivorId) return [];
+
+    const survivor = state.survivors[this.selectedSurvivorId];
+    if (!survivor || !survivor.skills.includes('sprint') || survivor.sprintUsedThisTurn) return [];
+    if (survivor.actionsRemaining < 1) return [];
+
+    const startZoneId = survivor.position.zoneId;
+    const isSlippery = survivor.skills.includes('slippery');
+    const reachable: ZoneId[] = [];
+
+    // BFS to depth 3, tracking paths; zombie zone stops movement
+    type Node = { zoneId: ZoneId; depth: number };
+    const queue: Node[] = [{ zoneId: startZoneId, depth: 0 }];
+    const visited = new Set<ZoneId>([startZoneId]);
+
+    while (queue.length > 0) {
+      const { zoneId, depth } = queue.shift()!;
+      if (depth >= 3) continue;
+
+      const zone = state.zones[zoneId];
+      if (!zone) continue;
+
+      // Entering a zone with zombies stops movement (except start zone)
+      if (depth > 0 && !isSlippery) {
+        const hasZombies = Object.values(state.zombies)
+          .some((z: any) => z.position.zoneId === zoneId);
+        if (hasZombies) continue; // can't continue past zombie zone
+      }
+
+      for (const conn of zone.connections) {
+        if (conn.hasDoor && !conn.doorOpen) continue;
+        if (visited.has(conn.toZoneId)) continue;
+        visited.add(conn.toZoneId);
+        const nextDepth = depth + 1;
+        if (nextDepth >= 2) { // Sprint requires at least 2 zones
+          reachable.push(conn.toZoneId);
+        }
+        queue.push({ zoneId: conn.toZoneId, depth: nextDepth });
+      }
+    }
+
+    return reachable;
+  }
+
+  private findSprintPath(state: GameState, fromZoneId: ZoneId, targetZoneId: ZoneId): ZoneId[] | null {
+    const isSlippery = state.survivors[this.selectedSurvivorId!]?.skills.includes('slippery');
+
+    // BFS to find shortest path of 2-3 zones
+    type Node = { zoneId: ZoneId; path: ZoneId[] };
+    const queue: Node[] = [{ zoneId: fromZoneId, path: [] }];
+    const visited = new Set<ZoneId>([fromZoneId]);
+
+    while (queue.length > 0) {
+      const { zoneId, path } = queue.shift()!;
+      if (path.length >= 3) continue;
+
+      const zone = state.zones[zoneId];
+      if (!zone) continue;
+
+      // Zombie zone stops movement (except start)
+      if (path.length > 0 && !isSlippery) {
+        const hasZombies = Object.values(state.zombies)
+          .some((z: any) => z.position.zoneId === zoneId);
+        if (hasZombies) continue;
+      }
+
+      for (const conn of zone.connections) {
+        if (conn.hasDoor && !conn.doorOpen) continue;
+        if (visited.has(conn.toZoneId)) continue;
+        visited.add(conn.toZoneId);
+        const nextPath = [...path, conn.toZoneId];
+        if (conn.toZoneId === targetZoneId && nextPath.length >= 2) {
+          return nextPath;
+        }
+        queue.push({ zoneId: conn.toZoneId, path: nextPath });
+      }
+    }
+    return null;
+  }
+
+  private getAvailableDoorZones(state: GameState): ZoneId[] {
+    if (this.interactionMode !== 'OPEN_DOOR' || !this.selectedSurvivorId) return [];
+
+    const activePlayerId = state.players[state.activePlayerIndex];
+    if (activePlayerId !== this.localPlayerId) return [];
+
+    const survivor = state.survivors[this.selectedSurvivorId];
+    if (!survivor || survivor.playerId !== this.localPlayerId) return [];
+
+    // Check if survivor has door-opening equipment in hand
+    const hasOpener = survivor.inventory.some(c => c.inHand && c.canOpenDoor);
+    if (!hasOpener) return [];
+
+    const currentZone = state.zones[survivor.position.zoneId];
+    if (!currentZone) return [];
+
+    // Return zones connected via closed doors
     return currentZone.connections
-      .filter(c => !(c.hasDoor && !c.doorOpen))
+      .filter(c => c.hasDoor && !c.doorOpen)
       .map(c => c.toZoneId);
   }
 
@@ -241,15 +419,52 @@ export class InputController {
     }
   }
 
-  private sendMoveAction(targetZoneId: ZoneId): void {
+  private sendMoveAction(targetZoneId: ZoneId, state?: GameState): void {
     if (!this.selectedSurvivorId) return;
 
-    networkManager.sendAction({
-      playerId: this.localPlayerId,
-      survivorId: this.selectedSurvivorId,
-      type: ActionType.MOVE,
-      payload: { targetZoneId },
-    });
+    // Check if target is a direct neighbor
+    const survivor = state?.survivors[this.selectedSurvivorId];
+    const currentZone = survivor ? state?.zones[survivor.position.zoneId] : null;
+    const isDirect = currentZone?.connections.some(c => c.toZoneId === targetZoneId && !(c.hasDoor && !c.doorOpen));
+
+    if (isDirect || !state || !currentZone) {
+      networkManager.sendAction({
+        playerId: this.localPlayerId,
+        survivorId: this.selectedSurvivorId,
+        type: ActionType.MOVE,
+        payload: { targetZoneId },
+      });
+    } else {
+      // 2-zone move: find intermediate zone
+      const path = this.findMovePath(state, survivor!.position.zoneId, targetZoneId);
+      if (path) {
+        networkManager.sendAction({
+          playerId: this.localPlayerId,
+          survivorId: this.selectedSurvivorId,
+          type: ActionType.MOVE,
+          payload: { path },
+        });
+      }
+    }
+  }
+
+  private findMovePath(state: GameState, fromZoneId: ZoneId, targetZoneId: ZoneId): ZoneId[] | null {
+    const fromZone = state.zones[fromZoneId];
+    if (!fromZone) return null;
+
+    for (const conn of fromZone.connections) {
+      if (conn.hasDoor && !conn.doorOpen) continue;
+      const midZone = state.zones[conn.toZoneId];
+      if (!midZone) continue;
+
+      for (const conn2 of midZone.connections) {
+        if (conn2.hasDoor && !conn2.doorOpen) continue;
+        if (conn2.toZoneId === targetZoneId) {
+          return [conn.toZoneId, targetZoneId];
+        }
+      }
+    }
+    return null;
   }
 
   private sendAttackAction(targetZoneId: ZoneId): void {
@@ -337,12 +552,22 @@ export class InputController {
         ? layout.centroidY * TILE_SIZE + TILE_SIZE / 2
         : layout.row * TILE_SIZE + TILE_SIZE / 2;
 
+      // Zone bounds for clamping (matches renderer's calculatePosition)
+      const margin = ENTITY_RADIUS;
+      const zoneLeft = layout.col * TILE_SIZE + margin;
+      const zoneRight = (layout.col + layout.w) * TILE_SIZE - margin;
+      const zoneTop = layout.row * TILE_SIZE + margin;
+      const zoneBottom = (layout.row + layout.h) * TILE_SIZE - margin;
+
       for (let i = 0; i < zoneSurvivors.length; i++) {
         const offsetX = -20 + (i % 3) * 40;
         const offsetY = -20 - Math.floor(i / 3) * 40;
 
-        const cx = centerX + offsetX;
-        const cy = centerY + offsetY;
+        let cx = centerX + offsetX;
+        let cy = centerY + offsetY;
+        // Clamp to zone bounds
+        cx = Math.max(zoneLeft, Math.min(zoneRight, cx));
+        cy = Math.max(zoneTop, Math.min(zoneBottom, cy));
 
         // Circle hit test
         const dx = x - cx;

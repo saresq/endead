@@ -11,3 +11,5 @@ export const TILE_PIXEL_SIZE = TILE_SIZE * TILE_CELLS_PER_SIDE; // 450
 
 export const ENTITY_RADIUS = 15;
 export const ENTITY_SPACING = 40;
+export const MIN_ENTITY_RADIUS = 8;        // Floor below which we group instead
+export const GROUP_BADGE_RADIUS = 14;       // Size of the "x12" badge circle

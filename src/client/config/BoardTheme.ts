@@ -37,6 +37,8 @@ export const BOARD_THEME = {
     plankGap: 0,         // gap between planks
     plankBorder: 0xFFC864, // light border around door group (like editor)
     plankBorderAlpha: 0.6,
+    highlightColor: 0xFF8800,  // orange highlight for openable doors
+    highlightAlpha: 0.4,
   },
   doorway: {
     color: 0x44AA44,
@@ -66,10 +68,17 @@ export const BOARD_THEME = {
     iconColor: 0xFFFFFF,
   },
   spawn: {
-    skullColor: 0xFF0000,
-    strokeColor: 0x000000,
+    bgColor: 0x661111,
+    bgAlpha: 0.85,
+    bgWidth: 40,
+    bgHeight: 36,
+    bgRadius: 4,
+    strokeColor: 0x991111,
+    strokeWidth: 2,
+    skullSize: 28,
     numberColor: 0xFFFFFF,
     numberStroke: 0x000000,
+    numberFontSize: 14,
   },
   exit: {
     fillColor: 0x2244AA,
@@ -106,6 +115,16 @@ export const BOARD_THEME = {
     abomination: 0x8b2020,
     initialColor: 0xDDDDDD,
     initialFontSize: 14,
+  },
+
+  // ─── Group badge (zombie overflow) ────────────────
+  groupBadge: {
+    bgColor: 0x333333,
+    bgAlpha: 0.9,
+    textColor: 0xFFFFFF,
+    fontSize: 12,
+    strokeColor: 0x000000,
+    strokeWidth: 2,
   },
 
   // ─── Editor grid ──────────────────────────────────

@@ -20,8 +20,16 @@ export class LobbyUI {
   private state: GameState | null = null;
   private availableMaps: { id: string; name: string; width: number; height: number }[] = [];
   private selectedMapId: string | null = null;
+  private abominationFest = false;
   private nameDebounceTimer: number | null = null;
   private roomPillCopied = false;
+  // Stable shell elements
+  private elCard: HTMLDivElement | null = null;
+  private elRoomPill: HTMLDivElement | null = null;
+  private elPlayers: HTMLDivElement | null = null;
+  private elControls: HTMLDivElement | null = null;
+  private elFooter: HTMLDivElement | null = null;
+  private shellBuilt = false;
 
   constructor(playerId: PlayerId, roomId: string) {
     this.localPlayerId = playerId;
@@ -32,6 +40,7 @@ export class LobbyUI {
     this.container.className = 'lobby';
     document.body.appendChild(this.container);
 
+    this.attachListeners();
     this.fetchMaps();
     this.render();
   }
@@ -66,14 +75,46 @@ export class LobbyUI {
 
   // ─── Rendering ───────────────────────────────────────────────
 
+  private buildShell(): void {
+    if (this.shellBuilt) return;
+    this.container.innerHTML = '';
+
+    this.elCard = document.createElement('div');
+    this.elCard.className = 'lobby__card';
+
+    const title = document.createElement('h1');
+    title.className = 'lobby__title';
+    title.textContent = 'Lobby';
+
+    this.elRoomPill = document.createElement('div');
+    this.elRoomPill.className = 'flex-center';
+
+    this.elPlayers = document.createElement('div');
+    this.elPlayers.className = 'lobby__players';
+
+    // Use display:contents so this wrapper is invisible to the flex layout
+    this.elControls = document.createElement('div');
+    this.elControls.style.display = 'contents';
+
+    this.elFooter = document.createElement('div');
+    this.elFooter.className = 'lobby__footer';
+
+    this.elCard.append(title, this.elRoomPill, this.elPlayers, this.elControls, this.elFooter);
+    this.container.appendChild(this.elCard);
+    this.shellBuilt = true;
+  }
+
   private render(): void {
     if (!this.state) {
       this.container.innerHTML = `
         <div class="lobby__card">
           <div class="lobby__waiting">Connecting to lobby...</div>
         </div>`;
+      this.shellBuilt = false;
       return;
     }
+
+    this.buildShell();
 
     const isHost = this.state.lobby.players.length > 0 && this.state.lobby.players[0].id === this.localPlayerId;
     const myPlayer = this.state.lobby.players.find(p => p.id === this.localPlayerId);
@@ -83,48 +124,57 @@ export class LobbyUI {
       if (p.characterClass) takenClasses.set(p.characterClass, p.name);
     });
 
-    const availableClasses = ['Wanda', 'Doug', 'Amy', 'Ned', 'Phil', 'Josh'];
+    const availableClasses = Object.keys(CHARACTER_DEFINITIONS);
 
-    this.container.innerHTML = `
-      <div class="lobby__card">
-        <h1 class="lobby__title">Lobby</h1>
+    this.elRoomPill!.innerHTML = this.renderRoomPill();
 
-        <div class="flex-center">
-          ${this.renderRoomPill()}
+    this.elPlayers!.innerHTML = this.state.lobby.players.length === 0
+      ? '<div class="lobby__players-empty">No players yet...</div>'
+      : this.state.lobby.players.map((p, idx) => this.renderPlayerCard(p, idx, isHost)).join('');
+
+    // Preserve nickname input focus/cursor position across renders
+    const activeEl = document.activeElement;
+    const nicknameInput = this.container.querySelector('#lobby-nickname') as HTMLInputElement | null;
+    const hadFocus = activeEl === nicknameInput;
+    const prevCursor = nicknameInput?.selectionStart ?? null;
+
+    this.elControls!.innerHTML = myPlayer ? `
+      <div class="lobby__controls">
+        <div class="form-group">
+          <label class="form-label">Your Name</label>
+          <input type="text" class="input" id="lobby-nickname" value="${this.escHtml(myPlayer.name)}" placeholder="Enter name" maxlength="24" aria-label="Your display name">
         </div>
 
-        <div class="lobby__players">
-          ${this.state.lobby.players.length === 0
-            ? '<div class="lobby__players-empty">No players yet...</div>'
-            : this.state.lobby.players.map((p, idx) => this.renderPlayerCard(p, idx, isHost)).join('')}
-        </div>
-
-        ${myPlayer ? `
-          <div class="lobby__controls">
-            <div class="form-group">
-              <label class="form-label">Your Name</label>
-              <input type="text" class="input" id="lobby-nickname" value="${this.escHtml(myPlayer.name)}" placeholder="Enter name" maxlength="24" aria-label="Your display name">
-            </div>
-
-            <div>
-              <div class="lobby__class-title">Choose Character</div>
-              <div class="lobby__class-grid" role="radiogroup" aria-label="Character selection">
-                ${availableClasses.map(c => this.renderClassButton(c, myPlayer.characterClass, takenClasses)).join('')}
-              </div>
-              ${myPlayer.characterClass ? this.renderCharacterPanel(myPlayer.characterClass) : ''}
-            </div>
-
-            ${isHost ? this.renderHostControls() : '<div class="lobby__waiting">Waiting for host to start...</div>'}
+        <div>
+          <div class="lobby__class-title">Choose Character</div>
+          <div class="lobby__class-grid" role="radiogroup" aria-label="Character selection">
+            ${availableClasses.map(c => this.renderClassButton(c, myPlayer.characterClass, takenClasses)).join('')}
           </div>
-        ` : ''}
-
-        <div class="lobby__footer">
-          ${renderButton({ label: 'Leave Room', icon: 'ArrowLeft', variant: 'ghost', dataAction: 'leave-room' })}
+          ${myPlayer.characterClass ? this.renderCharacterPanel(myPlayer.characterClass) : ''}
         </div>
-      </div>
-    `;
 
-    this.attachListeners();
+        ${isHost ? this.renderHostControls() : '<div class="lobby__waiting">Waiting for host to start...</div>'}
+      </div>
+    ` : '';
+
+    // Restore focus if the nickname input was focused before render
+    if (hadFocus) {
+      const newInput = this.container.querySelector('#lobby-nickname') as HTMLInputElement | null;
+      if (newInput) {
+        newInput.focus();
+        if (prevCursor !== null) {
+          newInput.setSelectionRange(prevCursor, prevCursor);
+        }
+      }
+    }
+
+    // Restore map select and abomination fest values
+    const mapSelect = this.container.querySelector('#lobby-map-select') as HTMLSelectElement | null;
+    if (mapSelect && this.selectedMapId) mapSelect.value = this.selectedMapId;
+    const abomCheck = this.container.querySelector('#lobby-abom-fest') as HTMLInputElement | null;
+    if (abomCheck) abomCheck.checked = this.abominationFest;
+
+    this.elFooter!.innerHTML = renderButton({ label: 'Leave Room', icon: 'ArrowLeft', variant: 'ghost', dataAction: 'leave-room' });
   }
 
   private renderRoomPill(): string {
@@ -213,6 +263,15 @@ export class LobbyUI {
         <select class="select" id="lobby-map-select" aria-label="Select map">${mapOptions}</select>
       </div>
 
+      <div class="lobby__config">
+        <div class="lobby__config-title">Game Settings</div>
+        <label class="lobby__toggle">
+          <input type="checkbox" id="lobby-abom-fest" ${this.abominationFest ? 'checked' : ''}>
+          <span class="lobby__toggle-label">Abomination Fest</span>
+          <span class="lobby__toggle-hint">Allow unlimited Abominations on the board</span>
+        </label>
+      </div>
+
       ${renderButton({
         label: `Start Game (${playerCount} player${playerCount !== 1 ? 's' : ''})`,
         icon: 'Play',
@@ -284,18 +343,37 @@ export class LobbyUI {
       </div>`;
   }
 
-  // ─── Event Handling ──────────────────────────────────────────
+  // ─── Event Handling (attached once in constructor, delegates via container) ──
+
+  private pushNicknameUpdate(): void {
+    const nameInput = this.container.querySelector('#lobby-nickname') as HTMLInputElement | null;
+    const nextName = nameInput?.value.trim();
+    if (!nextName) return;
+    localStorage.setItem('endead_nickname', nextName.slice(0, 24));
+    networkManager.sendAction({
+      playerId: this.localPlayerId,
+      type: ActionType.UPDATE_NICKNAME,
+      payload: { name: nextName },
+    });
+  }
 
   private attachListeners(): void {
-    // Delegated click handler
+    // Click delegation
     this.container.addEventListener('click', (e) => {
-      const target = (e.target as HTMLElement).closest('[data-action]') as HTMLElement | null;
-      if (!target) return;
+      const actionEl = (e.target as HTMLElement).closest('[data-action]') as HTMLElement | null;
+      const clickedEl = e.target as HTMLElement;
 
-      const action = target.dataset.action;
+      // Room pill copy (check by id since it's not a data-action)
+      if (clickedEl.closest('#room-pill')) {
+        this.handleRoomPillCopy();
+        return;
+      }
+
+      if (!actionEl) return;
+      const action = actionEl.dataset.action;
 
       if (action === 'select-class') {
-        const charClass = target.dataset.id;
+        const charClass = actionEl.dataset.id;
         const nameInput = this.container.querySelector('#lobby-nickname') as HTMLInputElement | null;
         if (charClass) {
           networkManager.sendAction({
@@ -308,7 +386,7 @@ export class LobbyUI {
       }
 
       if (action === 'kick-player') {
-        const targetId = target.dataset.id;
+        const targetId = actionEl.dataset.id;
         if (targetId) {
           modalManager.open({
             title: 'Kick Player?',
@@ -340,7 +418,7 @@ export class LobbyUI {
         networkManager.sendAction({
           playerId: this.localPlayerId,
           type: ActionType.START_GAME,
-          payload: { map },
+          payload: { map, abominationFest: this.abominationFest },
         });
         return;
       }
@@ -353,57 +431,49 @@ export class LobbyUI {
       }
     });
 
-    // Room pill copy
-    const roomPill = this.container.querySelector('#room-pill');
-    roomPill?.addEventListener('click', async () => {
-      const roomUrl = `${window.location.origin}/room/${this.roomId}`;
-      try {
-        await navigator.clipboard.writeText(roomUrl);
-        this.roomPillCopied = true;
-        this.render();
-        notificationManager.show({ variant: 'success', message: 'Room URL copied!', priority: 'low' });
-        setTimeout(() => {
-          this.roomPillCopied = false;
-          this.render();
-        }, 2000);
-      } catch {
-        notificationManager.show({ variant: 'warning', message: 'Could not copy URL. Room code: ' + this.roomId });
+    // Nickname input — debounced (delegated since input is re-created on render)
+    this.container.addEventListener('input', (e) => {
+      if ((e.target as HTMLElement).id === 'lobby-nickname') {
+        if (this.nameDebounceTimer) clearTimeout(this.nameDebounceTimer);
+        this.nameDebounceTimer = window.setTimeout(() => this.pushNicknameUpdate(), 500);
       }
     });
 
-    // Nickname input — debounced
-    const nameInput = this.container.querySelector('#lobby-nickname') as HTMLInputElement | null;
-    if (nameInput) {
-      const pushNicknameUpdate = () => {
-        const nextName = nameInput.value.trim();
-        if (!nextName) return;
-        localStorage.setItem('endead_nickname', nextName.slice(0, 24));
-        networkManager.sendAction({
-          playerId: this.localPlayerId,
-          type: ActionType.UPDATE_NICKNAME,
-          payload: { name: nextName },
-        });
-      };
-
-      nameInput.addEventListener('input', () => {
-        if (this.nameDebounceTimer) clearTimeout(this.nameDebounceTimer);
-        this.nameDebounceTimer = window.setTimeout(pushNicknameUpdate, 500);
-      });
-
-      nameInput.addEventListener('blur', () => {
+    this.container.addEventListener('blur', (e) => {
+      if ((e.target as HTMLElement).id === 'lobby-nickname') {
         if (this.nameDebounceTimer) {
           clearTimeout(this.nameDebounceTimer);
           this.nameDebounceTimer = null;
         }
-        pushNicknameUpdate();
-      });
-    }
+        this.pushNicknameUpdate();
+      }
+    }, true); // capture phase for blur
 
-    // Map select
-    const mapSelect = this.container.querySelector('#lobby-map-select');
-    mapSelect?.addEventListener('change', (e) => {
-      this.selectedMapId = (e.target as HTMLSelectElement).value;
+    // Map select + Abomination Fest toggle (delegated)
+    this.container.addEventListener('change', (e) => {
+      const target = e.target as HTMLElement;
+      if (target.id === 'lobby-map-select') {
+        this.selectedMapId = (target as HTMLSelectElement).value;
+      } else if (target.id === 'lobby-abom-fest') {
+        this.abominationFest = (target as HTMLInputElement).checked;
+      }
     });
+  }
+
+  private async handleRoomPillCopy(): Promise<void> {
+    const roomUrl = `${window.location.origin}/room/${this.roomId}`;
+    try {
+      await navigator.clipboard.writeText(roomUrl);
+      this.roomPillCopied = true;
+      this.render();
+      notificationManager.show({ variant: 'success', message: 'Room URL copied!', priority: 'low' });
+      setTimeout(() => {
+        this.roomPillCopied = false;
+        this.render();
+      }, 2000);
+    } catch {
+      notificationManager.show({ variant: 'warning', message: 'Could not copy URL. Room code: ' + this.roomId });
+    }
   }
 
   // ─── Helpers ─────────────────────────────────────────────────

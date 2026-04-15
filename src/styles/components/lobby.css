@@ -312,6 +312,58 @@
   font-style: italic;
 }
 
+/* ---------- Game Config ---------- */
+
+.lobby__config {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.lobby__config-title {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--text-secondary);
+}
+
+.lobby__toggle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--surface-2);
+  border: 1px solid var(--surface-4);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-in-out);
+}
+
+.lobby__toggle:hover {
+  background: var(--surface-3);
+}
+
+.lobby__toggle input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.lobby__toggle-label {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+}
+
+.lobby__toggle-hint {
+  width: 100%;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  padding-left: 26px;
+  margin-top: calc(-1 * var(--space-1));
+}
+
 /* ---------- Waiting / Footer ---------- */
 
 .lobby__waiting {

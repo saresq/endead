@@ -16,7 +16,7 @@ export function replayGame(
   actionHistory: GameState['history']
 ): GameState {
   // 1. Deep clone the initial state to ensure purity
-  let currentState: GameState = JSON.parse(JSON.stringify(initialState));
+  let currentState: GameState = structuredClone(initialState);
   
   // Reset history on the replay instance so we don't duplicate the logs
   // (ActionProcessor will generate new logs with new timestamps)

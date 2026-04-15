@@ -325,4 +325,23 @@ export const SURVIVOR_CLASSES: Record<string, ClassProgression> = {
     [DangerLevel.Orange]: ['ambidextrous', 'born_leader'],
     [DangerLevel.Red]: ['plus_1_die_ranged', 'plus_1_die_melee', 'lucky'],
   },
+  // // Test character — all skills unlocked at Blue level
+  // 'H4x0r': {
+  //   [DangerLevel.Blue]: [
+  //     'plus_1_action', 'slippery', 'sprint', 'charge',
+  //     'hit_and_run', 'plus_1_free_move', 'plus_1_free_search', 'plus_1_free_combat',
+  //     'plus_1_free_melee', 'plus_1_free_ranged',
+  //     'plus_1_damage_melee', 'plus_1_damage_ranged', 'plus_1_damage_combat',
+  //     'plus_1_die_melee', 'plus_1_die_ranged', 'plus_1_die_combat',
+  //     'plus_1_max_range', 'lucky', 'sniper', 'tough', 'steady_hand',
+  //     'search_anywhere', 'super_strength', 'reaper_combat', 'reaper_melee',
+  //     'point_blank', 'born_leader', 'bloodlust_melee', 'lifesaver',
+  //     'ambidextrous', 'swordmaster', 'barbarian', 'medic',
+  //     'hold_your_nose', 'matching_set', 'search_plus_1',
+  //     'can_search_more_than_once', 'low_profile', 'is_that_all_youve_got',
+  //   ],
+  //   [DangerLevel.Yellow]: [],
+  //   [DangerLevel.Orange]: [],
+  //   [DangerLevel.Red]: [],
+  // },
 };

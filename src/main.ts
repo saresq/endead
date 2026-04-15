@@ -254,6 +254,11 @@ async function startRoom(roomId: string): Promise<void> {
             entityId: op.path[0] as string,
           });
           audioManager.playSFX('zombie_spawn');
+        } else if (op.op === 'remove' && op.path.length === 1) {
+          animationController.handleEvent({
+            type: 'DEATH',
+            entityId: op.path[0] as string,
+          });
         }
       }
     }
@@ -292,13 +297,22 @@ async function startRoom(roomId: string): Promise<void> {
 
     if (error.code === 'SESSION_REPLACED') {
       showMenu('Session replaced by another connection.');
+      return;
     }
 
     if (error.code === 'KICKED') {
       networkManager.disconnect();
       window.history.pushState({}, '', '/');
       showMenu('You were kicked by the host.');
+      return;
     }
+
+    // Action rejection — show notification so player knows what went wrong
+    notificationManager.show({
+      variant: 'danger',
+      message: error.message || 'Action failed',
+      duration: 3000,
+    });
   };
 
   networkManager.connect();

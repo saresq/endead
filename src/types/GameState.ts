@@ -67,6 +67,7 @@ export interface SpawnDetail {
   };
   extraActivation?: ZombieType; // e.g. "All Walkers move"
   doubleSpawn?: boolean;
+  rush?: boolean; // Spawned zombies immediately activate (only the just-spawned ones)
 }
 
 export interface SpawnCard {
@@ -309,6 +310,8 @@ export interface GameState {
   config: {
     maxSurvivors: number;
     friendlyFire: boolean;
+    abominationFest?: boolean; // Allow unlimited Abominations (default: false = max 1)
+    zombiePool: { [key in ZombieType]: number }; // Miniature pool limits
   };
   
   // History
@@ -415,6 +418,13 @@ export const initialGameState: GameState = {
   config: {
     maxSurvivors: 6,
     friendlyFire: true,
+    abominationFest: false,
+    zombiePool: {
+      [ZombieType.Walker]: 40,
+      [ZombieType.Runner]: 16,
+      [ZombieType.Brute]: 16,
+      [ZombieType.Abomination]: 4,
+    },
   },
 
   history: []

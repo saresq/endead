@@ -56,7 +56,7 @@ export class DeckService {
    * Draws a card from the deck. Reshuffles discard if empty.
    */
   public static drawCard(state: GameState): { card: EquipmentCard | null, newState: GameState } {
-    const newState = JSON.parse(JSON.stringify(state)); // Deep clone
+    const newState = structuredClone(state);
     
     if (newState.equipmentDeck.length === 0) {
       if (newState.equipmentDiscard.length === 0) {
@@ -79,7 +79,7 @@ export class DeckService {
    * Draws a spawn card.
    */
   public static drawSpawnCard(state: GameState): { card: SpawnCard | null, newState: GameState } {
-    const newState = JSON.parse(JSON.stringify(state)); // Deep clone
+    const newState = structuredClone(state);
     
     if (newState.spawnDeck.length === 0) {
       if (newState.spawnDiscard.length === 0) {
