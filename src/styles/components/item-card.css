@@ -15,7 +15,7 @@
   position: relative;
   min-width: 0;
   user-select: none;
-  overflow: hidden;
+  overflow: visible;
   transition:
     background var(--duration-fast) var(--ease-military),
     border-color var(--duration-fast) var(--ease-military),
