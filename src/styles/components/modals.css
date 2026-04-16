@@ -1,6 +1,25 @@
 /* ==========================================================================
-   Modals — Backdrop, card shell, sizes, bottom-sheet, animations
+   Modals — Tactical overlay shells. Clipped corners, scanline surfaces,
+   danger-reactive borders. Each modal reads as a field terminal popup.
    ========================================================================== */
+
+/* ---------- Keyframes ---------- */
+
+@keyframes modal-scanline-sweep {
+  0%   { transform: translateY(-100%); opacity: 0.06; }
+  100% { transform: translateY(100%); opacity: 0.06; }
+}
+
+@keyframes modal-border-charge {
+  0%   { opacity: 0.4; }
+  50%  { opacity: 1; }
+  100% { opacity: 0.4; }
+}
+
+@keyframes modal-corner-flare {
+  0%, 100% { opacity: 0.6; }
+  50%       { opacity: 1; }
+}
 
 /* ---------- Backdrop ---------- */
 
@@ -8,12 +27,33 @@
   position: fixed;
   inset: 0;
   z-index: var(--z-overlay);
-  background: rgba(13, 15, 20, 0.7);
+  background: var(--modal-backdrop);
   display: flex;
   align-items: center;
   justify-content: center;
   opacity: 0;
   transition: opacity var(--duration-slow) var(--ease-in-out);
+
+  /* Tactical grid underlay on backdrop */
+  background-image:
+    linear-gradient(
+      var(--modal-backdrop),
+      var(--modal-backdrop)
+    ),
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 40px,
+      rgba(255,255,255,0.012) 40px,
+      rgba(255,255,255,0.012) 41px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 40px,
+      rgba(255,255,255,0.012) 40px,
+      rgba(255,255,255,0.012) 41px
+    );
 }
 
 .modal-backdrop--visible {
@@ -22,35 +62,102 @@
 
 /* ---------- Modal Card ---------- */
 
-/* Scoped under .modal-backdrop so legacy .modal (PickupUI, TradeUI) is unaffected */
 .modal-backdrop > .modal {
+  position: relative;
   z-index: var(--z-modal);
-  background: var(--surface-2);
+  background: var(--dl-surface-2, var(--surface-2));
   color: var(--text-primary);
   display: flex;
   flex-direction: column;
   max-height: 85vh;
   overflow: hidden;
-  box-shadow: var(--shadow-lg);
 
-  /* Desktop: centered with scale animation */
-  border-radius: var(--radius-xl);
-  transform: scale(0.95);
+  /* Tactical clipped-corner geometry */
+  clip-path: polygon(
+    var(--modal-corner-inset) 0%,
+    100% 0%,
+    100% calc(100% - var(--modal-corner-inset)),
+    calc(100% - var(--modal-corner-inset)) 100%,
+    0% 100%,
+    0% var(--modal-corner-inset)
+  );
+
+  border: var(--border-thin) solid var(--dl-border);
+  box-shadow: var(--dl-modal-shadow);
+
+  /* Enter animation */
+  transform: scale(0.95) translateY(-4px);
   opacity: 0;
-  transition: transform var(--duration-slow) var(--ease-out),
-              opacity var(--duration-slow) var(--ease-out);
+  transition:
+    transform var(--duration-slow) var(--ease-out),
+    opacity   var(--duration-slow) var(--ease-out);
+}
+
+/* Scanline sweep overlay — baked into the modal surface */
+.modal-backdrop > .modal::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+
+  /* Scanlines */
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent var(--hud-scanline-size),
+    var(--hud-scanline-color) var(--hud-scanline-size),
+    var(--hud-scanline-color) calc(var(--hud-scanline-size) * 2)
+  );
+  opacity: var(--dl-scanline-opacity);
+}
+
+/* Grain texture overlay */
+.modal-backdrop > .modal::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: var(--grain-url);
+  background-size: 200px 200px;
+  opacity: var(--dl-grain-opacity);
+  mix-blend-mode: overlay;
+}
+
+/* Top-edge accent bar — danger-reactive */
+.modal-backdrop > .modal .modal__header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--border-thick);
+  background: var(--dl-topbar-border);
+  box-shadow: 0 0 8px var(--dl-topbar-glow), 0 0 20px var(--dl-glow-intense);
+  opacity: 0.9;
+  animation: var(--dl-accent-pulse);
+  pointer-events: none;
 }
 
 .modal-backdrop > .modal.modal--visible {
-  transform: scale(1);
+  transform: scale(1) translateY(0);
   opacity: 1;
+}
+
+/* ---------- Tactical corner brackets — pseudo-element decorations ---------- */
+
+/* Top-left corner bracket */
+.modal-backdrop > .modal .modal__body::before,
+.modal-backdrop > .modal .modal__body::after {
+  display: none; /* Reserved — corners handled via header/footer */
 }
 
 /* ---------- Sizes ---------- */
 
-.modal-backdrop > .modal--sm { width: 400px; max-width: 95vw; }
-.modal-backdrop > .modal--md { width: 560px; max-width: 95vw; }
-.modal-backdrop > .modal--lg { width: 720px; max-width: 95vw; }
+.modal-backdrop > .modal--sm { width: 400px;  max-width: 95vw; }
+.modal-backdrop > .modal--md { width: 560px;  max-width: 95vw; }
+.modal-backdrop > .modal--lg { width: 720px;  max-width: 95vw; }
 
 /* ---------- Drag Handle (mobile bottom-sheet) ---------- */
 
@@ -61,18 +168,37 @@
 /* ---------- Header ---------- */
 
 .modal__header {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: var(--space-4) var(--space-5);
-  border-bottom: 1px solid var(--surface-4);
+  border-bottom: var(--border-thin) solid var(--dl-border);
   flex-shrink: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(255,255,255,0.025) 0%,
+    transparent 100%
+  );
+
+  /* Left inset accent stripe */
+  border-left: var(--border-heavy) solid var(--dl-topbar-border);
 }
 
 .modal__header--minimal {
+  position: absolute;
+  top: 0;
+  right: 0;
   border-bottom: none;
+  border-left: none;
   justify-content: flex-end;
-  padding: var(--space-3) var(--space-3) 0;
+  padding: var(--space-3);
+  z-index: 1;
+  background: none;
+}
+
+.modal__header--minimal::before {
+  display: none;
 }
 
 .modal__header-text {
@@ -83,29 +209,67 @@
 }
 
 .modal__title {
-  font-size: var(--text-lg);
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
   font-weight: var(--font-bold);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wider);
   margin: 0;
-  line-height: 1.3;
+  line-height: 1.15;
+  color: var(--dl-text-readout, var(--text-primary));
+
+  /* Subtle text glow matching danger level */
+  text-shadow: 0 0 16px var(--dl-glow-intense);
 }
 
 .modal__subtitle {
-  font-size: var(--text-sm);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
   color: var(--text-muted);
   line-height: 1.4;
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+}
+
+/* Tactical designation prefix — visual field ID stamp */
+.modal__title::before {
+  content: '// ';
+  color: var(--dl-hud-tint);
+  opacity: 0.5;
+  font-family: var(--font-mono);
+  font-size: 0.75em;
+  font-weight: var(--font-normal);
+  letter-spacing: 0;
 }
 
 .modal__close {
   flex-shrink: 0;
   margin-left: auto;
+  position: relative;
+  z-index: 1;
 }
 
 /* ---------- Divider ---------- */
 
 .modal__divider {
   border: none;
-  border-top: 1px solid var(--surface-4);
+  border-top: var(--border-thin) solid var(--dl-border);
   margin: 0;
+  position: relative;
+}
+
+/* Center tick mark on divider */
+.modal__divider::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -3px;
+  transform: translateX(-50%);
+  width: 6px;
+  height: 5px;
+  background: var(--dl-topbar-border);
+  opacity: 0.5;
+  clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
 }
 
 /* ---------- Body ---------- */
@@ -115,6 +279,29 @@
   overflow-y: auto;
   padding: var(--space-5);
   overscroll-behavior: contain;
+  position: relative;
+  z-index: 1;
+
+  /* Tactical scrollbar */
+  scrollbar-width: thin;
+  scrollbar-color: var(--dl-border) transparent;
+}
+
+.modal__body::-webkit-scrollbar {
+  width: 4px;
+}
+
+.modal__body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.modal__body::-webkit-scrollbar-thumb {
+  background: var(--dl-border);
+  border-radius: var(--radius-sm);
+}
+
+.modal__body::-webkit-scrollbar-thumb:hover {
+  background: var(--dl-hud-border);
 }
 
 /* Stack body content with consistent spacing */
@@ -132,8 +319,42 @@
   justify-content: flex-end;
   gap: var(--space-3);
   padding: var(--space-4) var(--space-5);
-  border-top: 1px solid var(--surface-4);
+  border-top: var(--border-thin) solid var(--dl-border);
   flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+
+  /* Bottom surface — slightly lighter inset to read as tray */
+  background: linear-gradient(
+    0deg,
+    rgba(0,0,0,0.18) 0%,
+    transparent 100%
+  );
+}
+
+/* Corner accent tick at bottom-right */
+.modal__footer::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: var(--modal-corner-inset);
+  height: var(--modal-corner-inset);
+  border-right: var(--border-thick) solid var(--dl-topbar-border);
+  border-bottom: var(--border-thick) solid var(--dl-topbar-border);
+  opacity: 0.5;
+  animation: var(--dl-accent-pulse);
+}
+
+/* ---------- Danger-level side glow pulse ---------- */
+
+[data-danger="orange"] .modal-backdrop > .modal,
+[data-danger="red"]    .modal-backdrop > .modal {
+  box-shadow: var(--dl-modal-shadow), inset 0 0 40px var(--dl-glow);
+}
+
+[data-danger="red"] .modal-backdrop > .modal {
+  animation: critical-strobe 4s ease-in-out infinite;
 }
 
 /* ---------- Mobile Bottom Sheet ---------- */
@@ -146,10 +367,20 @@
   .modal-backdrop > .modal {
     width: 100%;
     max-width: 100%;
-    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+
+    /* Bottom sheet — flat bottom, clipped top corners only */
+    clip-path: polygon(
+      var(--modal-corner-inset) 0%,
+      calc(100% - var(--modal-corner-inset)) 0%,
+      100% var(--modal-corner-inset),
+      100% 100%,
+      0% 100%,
+      0% var(--modal-corner-inset)
+    );
+    border-radius: 0;
     max-height: 85vh;
 
-    /* Slide up animation instead of scale */
+    /* Slide up from bottom */
     transform: translateY(100%);
     opacity: 1;
     transition: transform var(--duration-slow) var(--ease-out);
@@ -157,20 +388,31 @@
 
   .modal-backdrop > .modal.modal--visible {
     transform: translateY(0);
+    opacity: 1;
+  }
+
+  /* Top-edge bar spans full width on mobile sheet */
+  .modal-backdrop > .modal .modal__header::before {
+    left: var(--modal-corner-inset);
+    right: var(--modal-corner-inset);
   }
 
   .modal__drag-handle {
     display: flex;
     justify-content: center;
-    padding: var(--space-2) 0;
+    align-items: center;
+    padding: var(--space-3) 0 var(--space-2);
     flex-shrink: 0;
+    position: relative;
+    z-index: 1;
   }
 
   .modal__drag-handle span {
-    width: 32px;
-    height: 4px;
-    background: var(--surface-4);
+    width: 40px;
+    height: 3px;
+    background: var(--dl-hud-border);
     border-radius: var(--radius-full);
+    box-shadow: 0 0 6px var(--dl-glow-intense);
   }
 
   .modal__header {
@@ -183,7 +425,13 @@
 
   .modal__footer {
     padding: var(--space-3) var(--space-4);
-    padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom));
+    padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+  }
+
+  /* Footer corner tick adapts to full-width sheet */
+  .modal__footer::after {
+    width: calc(var(--modal-corner-inset) * 0.75);
+    height: calc(var(--modal-corner-inset) * 0.75);
   }
 }
 
@@ -191,4 +439,107 @@
 
 .modal--persistent .modal__close {
   display: none;
+}
+
+/* ---------- Section label inside modal body ---------- */
+
+.modal__section-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: var(--font-medium);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-widest);
+  color: var(--dl-hud-tint);
+  opacity: 0.65;
+  margin-bottom: var(--space-2);
+}
+
+/* ---------- Danger-level header tinting ---------- */
+
+[data-danger="red"]    .modal__title,
+[data-danger="orange"] .modal__title {
+  color: var(--dl-text-readout);
+}
+
+[data-danger="red"] .modal__title::before,
+[data-danger="orange"] .modal__title::before {
+  color: var(--dl-hud-tint);
+  opacity: 0.7;
+}
+
+[data-danger="red"] .modal__drag-handle span {
+  animation: modal-border-charge 1.2s ease-in-out infinite;
+}
+
+/* Condensation fogging — glass cracking at high danger */
+[data-danger="orange"] .modal-backdrop > .modal::after {
+  opacity: calc(var(--dl-grain-opacity) * 1.5);
+  mix-blend-mode: soft-light;
+}
+
+[data-danger="red"] .modal-backdrop > .modal::after {
+  opacity: calc(var(--dl-grain-opacity) * 2);
+  mix-blend-mode: soft-light;
+}
+
+/* ─── Zombie target picker ──────────────────────────────────── */
+
+.zombie-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: var(--space-2);
+}
+
+.zombie-picker-btn {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--surface-2);
+  border: 2px solid var(--surface-5);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: transform var(--duration-fast) var(--ease-military), background var(--duration-fast);
+}
+
+.zombie-picker-btn:hover {
+  transform: translateY(-1px);
+  background: var(--surface-3);
+}
+
+.zombie-picker-btn__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.zombie-picker-btn__label {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.zombie-picker-btn--selected {
+  background: color-mix(in srgb, var(--danger) 18%, var(--surface-2));
+  box-shadow: 0 0 0 2px var(--danger), 0 0 12px color-mix(in srgb, var(--danger) 50%, transparent);
+}
+
+.zombie-picker-btn__order {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 11px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 6px color-mix(in srgb, var(--danger) 60%, transparent);
 }

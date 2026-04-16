@@ -23,7 +23,7 @@ export function renderStatBar(opts: StatBarOptions): string {
     <div class="stat-bar">
       <div class="stat-bar__header">
         <span class="stat-bar__icon" style="color:${opts.color}">${renderIcon(opts.icon, 'sm')}</span>
-        <span class="stat-bar__value">${label}</span>
+        <span class="stat-bar__value" style="color:${opts.color}">${label}</span>
       </div>
       <div class="stat-bar__track">
         <div class="stat-bar__fill" style="width:${pct}%;background:${opts.color}"></div>

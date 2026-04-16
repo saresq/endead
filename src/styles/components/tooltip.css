@@ -1,5 +1,7 @@
 /* ==========================================================================
-   Tooltip — Hover tooltip overlay for board entities
+   Tooltip — Tactical HUD overlay for board entity inspection
+   Military heads-up display style. Sharp corners, phosphor tint, scanline
+   texture. Danger level shifts the chromatic environment.
    ========================================================================== */
 
 .board-tooltip {
@@ -8,17 +10,63 @@
   pointer-events: none;
   max-width: 260px;
   padding: var(--space-3) var(--space-4);
-  background: var(--surface-1);
+  background: var(--dl-surface-1, var(--surface-1));
   color: var(--text-primary);
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-size: var(--text-xs);
-  line-height: 1.5;
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg), 0 0 16px rgba(0, 0, 0, 0.5);
-  border: 2px solid var(--surface-4);
+  line-height: 1.55;
+  border-radius: var(--radius-sm);
+  border: var(--border-thin) solid var(--dl-border, var(--surface-4));
+  border-top: var(--border-thick) solid var(--dl-topbar-border, var(--surface-5));
+  box-shadow:
+    var(--shadow-lg),
+    0 0 0 1px rgba(0, 0, 0, 0.6),
+    0 0 20px var(--dl-glow, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4);
   opacity: 0;
   transition: opacity var(--duration-fast) var(--ease-out);
   white-space: nowrap;
+  /* Scanline texture overlay */
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 0, 0, var(--dl-scanline-opacity, 0.12)) 2px,
+      rgba(0, 0, 0, var(--dl-scanline-opacity, 0.12)) 4px
+    );
+  /* Corner notch — top left */
+  clip-path: polygon(
+    8px 0%, 100% 0%, 100% 100%, 0% 100%, 0% 8px
+  );
+}
+
+/* Corner reticle marks — tactical HUD decoration */
+.board-tooltip::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 8px;
+  height: 8px;
+  border-top: 1px solid var(--dl-hud-tint, var(--hud-phosphor));
+  border-right: 1px solid var(--dl-hud-tint, var(--hud-phosphor));
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.board-tooltip::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  width: 8px;
+  height: 8px;
+  border-bottom: 1px solid var(--dl-hud-tint, var(--hud-phosphor));
+  border-left: 1px solid var(--dl-hud-tint, var(--hud-phosphor));
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 .board-tooltip.visible {
@@ -28,33 +76,52 @@
 /* --- Title --- */
 
 .board-tooltip .tooltip-title {
+  font-family: var(--font-display);
   font-weight: var(--font-bold);
   font-size: var(--text-sm);
   margin-bottom: var(--space-2);
-  letter-spacing: 0.04em;
+  letter-spacing: var(--letter-spacing-wider);
   text-transform: uppercase;
+  color: var(--dl-text-readout, var(--text-hud));
+  text-shadow: 0 0 8px var(--dl-topbar-glow, transparent);
 }
 
 .board-tooltip .tooltip-title--group {
-  border-bottom: 1px solid var(--surface-4);
+  border-bottom: 1px solid var(--dl-border, var(--surface-4));
   padding-bottom: var(--space-2);
+  /* Faint accent line under group titles */
+  background-image: linear-gradient(
+    90deg,
+    var(--dl-topbar-border, transparent) 0%,
+    transparent 60%
+  );
+  background-size: 100% 1px;
+  background-repeat: no-repeat;
+  background-position: bottom left;
 }
 
 .board-tooltip .tooltip-count {
+  font-family: var(--font-mono);
   font-weight: var(--font-normal);
   color: var(--text-secondary);
   font-size: var(--text-xs);
   text-transform: none;
-  letter-spacing: 0;
+  letter-spacing: var(--letter-spacing-wide);
+  opacity: 0.75;
 }
 
 /* --- Type header (group tooltip) --- */
 
 .board-tooltip .tooltip-type-header {
+  font-family: var(--font-display);
   font-weight: var(--font-semibold);
   font-size: var(--text-xs);
+  letter-spacing: var(--letter-spacing-wider);
+  text-transform: uppercase;
+  color: var(--dl-hud-tint, var(--hud-phosphor));
   margin-top: var(--space-2);
   margin-bottom: var(--space-1);
+  opacity: 0.8;
 }
 
 /* --- Key-value rows --- */
@@ -63,13 +130,25 @@
   display: flex;
   justify-content: space-between;
   gap: var(--space-3);
-  color: var(--text-secondary);
-  padding: 1px 0;
+  color: var(--text-muted);
+  padding: 2px 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.board-tooltip .tooltip-row:last-of-type {
+  border-bottom: none;
 }
 
 .board-tooltip .tooltip-row .tooltip-value {
-  color: var(--text-primary);
+  color: var(--dl-text-readout, var(--text-hud));
   font-weight: var(--font-semibold);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--letter-spacing-normal);
+  text-transform: none;
 }
 
 /* --- Health bar (multi-wound zombies) --- */
@@ -78,35 +157,62 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: 2px 0;
+  padding: 3px 0;
 }
 
 .board-tooltip .tooltip-heart {
-  color: var(--text-muted);
-  font-size: 12px;
+  color: var(--danger-bright);
+  font-size: 11px;
   line-height: 1;
   flex-shrink: 0;
+  /* Subtle pulse on critical entities */
+  filter: drop-shadow(0 0 3px var(--danger-muted));
 }
 
 .board-tooltip .tooltip-hp-track {
   flex: 1;
-  height: 6px;
-  background: var(--surface-3);
-  border-radius: 3px;
+  height: 5px;
+  background: var(--dl-surface-2, var(--surface-3));
+  border-radius: var(--radius-none);
   overflow: hidden;
   min-width: 60px;
+  box-shadow: var(--shadow-cutout);
+  /* Notched track — military readout aesthetic */
+  border: 1px solid rgba(0, 0, 0, 0.4);
+  position: relative;
 }
 
 .board-tooltip .tooltip-hp-fill {
   display: block;
   height: 100%;
-  border-radius: 3px;
-  transition: width var(--duration-fast);
+  border-radius: var(--radius-none);
+  transition: width var(--duration-fast) var(--ease-military);
+  /* Gradient: full health = green, critical = red */
+  background: linear-gradient(
+    90deg,
+    var(--success-bright) 0%,
+    var(--success) 100%
+  );
+  box-shadow: 0 0 6px var(--success-muted);
+  position: relative;
+}
+
+/* Critical HP state — fill turns danger red */
+.board-tooltip .tooltip-hp-fill[data-critical="true"],
+.board-tooltip .tooltip-hp-fill.critical {
+  background: linear-gradient(
+    90deg,
+    var(--danger-bright) 0%,
+    var(--danger) 100%
+  );
+  box-shadow: 0 0 8px var(--danger-muted);
 }
 
 .board-tooltip .tooltip-hp-text {
   color: var(--text-secondary);
-  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
   font-variant-numeric: tabular-nums;
+  letter-spacing: var(--letter-spacing-wide);
   flex-shrink: 0;
 }

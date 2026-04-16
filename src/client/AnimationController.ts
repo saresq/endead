@@ -69,6 +69,11 @@ export class AnimationController {
     const startTime = performance.now();
 
     const animate = () => {
+      if (sprite.destroyed || !sprite.position) {
+        this.app.ticker.remove(animate);
+        this.animatingEntities.delete(entityId);
+        return;
+      }
       const elapsed = performance.now() - startTime;
       const t = Math.min(elapsed / duration, 1);
 
@@ -100,13 +105,16 @@ export class AnimationController {
 
     let progress = 0;
     const animate = () => {
+      if (sprite.destroyed || !sprite.scale) {
+        this.app.ticker.remove(animate);
+        return;
+      }
       progress += 0.1;
       if (progress >= 1) {
         sprite.scale.set(1);
         sprite.alpha = 1;
         this.app.ticker.remove(animate);
       } else {
-        // Elastic ease out
         const scale = this.elasticOut(progress);
         sprite.scale.set(scale);
         sprite.alpha = progress;
@@ -122,14 +130,17 @@ export class AnimationController {
 
     let progress = 0;
     const animate = () => {
+      if (sprite.destroyed || !sprite.scale) {
+        this.app.ticker.remove(animate);
+        return;
+      }
       progress += 0.1;
       if (progress >= 1) {
         sprite.alpha = 0;
         this.app.ticker.remove(animate);
-        // Renderer will likely remove it on next render if it's gone from state
       } else {
         sprite.alpha = 1 - progress;
-        sprite.scale.set(1 + progress * 0.5); // Expand and fade
+        sprite.scale.set(1 + progress * 0.5);
       }
     };
 

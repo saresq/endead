@@ -82,12 +82,16 @@ export class LobbyUI {
     this.elCard = document.createElement('div');
     this.elCard.className = 'lobby__card';
 
+    const header = document.createElement('div');
+    header.className = 'lobby__header';
+
     const title = document.createElement('h1');
     title.className = 'lobby__title';
     title.textContent = 'Lobby';
 
     this.elRoomPill = document.createElement('div');
-    this.elRoomPill.className = 'flex-center';
+
+    header.append(title, this.elRoomPill);
 
     this.elPlayers = document.createElement('div');
     this.elPlayers.className = 'lobby__players';
@@ -99,7 +103,7 @@ export class LobbyUI {
     this.elFooter = document.createElement('div');
     this.elFooter.className = 'lobby__footer';
 
-    this.elCard.append(title, this.elRoomPill, this.elPlayers, this.elControls, this.elFooter);
+    this.elCard.append(header, this.elPlayers, this.elControls, this.elFooter);
     this.container.appendChild(this.elCard);
     this.shellBuilt = true;
   }

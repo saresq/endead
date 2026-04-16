@@ -2,7 +2,7 @@
  * ActionButton — Game action button with icon, label, keyboard hint, and states.
  *
  * Usage:
- *   renderActionButton({ id: 'btn-search', icon: 'Search', label: 'Search', kbd: 'S', cost: '1 AP', disabled: true })
+ *   renderActionButton({ id: 'btn-search', icon: 'Search', label: 'Search', kbd: 'S', cost: 'FREE', disabled: true })
  */
 
 import { icon as renderIcon } from './icons';
@@ -12,7 +12,7 @@ export interface ActionButtonOptions {
   icon: string;         // Lucide icon name
   label: string;
   kbd?: string;         // Keyboard shortcut hint (desktop only)
-  cost?: string;        // e.g. "1 AP"
+  cost?: string;        // e.g. "1 AP", "FREE" — "1 AP" is hidden (default), only FREE or 2+ AP shown
   disabled?: boolean;
   selected?: boolean;   // Active targeting mode
   highlight?: boolean;  // Special highlight (e.g. objective available)
@@ -28,7 +28,10 @@ export function renderActionButton(opts: ActionButtonOptions): string {
   ].filter(Boolean).join(' ');
 
   const kbdHtml = opts.kbd ? `<span class="action-btn__kbd">${opts.kbd}</span>` : '';
-  const costHtml = opts.cost ? `<span class="action-btn__cost">${opts.cost}</span>` : '';
+
+  // Only show cost if it's FREE or something other than the default "1 AP"
+  const showCost = opts.cost && opts.cost !== '1 AP';
+  const costHtml = showCost ? `<span class="action-btn__cost${opts.cost === 'FREE' ? ' action-btn__cost--free' : ''}">${opts.cost}</span>` : '';
 
   const ariaAttrs = [
     `role="button"`,
@@ -39,8 +42,9 @@ export function renderActionButton(opts: ActionButtonOptions): string {
 
   return `
     <button id="${opts.id}" class="${classes}" ${opts.disabled ? 'disabled' : ''} ${opts.dataAction ? `data-action="${opts.dataAction}"` : ''} ${ariaAttrs}>
-      <span class="action-btn__icon">${renderIcon(opts.icon, 'md')}</span>
+      <span class="action-btn__icon">${renderIcon(opts.icon, 'sm')}</span>
       <span class="action-btn__label">${opts.label}</span>
+      <span class="action-btn__spacer"></span>
       ${costHtml}
       ${kbdHtml}
     </button>`;

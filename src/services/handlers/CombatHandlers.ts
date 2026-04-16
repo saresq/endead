@@ -234,39 +234,26 @@ export function handleAttack(state: GameState, intent: ActionRequest): GameState
       damagePerHit: stats.damage + bonusDamage,
   };
 
-  // Targeting priority: lowest toughness first (Walker -> Runner -> Brute -> Abomination)
+  // Zombicide 2E targeting priority (ranged default):
+  // Brute/Abomination first (attacker chooses between them), then Walker, then Runner.
+  // Melee: player freely assigns hits — honor client-supplied targetZombieIds.
   let zombiesInZone = Object.values(newState.zombies).filter((z: any) => z.position.zoneId === targetZoneId) as Zombie[];
 
   const priorityMap: Record<ZombieType, number> = {
-    [ZombieType.Walker]: 1,
-    [ZombieType.Runner]: 2,
-    [ZombieType.Brute]: 3,
-    [ZombieType.Abomination]: 4
+    [ZombieType.Brute]: 1,
+    [ZombieType.Abomination]: 1,
+    [ZombieType.Walker]: 2,
+    [ZombieType.Runner]: 3,
   };
 
   zombiesInZone.sort((a, b) => priorityMap[a.type] - priorityMap[b.type]);
 
-  // Sniper: free target choice — player specifies target order
   const hasSniper = survivor.skills.includes('sniper');
-  if (hasSniper && intent.payload?.targetZombieIds?.length > 0) {
-    const targetIds: string[] = intent.payload!.targetZombieIds;
-    const orderedZombies: Zombie[] = [];
-    for (const tid of targetIds) {
-      const z = zombiesInZone.find(zz => zz.id === tid);
-      if (z) orderedZombies.push(z);
-    }
-    // Append any remaining zombies not in the list
-    for (const z of zombiesInZone) {
-      if (!orderedZombies.includes(z)) orderedZombies.push(z);
-    }
-    zombiesInZone = orderedZombies;
-  }
-
-  // Point-Blank at Range 0: no friendly fire + free target choice
   const isPointBlankShot = hasPointBlank && distance === 0;
+  // Free target choice: melee always, plus Sniper / Point-Blank for ranged.
+  const canChooseTargets = isMelee || hasSniper || isPointBlankShot;
 
-  // Point-Blank at Range 0: free target choice (same as sniper)
-  if (isPointBlankShot && intent.payload?.targetZombieIds?.length > 0) {
+  if (canChooseTargets && intent.payload?.targetZombieIds?.length > 0) {
     const targetIds: string[] = intent.payload!.targetZombieIds;
     const orderedZombies: Zombie[] = [];
     for (const tid of targetIds) {

@@ -9,12 +9,12 @@ export interface PlayerIdentity {
 }
 
 const PLAYER_IDENTITIES: PlayerIdentity[] = [
-  { primary: '#ef4444', primaryNumeric: 0xef4444, muted: 'rgba(239,68,68,0.15)', onColor: '#fff', shape: 'circle' },
-  { primary: '#3b82f6', primaryNumeric: 0x3b82f6, muted: 'rgba(59,130,246,0.15)', onColor: '#fff', shape: 'square' },
-  { primary: '#22c55e', primaryNumeric: 0x22c55e, muted: 'rgba(34,197,94,0.15)', onColor: '#fff', shape: 'triangle' },
-  { primary: '#eab308', primaryNumeric: 0xeab308, muted: 'rgba(234,179,8,0.15)', onColor: '#000', shape: 'diamond' },
-  { primary: '#a855f7', primaryNumeric: 0xa855f7, muted: 'rgba(168,85,247,0.15)', onColor: '#fff', shape: 'pentagon' },
-  { primary: '#06b6d4', primaryNumeric: 0x06b6d4, muted: 'rgba(6,182,212,0.15)', onColor: '#fff', shape: 'hexagon' },
+  { primary: '#d94444', primaryNumeric: 0xd94444, muted: 'rgba(217,68,68,0.15)', onColor: '#fff', shape: 'circle' },
+  { primary: '#4a82c8', primaryNumeric: 0x4a82c8, muted: 'rgba(74,130,200,0.15)', onColor: '#fff', shape: 'square' },
+  { primary: '#4a9e50', primaryNumeric: 0x4a9e50, muted: 'rgba(74,158,80,0.15)', onColor: '#fff', shape: 'triangle' },
+  { primary: '#c8a830', primaryNumeric: 0xc8a830, muted: 'rgba(200,168,48,0.15)', onColor: '#000', shape: 'diamond' },
+  { primary: '#9060c0', primaryNumeric: 0x9060c0, muted: 'rgba(144,96,192,0.15)', onColor: '#fff', shape: 'pentagon' },
+  { primary: '#3a9aaa', primaryNumeric: 0x3a9aaa, muted: 'rgba(58,154,170,0.15)', onColor: '#fff', shape: 'hexagon' },
 ];
 
 function getStablePlayerOrder(state: GameState): PlayerId[] {

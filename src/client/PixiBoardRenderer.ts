@@ -21,6 +21,7 @@ export interface RenderOptions {
   moveCostByZone?: Record<ZoneId, number>;
   availableDoorZones?: ZoneId[];
   sprintZones?: ZoneId[];
+  attackZones?: ZoneId[];
   editorMode?: boolean;
 }
 
@@ -464,7 +465,7 @@ export class PixiBoardRenderer {
     }
 
     // 2. Board overlay (zones + edges + indicators — single pass)
-    this.drawBoard(state, options.validMoveZones || [], options.pendingMoveZoneId, options.editorMode, options.availableDoorZones || [], options.moveCostByZone, options.sprintZones || []);
+    this.drawBoard(state, options.validMoveZones || [], options.pendingMoveZoneId, options.editorMode, options.availableDoorZones || [], options.moveCostByZone, options.sprintZones || [], options.attackZones || []);
 
     // 3. Entities (Survivors & Zombies)
     this._lastState = state;
@@ -583,7 +584,7 @@ export class PixiBoardRenderer {
    * Single-pass board overlay: draws zone fills, edges, and indicators
    * on one PIXI.Graphics object. Matches the proven MapEditor overlay pattern.
    */
-  private drawBoard(state: GameState, validZones: ZoneId[], pendingMoveZoneId?: ZoneId, editorMode?: boolean, doorHighlightZones: ZoneId[] = [], moveCostByZone?: Record<ZoneId, number>, sprintZones: ZoneId[] = []): void {
+  private drawBoard(state: GameState, validZones: ZoneId[], pendingMoveZoneId?: ZoneId, editorMode?: boolean, doorHighlightZones: ZoneId[] = [], moveCostByZone?: Record<ZoneId, number>, sprintZones: ZoneId[] = [], attackZones: ZoneId[] = []): void {
     const g = this.boardGraphics;
     g.clear();
     this.iconContainer.removeChildren();
@@ -700,6 +701,33 @@ export class PixiBoardRenderer {
 
       const iconSize = 20;
       const texture = PIXI.Texture.from('/images/icons/sport-shoe-lightblue.svg');
+      const sprite = new PIXI.Sprite(texture);
+      sprite.width = iconSize;
+      sprite.height = iconSize;
+      sprite.anchor.set(0.5);
+      sprite.position.set(cx, cy);
+      this.iconContainer.addChild(sprite);
+    }
+
+    // --- 1d. Attack zone highlights (red fill + swords icon) ---
+    for (const zoneId of attackZones) {
+      const cells = geo.zoneCells[zoneId];
+      if (!cells || cells.length === 0) continue;
+
+      if (hasTiles) {
+        for (const c of cells) {
+          g.rect(c.x * TILE_SIZE, c.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+          g.fill({ color: BOARD_THEME.attack.fillColor, alpha: BOARD_THEME.attack.fillAlpha });
+        }
+      }
+
+      let cx = 0, cy = 0;
+      for (const c of cells) { cx += c.x; cy += c.y; }
+      cx = (cx / cells.length) * TILE_SIZE + TILE_SIZE / 2;
+      cy = (cy / cells.length) * TILE_SIZE + TILE_SIZE / 2;
+
+      const iconSize = 24;
+      const texture = PIXI.Texture.from('/images/icons/swords-red.svg');
       const sprite = new PIXI.Sprite(texture);
       sprite.width = iconSize;
       sprite.height = iconSize;

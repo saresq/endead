@@ -1,5 +1,8 @@
 /* ==========================================================================
-   Game Layout — In-game layout shell (top bar + canvas + bottom panel)
+   Game Layout — In-game layout shell
+   Industrial control room — corroded steel panels, gauge phosphor,
+   danger-level reactive decay. Canvas is the kill floor; everything
+   around it is crumbling monitoring infrastructure.
    ========================================================================== */
 
 .game-layout {
@@ -8,24 +11,105 @@
   display: flex;
   flex-direction: column;
   pointer-events: none;
+  background-color: var(--dl-bg, var(--surface-0));
+  transition:
+    background-color var(--duration-slow) var(--ease-military);
+}
+
+/* Danger-level vignette — burns inward as threat escalates */
+.game-layout::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: var(--z-overlay);
+  background: radial-gradient(
+    ellipse at center,
+    transparent var(--dl-vignette-radius, 65%),
+    var(--dl-vignette-color, transparent) 100%
+  );
+  opacity: var(--dl-vignette-opacity, 0);
+  transition:
+    opacity var(--duration-slow) var(--ease-military),
+    background var(--duration-slow) var(--ease-military);
+}
+
+/* Global grain texture overlay */
+.game-layout::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: calc(var(--z-overlay) + 1);
+  background-image: var(--grain-url);
+  background-size: 200px 200px;
+  opacity: var(--dl-grain-opacity, var(--grain-opacity));
+  mix-blend-mode: overlay;
+  transition: opacity var(--duration-slow) var(--ease-military);
 }
 
 /* ---------- Top Bar ---------- */
 
 .game-layout__topbar {
   position: relative;
-  z-index: var(--z-sticky);
+  z-index: var(--z-hud);
   flex-shrink: 0;
-  height: 48px;
-  background: var(--surface-1);
-  border-bottom: 1px solid var(--surface-4);
+  height: var(--hud-topbar-height, 52px);
+  background: var(--hud-bg, rgba(8, 7, 6, 0.92));
+  border-bottom: var(--border-thick) solid var(--dl-topbar-border, var(--surface-4));
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 var(--space-3);
+  padding-top: env(safe-area-inset-top);
   gap: var(--space-3);
   pointer-events: auto;
-  padding-top: env(safe-area-inset-top);
+
+  /* Phosphor glow bleeds downward from topbar edge */
+  box-shadow:
+    inset 0 -1px 0 var(--dl-hud-border, var(--hud-border)),
+    0 0 24px var(--dl-topbar-glow, transparent),
+    0 1px 0 rgba(0, 0, 0, 0.8),
+    var(--shadow-panel);
+
+  /* Scanlines etched into the topbar surface */
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    var(--hud-scanline-color) 2px,
+    var(--hud-scanline-color) 4px
+  );
+
+  transition:
+    border-color var(--duration-slow) var(--ease-military),
+    box-shadow var(--duration-slow) var(--ease-military),
+    background-color var(--duration-slow) var(--ease-military);
+}
+
+/* Corner reticle marks — top-left and top-right tactical brackets */
+.game-layout__topbar::before,
+.game-layout__topbar::after {
+  content: '';
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 6px);
+  width: var(--hud-corner-size, 8px);
+  height: var(--hud-corner-size, 8px);
+  pointer-events: none;
+  opacity: 0.55;
+  transition: border-color var(--duration-slow) var(--ease-military);
+}
+
+.game-layout__topbar::before {
+  left: var(--space-2);
+  border-top: var(--border-thin) solid var(--dl-hud-tint, var(--hud-phosphor));
+  border-left: var(--border-thin) solid var(--dl-hud-tint, var(--hud-phosphor));
+}
+
+.game-layout__topbar::after {
+  right: var(--space-2);
+  border-top: var(--border-thin) solid var(--dl-hud-tint, var(--hud-phosphor));
+  border-right: var(--border-thin) solid var(--dl-hud-tint, var(--hud-phosphor));
 }
 
 /* ---------- Canvas Area ---------- */
@@ -34,21 +118,62 @@
   flex: 1;
   min-height: 0;
   position: relative;
+
+  /* Inset shadow frames the battlefield */
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.6);
 }
 
 /* ---------- Bottom Panel (mobile) ---------- */
 
 .game-layout__bottom {
   position: relative;
-  z-index: var(--z-sticky);
+  z-index: var(--z-hud);
   flex-shrink: 0;
   max-height: 45vh;
   overflow-y: auto;
-  background: var(--surface-1);
-  border-top: 1px solid var(--surface-4);
+
+  background: var(--hud-bg, rgba(8, 7, 6, 0.92));
+  border-top: var(--border-thick) solid var(--dl-topbar-border, var(--surface-4));
   pointer-events: auto;
   padding: var(--space-3);
   padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom));
+
+  /* Mirror topbar glow upward */
+  box-shadow:
+    inset 0 1px 0 var(--dl-hud-border, var(--hud-border)),
+    0 0 24px var(--dl-topbar-glow, transparent),
+    0 -1px 0 rgba(0, 0, 0, 0.8),
+    var(--shadow-panel);
+
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    var(--hud-scanline-color) 2px,
+    var(--hud-scanline-color) 4px
+  );
+
+  /* Custom scrollbar — phosphor trace */
+  scrollbar-width: thin;
+  scrollbar-color: var(--dl-hud-tint, var(--hud-phosphor)) transparent;
+
+  transition:
+    border-color var(--duration-slow) var(--ease-military),
+    box-shadow var(--duration-slow) var(--ease-military);
+}
+
+.game-layout__bottom::-webkit-scrollbar {
+  width: 3px;
+}
+
+.game-layout__bottom::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.game-layout__bottom::-webkit-scrollbar-thumb {
+  background: var(--dl-hud-tint, var(--hud-phosphor));
+  opacity: 0.4;
+  border-radius: var(--radius-full);
 }
 
 /* ---------- Sidebar (desktop only) ---------- */
@@ -56,6 +181,8 @@
 .game-layout__sidebar {
   display: none;
 }
+
+/* ---------- Desktop Layout ---------- */
 
 @media (min-width: 1024px) {
   .game-layout {
@@ -71,22 +198,106 @@
   .game-layout__sidebar {
     display: flex;
     flex-direction: column;
-    width: 280px;
+    width: var(--hud-sidebar-width, 220px);
     flex-shrink: 0;
-    background: var(--surface-1);
-    border-right: 1px solid var(--surface-4);
+
+    background: var(--hud-panel-bg, rgba(16, 15, 10, 0.88));
+    border-right: var(--border-thin) solid var(--dl-panel-border, var(--surface-4));
     overflow-y: auto;
     pointer-events: auto;
+
+    /* Left panel glow edge */
+    box-shadow:
+      inset -1px 0 0 var(--dl-hud-border, var(--hud-border)),
+      1px 0 12px rgba(0, 0, 0, 0.5);
+
+    background-image: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      var(--hud-scanline-color) 2px,
+      var(--hud-scanline-color) 4px
+    );
+
+    scrollbar-width: thin;
+    scrollbar-color: var(--dl-hud-tint, var(--hud-phosphor)) transparent;
+
+    transition:
+      border-color var(--duration-slow) var(--ease-military),
+      box-shadow var(--duration-slow) var(--ease-military);
+  }
+
+  .game-layout__sidebar::-webkit-scrollbar {
+    width: 3px;
+  }
+
+  .game-layout__sidebar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .game-layout__sidebar::-webkit-scrollbar-thumb {
+    background: var(--dl-hud-tint, var(--hud-phosphor));
+    opacity: 0.4;
+    border-radius: var(--radius-full);
   }
 
   .game-layout__canvas {
     flex: 1;
+    box-shadow:
+      inset 2px 0 8px rgba(0, 0, 0, 0.4),
+      inset -2px 0 8px rgba(0, 0, 0, 0.4);
   }
 
   .game-layout__bottom {
     max-height: none;
     overflow-y: visible;
     padding: var(--space-2) var(--space-4);
+    padding-bottom: calc(var(--space-2) + env(safe-area-inset-bottom));
+  }
+}
+
+/* ---------- Danger-Level: RED — flicker the shell ---------- */
+
+[data-danger="red"] .game-layout__topbar,
+[data-danger="red"] .game-layout__bottom {
+  animation: hud-flicker var(--dl-flicker-duration, none) step-end infinite;
+}
+
+/* ---------- Danger-Level: ORANGE — ember edge glow ---------- */
+
+[data-danger="orange"] .game-layout__topbar,
+[data-danger="orange"] .game-layout__bottom {
+  animation: hud-flicker var(--dl-flicker-duration, none) step-end infinite;
+}
+
+/* ---------- Furnace heat shimmer — red danger structural failure ---------- */
+
+[data-danger="red"] .game-layout__canvas {
+  /* Intensified inset shadow — furnace glow bleeding through seams */
+  box-shadow:
+    inset 0 2px 12px rgba(152, 32, 24, 0.15),
+    inset 0 -2px 12px rgba(152, 32, 24, 0.1),
+    inset 0 0 40px rgba(0, 0, 0, 0.4);
+}
+
+[data-danger="orange"] .game-layout__canvas {
+  box-shadow:
+    inset 0 2px 10px rgba(168, 84, 24, 0.08),
+    inset 0 -2px 10px rgba(168, 84, 24, 0.06),
+    inset 0 0 30px rgba(0, 0, 0, 0.35);
+}
+
+/* ---------- Mobile safe-area adjustments ---------- */
+
+@media (max-width: 374px) {
+  .game-layout__topbar {
+    padding: 0 var(--space-2);
+    padding-top: env(safe-area-inset-top);
+    gap: var(--space-2);
+  }
+
+  .game-layout__bottom {
+    padding: var(--space-2);
     padding-bottom: calc(var(--space-2) + env(safe-area-inset-bottom));
   }
 }

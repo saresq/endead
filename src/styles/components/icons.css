@@ -1,11 +1,29 @@
 /* ==========================================================================
-   Icons — Sizing and utility classes for inline SVG icons
+   Icons — Sizing, color, and utility classes for inline SVG icons
+   Industrial gauge aesthetic — icons as functional instrument glyphs
    ========================================================================== */
 
 .icon {
   display: inline-flex;
   vertical-align: middle;
   flex-shrink: 0;
+  color: currentColor;
+  transition: color var(--duration-fast) var(--ease-military),
+              filter var(--duration-fast) var(--ease-military);
+}
+
+.icon svg,
+.icon img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---------- Size variants ---------- */
+
+.icon--xs {
+  width: var(--icon-xs);
+  height: var(--icon-xs);
 }
 
 .icon--sm {
@@ -28,11 +46,167 @@
   height: var(--icon-xl);
 }
 
+.icon--2xl {
+  width: var(--icon-2xl);
+  height: var(--icon-2xl);
+}
+
+/* ---------- Color / tone variants ---------- */
+
+.icon--muted {
+  color: var(--text-muted);
+}
+
+.icon--secondary {
+  color: var(--text-secondary);
+}
+
+.icon--accent {
+  color: var(--accent);
+  filter: drop-shadow(0 0 3px var(--accent-glow));
+}
+
+.icon--hud {
+  color: var(--dl-hud-tint);
+  filter: drop-shadow(0 0 4px var(--hud-phosphor-dim));
+}
+
+.icon--danger {
+  color: var(--danger-bright);
+  filter: drop-shadow(0 0 4px var(--danger-muted));
+}
+
+.icon--success {
+  color: var(--success-bright);
+  filter: drop-shadow(0 0 3px var(--success-muted));
+}
+
+.icon--warning {
+  color: var(--warning);
+}
+
+.icon--disabled {
+  color: var(--text-disabled);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* ---------- Danger-level reactive tint ---------- */
+
+.icon--reactive {
+  color: var(--dl-hud-tint);
+  filter: drop-shadow(0 0 3px var(--dl-glow-intense));
+  transition: color var(--duration-slow) var(--ease-military),
+              filter var(--duration-slow) var(--ease-military);
+}
+
+/* ---------- Phosphor glow treatment (HUD readouts) ---------- */
+
+.icon--phosphor {
+  color: var(--hud-phosphor);
+  filter:
+    drop-shadow(0 0 2px var(--hud-phosphor-dim))
+    drop-shadow(0 0 6px var(--hud-phosphor-dim));
+}
+
+/* ---------- Inset / recessed (panel-etched look) ---------- */
+
+.icon--inset {
+  opacity: 0.55;
+  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.06));
+}
+
+/* ---------- Badge / overlay container ---------- */
+
+.icon-badge {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.icon-badge__pip {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--dl-status-indicator);
+  box-shadow: 0 0 4px var(--dl-glow-intense);
+  border: 1px solid var(--dl-bg);
+}
+
+/* ---------- Motion utilities ---------- */
+
 .icon--spin {
   animation: icon-spin 1s linear infinite;
 }
 
+.icon--pulse {
+  animation: icon-pulse 1.6s ease-in-out infinite;
+}
+
+.icon--blink {
+  animation: hud-blink-caret 1.1s step-end infinite;
+}
+
+/* ---------- Weapon / item type icons (tactical markers) ---------- */
+
+.icon--weapon {
+  color: var(--text-secondary);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7));
+}
+
+.icon--weapon:hover,
+.icon--weapon.is-equipped {
+  color: var(--dl-hud-tint);
+  filter:
+    drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7))
+    drop-shadow(0 0 4px var(--dl-glow-intense));
+}
+
+.icon--noise {
+  color: var(--warning);
+}
+
+.icon--objective {
+  color: var(--accent);
+  filter: drop-shadow(0 0 4px var(--accent-glow));
+}
+
+.icon--zombie {
+  color: var(--zombie-walker);
+}
+
+.icon--zombie--runner {
+  color: var(--zombie-runner);
+}
+
+.icon--zombie--brute {
+  color: var(--zombie-brute);
+}
+
+.icon--zombie--abom {
+  color: var(--zombie-abom);
+  filter: drop-shadow(0 0 6px rgba(136, 24, 24, 0.5));
+}
+
+/* ---------- Keyframe definitions ---------- */
+
 @keyframes icon-spin {
   from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes icon-pulse {
+  0%, 100% {
+    opacity: 1;
+    filter: drop-shadow(0 0 3px var(--dl-glow-intense));
+  }
+  50% {
+    opacity: 0.65;
+    filter: drop-shadow(0 0 1px var(--dl-glow));
+  }
 }

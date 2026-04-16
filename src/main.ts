@@ -101,7 +101,9 @@ function cleanupRoomUi(): void {
   lobbyUi?.hide();
   lobbyUi = null;
 
+  gameHud?.destroy();
   gameHud = null;
+  document.documentElement.removeAttribute('data-danger');
 
   if (unsubscribeStore) {
     unsubscribeStore();
@@ -209,6 +211,10 @@ async function startRoom(roomId: string): Promise<void> {
     if (!inputController) return;
 
     if (newState.phase === GamePhase.Lobby) {
+      if (gameHud) {
+        gameHud.destroy();
+        gameHud = null;
+      }
       if (!lobbyUi) lobbyUi = new LobbyUI(playerId, roomId);
       lobbyUi.update(newState);
       lobbyUi.show();

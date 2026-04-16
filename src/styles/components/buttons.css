@@ -1,110 +1,251 @@
 /* ==========================================================================
-   Buttons — Variants, sizes, and states
+   Buttons — Tactical Switches, Stamped Labels, Field Controls
+   Heavy metal aesthetic. Not a web app. A survival instrument panel.
    ========================================================================== */
 
-/* ---------- Base ---------- */
+/* ---------- Base — shared foundation ---------- */
 
 .btn {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  border-radius: var(--radius-md);
-  font-weight: var(--font-semibold);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-display);
+  font-weight: var(--font-bold);
+  font-size: var(--text-sm);
+  letter-spacing: var(--letter-spacing-wider);
+  text-transform: uppercase;
   cursor: pointer;
-  transition: all var(--duration-fast) var(--ease-in-out);
+  transition:
+    background var(--duration-fast) var(--ease-military),
+    border-color var(--duration-fast) var(--ease-military),
+    box-shadow var(--duration-fast) var(--ease-military),
+    transform var(--duration-fast) var(--ease-military),
+    color var(--duration-fast) var(--ease-military);
   white-space: nowrap;
   user-select: none;
   -webkit-user-select: none;
-  border: none;
+  border: var(--border-thin) solid transparent;
   text-decoration: none;
   line-height: 1;
+  /* Subtle noise over all buttons */
+  isolation: isolate;
+}
+
+/* Worn metal surface overlay */
+.btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background-image: var(--grain-url);
+  opacity: 0.035;
+  pointer-events: none;
+  z-index: 1;
+  mix-blend-mode: overlay;
+}
+
+/* Top-edge highlight — stamped metal bevel */
+.btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), inset 0 -1px 0 rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  z-index: 2;
 }
 
 /* ---------- Sizes ---------- */
 
 .btn--sm {
-  height: 32px;
+  height: 30px;
   min-width: 44px;
   padding: 0 var(--space-3);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
+  letter-spacing: var(--letter-spacing-widest);
 }
 
 .btn--md {
   height: 40px;
   min-width: 44px;
   padding: 0 var(--space-4);
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
 }
 
 .btn--lg {
-  height: 48px;
+  height: 50px;
   min-width: 44px;
-  padding: 0 var(--space-5);
+  padding: 0 var(--space-6);
   font-size: var(--text-base);
+  letter-spacing: var(--letter-spacing-widest);
 }
 
-/* ---------- Variants ---------- */
+/* ---------- PRIMARY — Accent, high importance, the call to action ---------- */
 
 .btn--primary {
-  background: var(--accent);
+  background:
+    linear-gradient(180deg, var(--accent-hover) 0%, var(--accent) 60%, color-mix(in srgb, var(--accent) 80%, black) 100%);
   color: var(--text-inverse);
+  border-color: color-mix(in srgb, var(--accent) 60%, black);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.3),
+    0 2px 8px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(0, 0, 0, 0.4);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
 .btn--primary:hover:not(:disabled):not(.btn--loading) {
-  background: var(--accent-hover);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--accent-hover) 90%, white 10%) 0%, var(--accent-hover) 60%, var(--accent) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.25),
+    0 4px 14px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(0, 0, 0, 0.4),
+    0 0 18px var(--accent-glow);
   transform: translateY(-1px);
 }
 
 .btn--primary:active:not(:disabled):not(.btn--loading) {
-  background: var(--accent);
-  transform: scale(0.97);
+  background:
+    linear-gradient(180deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 80%, black) 100%);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(0, 0, 0, 0.2),
+    0 1px 4px rgba(0, 0, 0, 0.5);
+  transform: translateY(1px) scale(0.985);
 }
 
+/* ---------- SECONDARY — Recessed panel switch ---------- */
+
 .btn--secondary {
-  background: var(--surface-3);
+  background:
+    linear-gradient(180deg, var(--surface-3) 0%, var(--surface-2) 50%, color-mix(in srgb, var(--surface-2) 90%, black) 100%);
   color: var(--text-primary);
-  border: 1px solid var(--surface-4);
+  border-color: var(--surface-4);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4),
+    0 2px 6px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(0, 0, 0, 0.3);
 }
 
 .btn--secondary:hover:not(:disabled):not(.btn--loading) {
-  background: var(--surface-4);
+  background:
+    linear-gradient(180deg, var(--surface-4) 0%, var(--surface-3) 50%, var(--surface-2) 100%);
+  border-color: var(--surface-5);
+  color: var(--text-primary);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
+    0 3px 10px rgba(0, 0, 0, 0.5);
   transform: translateY(-1px);
 }
 
 .btn--secondary:active:not(:disabled):not(.btn--loading) {
-  background: var(--surface-3);
-  transform: scale(0.97);
+  background:
+    linear-gradient(180deg, var(--surface-2) 0%, var(--surface-3) 100%);
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.45),
+    0 1px 3px rgba(0, 0, 0, 0.4);
+  transform: translateY(1px) scale(0.985);
 }
 
+/* ---------- DESTRUCTIVE — High-voltage warning. Don't press this. ---------- */
+
 .btn--destructive {
-  background: var(--danger);
-  color: var(--text-inverse);
+  background:
+    linear-gradient(180deg, var(--danger-bright) 0%, var(--danger) 55%, color-mix(in srgb, var(--danger) 75%, black) 100%);
+  color: #f0d0c8;
+  border-color: color-mix(in srgb, var(--danger) 55%, black);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.35),
+    0 2px 8px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(0, 0, 0, 0.4);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .btn--destructive:hover:not(:disabled):not(.btn--loading) {
-  filter: brightness(1.1);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--danger-bright) 85%, white 15%) 0%, var(--danger-bright) 55%, var(--danger) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.3),
+    0 4px 14px rgba(0, 0, 0, 0.55),
+    0 0 20px var(--danger-muted);
   transform: translateY(-1px);
 }
 
 .btn--destructive:active:not(:disabled):not(.btn--loading) {
-  filter: brightness(0.95);
-  transform: scale(0.97);
+  background:
+    linear-gradient(180deg, var(--danger) 0%, color-mix(in srgb, var(--danger) 75%, black) 100%);
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.5),
+    0 1px 3px rgba(0, 0, 0, 0.4);
+  transform: translateY(1px) scale(0.985);
 }
+
+/* ---------- GHOST — Minimal. Etched outline. ---------- */
 
 .btn--ghost {
   background: transparent;
   color: var(--text-secondary);
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.btn--ghost::after {
+  box-shadow: none;
 }
 
 .btn--ghost:hover:not(:disabled):not(.btn--loading) {
   background: var(--surface-3);
   color: var(--text-primary);
+  border-color: var(--surface-4);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 1px 4px rgba(0, 0, 0, 0.3);
 }
 
 .btn--ghost:active:not(:disabled):not(.btn--loading) {
   background: var(--surface-4);
+  border-color: var(--surface-5);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
 }
+
+/* ---------- OUTLINE — Etched into the panel ---------- */
+
+.btn--outline {
+  background: transparent;
+  color: var(--accent);
+  border-color: var(--accent-border);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 0 0 1px rgba(0, 0, 0, 0.3);
+}
+
+.btn--outline:hover:not(:disabled):not(.btn--loading) {
+  background: var(--accent-muted);
+  border-color: var(--accent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 0 12px var(--accent-glow),
+    0 0 0 1px rgba(0, 0, 0, 0.3);
+  transform: translateY(-1px);
+}
+
+.btn--outline:active:not(:disabled):not(.btn--loading) {
+  background: color-mix(in srgb, var(--accent-muted) 150%, transparent);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.35);
+  transform: translateY(1px) scale(0.985);
+}
+
+/* ---------- ICON — Bare control, no frame ---------- */
 
 .btn--icon {
   background: transparent;
@@ -113,25 +254,52 @@
   width: 44px;
   height: 44px;
   min-width: 44px;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.btn--icon::after {
+  box-shadow: none;
 }
 
 .btn--icon:hover:not(:disabled):not(.btn--loading) {
   background: var(--surface-3);
   color: var(--text-primary);
+  border-color: var(--surface-4);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .btn--icon:active:not(:disabled):not(.btn--loading) {
   background: var(--surface-4);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+  transform: scale(0.9);
 }
 
-/* ---------- States ---------- */
+/* ---------- DANGER-LEVEL REACTIVE — btn--primary responds to dl ---------- */
+
+[data-danger="yellow"] .btn--primary,
+[data-danger="orange"] .btn--primary,
+[data-danger="red"] .btn--primary {
+  animation: var(--dl-accent-pulse);
+}
+
+[data-danger="red"] .btn--primary:hover:not(:disabled) {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.3),
+    0 4px 14px rgba(0, 0, 0, 0.55),
+    0 0 24px var(--accent-glow);
+}
+
+/* ---------- STATES ---------- */
 
 .btn:disabled,
 .btn--disabled {
-  opacity: 0.4;
+  opacity: 0.32;
   cursor: not-allowed;
   pointer-events: none;
+  filter: saturate(0.4);
 }
 
 .btn--loading {
@@ -140,19 +308,41 @@
 }
 
 .btn--loading .btn__label,
-.btn--loading .btn__icon {
+.btn--loading .btn__icon,
+.btn--loading .btn__kbd,
+.btn--loading .btn__cost {
   visibility: hidden;
+}
+
+.btn--loading::before {
+  /* suppress grain during loading */
+  opacity: 0;
 }
 
 .btn--loading::after {
   content: '';
   position: absolute;
-  width: var(--icon-md);
-  height: var(--icon-md);
+  width: 16px;
+  height: 16px;
   border: 2px solid currentColor;
   border-top-color: transparent;
   border-radius: 50%;
-  animation: icon-spin 0.8s linear infinite;
+  animation: icon-spin 0.7s linear infinite;
+  box-shadow: none;
+  inset: auto;
+}
+
+/* ---------- SELECTED / ACTIVE TOGGLE ---------- */
+
+.btn--selected,
+.btn[aria-pressed="true"] {
+  background: var(--accent-muted);
+  border-color: var(--accent-border);
+  color: var(--accent-bright);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.4),
+    inset 0 0 0 1px var(--accent-border),
+    0 0 10px var(--accent-glow);
 }
 
 /* ---------- Full width ---------- */
@@ -165,48 +355,563 @@
 
 .btn:focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline-offset: 3px;
 }
 
-/* ---------- Button Group ---------- */
+/* ---------- Button Group — riveted panel controls ---------- */
 
 .btn-group {
   display: flex;
+  gap: 0;
 }
 
 .btn-group .btn {
   border-radius: 0;
+  position: relative;
 }
 
 .btn-group .btn:first-child {
-  border-radius: var(--radius-md) 0 0 var(--radius-md);
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
 }
 
 .btn-group .btn:last-child {
-  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
 }
 
 .btn-group .btn + .btn {
-  border-left: 1px solid var(--surface-4);
+  border-left: var(--border-thin) solid rgba(0, 0, 0, 0.5);
+  margin-left: -1px;
+}
+
+.btn-group .btn + .btn::before {
+  /* rivet separator line */
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 20%;
+  height: 60%;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.05);
+  pointer-events: none;
 }
 
 /* ---------- Sub-elements ---------- */
 
 .btn__icon {
   flex-shrink: 0;
+  position: relative;
+  z-index: 3;
 }
 
 .btn__label {
   flex-shrink: 1;
+  position: relative;
+  z-index: 3;
 }
 
+/* KBD hint — stamped or etched into the button face */
 .btn__kbd {
   font-family: var(--font-mono);
-  font-size: var(--text-xs);
+  font-size: var(--text-2xs);
+  font-weight: var(--font-normal);
   color: var(--text-muted);
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.35);
+  border: var(--border-thin) solid rgba(255, 255, 255, 0.08);
+  border-bottom: var(--border-thin) solid rgba(0, 0, 0, 0.5);
   border-radius: var(--radius-sm);
-  padding: 1px 5px;
+  padding: 1px 4px;
   margin-left: var(--space-1);
+  letter-spacing: 0;
+  text-transform: none;
+  line-height: 1.6;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  position: relative;
+  z-index: 3;
+}
+
+/* ---------- ACTION BUTTONS — HUD controls, the primary gameplay surface ---------- */
+
+/*
+ * .action-btn — the main HUD action panel buttons.
+ * These are heavy switches. Metal toggle plates. Stamped labels.
+ * Each has: icon area, label (all-caps), kbd hint, cost pill.
+ * Layout: column (icon top, label mid, footer row bottom).
+ */
+
+.action-btn {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  border: var(--border-thin) solid var(--surface-4);
+  background:
+    linear-gradient(
+      170deg,
+      rgba(255, 255, 255, 0.03) 0%,
+      transparent 40%
+    ),
+    var(--surface-2);
+  transition:
+    background var(--duration-fast) var(--ease-military),
+    border-color var(--duration-fast) var(--ease-military),
+    box-shadow var(--duration-fast) var(--ease-military),
+    transform var(--duration-fast) var(--ease-military);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.4),
+    0 2px 6px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(0, 0, 0, 0.3);
+  isolation: isolate;
+  /* Left-edge accent indicator */
+  border-left-width: var(--border-thick);
+  border-left-color: var(--surface-5);
+}
+
+/* Grain texture over action button */
+.action-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background-image: var(--grain-url);
+  opacity: var(--dl-grain-opacity, 0.045);
+  mix-blend-mode: overlay;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Corner-clip bevel effect (top-right) */
+.action-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.action-btn:hover:not(.action-btn--disabled):not(.action-btn--unavailable) {
+  background:
+    linear-gradient(
+      170deg,
+      rgba(255, 255, 255, 0.05) 0%,
+      transparent 40%
+    ),
+    var(--surface-3);
+  border-color: var(--surface-5);
+  border-left-color: var(--accent-border);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.35),
+    0 4px 12px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(0, 0, 0, 0.3),
+    0 0 14px rgba(0, 0, 0, 0.2);
+  transform: translateY(-1px);
+}
+
+.action-btn:active:not(.action-btn--disabled):not(.action-btn--unavailable) {
+  background:
+    linear-gradient(180deg, var(--surface-1) 0%, var(--surface-2) 100%);
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(0, 0, 0, 0.3),
+    0 1px 3px rgba(0, 0, 0, 0.5);
+  transform: translateY(1px) scale(0.97);
+  border-left-color: var(--accent);
+}
+
+/* Available state — glowing accent left edge + active indicator dot */
+.action-btn--available {
+  border-left-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  /* Active status indicator — riveted LED */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.4),
+    0 2px 6px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(0, 0, 0, 0.3),
+    -1px 0 4px var(--accent-glow);
+}
+
+.action-btn--available:hover:not(.action-btn--disabled) {
+  border-left-color: var(--accent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.35),
+    0 4px 12px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(0, 0, 0, 0.3),
+    -2px 0 8px var(--accent-glow);
+}
+
+/* Selected / active action */
+.action-btn--selected,
+.action-btn[aria-pressed="true"] {
+  background:
+    linear-gradient(170deg, var(--accent-muted) 0%, rgba(0, 0, 0, 0.1) 100%),
+    var(--surface-2);
+  border-color: var(--accent-border);
+  border-left-color: var(--accent);
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.4),
+    inset 0 0 0 1px var(--accent-muted),
+    0 0 12px var(--accent-glow),
+    -2px 0 10px var(--accent-glow);
+}
+
+/* Free action state — success green left edge */
+.action-btn--free {
+  border-left-color: var(--success-border);
+}
+
+.action-btn--free .action-btn__cost {
+  background: var(--success-muted);
+  border-color: var(--success-border);
+  color: var(--success-bright);
+}
+
+/* Disabled / unavailable — powered down */
+.action-btn--disabled,
+.action-btn--unavailable {
+  opacity: 0.3;
+  cursor: not-allowed;
+  filter: saturate(0.25) brightness(0.7);
+  pointer-events: none;
+}
+
+/* Icon area */
+.action-btn__icon {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  transition: color var(--duration-fast) var(--ease-military);
+}
+
+.action-btn:hover:not(.action-btn--disabled):not(.action-btn--unavailable) .action-btn__icon {
+  color: var(--text-primary);
+}
+
+.action-btn--available .action-btn__icon,
+.action-btn--selected .action-btn__icon {
+  color: var(--accent);
+}
+
+/* Label — stencilled military stamp */
+.action-btn__label {
+  position: relative;
+  z-index: 3;
+  font-family: var(--font-display);
+  font-weight: var(--font-bold);
+  font-size: var(--text-2xs);
+  letter-spacing: var(--letter-spacing-widest);
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  text-align: left;
+  line-height: 1.1;
+  white-space: nowrap;
+  transition: color var(--duration-fast) var(--ease-military);
+}
+
+.action-btn:hover:not(.action-btn--disabled):not(.action-btn--unavailable) .action-btn__label {
+  color: var(--text-primary);
+}
+
+.action-btn--available .action-btn__label,
+.action-btn--selected .action-btn__label {
+  color: var(--text-primary);
+}
+
+/* Spacer pushes cost/kbd to the right */
+.action-btn__spacer {
+  flex: 1;
+}
+
+/* KBD hint on action button — looks etched into metal */
+.action-btn__kbd {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: var(--font-normal);
+  color: var(--text-muted);
+  background: rgba(0, 0, 0, 0.4);
+  border: var(--border-thin) solid rgba(255, 255, 255, 0.07);
+  border-bottom-color: rgba(0, 0, 0, 0.6);
+  border-radius: var(--radius-sm);
+  padding: 0 3px;
+  line-height: 1.65;
+  letter-spacing: 0;
+  text-transform: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Cost pill — AP / FREE readout. This is a critical information element. */
+.action-btn__cost {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: var(--font-medium);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 1px 4px;
+  border-radius: var(--radius-sm);
+  border: var(--border-thin) solid var(--surface-5);
+  background: rgba(0, 0, 0, 0.45);
+  color: var(--text-muted);
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+/* FREE indicator — green, glowing, it's a gift */
+.action-btn__cost--free {
+  background: var(--success-muted);
+  border-color: var(--success-border);
+  color: var(--success-bright);
+  box-shadow: 0 0 6px rgba(72, 128, 58, 0.2);
+  font-weight: var(--font-semibold);
+  letter-spacing: var(--letter-spacing-wider);
+}
+
+/* AP cost — amber readout, tactical */
+.action-btn__cost--ap {
+  background: var(--accent-muted);
+  border-color: var(--accent-border);
+  color: var(--accent-bright);
+}
+
+/* Zero AP remaining — you can't afford this */
+.action-btn__cost--expensive {
+  background: var(--danger-muted);
+  border-color: var(--danger-border);
+  color: var(--text-danger-red);
+}
+
+/* ---------- END TURN — Special large CTA button ---------- */
+
+.action-btn--end-turn {
+  background:
+    linear-gradient(
+      170deg,
+      rgba(184, 112, 48, 0.06) 0%,
+      transparent 50%
+    ),
+    var(--surface-2);
+  border-color: var(--accent-border);
+  border-left-color: var(--accent);
+  min-width: 80px;
+}
+
+.action-btn--end-turn .action-btn__icon {
+  color: var(--accent);
+}
+
+.action-btn--end-turn .action-btn__label {
+  color: var(--accent);
+}
+
+.action-btn--end-turn:hover:not(.action-btn--disabled) {
+  background:
+    linear-gradient(
+      170deg,
+      var(--accent-muted) 0%,
+      rgba(0, 0, 0, 0.1) 100%
+    ),
+    var(--surface-2);
+  border-color: var(--accent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.3),
+    0 4px 14px rgba(0, 0, 0, 0.55),
+    0 0 20px var(--accent-glow),
+    -3px 0 12px var(--accent-glow);
+}
+
+/* ---------- SKILL ACTION BUTTONS — distinct from standard actions ---------- */
+
+.action-btn--skill {
+  border-left-color: var(--success-border);
+  min-width: 62px;
+}
+
+.action-btn--skill .action-btn__icon {
+  color: var(--success);
+}
+
+.action-btn--skill .action-btn__label {
+  color: var(--success);
+}
+
+.action-btn--skill:hover:not(.action-btn--disabled) .action-btn__icon,
+.action-btn--skill:hover:not(.action-btn--disabled) .action-btn__label {
+  color: var(--success-bright);
+}
+
+.action-btn--skill:hover:not(.action-btn--disabled) {
+  border-left-color: var(--success-border);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.35),
+    0 4px 12px rgba(0, 0, 0, 0.5),
+    -2px 0 8px rgba(72, 128, 58, 0.25);
+}
+
+/* Used skill — exhausted, spent */
+.action-btn--skill-used {
+  opacity: 0.42;
+  filter: saturate(0.2);
+  cursor: default;
+}
+
+.action-btn--skill-used .action-btn__label::after {
+  content: ' ✓';
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  opacity: 0.6;
+}
+
+/* ---------- ICON-ONLY BUTTON VARIANT — compact HUD controls ---------- */
+
+.btn--hud-control {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  padding: 0;
+  background: var(--hud-panel-bg);
+  border: var(--border-thin) solid var(--hud-border);
+  border-radius: var(--radius-sm);
+  color: var(--hud-phosphor-dim);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-military),
+    border-color var(--duration-fast) var(--ease-military),
+    color var(--duration-fast) var(--ease-military),
+    box-shadow var(--duration-fast) var(--ease-military);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4);
+}
+
+.btn--hud-control:hover {
+  background: var(--surface-3);
+  border-color: var(--dl-hud-border);
+  color: var(--hud-phosphor);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
+    0 0 8px var(--dl-glow);
+}
+
+.btn--hud-control:active {
+  background: var(--surface-1);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.45),
+    0 0 4px var(--dl-glow);
+  transform: scale(0.93);
+}
+
+/* ---------- WOUND ALERT BUTTON — pulsing critical warning ---------- */
+
+.btn--wound-alert {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  height: 36px;
+  background: var(--danger-muted);
+  border: var(--border-thick) solid var(--danger-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-danger-red);
+  font-family: var(--font-display);
+  font-weight: var(--font-bold);
+  font-size: var(--text-xs);
+  letter-spacing: var(--letter-spacing-wider);
+  text-transform: uppercase;
+  cursor: pointer;
+  animation: wound-alert-pulse 1.4s ease-in-out infinite;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 0 16px var(--danger-muted),
+    0 2px 6px rgba(0, 0, 0, 0.5);
+}
+
+.btn--wound-alert:hover {
+  background: color-mix(in srgb, var(--danger-muted) 180%, transparent);
+  border-color: var(--danger-bright);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 24px var(--danger-muted),
+    0 2px 8px rgba(0, 0, 0, 0.55);
+}
+
+@keyframes wound-alert-pulse {
+  0%, 100% { box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 0 10px var(--danger-muted), 0 2px 6px rgba(0,0,0,0.5); }
+  50%       { box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 0 22px rgba(168, 48, 40, 0.4), 0 2px 6px rgba(0,0,0,0.5); }
+}
+
+/* ---------- READY BUTTON (lobby) — confirm / locked in ---------- */
+
+.btn--ready {
+  background:
+    linear-gradient(180deg, var(--success-bright) 0%, var(--success) 60%, color-mix(in srgb, var(--success) 70%, black) 100%);
+  color: rgba(0, 0, 0, 0.85);
+  border-color: color-mix(in srgb, var(--success) 50%, black);
+  font-family: var(--font-display);
+  font-weight: var(--font-bold);
+  letter-spacing: var(--letter-spacing-wider);
+  text-transform: uppercase;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.3),
+    0 2px 8px rgba(0, 0, 0, 0.5),
+    0 0 16px var(--success-muted);
+}
+
+.btn--ready:hover:not(:disabled) {
+  filter: brightness(1.1);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.25),
+    0 4px 14px rgba(0, 0, 0, 0.55),
+    0 0 24px rgba(72, 128, 58, 0.35);
+  transform: translateY(-1px);
+}
+
+.btn--ready:active:not(:disabled) {
+  filter: brightness(0.92);
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.35),
+    0 0 12px rgba(72, 128, 58, 0.25);
+  transform: translateY(1px) scale(0.985);
+}
+
+.btn--ready--confirmed {
+  background:
+    linear-gradient(180deg, rgba(72, 128, 58, 0.35) 0%, rgba(72, 128, 58, 0.2) 100%);
+  border-color: var(--success-border);
+  color: var(--success-bright);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.35),
+    0 0 12px var(--success-muted);
+  cursor: default;
+}
+
+/* ---------- Shared icon-spin animation ---------- */
+
+@keyframes icon-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }

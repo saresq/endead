@@ -64,6 +64,8 @@ export interface MovePayload {
 export interface AttackPayload {
   targetZoneId: ZoneId;
   weaponId?: EntityId;
+  /** Player-specified kill priority (melee: free choice per 2E rules; ranged: Sniper/Point-Blank). */
+  targetZombieIds?: EntityId[];
 }
 
 export interface OpenDoorPayload {

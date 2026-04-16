@@ -1,5 +1,6 @@
 /* ==========================================================================
-   Player Avatar — Colored circle with initial + shape badge
+   Player Avatar — Tactical operator identifier
+   Military HUD aesthetic: clipped corners, phosphor glow, data-tag readout
    ========================================================================== */
 
 /* ---------- Avatar Circle ---------- */
@@ -8,96 +9,306 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-full);
-  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-sm);
+  border: var(--border-thick) solid currentColor;
+  font-family: var(--font-display);
   font-weight: var(--font-bold);
+  letter-spacing: var(--letter-spacing-wide);
   flex-shrink: 0;
   position: relative;
   user-select: none;
-  transition: box-shadow var(--duration-normal) var(--ease-in-out),
-              filter var(--duration-normal) var(--ease-in-out),
-              opacity var(--duration-normal) var(--ease-in-out);
+  text-transform: uppercase;
+  background: var(--surface-1);
+  /* Clipped corner — top-left bevel for tactical feel */
+  clip-path: polygon(6px 0%, 100% 0%, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0% 100%, 0% 6px);
+  transition:
+    box-shadow var(--duration-normal) var(--ease-in-out),
+    filter var(--duration-normal) var(--ease-in-out),
+    opacity var(--duration-normal) var(--ease-in-out);
 }
 
-/* Sizes */
+/* Scanline texture overlay */
+.player-avatar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.12) 2px,
+    rgba(0, 0, 0, 0.12) 4px
+  );
+  pointer-events: none;
+  z-index: 0;
+  opacity: var(--dl-scanline-opacity, 0.12);
+}
+
+/* Corner reticle marks — top-right and bottom-left */
+.player-avatar::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-top: var(--border-thin) solid currentColor;
+  border-bottom: var(--border-thin) solid currentColor;
+  opacity: 0.2;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ---------- Sizes ---------- */
+
 .player-avatar--sm {
-  width: 24px;
-  height: 24px;
-  font-size: var(--text-xs);
+  width: var(--avatar-size-sm);   /* 36px */
+  height: var(--avatar-size-sm);
+  font-size: var(--text-sm);
+  clip-path: polygon(4px 0%, 100% 0%, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0% 100%, 0% 4px);
 }
 
 .player-avatar--md {
-  width: 36px;
-  height: 36px;
-  font-size: var(--text-sm);
+  width: var(--avatar-size-md);   /* 52px */
+  height: var(--avatar-size-md);
+  font-size: var(--text-base);
 }
 
-/* Initial letter */
+.player-avatar--lg {
+  width: var(--avatar-size-lg);   /* 72px */
+  height: var(--avatar-size-lg);
+  font-size: var(--text-xl);
+}
+
+/* ---------- Initial letter ---------- */
+
 .player-avatar__initial {
   line-height: 1;
   z-index: 1;
+  position: relative;
+  /* Slight text-shadow for phosphor readout effect */
+  text-shadow: 0 0 8px currentColor;
 }
 
-/* Shape indicator — positioned bottom-right of avatar */
+/* ---------- Shape indicator ---------- */
+/* Positioned bottom-right — acts as operator role badge */
+
 .player-avatar__shape {
   position: absolute;
-  bottom: -2px;
-  right: -2px;
-  width: 10px;
-  height: 10px;
-  border: 1.5px solid var(--surface-1);
+  bottom: -3px;
+  right: -3px;
+  width: 11px;
+  height: 11px;
+  border: var(--border-thick) solid var(--surface-0);
   z-index: 2;
+  /* Shape itself is colored by parent's player color via background inline */
 }
 
 .player-avatar--sm .player-avatar__shape {
   width: 8px;
   height: 8px;
-  bottom: -1px;
-  right: -1px;
+  bottom: -2px;
+  right: -2px;
+  border-width: var(--border-thin);
+}
+
+.player-avatar--lg .player-avatar__shape {
+  width: 14px;
+  height: 14px;
+  bottom: -4px;
+  right: -4px;
 }
 
 /* ---------- States ---------- */
 
-/* Active — pulsing glow (glow itself applied via inline style for player color) */
+/* Active — phosphor glow pulse, tuned to danger level tint */
 .player-avatar--active {
   animation: avatar-pulse 2s ease-in-out infinite;
+  box-shadow:
+    0 0 0 1px currentColor,
+    0 0 12px currentColor,
+    inset 0 0 6px rgba(255, 255, 255, 0.04);
 }
 
 @keyframes avatar-pulse {
-  0%, 100% { filter: brightness(1); }
-  50% { filter: brightness(1.2); }
+  0%, 100% {
+    filter: brightness(1);
+    box-shadow:
+      0 0 0 1px currentColor,
+      0 0 10px currentColor,
+      inset 0 0 4px rgba(255,255,255,0.03);
+  }
+  50% {
+    filter: brightness(1.25);
+    box-shadow:
+      0 0 0 1px currentColor,
+      0 0 20px currentColor,
+      0 0 40px currentColor,
+      inset 0 0 8px rgba(255,255,255,0.06);
+  }
 }
 
-/* Dead — grayscale + dimmed */
+/* Dead — desaturated, dimmed, cracked-screen feel */
 .player-avatar--dead {
-  filter: grayscale(1);
-  opacity: 0.5;
+  filter: grayscale(0.85) sepia(0.2) saturate(0.3) brightness(0.6);
+  opacity: 0.45;
+  border-style: solid;
+  /* Scratch marks via gradient */
+  background-image: repeating-linear-gradient(
+    112deg,
+    transparent,
+    transparent 8px,
+    rgba(255, 255, 255, 0.015) 8px,
+    rgba(255, 255, 255, 0.015) 9px
+  );
 }
 
-/* Disconnected — dashed border + dimmed */
+.player-avatar--dead .player-avatar__initial {
+  text-shadow: none;
+}
+
+/* Disconnected — dashed border, signal-lost aesthetic */
 .player-avatar--disconnected {
   border-style: dashed;
-  opacity: 0.6;
+  opacity: 0.55;
+  animation: disconnected-flicker 4s ease-in-out infinite;
 }
 
-/* ---------- Player Tag (avatar + name) ---------- */
+@keyframes disconnected-flicker {
+  0%, 90%, 100%  { opacity: 0.55; }
+  92%            { opacity: 0.3; }
+  94%            { opacity: 0.55; }
+  96%            { opacity: 0.35; }
+  98%            { opacity: 0.55; }
+}
+
+/* Wounded — subtle red edge, pulsing urgency */
+.player-avatar--wounded {
+  box-shadow:
+    0 0 0 1px var(--danger-border),
+    0 0 8px var(--danger-muted),
+    inset 0 0 6px rgba(168, 48, 40, 0.12);
+}
+
+/* ---------- Player Tag (avatar + name label) ---------- */
 
 .player-tag {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  min-width: 0; /* allow truncation */
+  min-width: 0;
 }
 
 .player-tag__name {
-  font-size: var(--text-base);
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
   font-weight: var(--font-semibold);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
   color: var(--text-primary);
   max-width: 12ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* Mono-style data readout feel */
+  font-variant-numeric: tabular-nums;
 }
 
 .player-tag__host {
   color: var(--warning);
   flex-shrink: 0;
   display: inline-flex;
+  /* Tiny glow on host star */
+  filter: drop-shadow(0 0 4px var(--warning));
+}
+
+/* ---------- Danger-level reactive glow tinting ---------- */
+/* When active, the glow should bleed into the danger level color */
+
+[data-danger="blue"] .player-avatar--active {
+  box-shadow:
+    0 0 0 1px currentColor,
+    0 0 12px currentColor,
+    0 0 24px var(--dl-glow-intense),
+    inset 0 0 6px rgba(255, 255, 255, 0.04);
+}
+
+[data-danger="yellow"] .player-avatar--active {
+  box-shadow:
+    0 0 0 1px currentColor,
+    0 0 14px currentColor,
+    0 0 28px var(--dl-glow-intense),
+    inset 0 0 6px rgba(255, 255, 255, 0.04);
+}
+
+[data-danger="orange"] .player-avatar--active {
+  box-shadow:
+    0 0 0 1px currentColor,
+    0 0 16px currentColor,
+    0 0 32px var(--dl-glow-intense),
+    inset 0 0 6px rgba(255, 255, 255, 0.04);
+}
+
+[data-danger="red"] .player-avatar--active {
+  box-shadow:
+    0 0 0 1px currentColor,
+    0 0 18px currentColor,
+    0 0 40px var(--dl-glow-intense),
+    inset 0 0 8px rgba(255, 255, 255, 0.05);
+  animation: avatar-pulse-red 1.4s ease-in-out infinite;
+}
+
+@keyframes avatar-pulse-red {
+  0%, 100% {
+    filter: brightness(1) saturate(1);
+    box-shadow:
+      0 0 0 1px currentColor,
+      0 0 14px currentColor,
+      0 0 30px var(--dl-glow-intense),
+      inset 0 0 6px rgba(255, 255, 255, 0.04);
+  }
+  50% {
+    filter: brightness(1.3) saturate(1.15);
+    box-shadow:
+      0 0 0 2px currentColor,
+      0 0 24px currentColor,
+      0 0 50px var(--dl-glow-intense),
+      inset 0 0 10px rgba(255, 255, 255, 0.06);
+  }
+}
+
+/* ---------- Player Color Variants ---------- */
+/* Applied via .player-avatar--p1 … --p6; color prop sets border + text */
+
+.player-avatar--p1 { color: var(--player-1-bright); background: var(--player-1-muted); }
+.player-avatar--p2 { color: var(--player-2-bright); background: var(--player-2-muted); }
+.player-avatar--p3 { color: var(--player-3-bright); background: var(--player-3-muted); }
+.player-avatar--p4 { color: var(--player-4-bright); background: var(--player-4-muted); }
+.player-avatar--p5 { color: var(--player-5-bright); background: var(--player-5-muted); }
+.player-avatar--p6 { color: var(--player-6-bright); background: var(--player-6-muted); }
+
+/* ---------- Stack layout for multi-player strips ---------- */
+
+.player-avatar-stack {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0;
+}
+
+.player-avatar-stack .player-avatar {
+  margin-left: -8px;
+  border-color: var(--surface-0);
+  transition: margin-left var(--duration-fast) var(--ease-out),
+              z-index 0ms,
+              filter var(--duration-normal) var(--ease-in-out);
+}
+
+.player-avatar-stack .player-avatar:first-child {
+  margin-left: 0;
+}
+
+.player-avatar-stack:hover .player-avatar {
+  margin-left: var(--space-1);
+}
+
+.player-avatar-stack .player-avatar:hover {
+  z-index: var(--z-card);
 }

@@ -82,6 +82,13 @@ export class GameHUD {
     this.render();
   }
 
+  public destroy(): void {
+    document.documentElement.removeAttribute('data-danger');
+    this.container.removeEventListener('click', this.boundDelegateHandler);
+    this.container.innerHTML = '';
+    this.shellBuilt = false;
+  }
+
   // ─── Click Delegation ────────────────────────────────────────
 
   private handleDelegatedClick(e: Event): void {
@@ -250,6 +257,8 @@ export class GameHUD {
 
     this.buildShell();
 
+    document.documentElement.setAttribute('data-danger', this.state.currentDangerLevel.toLowerCase());
+
     const isMyTurn = this.state.players[this.state.activePlayerIndex] === this.localPlayerId;
     const activeSurvivor = this.selectedSurvivorId ? this.state.survivors[this.selectedSurvivorId] : null;
 
@@ -279,7 +288,6 @@ export class GameHUD {
     const state = this.state!;
     const dangerClass = `hud-pill--danger-${state.currentDangerLevel.toLowerCase()}`;
     const myTurnClass = isMyTurn ? ' hud-top--my-turn' : '';
-    const muteIcon = audioManager.muted ? 'VolumeX' : 'Volume2';
 
     const turnBadge = isMyTurn
       ? '<span class="hud-turn-badge">Your Turn</span>'
@@ -299,9 +307,9 @@ export class GameHUD {
           ${playerStrip}
         </div>
         <div class="hud-top__right">
-          ${renderButton({ icon: muteIcon, variant: 'icon', size: 'sm', dataAction: 'toggle-mute', title: audioManager.muted ? 'Unmute' : 'Mute' })}
           ${renderButton({ icon: 'Menu', variant: 'icon', size: 'sm', dataAction: 'open-menu', title: 'Menu' })}
         </div>
+        <div class="hud-danger-bar hud-danger-bar--${state.currentDangerLevel.toLowerCase()}"></div>
       </div>`;
   }
 
@@ -418,8 +426,9 @@ export class GameHUD {
           ${weapons.length > 0
             ? weapons.map(w => {
                 const boosts = weaponBoosts.get(w.id) || { dice: 0, damage: 0 };
+                const isActive = this.inputController.mode === 'ATTACK' && this.inputController.weaponId === w.id;
                 return `
-                <button class="hud-weapon-btn" data-id="${w.id}" ${!isMyTurn || (noAP && survivor.freeCombatsRemaining <= 0 && survivor.freeMeleeRemaining <= 0 && survivor.freeRangedRemaining <= 0) ? 'disabled' : ''}>
+                <button class="hud-weapon-btn${isActive ? ' hud-weapon-btn--active' : ''}" data-id="${w.id}" ${!isMyTurn || (noAP && survivor.freeCombatsRemaining <= 0 && survivor.freeMeleeRemaining <= 0 && survivor.freeRangedRemaining <= 0) ? 'disabled' : ''}>
                   ${renderItemCard(w, { variant: 'weapon', showSlot: false, bonusDice: boosts.dice, bonusDamage: boosts.damage })}
                 </button>`;
               }).join('')
@@ -909,12 +918,16 @@ export class GameHUD {
 
   private openPauseMenu(): void {
     const isHost = this.state?.players[0] === this.localPlayerId;
+    const muteLabel = audioManager.muted ? 'Unmute' : 'Mute';
+    const muteIcon = audioManager.muted ? 'VolumeX' : 'Volume2';
 
     modalManager.open({
       size: 'sm',
+      title: 'Paused',
       renderBody: () => `
-        <div class="stack stack--sm py-2">
+        <div class="stack stack--sm">
           ${renderButton({ label: 'Resume Game', icon: 'Play', variant: 'ghost', fullWidth: true, dataAction: 'modal-close' })}
+          ${renderButton({ label: muteLabel, icon: muteIcon, variant: 'ghost', fullWidth: true, dataAction: 'toggle-mute' })}
           ${isHost ? renderButton({ label: 'End Game', icon: 'Power', variant: 'destructive', fullWidth: true, dataAction: 'pause-end-game' }) : ''}
           ${renderButton({ label: 'Leave Game', icon: 'LogOut', variant: 'ghost', fullWidth: true, dataAction: 'pause-leave' })}
         </div>`,
@@ -922,6 +935,11 @@ export class GameHUD {
         el.addEventListener('click', (e) => {
           const t = (e.target as HTMLElement).closest('[data-action]') as HTMLElement | null;
           if (!t) return;
+          if (t.dataset.action === 'toggle-mute') {
+            audioManager.toggleMute();
+            modalManager.closeAll();
+            this.render();
+          }
           if (t.dataset.action === 'pause-end-game') {
             modalManager.closeAll();
             this.openEndGameConfirm();

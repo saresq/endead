@@ -1,35 +1,79 @@
 /* ==========================================================================
-   Trade & Pickup — Visual rework
-   Slots as solid surface cards. Clean selection states. Single-column trade.
+   Trade & Pickup — Weathered Tactical Interface
+   Military equipment manifest aesthetic. Worn ballistic nylon surfaces.
+   Danger-level reactive borders and glows throughout.
    ========================================================================== */
 
 /* ---------- Shared Section Panel ---------- */
 
 .inv-panel {
-  background: var(--surface-1);
-  border: 1px solid var(--surface-4);
-  border-radius: var(--radius-lg);
+  background: var(--dl-surface-1, var(--surface-1));
+  border: var(--border-thin) solid var(--dl-panel-border, var(--surface-4));
+  border-radius: var(--radius-sm);
   padding: var(--space-4);
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
   overflow: visible;
   min-width: 0;
+  position: relative;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
+    0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+/* Corner reticle marks — tactical equipment feel */
+.inv-panel::before,
+.inv-panel::after {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+.inv-panel::before {
+  top: -1px;
+  left: -1px;
+  border-top: var(--border-thick) solid var(--dl-hud-tint, var(--hud-phosphor));
+  border-left: var(--border-thick) solid var(--dl-hud-tint, var(--hud-phosphor));
+}
+
+.inv-panel::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: var(--border-thick) solid var(--dl-hud-tint, var(--hud-phosphor));
+  border-right: var(--border-thick) solid var(--dl-hud-tint, var(--hud-phosphor));
 }
 
 .inv-panel__header {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  font-family: var(--font-display);
   font-size: var(--text-xs);
-  font-weight: var(--font-semibold);
-  color: var(--text-muted);
+  font-weight: var(--font-bold);
+  color: var(--dl-text-readout, var(--text-muted));
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: var(--letter-spacing-wider);
+  padding-bottom: var(--space-2);
+  border-bottom: var(--border-thin) solid var(--dl-border, var(--surface-4));
+  opacity: 0.75;
+}
+
+.inv-panel__header::before {
+  content: '//';
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--dl-text-readout, var(--text-muted));
+  opacity: 0.5;
+  letter-spacing: 0;
 }
 
 .inv-panel__header .icon {
-  opacity: 0.6;
+  opacity: 0.55;
 }
 
 /* ---------- Slot Grid ---------- */
@@ -52,49 +96,71 @@
 
 .inv-slot {
   background: var(--surface-0);
-  border: 2px solid transparent;
-  border-radius: var(--radius-md);
+  border: var(--border-thin) solid var(--dl-border, var(--surface-4));
+  border-radius: var(--radius-sm);
   padding: var(--space-1);
   min-height: 52px;
   display: flex;
   align-items: center;
   position: relative;
-  transition: border-color var(--duration-fast) var(--ease-in-out),
-              background var(--duration-fast) var(--ease-in-out);
+  transition:
+    border-color var(--duration-fast) var(--ease-in-out),
+    background var(--duration-fast) var(--ease-in-out),
+    box-shadow var(--duration-fast) var(--ease-in-out);
+  box-shadow: var(--shadow-cutout);
+}
+
+/* Slot index marker — top-right corner */
+.inv-slot::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 0 6px 6px 0;
+  border-color: transparent var(--dl-border, var(--surface-4)) transparent transparent;
+  opacity: 0.6;
+  pointer-events: none;
 }
 
 .inv-slot--filled {
   background: transparent;
   padding: 0;
+  border-color: var(--dl-card-edge, transparent);
 }
 
 .inv-slot--ghost {
-  border-color: var(--success);
+  border-color: var(--success-border);
   border-style: dashed;
-  background: transparent;
+  background: var(--success-muted);
   padding: 0;
+  box-shadow: inset 0 0 12px var(--success-muted);
 }
 
-/* Item card inside a filled slot merges with the slot */
+/* Item card inside a filled slot merges cleanly */
 .inv-slot--filled > .item-card,
 .inv-slot--ghost > .item-card {
-  border: 1px solid var(--surface-4);
+  border: var(--border-thin) solid var(--dl-border, var(--surface-4));
   background: transparent;
   width: 100%;
 }
 
-/* Slot label — sits inside top-left as a tiny pill */
+/* Slot label — tactical stencil */
 .inv-slot__label {
   position: absolute;
   top: var(--space-1);
   left: var(--space-2);
+  font-family: var(--font-mono);
   font-size: 9px;
   font-weight: var(--font-bold);
-  color: var(--text-muted);
+  color: var(--dl-text-readout, var(--text-muted));
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   pointer-events: none;
   z-index: 1;
+  opacity: 0.45;
 }
 
 /* Hide label when slot has content */
@@ -107,23 +173,47 @@
 
 .discard-zone {
   background: var(--surface-0);
-  border: 2px solid transparent;
-  border-radius: var(--radius-md);
+  border: var(--border-thin) solid var(--dl-border, var(--surface-4));
+  border-radius: var(--radius-sm);
   padding: var(--space-2);
   min-height: 48px;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  transition: border-color var(--duration-fast) var(--ease-in-out),
-              background var(--duration-fast) var(--ease-in-out);
+  transition:
+    border-color var(--duration-fast) var(--ease-in-out),
+    background var(--duration-fast) var(--ease-in-out),
+    box-shadow var(--duration-fast) var(--ease-in-out);
+  box-shadow: var(--shadow-cutout);
+  position: relative;
+}
+
+/* Worn-out discard stamp */
+.discard-zone::before {
+  content: 'DISCARD';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-8deg);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: var(--font-black);
+  color: var(--danger);
+  opacity: 0.04;
+  letter-spacing: var(--letter-spacing-widest);
+  pointer-events: none;
+  white-space: nowrap;
 }
 
 /* ---------- Tap-to-Select States ---------- */
 
 .tap-selected {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-  border-radius: var(--radius-md);
+  outline: var(--border-thick) solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+  box-shadow:
+    0 0 0 4px var(--accent-muted),
+    0 0 12px var(--accent-glow);
 }
 
 .tap-selected .item-card {
@@ -135,6 +225,10 @@
   border-style: dashed !important;
   background: var(--accent-muted) !important;
   cursor: pointer;
+  box-shadow:
+    inset 0 0 16px var(--accent-muted),
+    0 0 8px var(--accent-glow) !important;
+  animation: tap-target-breathe 1.8s var(--ease-in-out) infinite;
 }
 
 .tap-target .item-card__empty {
@@ -145,9 +239,13 @@
 .discard-zone.tap-target {
   border-color: var(--danger) !important;
   background: var(--danger-muted) !important;
+  box-shadow:
+    inset 0 0 16px var(--danger-muted),
+    0 0 8px rgba(168, 48, 40, 0.2) !important;
+  animation: none;
 }
 
-/* Discard item wrappers are click targets only — no visual styling */
+/* Discard item wrappers — passthrough, no visual styling */
 .discard-item.tap-selected,
 .discard-item.tap-target {
   outline: none;
@@ -155,19 +253,59 @@
   border-color: transparent !important;
   border-style: none !important;
   background: transparent !important;
+  box-shadow: none !important;
+  animation: none;
+}
+
+@keyframes tap-target-breathe {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.78; }
 }
 
 /* ---------- Pickup: Featured Card ---------- */
 
 .pickup-hero {
   background: var(--accent-muted);
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-lg);
+  border: var(--border-thin) solid var(--accent-border);
+  border-radius: var(--radius-sm);
   padding: var(--space-3);
   position: relative;
-  transition: border-color var(--duration-fast) var(--ease-in-out),
-              background var(--duration-fast) var(--ease-in-out);
-  box-shadow: 0 0 20px rgba(74, 158, 255, 0.12);
+  transition:
+    border-color var(--duration-fast) var(--ease-in-out),
+    background var(--duration-fast) var(--ease-in-out),
+    box-shadow var(--duration-normal) var(--ease-out);
+  box-shadow:
+    0 0 24px var(--accent-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 4px 16px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+
+/* Glint sweep across pickup hero */
+.pickup-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.025) 50%,
+    transparent 70%
+  );
+  pointer-events: none;
+}
+
+/* Corner marks */
+.pickup-hero::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 10px;
+  height: 10px;
+  border-top: var(--border-thick) solid var(--accent-border);
+  border-right: var(--border-thick) solid var(--accent-border);
+  pointer-events: none;
 }
 
 .pickup-hero .item-card {
@@ -176,43 +314,93 @@
 }
 
 .pickup-hero.tap-selected {
-  outline: 2px solid var(--accent);
+  outline: var(--border-thick) solid var(--accent);
   outline-offset: 2px;
+  box-shadow:
+    0 0 32px var(--accent-glow),
+    0 0 8px var(--accent-muted),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .pickup-hero.tap-target {
   border-color: var(--accent);
   border-style: dashed;
   background: var(--accent-muted);
+  box-shadow:
+    0 0 20px var(--accent-glow),
+    inset 0 0 16px var(--accent-muted) !important;
+  animation: tap-target-breathe 1.8s var(--ease-in-out) infinite;
 }
 
-/* Placed state — dimmed */
+/* Placed state — spent */
 .pickup-hero--placed {
-  opacity: 0.4;
+  opacity: 0.38;
   box-shadow: none;
   border-style: dashed;
+  filter: grayscale(0.4);
+}
+
+.pickup-hero--placed::before,
+.pickup-hero--placed::after {
+  display: none;
 }
 
 /* ---------- Trade: Offer Panels ---------- */
 
 .offer-panel {
-  background: var(--surface-1);
-  border: 1px solid var(--surface-4);
-  border-radius: var(--radius-lg);
+  background: var(--dl-surface-1, var(--surface-1));
+  border: var(--border-thin) solid var(--dl-panel-border, var(--surface-4));
+  border-radius: var(--radius-sm);
   overflow: hidden;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 4px 16px rgba(0, 0, 0, 0.55);
+  position: relative;
+}
+
+/* Top-edge accent bar on offer panel */
+.offer-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--dl-hud-tint, var(--hud-phosphor)),
+    transparent
+  );
+  opacity: 0.2;
+  pointer-events: none;
 }
 
 .offer-section {
   padding: var(--space-3) var(--space-4);
+  position: relative;
 }
 
 .offer-section__title {
+  font-family: var(--font-display);
   font-size: var(--text-xs);
-  font-weight: var(--font-semibold);
-  color: var(--text-muted);
+  font-weight: var(--font-bold);
+  color: var(--dl-text-readout, var(--text-muted));
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: var(--letter-spacing-wider);
   margin-bottom: var(--space-2);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  opacity: 0.7;
+}
+
+/* Field prefix for section titles */
+.offer-section__title::before {
+  content: '▶';
+  font-size: 6px;
+  opacity: 0.6;
+  vertical-align: middle;
 }
 
 .offer-section__items {
@@ -221,30 +409,44 @@
   gap: var(--space-2);
 }
 
-/* Divider between my offers and partner offers */
+/* Offer section as tap target */
+.offer-section.tap-target {
+  background: var(--accent-muted) !important;
+  border: none !important;
+  outline: var(--border-thick) dashed var(--accent);
+  outline-offset: -2px;
+  box-shadow: inset 0 0 20px var(--accent-muted);
+  animation: tap-target-breathe 1.8s var(--ease-in-out) infinite;
+}
+
+/* ---------- Trade Divider — Exchange Line ---------- */
+
 .offer-divider {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: 0 var(--space-4);
-  color: var(--text-muted);
-  font-size: var(--text-xs);
+  padding: var(--space-2) var(--space-4);
+  color: var(--dl-text-readout, var(--text-muted));
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: var(--letter-spacing-wider);
+  text-transform: uppercase;
+  opacity: 0.55;
+  position: relative;
 }
 
 .offer-divider::before,
 .offer-divider::after {
   content: '';
   flex: 1;
-  height: 1px;
-  background: var(--surface-4);
-}
-
-/* Offer section as tap target */
-.offer-section.tap-target {
-  background: var(--accent-muted) !important;
-  border: none !important;
-  outline: 2px dashed var(--accent);
-  outline-offset: -2px;
+  height: var(--border-thin);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--dl-border, var(--surface-4)) 30%,
+    var(--dl-border, var(--surface-4)) 70%,
+    transparent
+  );
 }
 
 /* ---------- Trade: Status Badges ---------- */
@@ -253,6 +455,7 @@
   display: flex;
   gap: var(--space-4);
   font-size: var(--text-sm);
+  font-family: var(--font-mono);
 }
 
 .trade-status__item {
@@ -260,6 +463,10 @@
   align-items: center;
   gap: var(--space-2);
   color: var(--text-muted);
+  font-size: var(--text-xs);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+  transition: color var(--duration-fast) var(--ease-in-out);
 }
 
 .trade-status__dot {
@@ -268,14 +475,33 @@
   border-radius: var(--radius-full);
   background: var(--surface-4);
   flex-shrink: 0;
+  position: relative;
+  transition: background var(--duration-fast) var(--ease-in-out),
+              box-shadow var(--duration-fast) var(--ease-in-out);
+}
+
+/* Pulse ring on ready dot */
+.trade-status__item--ready .trade-status__dot::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: var(--radius-full);
+  border: var(--border-thin) solid var(--success-border);
+  animation: dot-ring-pulse 2s var(--ease-in-out) infinite;
+}
+
+@keyframes dot-ring-pulse {
+  0%, 100% { opacity: 0.8; transform: scale(1); }
+  50%       { opacity: 0.3; transform: scale(1.4); }
 }
 
 .trade-status__item--ready .trade-status__dot {
   background: var(--success);
+  box-shadow: 0 0 6px var(--success-border);
 }
 
 .trade-status__item--ready {
-  color: var(--success);
+  color: var(--success-bright);
   font-weight: var(--font-semibold);
 }
 
@@ -287,6 +513,97 @@
 }
 
 .trade-footer__hint {
+  font-family: var(--font-mono);
   font-size: var(--text-xs);
   color: var(--text-muted);
+  letter-spacing: var(--letter-spacing-wide);
+  opacity: 0.6;
+}
+
+/* ---------- Danger-Level Reactive Glow States ---------- */
+
+/* Blue — cold scanner edge on slots */
+[data-danger="blue"] .inv-slot--filled {
+  box-shadow: inset 0 0 0 1px var(--dl-card-edge);
+}
+
+[data-danger="blue"] .pickup-hero {
+  box-shadow:
+    0 0 28px var(--accent-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 4px 16px rgba(0, 0, 0, 0.6);
+}
+
+/* Yellow — amber sweep on offer panel edge */
+[data-danger="yellow"] .offer-panel::before {
+  opacity: 0.35;
+  animation: var(--dl-accent-pulse);
+}
+
+[data-danger="yellow"] .pickup-hero {
+  box-shadow:
+    0 0 32px var(--accent-glow),
+    inset 0 0 20px rgba(192, 144, 40, 0.05),
+    0 4px 16px rgba(0, 0, 0, 0.6);
+}
+
+/* Orange — ember heat on panel borders */
+[data-danger="orange"] .inv-panel,
+[data-danger="orange"] .offer-panel {
+  border-color: var(--dl-panel-border);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.025),
+    0 0 20px rgba(168, 84, 24, 0.06),
+    0 4px 16px rgba(0, 0, 0, 0.65);
+}
+
+[data-danger="orange"] .pickup-hero {
+  box-shadow:
+    0 0 36px var(--accent-glow),
+    inset 0 0 24px rgba(184, 96, 24, 0.08),
+    0 4px 16px rgba(0, 0, 0, 0.65);
+}
+
+[data-danger="orange"] .tap-selected {
+  box-shadow:
+    0 0 0 4px var(--accent-muted),
+    0 0 18px var(--accent-glow);
+}
+
+/* Red — blood edge, everything tinted */
+[data-danger="red"] .inv-panel,
+[data-danger="red"] .offer-panel {
+  border-color: var(--dl-panel-border);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.02),
+    0 0 28px rgba(152, 32, 24, 0.1),
+    0 4px 16px rgba(0, 0, 0, 0.7);
+}
+
+[data-danger="red"] .offer-panel::before {
+  opacity: 0.45;
+  animation: var(--dl-accent-pulse);
+}
+
+[data-danger="red"] .pickup-hero {
+  box-shadow:
+    0 0 40px var(--accent-glow),
+    inset 0 0 28px rgba(184, 48, 40, 0.1),
+    0 4px 20px rgba(0, 0, 0, 0.7);
+}
+
+[data-danger="red"] .tap-selected {
+  box-shadow:
+    0 0 0 4px var(--accent-muted),
+    0 0 24px var(--accent-glow);
+  animation: var(--dl-accent-pulse);
+}
+
+[data-danger="red"] .discard-zone::before {
+  opacity: 0.07;
+  color: var(--danger-red-bright);
+}
+
+[data-danger="red"] .trade-status__item--ready {
+  animation: critical-strobe 3s var(--ease-in-out) infinite;
 }
