@@ -12,8 +12,11 @@ dist
 dist-ssr
 *.local
 
-# Runtime game data (persisted on server disk — do not ship via git)
-data/
+# Runtime game data (transient; data/endead.db snapshot is committed)
+data/*.db-shm
+data/*.db-wal
+data/gamestate.json
+data/history.json
 
 # Editor directories and files
 .vscode/*

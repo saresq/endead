@@ -1,0 +1,124 @@
+{
+  "id": "map-1776396142047",
+  "name": "ENDEAD",
+  "width": 4,
+  "height": 3,
+  "gridSize": 30,
+  "tiles": [
+    {
+      "id": "tile-1-2",
+      "tileId": "8V",
+      "x": 1,
+      "y": 2,
+      "rotation": 90
+    },
+    {
+      "id": "tile-1-1",
+      "tileId": "4V",
+      "x": 1,
+      "y": 1,
+      "rotation": 270
+    },
+    {
+      "id": "tile-1-0",
+      "tileId": "6R",
+      "x": 1,
+      "y": 0,
+      "rotation": 180
+    },
+    {
+      "id": "tile-2-2",
+      "tileId": "9R",
+      "x": 2,
+      "y": 2,
+      "rotation": 90
+    },
+    {
+      "id": "tile-2-1",
+      "tileId": "7R",
+      "x": 2,
+      "y": 1,
+      "rotation": 90
+    },
+    {
+      "id": "tile-2-0",
+      "tileId": "3R",
+      "x": 2,
+      "y": 0,
+      "rotation": 0
+    },
+    {
+      "id": "tile-3-0",
+      "tileId": "6V",
+      "x": 3,
+      "y": 0,
+      "rotation": 90
+    },
+    {
+      "id": "tile-3-1",
+      "tileId": "2V",
+      "x": 3,
+      "y": 1,
+      "rotation": 0
+    },
+    {
+      "id": "tile-3-2",
+      "tileId": "1V",
+      "x": 3,
+      "y": 2,
+      "rotation": 90
+    }
+  ],
+  "markers": [
+    {
+      "type": "PLAYER_START",
+      "x": 34,
+      "y": 3
+    },
+    {
+      "type": "ZOMBIE_SPAWN",
+      "x": 93,
+      "y": 4
+    },
+    {
+      "type": "ZOMBIE_SPAWN",
+      "x": 117,
+      "y": 57
+    },
+    {
+      "type": "EXIT",
+      "x": 33,
+      "y": 26
+    },
+    {
+      "type": "OBJECTIVE",
+      "x": 46,
+      "y": 18
+    },
+    {
+      "type": "OBJECTIVE",
+      "x": 42,
+      "y": 56
+    },
+    {
+      "type": "OBJECTIVE",
+      "x": 48,
+      "y": 74
+    },
+    {
+      "type": "OBJECTIVE",
+      "x": 71,
+      "y": 20
+    },
+    {
+      "type": "OBJECTIVE",
+      "x": 116,
+      "y": 13
+    },
+    {
+      "type": "OBJECTIVE",
+      "x": 118,
+      "y": 47
+    }
+  ]
+}

@@ -5409,137 +5409,146 @@
         "side": "north",
         "localIndex": 0,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "north",
         "localIndex": 1,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "north",
         "localIndex": 2,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "north",
         "localIndex": 3,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "north",
         "localIndex": 4,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "north",
         "localIndex": 5,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "north",
         "localIndex": 6,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "north",
         "localIndex": 7,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "north",
         "localIndex": 8,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "north",
         "localIndex": 9,
-        "type": "wall",
+        "type": "street",
         "crosswalk": false,
         "doorway": true
       },
       {
         "side": "north",
         "localIndex": 10,
-        "type": "wall",
+        "type": "street",
         "crosswalk": false,
         "doorway": true
       },
       {
         "side": "north",
         "localIndex": 11,
-        "type": "wall",
+        "type": "street",
         "crosswalk": false,
         "doorway": true
       },
       {
         "side": "north",
         "localIndex": 12,
-        "type": "wall",
+        "type": "street",
         "crosswalk": false,
         "doorway": true
       },
       {
         "side": "north",
         "localIndex": 13,
-        "type": "wall",
+        "type": "street",
         "crosswalk": false,
         "doorway": true
       },
       {
         "side": "north",
         "localIndex": 14,
-        "type": "wall",
+        "type": "street",
         "crosswalk": false,
         "doorway": true
       },
       {
         "side": "north",
         "localIndex": 15,
-        "type": "wall",
+        "type": "street",
         "crosswalk": false,
         "doorway": true
       },
       {
         "side": "north",
         "localIndex": 16,
-        "type": "wall",
+        "type": "street",
         "crosswalk": false,
         "doorway": true
       },
       {
         "side": "north",
         "localIndex": 17,
-        "type": "wall",
+        "type": "street",
         "crosswalk": false,
         "doorway": true
       },
       {
         "side": "north",
         "localIndex": 18,
-        "type": "wall",
+        "type": "street",
         "crosswalk": false,
         "doorway": true
       },
       {
         "side": "north",
         "localIndex": 19,
-        "type": "wall",
+        "type": "street",
         "crosswalk": false,
         "doorway": true
       },
       {
         "side": "north",
         "localIndex": 20,
-        "type": "wall",
+        "type": "street",
         "crosswalk": false,
         "doorway": true
       },
@@ -5547,371 +5556,419 @@
         "side": "north",
         "localIndex": 21,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "north",
         "localIndex": 22,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "north",
         "localIndex": 23,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "north",
         "localIndex": 24,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "north",
         "localIndex": 25,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "north",
         "localIndex": 26,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "north",
         "localIndex": 27,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "north",
         "localIndex": 28,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "north",
         "localIndex": 29,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "south",
         "localIndex": 0,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "south",
         "localIndex": 1,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "south",
         "localIndex": 2,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "south",
         "localIndex": 3,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "south",
         "localIndex": 4,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "south",
         "localIndex": 5,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "south",
         "localIndex": 6,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "south",
         "localIndex": 7,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "south",
         "localIndex": 8,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "south",
         "localIndex": 9,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "south",
         "localIndex": 10,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "south",
         "localIndex": 11,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "south",
         "localIndex": 12,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "south",
         "localIndex": 13,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "south",
         "localIndex": 14,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "south",
         "localIndex": 15,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "south",
         "localIndex": 16,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "south",
         "localIndex": 17,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "south",
         "localIndex": 18,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "south",
         "localIndex": 19,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "south",
         "localIndex": 20,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "south",
         "localIndex": 21,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "south",
         "localIndex": 22,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "south",
         "localIndex": 23,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "south",
         "localIndex": 24,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "south",
         "localIndex": 25,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "south",
         "localIndex": 26,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "south",
         "localIndex": 27,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "south",
         "localIndex": 28,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "south",
         "localIndex": 29,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "east",
         "localIndex": 0,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "east",
         "localIndex": 1,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "east",
         "localIndex": 2,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "east",
         "localIndex": 3,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "east",
         "localIndex": 4,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "east",
         "localIndex": 5,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "east",
         "localIndex": 6,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "east",
         "localIndex": 7,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "east",
         "localIndex": 8,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "east",
         "localIndex": 9,
-        "type": "wall",
+        "type": "street",
         "crosswalk": false,
         "doorway": true
       },
       {
         "side": "east",
         "localIndex": 10,
-        "type": "wall",
+        "type": "street",
         "crosswalk": false,
         "doorway": true
       },
       {
         "side": "east",
         "localIndex": 11,
-        "type": "wall",
+        "type": "street",
         "crosswalk": false,
         "doorway": true
       },
       {
         "side": "east",
         "localIndex": 12,
-        "type": "wall",
+        "type": "street",
         "crosswalk": false,
         "doorway": true
       },
       {
         "side": "east",
         "localIndex": 13,
-        "type": "wall",
+        "type": "street",
         "crosswalk": false,
         "doorway": true
       },
       {
         "side": "east",
         "localIndex": 14,
-        "type": "wall",
+        "type": "street",
         "crosswalk": false,
         "doorway": true
       },
       {
         "side": "east",
         "localIndex": 15,
-        "type": "wall",
+        "type": "street",
         "crosswalk": false,
         "doorway": true
       },
       {
         "side": "east",
         "localIndex": 16,
-        "type": "wall",
+        "type": "street",
         "crosswalk": false,
         "doorway": true
       },
       {
         "side": "east",
         "localIndex": 17,
-        "type": "wall",
+        "type": "street",
         "crosswalk": false,
         "doorway": true
       },
       {
         "side": "east",
         "localIndex": 18,
-        "type": "wall",
+        "type": "street",
         "crosswalk": false,
         "doorway": true
       },
       {
         "side": "east",
         "localIndex": 19,
-        "type": "wall",
+        "type": "street",
         "crosswalk": false,
         "doorway": true
       },
       {
         "side": "east",
         "localIndex": 20,
-        "type": "wall",
+        "type": "street",
         "crosswalk": false,
         "doorway": true
       },
@@ -5919,235 +5976,274 @@
         "side": "east",
         "localIndex": 21,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "east",
         "localIndex": 22,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "east",
         "localIndex": 23,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "east",
         "localIndex": 24,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "east",
         "localIndex": 25,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "east",
         "localIndex": 26,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "east",
         "localIndex": 27,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "east",
         "localIndex": 28,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "east",
         "localIndex": 29,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "west",
         "localIndex": 0,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "west",
         "localIndex": 1,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "west",
         "localIndex": 2,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "west",
         "localIndex": 3,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "west",
         "localIndex": 4,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "west",
         "localIndex": 5,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "west",
         "localIndex": 6,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "west",
         "localIndex": 7,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "west",
         "localIndex": 8,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "west",
         "localIndex": 9,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "west",
         "localIndex": 10,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "west",
         "localIndex": 11,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "west",
         "localIndex": 12,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "west",
         "localIndex": 13,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "west",
         "localIndex": 14,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "west",
         "localIndex": 15,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "west",
         "localIndex": 16,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "west",
         "localIndex": 17,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "west",
         "localIndex": 18,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "west",
         "localIndex": 19,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "west",
         "localIndex": 20,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "west",
         "localIndex": 21,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "west",
         "localIndex": 22,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "west",
         "localIndex": 23,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "west",
         "localIndex": 24,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "west",
         "localIndex": 25,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "west",
         "localIndex": 26,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "west",
         "localIndex": 27,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "west",
         "localIndex": 28,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       },
       {
         "side": "west",
         "localIndex": 29,
         "type": "street",
-        "crosswalk": false
+        "crosswalk": false,
+        "doorway": false
       }
     ],
     "internalEdges": [
@@ -120476,55 +120572,55 @@
         "localX": 0,
         "localY": 6,
         "type": "street",
-        "roomId": "S2"
+        "roomId": "S1"
       },
       {
         "localX": 1,
         "localY": 6,
         "type": "street",
-        "roomId": "S2"
+        "roomId": "S1"
       },
       {
         "localX": 2,
         "localY": 6,
         "type": "street",
-        "roomId": "S2"
+        "roomId": "S1"
       },
       {
         "localX": 3,
         "localY": 6,
         "type": "street",
-        "roomId": "S2"
+        "roomId": "S1"
       },
       {
         "localX": 4,
         "localY": 6,
         "type": "street",
-        "roomId": "S2"
+        "roomId": "S1"
       },
       {
         "localX": 5,
         "localY": 6,
         "type": "street",
-        "roomId": "S2"
+        "roomId": "S1"
       },
       {
         "localX": 6,
         "localY": 6,
         "type": "street",
-        "roomId": "S2"
+        "roomId": "S1"
       },
       {
         "localX": 7,
         "localY": 6,
         "type": "street",
-        "roomId": "S2"
+        "roomId": "S1"
       },
       {
         "localX": 8,
         "localY": 6,
         "type": "street",
-        "roomId": "S2"
+        "roomId": "S1"
       },
       {
         "localX": 9,
@@ -120656,55 +120752,55 @@
         "localX": 0,
         "localY": 7,
         "type": "street",
-        "roomId": "S2"
+        "roomId": "S1"
       },
       {
         "localX": 1,
         "localY": 7,
         "type": "street",
-        "roomId": "S2"
+        "roomId": "S1"
       },
       {
         "localX": 2,
         "localY": 7,
         "type": "street",
-        "roomId": "S2"
+        "roomId": "S1"
       },
       {
         "localX": 3,
         "localY": 7,
         "type": "street",
-        "roomId": "S2"
+        "roomId": "S1"
       },
       {
         "localX": 4,
         "localY": 7,
         "type": "street",
-        "roomId": "S2"
+        "roomId": "S1"
       },
       {
         "localX": 5,
         "localY": 7,
         "type": "street",
-        "roomId": "S2"
+        "roomId": "S1"
       },
       {
         "localX": 6,
         "localY": 7,
         "type": "street",
-        "roomId": "S2"
+        "roomId": "S1"
       },
       {
         "localX": 7,
         "localY": 7,
         "type": "street",
-        "roomId": "S2"
+        "roomId": "S1"
       },
       {
         "localX": 8,
         "localY": 7,
         "type": "street",
-        "roomId": "S2"
+        "roomId": "S1"
       },
       {
         "localX": 9,
@@ -120836,55 +120932,55 @@
         "localX": 0,
         "localY": 8,
         "type": "street",
-        "roomId": "S2"
+        "roomId": "S1"
       },
       {
         "localX": 1,
         "localY": 8,
         "type": "street",
-        "roomId": "S2"
+        "roomId": "S1"
       },
       {
         "localX": 2,
         "localY": 8,
         "type": "street",
-        "roomId": "S2"
+        "roomId": "S1"
       },
       {
         "localX": 3,
         "localY": 8,
         "type": "street",
-        "roomId": "S2"
+        "roomId": "S1"
       },
       {
         "localX": 4,
         "localY": 8,
         "type": "street",
-        "roomId": "S2"
+        "roomId": "S1"
       },
       {
         "localX": 5,
         "localY": 8,
         "type": "street",
-        "roomId": "S2"
+        "roomId": "S1"
       },
       {
         "localX": 6,
         "localY": 8,
         "type": "street",
-        "roomId": "S2"
+        "roomId": "S1"
       },
       {
         "localX": 7,
         "localY": 8,
         "type": "street",
-        "roomId": "S2"
+        "roomId": "S1"
       },
       {
         "localX": 8,
         "localY": 8,
         "type": "street",
-        "roomId": "S2"
+        "roomId": "S1"
       },
       {
         "localX": 9,
@@ -125679,6 +125775,27 @@
         "type": "wall"
       },
       {
+        "fromX": 8,
+        "fromY": 6,
+        "toX": 9,
+        "toY": 6,
+        "type": "wall"
+      },
+      {
+        "fromX": 8,
+        "fromY": 7,
+        "toX": 9,
+        "toY": 7,
+        "type": "wall"
+      },
+      {
+        "fromX": 8,
+        "fromY": 8,
+        "toX": 9,
+        "toY": 8,
+        "type": "wall"
+      },
+      {
         "fromX": 20,
         "fromY": 0,
         "toX": 21,
@@ -125742,25 +125859,67 @@
         "type": "doorway"
       },
       {
-        "fromX": 8,
-        "fromY": 6,
-        "toX": 9,
-        "toY": 6,
-        "type": "wall"
+        "fromX": 0,
+        "fromY": 8,
+        "toX": 0,
+        "toY": 9,
+        "type": "crosswalk"
       },
       {
-        "fromX": 8,
-        "fromY": 7,
-        "toX": 9,
-        "toY": 7,
-        "type": "wall"
+        "fromX": 1,
+        "fromY": 8,
+        "toX": 1,
+        "toY": 9,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 2,
+        "fromY": 8,
+        "toX": 2,
+        "toY": 9,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 3,
+        "fromY": 8,
+        "toX": 3,
+        "toY": 9,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 4,
+        "fromY": 8,
+        "toX": 4,
+        "toY": 9,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 5,
+        "fromY": 8,
+        "toX": 5,
+        "toY": 9,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 6,
+        "fromY": 8,
+        "toX": 6,
+        "toY": 9,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 7,
+        "fromY": 8,
+        "toX": 7,
+        "toY": 9,
+        "type": "crosswalk"
       },
       {
         "fromX": 8,
         "fromY": 8,
-        "toX": 9,
-        "toY": 8,
-        "type": "wall"
+        "toX": 8,
+        "toY": 9,
+        "type": "crosswalk"
       },
       {
         "fromX": 9,
@@ -125992,6 +126151,69 @@
         "toX": 21,
         "toY": 20,
         "type": "doorway"
+      },
+      {
+        "fromX": 0,
+        "fromY": 20,
+        "toX": 0,
+        "toY": 21,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 1,
+        "fromY": 20,
+        "toX": 1,
+        "toY": 21,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 2,
+        "fromY": 20,
+        "toX": 2,
+        "toY": 21,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 3,
+        "fromY": 20,
+        "toX": 3,
+        "toY": 21,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 4,
+        "fromY": 20,
+        "toX": 4,
+        "toY": 21,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 5,
+        "fromY": 20,
+        "toX": 5,
+        "toY": 21,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 6,
+        "fromY": 20,
+        "toX": 6,
+        "toY": 21,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 7,
+        "fromY": 20,
+        "toX": 7,
+        "toY": 21,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 8,
+        "fromY": 20,
+        "toX": 8,
+        "toY": 21,
+        "type": "crosswalk"
       },
       {
         "fromX": 9,
@@ -126258,7 +126480,9 @@
       "A|D": "doorway",
       "A|B": "doorway",
       "B|D": "doorway",
-      "B|C": "doorway"
+      "B|C": "doorway",
+      "S1|S2": "crosswalk",
+      "S2|S3": "crosswalk"
     },
     "doors": [
       {
