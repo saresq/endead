@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Runtime game data (persisted on server disk — do not ship via git)
+data/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

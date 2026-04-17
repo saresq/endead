@@ -266,7 +266,7 @@ function sendError(ws: WebSocket, error: { code: string; message: string }) {
   ws.send(JSON.stringify({ type: 'ERROR', payload: error }));
 }
 
-function broadcastRoomState(room: RoomContext): void {
+function broadcastRoomState(room: RoomContext, excludeSocket?: WebSocket): void {
   let message: string;
 
   if (room.previousState) {
@@ -282,6 +282,7 @@ function broadcastRoomState(room: RoomContext): void {
   room.previousState = structuredClone(room.gameState);
 
   room.clients.forEach((_playerId, ws) => {
+    if (ws === excludeSocket) return;
     if (ws.readyState === WebSocket.OPEN) {
       ws.send(message);
     }
@@ -434,14 +435,17 @@ function handleJoin(ws: WebSocket, payload: { roomId: string; playerId: PlayerId
         ready: false,
         characterClass: '',
       });
-      broadcastRoomState(room);
+      // New socket has no local state — send full snapshot, broadcast patch to others
+      ws.send(JSON.stringify({ type: 'STATE_UPDATE', payload: room.gameState }));
+      broadcastRoomState(room, ws);
       return;
     }
 
     const nextName = sanitizeNickname(name, '');
     if (nextName && lobbyPlayer.name !== nextName) {
       lobbyPlayer.name = nextName;
-      broadcastRoomState(room);
+      ws.send(JSON.stringify({ type: 'STATE_UPDATE', payload: room.gameState }));
+      broadcastRoomState(room, ws);
       return;
     }
   }
