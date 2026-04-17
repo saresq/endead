@@ -127,6 +127,19 @@ export class GameHUD {
       return;
     }
 
+    // --- Lucky reroll ---
+    if (action === 'reroll-lucky') {
+      const last = this.state?.lastAction;
+      if (last?.survivorId && last.playerId === this.localPlayerId) {
+        networkManager.sendAction({
+          playerId: this.localPlayerId,
+          survivorId: last.survivorId,
+          type: ActionType.REROLL_LUCKY,
+        });
+      }
+      return;
+    }
+
     // --- Backpack FAB ---
     if (id === 'btn-backpack-fab' || action === 'open-backpack') {
       this.openBackpack();
@@ -325,7 +338,7 @@ export class GameHUD {
       const isDead = survivor.wounds >= survivor.maxHealth;
       const isActive = pid === activePlayerId;
       const state = isDead ? 'dead' as const : isActive ? 'active' as const : undefined;
-      return renderAvatar(survivor.name, identity, 'sm', state);
+      return renderAvatar(survivor.name, identity, 'sm', state, survivor.characterClass);
     }).join('');
 
     return `<div class="hud-player-strip">${chips}</div>`;
@@ -348,13 +361,37 @@ export class GameHUD {
     if (!lastAction && !spawnInfo) return '';
 
     const dismissBtn = `<button class="btn btn--icon btn--sm hud-feed__dismiss" data-action="dismiss-feed" title="Dismiss">${icon('X', 'sm')}</button>`;
+    const luckyBtn = this.renderLuckyRerollButton();
 
     // Desktop: sidebar feed
-    const desktopFeed = `<div class="hud-feed"><div class="hud-feed__section">${dismissBtn}${lastAction}${spawnInfo}</div></div>`;
+    const desktopFeed = `<div class="hud-feed"><div class="hud-feed__section">${dismissBtn}${lastAction}${luckyBtn}${spawnInfo}</div></div>`;
     // Mobile: last event as floating overlay
-    const mobileFeed = lastAction ? `<div class="hud-feed-mobile">${lastAction}</div>` : '';
+    const mobileFeed = lastAction ? `<div class="hud-feed-mobile">${lastAction}${luckyBtn}</div>` : '';
 
     return `${desktopFeed}${mobileFeed}`;
+  }
+
+  /**
+   * Lucky reroll affordance — surfaces a button in the feed when:
+   * - local survivor owns the last ATTACK action,
+   * - Lucky skill is unspent this turn,
+   * - the attack carried a rollback snapshot (always true for Lucky-capable attackers).
+   */
+  private renderLuckyRerollButton(): string {
+    const state = this.state;
+    if (!state || !state.lastAction) return '';
+    const last = state.lastAction;
+    if (last.type !== ActionType.ATTACK) return '';
+    if (last.playerId !== this.localPlayerId) return '';
+    if (!last.survivorId) return '';
+    const survivor = state.survivors[last.survivorId];
+    if (!survivor) return '';
+    if (!survivor.skills.includes('lucky')) return '';
+    if (survivor.luckyUsedThisTurn) return '';
+    if (!last.rollbackSnapshot) return '';
+    return `<button class="action-btn action-btn--lucky" data-action="reroll-lucky" title="Reroll dice (Lucky — commits to new result even if worse)">
+      ${icon('Dices', 'sm')} Reroll (Lucky)
+    </button>`;
   }
 
   private renderBottomDashboard(survivor: Survivor, isMyTurn: boolean): string {
@@ -362,7 +399,7 @@ export class GameHUD {
     if (!isOwner) return '';
 
     const identity = getPlayerIdentity(this.state!, survivor.playerId);
-    const avatar = renderAvatar(survivor.name, identity, 'md');
+    const avatar = renderAvatar(survivor.name, identity, 'md', undefined, survivor.characterClass);
 
     const hp = renderStatBar({ icon: 'Heart', current: survivor.maxHealth - survivor.wounds, max: survivor.maxHealth, color: 'var(--danger)' });
     const xp = renderStatBar({ icon: 'Star', current: survivor.experience, max: survivor.experience + 5, color: 'var(--accent)', label: `${survivor.experience} XP` });
@@ -552,11 +589,6 @@ export class GameHUD {
       if (survivor.skills.includes('plus_1_damage_combat')) bonusDamage++;
       if (isMelee && survivor.skills.includes('super_strength')) {
         bonusDamage = Math.max(bonusDamage, 3 - w.stats.damage);
-      }
-
-      // Plenty of Ammo
-      if (isRanged && survivor.inventory.some(c => c.name === 'Plenty of Ammo' && c.inHand)) {
-        bonusDice++;
       }
 
       if (bonusDice > 0 || bonusDamage > 0) {
@@ -750,7 +782,7 @@ export class GameHUD {
       const count = this.woundDistAssignments[sid] || 0;
       const hp = survivor.maxHealth - survivor.wounds;
       const identity = getPlayerIdentity(this.state!, survivor.playerId);
-      const avatar = renderAvatar(survivor.name, identity, 'sm');
+      const avatar = renderAvatar(survivor.name, identity, 'sm', undefined, survivor.characterClass);
 
       return `<div class="wound-dist__row">
         ${avatar}
@@ -809,7 +841,7 @@ export class GameHUD {
         <div class="stack stack--sm">
           ${others.map(t => {
             const identity = getPlayerIdentity(this.state!, t.playerId);
-            const avatar = renderAvatar(t.name, identity, 'md');
+            const avatar = renderAvatar(t.name, identity, 'md', undefined, t.characterClass);
             return `
               <button class="action-btn" data-action="select-bl-target" data-id="${t.id}" style="width:100%">
                 ${avatar}
@@ -1052,12 +1084,19 @@ export class GameHUD {
           subDetail = `<div class="history-entry__dice">${diceStr} <span class="history-entry__hits">${hitsStr}${dmgStr}</span></div>`;
         }
 
-        // Lucky reroll
-        if (entry.luckyRerollOriginal && entry.luckyRerollOriginal.length > 0) {
-          const origDice = entry.luckyRerollOriginal.map(d =>
+        // Reroll indicator (Lucky / Plenty of Bullets / Plenty of Shells)
+        if (entry.rerolledFrom && entry.rerolledFrom.length > 0) {
+          const origDice = entry.rerolledFrom.map(d =>
             `<span class="history-die history-die--discarded">${d}</span>`
           ).join('');
-          subDetail = `<div class="history-entry__lucky">Lucky rerolled: ${origDice}</div>${subDetail}`;
+          const label = entry.rerollSource === 'lucky'
+            ? 'Lucky rerolled'
+            : entry.rerollSource === 'plenty_of_bullets'
+              ? 'Plenty of Bullets rerolled'
+              : entry.rerollSource === 'plenty_of_shells'
+                ? 'Plenty of Shells rerolled'
+                : 'Rerolled';
+          subDetail = `<div class="history-entry__lucky">${label}: ${origDice}</div>${subDetail}`;
         }
 
         // Boost info
@@ -1185,7 +1224,7 @@ export class GameHUD {
         <div class="stack stack--sm">
           ${targets.map(t => {
             const identity = getPlayerIdentity(this.state!, t.playerId);
-            const avatar = renderAvatar(t.name, identity, 'md');
+            const avatar = renderAvatar(t.name, identity, 'md', undefined, t.characterClass);
             return `
               <button class="action-btn" data-action="select-trade-target" data-id="${t.id}" style="width:100%">
                 ${avatar}

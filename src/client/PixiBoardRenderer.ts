@@ -1,7 +1,7 @@
 // src/client/PixiBoardRenderer.ts
 
 import * as PIXI from 'pixi.js';
-import { GameState, ZoneId, EntityId, Survivor, Zombie, ZombieType } from '../types/GameState';
+import { GameState, ZoneId, EntityId, Survivor, Zombie, ZombieType, DangerLevel } from '../types/GameState';
 import { TILE_SIZE, TILE_CELLS_PER_SIDE, TILE_PIXEL_SIZE, ENTITY_RADIUS, ENTITY_SPACING, MIN_ENTITY_RADIUS, GROUP_BADGE_RADIUS } from '../config/Layout';
 import { tileService } from '../services/TileService';
 import { TileInstance } from '../types/Map';
@@ -60,7 +60,6 @@ export class PixiBoardRenderer {
   // Layers
   private layerGrid: PIXI.Container;
   private layerTiles: PIXI.Container;
-  private layerSeams: PIXI.Container;
   private layerBoard: PIXI.Container;    // Single-pass zone overlay (fills + edges + indicators)
   private boardGraphics: PIXI.Graphics;  // One Graphics object for all zone visuals
   private iconContainer: PIXI.Container; // Lucide icon sprites (cleared each frame)
@@ -75,7 +74,6 @@ export class PixiBoardRenderer {
     // Create Layers
     this.layerGrid = new PIXI.Container();
     this.layerTiles = new PIXI.Container();
-    this.layerSeams = new PIXI.Container();
     this.layerBoard = new PIXI.Container();
     this.boardGraphics = new PIXI.Graphics();
     this.iconContainer = new PIXI.Container();
@@ -86,7 +84,6 @@ export class PixiBoardRenderer {
 
     this.container.addChild(this.layerGrid);
     this.container.addChild(this.layerTiles);
-    this.container.addChild(this.layerSeams);
     this.container.addChild(this.layerBoard);
     this.container.addChild(this.layerEntities);
     this.container.addChild(this.layerBadges);
@@ -96,7 +93,6 @@ export class PixiBoardRenderer {
       if (this._lastState?.tiles) {
         this._lastTileHash = '';  // force redraw
         this.renderTiles(this._lastState.tiles);
-        this.renderSeams(this._lastState);
       }
     });
 
@@ -461,7 +457,6 @@ export class PixiBoardRenderer {
     // 1. Tiles
     if (state.tiles) {
        this.renderTiles(state.tiles);
-       this.renderSeams(state);
     }
 
     // 2. Board overlay (zones + edges + indicators — single pass)
@@ -485,99 +480,25 @@ export class PixiBoardRenderer {
      tiles.forEach(tile => {
          const texture = tileService.getTexture(tile.tileId);
          if (!texture) return;
-         
+
          const sprite = new PIXI.Sprite(texture);
-         
+
          const targetSize = TILE_PIXEL_SIZE;
          const scale = targetSize / texture.width;
-         
+
          sprite.scale.set(scale);
          sprite.anchor.set(0.5);
 
          // Position logic
          const px = (tile.x * targetSize) + (targetSize / 2);
          const py = (tile.y * targetSize) + (targetSize / 2);
-         
+
          sprite.x = px;
          sprite.y = py;
          sprite.rotation = (tile.rotation * Math.PI) / 180;
-         
+
          this.layerTiles.addChild(sprite);
      });
-  }
-
-  /**
-   * Draw opaque strips at tile boundaries where both sides are street cells.
-   * This covers the doubled lane markings that appear when two tiles share a street edge.
-   */
-  private renderSeams(state: GameState): void {
-    this.layerSeams.removeChildren();
-    if (!state.tiles || state.tiles.length < 2 || !state.zoneGeometry) return;
-
-    const g = new PIXI.Graphics();
-    const SEAM_WIDTH = 12; // pixels to cover on each side of the boundary
-    const STREET_COLOR = BOARD_THEME.seam.streetColor;
-
-    // Build a tile lookup: "tx,ty" → TileInstance
-    const tileLookup = new Map<string, typeof state.tiles[0]>();
-    for (const t of state.tiles) {
-      tileLookup.set(`${t.x},${t.y}`, t);
-    }
-
-    for (const tile of state.tiles) {
-      // Check east neighbor
-      const eastKey = `${tile.x + 1},${tile.y}`;
-      const eastTile = tileLookup.get(eastKey);
-      if (eastTile) {
-        // Check each cell pair along the shared edge
-        for (let i = 0; i < TILE_CELLS_PER_SIDE; i++) {
-          const cellAx = tile.x * TILE_CELLS_PER_SIDE + (TILE_CELLS_PER_SIDE - 1);
-          const cellAy = tile.y * TILE_CELLS_PER_SIDE + i;
-          const cellBx = eastTile.x * TILE_CELLS_PER_SIDE;
-          const cellBy = eastTile.y * TILE_CELLS_PER_SIDE + i;
-
-          const zoneA = state.zoneGeometry.cellToZone[`${cellAx},${cellAy}`];
-          const zoneB = state.zoneGeometry.cellToZone[`${cellBx},${cellBy}`];
-
-          if (zoneA && zoneB && state.zones[zoneA] && state.zones[zoneB]) {
-            const bothStreet = !state.zones[zoneA].isBuilding && !state.zones[zoneB].isBuilding;
-            if (bothStreet) {
-              const boundaryX = (tile.x + 1) * TILE_PIXEL_SIZE;
-              const cellWorldY = cellAy * TILE_SIZE;
-              g.rect(boundaryX - SEAM_WIDTH, cellWorldY + 2, SEAM_WIDTH * 2, TILE_SIZE - 4);
-              g.fill({ color: STREET_COLOR, alpha: BOARD_THEME.seam.alpha });
-            }
-          }
-        }
-      }
-
-      // Check south neighbor
-      const southKey = `${tile.x},${tile.y + 1}`;
-      const southTile = tileLookup.get(southKey);
-      if (southTile) {
-        for (let i = 0; i < TILE_CELLS_PER_SIDE; i++) {
-          const cellAx = tile.x * TILE_CELLS_PER_SIDE + i;
-          const cellAy = tile.y * TILE_CELLS_PER_SIDE + (TILE_CELLS_PER_SIDE - 1);
-          const cellBx = southTile.x * TILE_CELLS_PER_SIDE + i;
-          const cellBy = southTile.y * TILE_CELLS_PER_SIDE;
-
-          const zoneA = state.zoneGeometry.cellToZone[`${cellAx},${cellAy}`];
-          const zoneB = state.zoneGeometry.cellToZone[`${cellBx},${cellBy}`];
-
-          if (zoneA && zoneB && state.zones[zoneA] && state.zones[zoneB]) {
-            const bothStreet = !state.zones[zoneA].isBuilding && !state.zones[zoneB].isBuilding;
-            if (bothStreet) {
-              const cellWorldX = cellAx * TILE_SIZE;
-              const boundaryY = (tile.y + 1) * TILE_PIXEL_SIZE;
-              g.rect(cellWorldX + 2, boundaryY - SEAM_WIDTH, TILE_SIZE - 4, SEAM_WIDTH * 2);
-              g.fill({ color: STREET_COLOR, alpha: BOARD_THEME.seam.alpha });
-            }
-          }
-        }
-      }
-    }
-
-    this.layerSeams.addChild(g);
   }
 
   /**
@@ -1361,12 +1282,17 @@ export class PixiBoardRenderer {
 
     const survivor = state.survivors[entityId];
     if (survivor) {
-      const weapon = survivor.inventory.find(c => c.inHand && c.stats);
-      const weaponName = weapon ? weapon.name : 'None';
+      const hand1 = survivor.inventory.find(c => c.slot === 'HAND_1');
+      const hand2 = survivor.inventory.find(c => c.slot === 'HAND_2');
+      const hand1Name = hand1 ? hand1.name : 'Empty';
+      const hand2Name = hand2 ? hand2.name : 'Empty';
       const hp = survivor.maxHealth - survivor.wounds;
-      return `<div class="tooltip-title">${survivor.name}</div>`
+      const xpColor = PixiBoardRenderer.DANGER_LEVEL_COLORS[survivor.dangerLevel];
+      return `<div class="tooltip-title">${survivor.name} <span class="tooltip-count">${survivor.characterClass}</span></div>`
         + `<div class="tooltip-row"><span>Health</span><span class="tooltip-value">${hp}/${survivor.maxHealth}</span></div>`
-        + `<div class="tooltip-row"><span>Weapon</span><span class="tooltip-value">${weaponName}</span></div>`;
+        + `<div class="tooltip-row"><span>XP</span><span class="tooltip-value" style="color:${xpColor}">${survivor.experience}</span></div>`
+        + `<div class="tooltip-row"><span>Hand 1</span><span class="tooltip-value">${hand1Name}</span></div>`
+        + `<div class="tooltip-row"><span>Hand 2</span><span class="tooltip-value">${hand2Name}</span></div>`;
     }
 
     const zombie = state.zombies[entityId];
@@ -1396,6 +1322,13 @@ export class PixiBoardRenderer {
     [ZombieType.Runner]: 1,
     [ZombieType.Brute]: 2,
     [ZombieType.Abomination]: 3,
+  };
+
+  private static DANGER_LEVEL_COLORS: Record<DangerLevel, string> = {
+    [DangerLevel.Blue]: '#6aa8d0',
+    [DangerLevel.Yellow]: '#d0a030',
+    [DangerLevel.Orange]: '#c86820',
+    [DangerLevel.Red]: '#c02820',
   };
 
   private buildTypeTooltipContent(zoneId: ZoneId, type: ZombieType): string | null {
@@ -1482,26 +1415,41 @@ export class PixiBoardRenderer {
         graphics.stroke({ width: 3, color: 0xFFD700 }); // Gold Border
       }
 
-      // 3. Survivor Body — sprite or colored circle
+      // 3. Survivor Body — portrait sprite masked to a circle, or fallback colored circle
       const survivorTex = this._assetManager?.getSurvivorTexture(survivor.characterClass);
+      const playerColor = this.getPlayerColor(survivor.playerId, state);
       if (survivorTex) {
+        const r = ENTITY_RADIUS;
         const sprite = new PIXI.Sprite(survivorTex);
         sprite.anchor.set(0.5);
-        sprite.width = ENTITY_RADIUS * 2;
-        sprite.height = ENTITY_RADIUS * 2;
+        // Scale the portrait to "cover" the circle while preserving aspect ratio,
+        // then bias upward so the face sits inside the token.
+        const srcW = survivorTex.width || 1;
+        const srcH = survivorTex.height || 1;
+        const cover = Math.max((r * 2) / srcW, (r * 2) / srcH);
+        // Zoom in a touch more so the head fills the token instead of shoulders.
+        const scale = cover * 1.35;
+        sprite.scale.set(scale);
+        sprite.y = -r * 0.25;
+
+        const spriteMask = new PIXI.Graphics();
+        spriteMask.circle(0, 0, r);
+        spriteMask.fill({ color: 0xFFFFFF });
+        container.addChild(spriteMask);
+        sprite.mask = spriteMask;
         container.addChild(sprite);
-        // Draw colored ring around sprite
-        const playerColor = this.getPlayerColor(survivor.playerId, state);
-        graphics.circle(0, 0, ENTITY_RADIUS);
-        graphics.stroke({ width: 2, color: playerColor });
+
+        // Colored ring around the portrait to preserve player identity
+        graphics.circle(0, 0, r);
+        graphics.stroke({ width: 3, color: playerColor });
       } else {
-        const playerColor = this.getPlayerColor(survivor.playerId, state);
         graphics.circle(0, 0, ENTITY_RADIUS);
         graphics.fill({ color: playerColor });
       }
 
       // 4. Wound Indicator
       if (survivor.wounds > 0) {
+        graphics.circle(0, 0, ENTITY_RADIUS);
         graphics.stroke({ width: 3, color: 0xFF0000 }); // Red Outline if wounded
       } else if (!survivorTex) {
         // Standard Outline only for placeholder circles

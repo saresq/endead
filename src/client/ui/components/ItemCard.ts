@@ -29,7 +29,6 @@ export interface ItemCardOptions {
 
 function getTypeIconName(card: EquipmentCard): string {
   if (card.type === 'WEAPON') return card.stats && card.stats.range[0] === 0 ? 'Swords' : 'Crosshair';
-  if (card.type === 'ARMOR') return 'Shield';
   return 'Package';
 }
 

@@ -8,7 +8,7 @@ import { deductAPWithFreeCheck, ActionHandler } from './handlers/handlerUtils';
 // --- Handler imports ---
 import { handleJoinLobby, handleUpdateNickname, handleSelectCharacter, handleStartGame, handleEndGame } from './handlers/LobbyHandlers';
 import { handleMove, handleSprint } from './handlers/MovementHandlers';
-import { handleAttack, handleResolveWounds, handleDistributeZombieWounds } from './handlers/CombatHandlers';
+import { handleAttack, handleResolveWounds, handleDistributeZombieWounds, handleRerollLucky } from './handlers/CombatHandlers';
 import { handleCharge, handleBornLeader, handleBloodlustMelee, handleLifesaver, handleChooseSkill } from './handlers/SkillHandlers';
 import { handleUseItem, handleSearch, handleResolveSearch, handleOrganize } from './handlers/ItemHandlers';
 import { handleOpenDoor, handleMakeNoise } from './handlers/DoorHandlers';
@@ -45,6 +45,7 @@ const handlers: Partial<Record<ActionType, ActionHandler>> = {
   [ActionType.LIFESAVER]: handleLifesaver,
   [ActionType.RESOLVE_WOUNDS]: handleResolveWounds,
   [ActionType.DISTRIBUTE_ZOMBIE_WOUNDS]: handleDistributeZombieWounds,
+  [ActionType.REROLL_LUCKY]: handleRerollLucky,
 };
 
 // --- Game End Logic ---
@@ -123,7 +124,7 @@ export function processAction(state: GameState, intent: ActionRequest): ActionRe
       if ((intent.type === ActionType.CHOOSE_SKILL || intent.type === ActionType.RESOLVE_SEARCH
           || intent.type === ActionType.CHARGE || intent.type === ActionType.BORN_LEADER
           || intent.type === ActionType.LIFESAVER || intent.type === ActionType.RESOLVE_WOUNDS
-          || intent.type === ActionType.END_TURN)
+          || intent.type === ActionType.END_TURN || intent.type === ActionType.REROLL_LUCKY)
           && turnError && turnError.code === 'NO_ACTIONS') {
         turnError = null;
       }
@@ -230,7 +231,8 @@ export function processAction(state: GameState, intent: ActionRequest): ActionRe
             historyEntry.damagePerHit = newState.lastAction.damagePerHit;
             historyEntry.bonusDice = newState.lastAction.bonusDice;
             historyEntry.bonusDamage = newState.lastAction.bonusDamage;
-            historyEntry.luckyRerollOriginal = newState.lastAction.luckyRerollOriginal;
+            historyEntry.rerolledFrom = newState.lastAction.rerolledFrom;
+            historyEntry.rerollSource = newState.lastAction.rerollSource;
             historyEntry.usedFreeAction = newState.lastAction.usedFreeAction;
             historyEntry.freeActionType = newState.lastAction.freeActionType;
         }

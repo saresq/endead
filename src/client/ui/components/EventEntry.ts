@@ -11,7 +11,8 @@ export interface LastActionData {
   dice?: number[];
   hits?: number;
   // Combat feedback metadata
-  luckyRerollOriginal?: number[];
+  rerolledFrom?: number[];
+  rerollSource?: 'lucky' | 'plenty_of_bullets' | 'plenty_of_shells';
   bonusDice?: number;
   bonusDamage?: number;
   damagePerHit?: number;
@@ -39,14 +40,21 @@ export function renderLastActionEntry(action: LastActionData): string {
     ? `<div class="event-entry__boosts">${diceBoost}${damageBoost}</div>`
     : '';
 
-  // Lucky reroll: show original dice that were discarded
-  let luckyHtml = '';
-  if (action.luckyRerollOriginal && action.luckyRerollOriginal.length > 0) {
-    const originalDice = action.luckyRerollOriginal.map(d =>
+  // Reroll indicator (Lucky / Plenty of Bullets / Plenty of Shells)
+  let rerollHtml = '';
+  if (action.rerolledFrom && action.rerolledFrom.length > 0) {
+    const label = action.rerollSource === 'lucky'
+      ? 'Lucky — rerolled:'
+      : action.rerollSource === 'plenty_of_bullets'
+        ? 'Plenty of Bullets — rerolled:'
+        : action.rerollSource === 'plenty_of_shells'
+          ? 'Plenty of Shells — rerolled:'
+          : 'Rerolled:';
+    const originalDice = action.rerolledFrom.map(d =>
       `<span class="event-die event-die--discarded">${d}</span>`
     ).join('');
-    luckyHtml = `<div class="event-entry__lucky">
-      <span class="event-entry__lucky-label">Lucky — rerolled:</span>
+    rerollHtml = `<div class="event-entry__lucky">
+      <span class="event-entry__lucky-label">${label}</span>
       ${originalDice}
     </div>`;
   }
@@ -66,7 +74,7 @@ export function renderLastActionEntry(action: LastActionData): string {
     <div class="event-entry event-entry--action">
       <div class="event-entry__desc">${freeLabel}${action.description || action.type}</div>
       ${boostLine}
-      ${luckyHtml}
+      ${rerollHtml}
       ${diceHtml}
     </div>`;
 }

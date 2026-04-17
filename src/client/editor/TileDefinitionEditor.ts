@@ -311,6 +311,11 @@ export class TileDefinitionEditor {
         this.spaceHeld = true;
         this.container.classList.add('tde--panning');
       }
+      // Hold Backspace to hide overlays (show tile image only)
+      if (e.code === 'Backspace') {
+        e.preventDefault();
+        this.gridWrapperEl?.classList.add('tde-grid-wrapper--hide-overlay');
+      }
       if (!this.state) return;
       const key = e.key;
 
@@ -350,6 +355,9 @@ export class TileDefinitionEditor {
         this.isPanning = false;
         this.panStart = null;
         this.container.classList.remove('tde--panning');
+      }
+      if (e.code === 'Backspace') {
+        this.gridWrapperEl?.classList.remove('tde-grid-wrapper--hide-overlay');
       }
     };
 
@@ -1259,6 +1267,7 @@ export class TileDefinitionEditor {
           if (!this.state!.def.roomProperties[zid]) this.state!.def.roomProperties[zid] = { isDark: false };
           this.state!.def.roomProperties[zid].isDark = !isDark;
           this.updateProps();
+          this.updateGrid();
         });
         item.appendChild(darkBtn);
       }

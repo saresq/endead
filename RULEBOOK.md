@@ -371,6 +371,15 @@ All Zombies activate. **Resolve ALL Attacks first, then ALL Moves.**
 - Place indicated Zombies in the Spawn Zone
 - When Zombie deck runs out: reshuffle all discarded Zombie cards
 
+> **Endead implementation note — spawn zone ordering.** In this codebase, spawn
+> order is derived from the **placement order chosen by the map author** in the
+> map editor (i.e., `spawnZoneIds`). This is a deliberate design decision so
+> mappers can author the correct Starting-Spawn-first-then-clockwise sequence
+> directly, rather than the engine inferring geometry. **Do not "fix" this by
+> adding automatic clockwise detection or a separate starting-spawn flag unless
+> explicitly requested.** The mapper is responsible for placing spawn zones in
+> the proper order.
+
 #### Colored Spawn Zones
 - Blue/Green Spawn Zones don't spawn until activated (usually by taking a matching Objective)
 - When activated, they start spawning on the **next** Zombie Phase (not immediately)
@@ -608,7 +617,7 @@ When using a Ranged weapon, the shooter does **NOT** choose targets. Hits are as
 | Sawed-Off | Ranged | 0-1 | 2 | 4+ | 1 | Noisy | No | No | Shells | Reload | 4 |
 | Shotgun | Ranged | 0-1 | 2 | 4+ | 2 | Noisy | No | No | Shells | - | 2 |
 | Sniper Rifle | Ranged | 1-3 | 1 | 2+ | 2 | Noisy | No | No | Bullets | Sniper | 2 |
-| Sub-MG | Ranged | 0-1 | 3 | 5+ | 1 | Noisy | No | No | Bullets | - | 2 |
+| Sub-MG | Ranged | 0-1 | 3 | 5+ | 1 | Noisy | No | Yes | Bullets | - | 2 |
 | Water | Food | - | - | - | - | - | - | - | - | Consume for 1 AP | 2 |
 
 **Total Standard Equipment**: 45 cards

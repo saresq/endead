@@ -7,7 +7,7 @@ import { ZombieType } from '../types/GameState';
  * callers should check for undefined return and render placeholders.
  *
  * Asset directory structure (expected in public/):
- *   images/sprites/survivors/{classId}.png  (64x64)
+ *   images/characters/{classId}.webp        (portrait — used for board tokens + HUD)
  *   images/sprites/zombies/{type}.png       (64x64)
  *   images/icons/items/{itemId}.png         (48x48)
  *   images/icons/actions/{action}.png       (32x32)
@@ -32,20 +32,21 @@ export class AssetManager {
   async loadAssets(): Promise<void> {
     if (this._isReady) return;
 
-    const survivorClasses = ['wanda', 'doug', 'amy', 'ned', 'phil', 'josh'];
+    const survivorClasses = ['wanda', 'doug', 'amy', 'ned', 'elle', 'josh'];
     const zombieTypes = ['walker', 'runner', 'brute', 'abomination'];
     const items = [
-      'crowbar', 'fire_axe', 'machete', 'katana', 'chainsaw', 'pan', 'baseball_bat',
-      'pistol', 'sawed_off', 'shotgun', 'sniper_rifle', 'smg', 'molotov',
-      'flashlight', 'plenty_of_ammo', 'goalie_mask', 'canned_food', 'water',
+      'fire_axe', 'crowbar', 'chainsaw', 'katana', 'kukri', 'machete', 'baseball_bat',
+      'pistol', 'sawed_off', 'shotgun', 'sub_mg', 'rifle', 'molotov',
+      'flashlight', 'plenty_of_bullets', 'plenty_of_shells',
+      'canned_food', 'water', 'bag_of_rice', 'aaahh',
     ];
     const actions = ['search', 'noise', 'door', 'objective', 'trade', 'end_turn', 'attack', 'sprint'];
     const zoneIndicators = ['noise', 'searchable', 'spawn', 'exit', 'objective'];
 
-    const loadInto = async (map: Map<string, PIXI.Texture>, basePath: string, ids: string[]) => {
+    const loadInto = async (map: Map<string, PIXI.Texture>, basePath: string, ids: string[], ext = 'png') => {
       for (const id of ids) {
         try {
-          const texture = await PIXI.Assets.load(`${basePath}/${id}.png`);
+          const texture = await PIXI.Assets.load(`${basePath}/${id}.${ext}`);
           if (texture) map.set(id, texture);
         } catch {
           // Asset not found — skip silently
@@ -54,7 +55,7 @@ export class AssetManager {
     };
 
     await Promise.all([
-      loadInto(this.survivorTextures, '/images/sprites/survivors', survivorClasses),
+      loadInto(this.survivorTextures, '/images/characters', survivorClasses, 'webp'),
       loadInto(this.zombieTextures, '/images/sprites/zombies', zombieTypes),
       loadInto(this.itemIconTextures, '/images/icons/items', items),
       loadInto(this.actionIconTextures, '/images/icons/actions', actions),

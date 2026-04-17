@@ -145,7 +145,6 @@ Global danger = max danger of any survivor. XP thresholds: Blue(0) → Yellow(7)
 5 inventory slots per survivor:
 - `HAND_1`, `HAND_2`: Weapons for combat (checked during attack)
 - `BACKPACK_0`, `BACKPACK_1`, `BACKPACK_2`: Storage, items not usable until moved to hand
-- `BODY`: Armor slot (Goalie Mask implemented — absorbs 1 wound, then discarded)
 - `DISCARD`: Trade/pickup target for items to discard
 
 Weapons have: `range[min,max]`, `dice`, `accuracy` (threshold), `damage`, `noise`, `dualWield`, `canOpenDoor`.

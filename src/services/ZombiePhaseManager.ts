@@ -2,7 +2,7 @@
 import { GameState, GamePhase, DangerLevel, Zombie, ZombieType, ZoneId, SpawnCard, SpawnDetail, Survivor } from '../types/GameState';
 import { ZombieAI, ZombieAction } from './ZombieAI';
 import { DeckService } from './DeckService';
-import { nextRandom } from './DiceService';
+import { Rng } from './Rng';
 import { XPManager } from './XPManager';
 
 const DANGER_VALUES: Record<DangerLevel, number> = {
@@ -172,16 +172,6 @@ export class ZombiePhaseManager {
       return; // Wound absorbed
     }
 
-    // Armor check: equipped armor absorbs the wound and is discarded
-    const armorIndex = survivor.inventory.findIndex(
-      (c: any) => c.type === 'ARMOR' && c.inHand && c.armorValue && c.armorValue > 0
-    );
-    if (armorIndex >= 0) {
-      const armor = survivor.inventory.splice(armorIndex, 1)[0];
-      state.equipmentDiscard.push(armor);
-      return; // Wound absorbed by armor (armor destroyed per Zombicide rules)
-    }
-
     // "Is That All You've Got?" — survivor can discard equipment to negate wounds
     if (survivor.skills?.includes('is_that_all_youve_got') && survivor.inventory.length > 0) {
       survivor.pendingWounds = (survivor.pendingWounds || 0) + 1;
@@ -189,14 +179,6 @@ export class ZombiePhaseManager {
     }
 
     survivor.wounds += 1;
-
-    // Wound equipment discard: prefer backpack items, then any item
-    if (survivor.wounds < survivor.maxHealth && survivor.inventory.length > 0) {
-      const backpackIdx = survivor.inventory.findIndex((c: any) => !c.inHand);
-      const discardIdx = backpackIdx >= 0 ? backpackIdx : survivor.inventory.length - 1;
-      const [discarded] = survivor.inventory.splice(discardIdx, 1);
-      state.equipmentDiscard.push(discarded);
-    }
 
     // Handle death: drop equipment, zero out actions
     if (survivor.wounds >= survivor.maxHealth) {
@@ -453,9 +435,10 @@ export class ZombiePhaseManager {
   }
 
   public static spawnZombie(state: GameState, zoneId: ZoneId, type: ZombieType) {
-    // Use deterministic random from DiceService
-    const rnd = nextRandom(state.seed);
-    state.seed = rnd.nextSeed;
+    // Advance RNG to keep deterministic replay parity with prior implementation.
+    const rng = Rng.from(state.seed);
+    rng.nextU32();
+    state.seed = rng.snapshot();
 
     // Generate unique ID using monotonic counter
     const zombieNum = state.nextZombieId ?? 1;
@@ -559,6 +542,7 @@ export class ZombiePhaseManager {
       survivor.bloodlustUsedThisTurn = false;
       survivor.lifesaverUsedThisTurn = false;
       survivor.hitAndRunFreeMove = false;
+      survivor.luckyUsedThisTurn = false;
     }
 
     // 4. Rotate First Player (index-based, no array mutation)

@@ -6,6 +6,7 @@ import { compileScenario } from '../ScenarioCompiler';
 import { SURVIVOR_CLASSES } from '../../config/SkillRegistry';
 import { DEFAULT_MAP } from '../../config/DefaultMap';
 import { buildStartingEquipment } from '../../config/CharacterRegistry';
+import { seedFromString } from '../Rng';
 
 export function handleJoinLobby(state: GameState, intent: ActionRequest): GameState {
     return state;
@@ -135,6 +136,7 @@ export function handleStartGame(state: GameState, intent: ActionRequest): GameSt
             bloodlustUsedThisTurn: false,
             lifesaverUsedThisTurn: false,
             hitAndRunFreeMove: false,
+            luckyUsedThisTurn: false,
             toughUsedZombieAttack: false,
             toughUsedFriendlyFire: false,
         } as Survivor;

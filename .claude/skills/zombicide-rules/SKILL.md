@@ -169,6 +169,14 @@ For the full detailed reference with missions and flavor text, see `RULEBOOK.md`
 
 **Colored Spawn Zones**: Blue/Green don't spawn until activated (usually by taking matching Objective). Start spawning on NEXT Zombie Phase after activation.
 
+> **Endead implementation note — spawn zone ordering.** Spawn order follows the
+> **placement order defined by the map author** in the map editor
+> (`spawnZoneIds`). This is an intentional design decision: mappers place spawn
+> zones in the correct Starting-first-then-clockwise sequence, so the engine
+> does not need to compute clockwise geometry. **Never change or "fix" the
+> engine to auto-detect clockwise order or add a separate starting-spawn flag
+> unless the user explicitly asks for it.**
+
 **Zombie Rush cards**: Place Zombies normally, then those Zombies immediately Activate.
 **Extra Activation cards**: No spawn. All Zombies of indicated type get extra Activation. NO EFFECT at Blue Level.
 **Out of miniatures**: Place what you can, then ALL Zombies of that type get extra Activation.
@@ -252,7 +260,7 @@ For the full detailed reference with missions and flavor text, see `RULEBOOK.md`
 | Sawed-Off | Ranged | 0-1 | 2 | 4+ | 1 | Noisy | No | No | Shells, Reload | 4 |
 | Shotgun | Ranged | 0-1 | 2 | 4+ | 2 | Noisy | No | No | Shells | 2 |
 | Sniper Rifle | Ranged | 1-3 | 1 | 2+ | 2 | Noisy | No | No | Bullets, Sniper skill | 2 |
-| Sub-MG | Ranged | 0-1 | 3 | 5+ | 1 | Noisy | No | No | Bullets | 2 |
+| Sub-MG | Ranged | 0-1 | 3 | 5+ | 1 | Noisy | No | Yes | Bullets | 2 |
 | Water | Food | - | - | - | - | - | - | - | 1 AP | 2 |
 
 ## EPIC WEAPONS (11 cards)
@@ -333,7 +341,7 @@ Each has unique Skill tree: Blue (fixed), Yellow (+1 Action always), Orange (pic
 2. **Deterministic RNG**: Seeded PRNG ensures replay capability
 3. **Zombie activation order**: ALL Attacks resolved before ANY Moves
 4. **Runner second actions**: After ALL first actions (including other Runners), then Runners do second
-5. **Spawn order**: Starting Spawn Zone ALWAYS first, then clockwise
+5. **Spawn order**: Starting Spawn Zone ALWAYS first, then clockwise. **In Endead, this sequence is set by the map author's placement order in the editor (`spawnZoneIds`) — do NOT modify the engine to auto-detect or re-order unless explicitly asked.**
 6. **Danger Level for spawning**: Use the HIGHEST among ALL living Survivors
 7. **Dead Survivors**: Should NOT count toward Danger Level calculation
 8. **Spawn discard**: Used Zombie cards go to discard pile (reshuffle when empty)

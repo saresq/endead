@@ -4,6 +4,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { initialGameState, GameState, PlayerId, GamePhase } from '../types/GameState';
 import { processAction } from '../services/ActionProcessor';
 import { ActionRequest, ActionResponse, ActionType } from '../types/Action';
+import { seedFromString } from '../services/Rng';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { HeartbeatManager } from './HeartbeatManager';
@@ -200,7 +201,7 @@ function generateRoomId(): string {
 function createRoom(roomId: string): RoomContext {
   const gameState = structuredClone(initialGameState) as GameState;
   gameState.id = roomId;
-  gameState.seed = `seed-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+  gameState.seed = seedFromString(`${roomId}-${Date.now()}-${Math.floor(Math.random() * 1e9)}`);
 
   return {
     id: roomId,

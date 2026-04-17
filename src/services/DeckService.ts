@@ -3,18 +3,16 @@
 import { GameState, EquipmentCard, SpawnCard } from '../types/GameState';
 import { EQUIPMENT_CARDS, INITIAL_DECK_CONFIG } from '../config/EquipmentRegistry';
 import { SPAWN_CARDS } from '../config/SpawnRegistry';
-import { nextRandom } from './DiceService';
+import { Rng, RngState } from './Rng';
 
 export class DeckService {
-  
+
   /**
    * Initializes the Equipment Deck with a fresh, shuffled set of cards based on the config.
    */
-  public static initializeDeck(seed: string): { deck: EquipmentCard[], newSeed: string } {
-    let currentSeed = seed;
+  public static initializeDeck(seed: RngState): { deck: EquipmentCard[], newSeed: RngState } {
     const deck: EquipmentCard[] = [];
 
-    // 1. Build Deck
     let cardCounter = 0;
     for (const cardKey of INITIAL_DECK_CONFIG) {
       const template = EQUIPMENT_CARDS[cardKey];
@@ -23,33 +21,24 @@ export class DeckService {
           id: `card-${cardKey}-${cardCounter++}`,
           ...template,
           inHand: false,
-          slot: 'BACKPACK' // Default
+          slot: 'BACKPACK'
         });
       }
     }
 
-    // 2. Shuffle
-    const shuffled = this.shuffle(deck, currentSeed);
-    
-    return {
-      deck: shuffled.deck,
-      newSeed: shuffled.newSeed
-    };
+    const rng = Rng.from(seed);
+    const shuffled = this.shuffle(deck, rng);
+    return { deck: shuffled, newSeed: rng.snapshot() };
   }
 
   /**
    * Initializes the Spawn Deck.
    */
-  public static initializeSpawnDeck(seed: string): { deck: SpawnCard[], newSeed: string } {
-    let currentSeed = seed;
-    // Clone spawn cards to avoid mutation of registry
+  public static initializeSpawnDeck(seed: RngState): { deck: SpawnCard[], newSeed: RngState } {
     const deck: SpawnCard[] = SPAWN_CARDS.map(c => ({ ...c }));
-    
-    const shuffled = this.shuffle(deck, currentSeed);
-    return {
-      deck: shuffled.deck,
-      newSeed: shuffled.newSeed
-    };
+    const rng = Rng.from(seed);
+    const shuffled = this.shuffle(deck, rng);
+    return { deck: shuffled, newSeed: rng.snapshot() };
   }
 
   /**
@@ -57,21 +46,19 @@ export class DeckService {
    */
   public static drawCard(state: GameState): { card: EquipmentCard | null, newState: GameState } {
     const newState = structuredClone(state);
-    
+
     if (newState.equipmentDeck.length === 0) {
       if (newState.equipmentDiscard.length === 0) {
-        return { card: null, newState }; // Totally empty
+        return { card: null, newState };
       }
-      
-      // Reshuffle Discard
-      const result = this.shuffle(newState.equipmentDiscard, newState.seed);
-      newState.equipmentDeck = result.deck;
+
+      const rng = Rng.from(newState.seed);
+      newState.equipmentDeck = this.shuffle(newState.equipmentDiscard, rng);
       newState.equipmentDiscard = [];
-      newState.seed = result.newSeed;
+      newState.seed = rng.snapshot();
     }
 
-    const card = newState.equipmentDeck.shift(); // Remove from top (front)
-    
+    const card = newState.equipmentDeck.shift();
     return { card: card || null, newState };
   }
 
@@ -80,16 +67,16 @@ export class DeckService {
    */
   public static drawSpawnCard(state: GameState): { card: SpawnCard | null, newState: GameState } {
     const newState = structuredClone(state);
-    
+
     if (newState.spawnDeck.length === 0) {
       if (newState.spawnDiscard.length === 0) {
         return { card: null, newState };
       }
-      
-      const result = this.shuffle(newState.spawnDiscard, newState.seed);
-      newState.spawnDeck = result.deck;
+
+      const rng = Rng.from(newState.seed);
+      newState.spawnDeck = this.shuffle(newState.spawnDiscard, rng);
       newState.spawnDiscard = [];
-      newState.seed = result.newSeed;
+      newState.seed = rng.snapshot();
     }
 
     const card = newState.spawnDeck.shift();
@@ -100,23 +87,17 @@ export class DeckService {
   }
 
   /**
-   * Fisher-Yates Shuffle using deterministic PRNG.
+   * Fisher-Yates shuffle using the handle-based Rng. Advances the handle's state
+   * in place; caller reads `.snapshot()` afterwards to persist the new seed.
    */
-  private static shuffle<T>(array: T[], seed: string): { deck: T[], newSeed: string } {
+  private static shuffle<T>(array: T[], rng: Rng): T[] {
     const deck = [...array];
-    let currentSeed = seed;
-    let m = deck.length, t, i;
-
-    while (m) {
-      const result = nextRandom(currentSeed);
-      currentSeed = result.nextSeed;
-      i = Math.floor(result.value * m--);
-
-      t = deck[m];
+    for (let m = deck.length - 1; m > 0; m--) {
+      const i = rng.nextInt(m + 1);
+      const t = deck[m];
       deck[m] = deck[i];
       deck[i] = t;
     }
-
-    return { deck, newSeed: currentSeed };
+    return deck;
   }
 }

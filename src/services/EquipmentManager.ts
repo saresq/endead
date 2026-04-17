@@ -156,7 +156,6 @@ export class EquipmentManager {
   public static validateLoadout(inventory: { slot?: string }[]): boolean {
     const hands = inventory.filter(c => c.slot === 'HAND_1' || c.slot === 'HAND_2');
     const backpack = inventory.filter(c => isBackpackSlot(c.slot));
-    const body = inventory.filter(c => c.slot === 'BODY'); // Future proofing
 
     if (hands.length > this.MAX_HANDS) return false;
     if (backpack.length > this.MAX_BACKPACK) return false;

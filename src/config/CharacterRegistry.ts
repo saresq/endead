@@ -33,8 +33,8 @@ export const CHARACTER_DEFINITIONS: Record<string, CharacterDefinition> = {
     startingEquipmentKey: 'crowbar',
     color: '#4363d8', // blue
   },
-  'Phil': {
-    name: 'Phil',
+  'Elle': {
+    name: 'Elle',
     startingEquipmentKey: 'machete',
     color: '#f58231', // orange
   },

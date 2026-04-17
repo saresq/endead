@@ -198,7 +198,7 @@ export class LobbyUI {
     const meClass = isMe ? ' lobby__player--me' : '';
 
     const avatar = identity
-      ? renderAvatar(player.name, identity, 'md')
+      ? renderAvatar(player.name, identity, 'md', undefined, player.characterClass)
       : '';
 
     const hostBadge = isPlayerHost

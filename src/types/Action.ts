@@ -36,6 +36,7 @@ export enum ActionType {
   RESOLVE_WOUNDS = 'RESOLVE_WOUNDS',
   DISTRIBUTE_ZOMBIE_WOUNDS = 'DISTRIBUTE_ZOMBIE_WOUNDS',
   KICK_PLAYER = 'KICK_PLAYER',
+  REROLL_LUCKY = 'REROLL_LUCKY',
 }
 
 // --- Action Payload Types ---
@@ -151,6 +152,7 @@ export interface ActionPayloadMap {
   [ActionType.RESOLVE_WOUNDS]: ResolveWoundsPayload;
   [ActionType.DISTRIBUTE_ZOMBIE_WOUNDS]: DistributeZombieWoundsPayload;
   [ActionType.KICK_PLAYER]: KickPlayerPayload;
+  [ActionType.REROLL_LUCKY]: undefined;
 }
 
 export type ActionPayload = ActionPayloadMap[ActionType];

@@ -13417,77 +13417,77 @@
         "fromY": 0,
         "toX": 19,
         "toY": 0,
-        "type": "wall"
+        "type": "doorway"
       },
       {
         "fromX": 18,
         "fromY": 1,
         "toX": 19,
         "toY": 1,
-        "type": "wall"
+        "type": "doorway"
       },
       {
         "fromX": 18,
         "fromY": 2,
         "toX": 19,
         "toY": 2,
-        "type": "wall"
+        "type": "doorway"
       },
       {
         "fromX": 18,
         "fromY": 3,
         "toX": 19,
         "toY": 3,
-        "type": "wall"
+        "type": "doorway"
       },
       {
         "fromX": 18,
         "fromY": 4,
         "toX": 19,
         "toY": 4,
-        "type": "wall"
+        "type": "doorway"
       },
       {
         "fromX": 18,
         "fromY": 5,
         "toX": 19,
         "toY": 5,
-        "type": "wall"
+        "type": "doorway"
       },
       {
         "fromX": 18,
         "fromY": 6,
         "toX": 19,
         "toY": 6,
-        "type": "wall"
+        "type": "doorway"
       },
       {
         "fromX": 18,
         "fromY": 7,
         "toX": 19,
         "toY": 7,
-        "type": "wall"
+        "type": "doorway"
       },
       {
         "fromX": 18,
         "fromY": 8,
         "toX": 19,
         "toY": 8,
-        "type": "wall"
+        "type": "doorway"
       },
       {
         "fromX": 18,
         "fromY": 9,
         "toX": 19,
         "toY": 9,
-        "type": "wall"
+        "type": "doorway"
       },
       {
         "fromX": 18,
         "fromY": 10,
         "toX": 19,
         "toY": 10,
-        "type": "wall"
+        "type": "doorway"
       },
       {
         "fromX": 0,
@@ -14105,7 +14105,8 @@
       "S3|S4": "crosswalk",
       "S4|S5": "crosswalk",
       "B|C": "doorway",
-      "A|C": "doorway"
+      "A|C": "doorway",
+      "A|B": "doorway"
     },
     "roomProperties": {
       "B": {
@@ -34783,84 +34784,84 @@
         "fromY": 9,
         "toX": 9,
         "toY": 10,
-        "type": "wall"
+        "type": "doorway"
       },
       {
         "fromX": 10,
         "fromY": 9,
         "toX": 10,
         "toY": 10,
-        "type": "wall"
+        "type": "doorway"
       },
       {
         "fromX": 11,
         "fromY": 9,
         "toX": 11,
         "toY": 10,
-        "type": "wall"
+        "type": "doorway"
       },
       {
         "fromX": 12,
         "fromY": 9,
         "toX": 12,
         "toY": 10,
-        "type": "wall"
+        "type": "doorway"
       },
       {
         "fromX": 13,
         "fromY": 9,
         "toX": 13,
         "toY": 10,
-        "type": "wall"
+        "type": "doorway"
       },
       {
         "fromX": 14,
         "fromY": 9,
         "toX": 14,
         "toY": 10,
-        "type": "wall"
+        "type": "doorway"
       },
       {
         "fromX": 15,
         "fromY": 9,
         "toX": 15,
         "toY": 10,
-        "type": "wall"
+        "type": "doorway"
       },
       {
         "fromX": 16,
         "fromY": 9,
         "toX": 16,
         "toY": 10,
-        "type": "wall"
+        "type": "doorway"
       },
       {
         "fromX": 17,
         "fromY": 9,
         "toX": 17,
         "toY": 10,
-        "type": "wall"
+        "type": "doorway"
       },
       {
         "fromX": 18,
         "fromY": 9,
         "toX": 18,
         "toY": 10,
-        "type": "wall"
+        "type": "doorway"
       },
       {
         "fromX": 19,
         "fromY": 9,
         "toX": 19,
         "toY": 10,
-        "type": "wall"
+        "type": "doorway"
       },
       {
         "fromX": 20,
         "fromY": 9,
         "toX": 20,
         "toY": 10,
-        "type": "wall"
+        "type": "doorway"
       },
       {
         "fromX": 20,
@@ -35284,7 +35285,8 @@
       "S1|S2": "crosswalk",
       "S2|S3": "crosswalk",
       "S4|S5": "crosswalk",
-      "S5|S6": "crosswalk"
+      "S5|S6": "crosswalk",
+      "A|B": "doorway"
     }
   },
   {
@@ -49402,7 +49404,12 @@
         "x2": 21,
         "y2": 18
       }
-    ]
+    ],
+    "roomProperties": {
+      "A": {
+        "isDark": true
+      }
+    }
   },
   {
     "id": "4V",
@@ -98781,7 +98788,7 @@
     ],
     "roomProperties": {
       "D": {
-        "isDark": true
+        "isDark": false
       },
       "C": {
         "isDark": true
@@ -119146,6 +119153,195 @@
     ],
     "internalEdges": [
       {
+        "fromX": 8,
+        "fromY": 0,
+        "toX": 9,
+        "toY": 0,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 8,
+        "fromY": 1,
+        "toX": 9,
+        "toY": 1,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 8,
+        "fromY": 2,
+        "toX": 9,
+        "toY": 2,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 8,
+        "fromY": 3,
+        "toX": 9,
+        "toY": 3,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 8,
+        "fromY": 4,
+        "toX": 9,
+        "toY": 4,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 8,
+        "fromY": 5,
+        "toX": 9,
+        "toY": 5,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 8,
+        "fromY": 6,
+        "toX": 9,
+        "toY": 6,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 8,
+        "fromY": 7,
+        "toX": 9,
+        "toY": 7,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 8,
+        "fromY": 8,
+        "toX": 9,
+        "toY": 8,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 20,
+        "fromY": 0,
+        "toX": 21,
+        "toY": 0,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 20,
+        "fromY": 1,
+        "toX": 21,
+        "toY": 1,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 20,
+        "fromY": 2,
+        "toX": 21,
+        "toY": 2,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 20,
+        "fromY": 3,
+        "toX": 21,
+        "toY": 3,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 20,
+        "fromY": 4,
+        "toX": 21,
+        "toY": 4,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 20,
+        "fromY": 5,
+        "toX": 21,
+        "toY": 5,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 20,
+        "fromY": 6,
+        "toX": 21,
+        "toY": 6,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 20,
+        "fromY": 7,
+        "toX": 21,
+        "toY": 7,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 20,
+        "fromY": 8,
+        "toX": 21,
+        "toY": 8,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 0,
+        "fromY": 8,
+        "toX": 0,
+        "toY": 9,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 1,
+        "fromY": 8,
+        "toX": 1,
+        "toY": 9,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 2,
+        "fromY": 8,
+        "toX": 2,
+        "toY": 9,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 3,
+        "fromY": 8,
+        "toX": 3,
+        "toY": 9,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 4,
+        "fromY": 8,
+        "toX": 4,
+        "toY": 9,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 5,
+        "fromY": 8,
+        "toX": 5,
+        "toY": 9,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 6,
+        "fromY": 8,
+        "toX": 6,
+        "toY": 9,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 7,
+        "fromY": 8,
+        "toX": 7,
+        "toY": 9,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 8,
+        "fromY": 8,
+        "toX": 8,
+        "toY": 9,
+        "type": "crosswalk"
+      },
+      {
         "fromX": 9,
         "fromY": 8,
         "toX": 9,
@@ -119228,6 +119424,69 @@
         "toX": 20,
         "toY": 9,
         "type": "wall"
+      },
+      {
+        "fromX": 21,
+        "fromY": 8,
+        "toX": 21,
+        "toY": 9,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 22,
+        "fromY": 8,
+        "toX": 22,
+        "toY": 9,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 23,
+        "fromY": 8,
+        "toX": 23,
+        "toY": 9,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 24,
+        "fromY": 8,
+        "toX": 24,
+        "toY": 9,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 25,
+        "fromY": 8,
+        "toX": 25,
+        "toY": 9,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 26,
+        "fromY": 8,
+        "toX": 26,
+        "toY": 9,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 27,
+        "fromY": 8,
+        "toX": 27,
+        "toY": 9,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 28,
+        "fromY": 8,
+        "toX": 28,
+        "toY": 9,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 29,
+        "fromY": 8,
+        "toX": 29,
+        "toY": 9,
+        "type": "crosswalk"
       },
       {
         "fromX": 8,
@@ -119356,6 +119615,69 @@
         "type": "wall"
       },
       {
+        "fromX": 0,
+        "fromY": 20,
+        "toX": 0,
+        "toY": 21,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 1,
+        "fromY": 20,
+        "toX": 1,
+        "toY": 21,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 2,
+        "fromY": 20,
+        "toX": 2,
+        "toY": 21,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 3,
+        "fromY": 20,
+        "toX": 3,
+        "toY": 21,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 4,
+        "fromY": 20,
+        "toX": 4,
+        "toY": 21,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 5,
+        "fromY": 20,
+        "toX": 5,
+        "toY": 21,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 6,
+        "fromY": 20,
+        "toX": 6,
+        "toY": 21,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 7,
+        "fromY": 20,
+        "toX": 7,
+        "toY": 21,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 8,
+        "fromY": 20,
+        "toX": 8,
+        "toY": 21,
+        "type": "crosswalk"
+      },
+      {
         "fromX": 9,
         "fromY": 20,
         "toX": 9,
@@ -119438,6 +119760,195 @@
         "toX": 20,
         "toY": 21,
         "type": "wall"
+      },
+      {
+        "fromX": 21,
+        "fromY": 20,
+        "toX": 21,
+        "toY": 21,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 22,
+        "fromY": 20,
+        "toX": 22,
+        "toY": 21,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 23,
+        "fromY": 20,
+        "toX": 23,
+        "toY": 21,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 24,
+        "fromY": 20,
+        "toX": 24,
+        "toY": 21,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 25,
+        "fromY": 20,
+        "toX": 25,
+        "toY": 21,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 26,
+        "fromY": 20,
+        "toX": 26,
+        "toY": 21,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 27,
+        "fromY": 20,
+        "toX": 27,
+        "toY": 21,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 28,
+        "fromY": 20,
+        "toX": 28,
+        "toY": 21,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 29,
+        "fromY": 20,
+        "toX": 29,
+        "toY": 21,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 8,
+        "fromY": 21,
+        "toX": 9,
+        "toY": 21,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 8,
+        "fromY": 22,
+        "toX": 9,
+        "toY": 22,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 8,
+        "fromY": 23,
+        "toX": 9,
+        "toY": 23,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 8,
+        "fromY": 24,
+        "toX": 9,
+        "toY": 24,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 8,
+        "fromY": 25,
+        "toX": 9,
+        "toY": 25,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 8,
+        "fromY": 26,
+        "toX": 9,
+        "toY": 26,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 8,
+        "fromY": 27,
+        "toX": 9,
+        "toY": 27,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 8,
+        "fromY": 28,
+        "toX": 9,
+        "toY": 28,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 8,
+        "fromY": 29,
+        "toX": 9,
+        "toY": 29,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 20,
+        "fromY": 21,
+        "toX": 21,
+        "toY": 21,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 20,
+        "fromY": 22,
+        "toX": 21,
+        "toY": 22,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 20,
+        "fromY": 23,
+        "toX": 21,
+        "toY": 23,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 20,
+        "fromY": 24,
+        "toX": 21,
+        "toY": 24,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 20,
+        "fromY": 25,
+        "toX": 21,
+        "toY": 25,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 20,
+        "fromY": 26,
+        "toX": 21,
+        "toY": 26,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 20,
+        "fromY": 27,
+        "toX": 21,
+        "toY": 27,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 20,
+        "fromY": 28,
+        "toX": 21,
+        "toY": 28,
+        "type": "crosswalk"
+      },
+      {
+        "fromX": 20,
+        "fromY": 29,
+        "toX": 21,
+        "toY": 29,
+        "type": "crosswalk"
       }
     ],
     "roomProperties": {
@@ -119482,7 +119993,17 @@
         "x2": 21,
         "y2": 15
       }
-    ]
+    ],
+    "boundaryTypes": {
+      "S1|S4": "crosswalk",
+      "S1|S2": "crosswalk",
+      "S4|S6": "crosswalk",
+      "S6|S7": "crosswalk",
+      "S7|S8": "crosswalk",
+      "S5|S8": "crosswalk",
+      "S3|S5": "crosswalk",
+      "S2|S3": "crosswalk"
+    }
   },
   {
     "id": "9V",

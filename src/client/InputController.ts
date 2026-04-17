@@ -554,7 +554,7 @@ export class InputController {
     return null;
   }
 
-  private sendAttackAction(targetZoneId: ZoneId, targetZombieIds?: EntityId[]): void {
+  private sendAttackAction(targetZoneId: ZoneId, targetZombieIds?: EntityId[], weaponId?: EntityId | null): void {
     if (!this.selectedSurvivorId) return;
 
     networkManager.sendAction({
@@ -563,7 +563,7 @@ export class InputController {
       type: ActionType.ATTACK,
       payload: {
         targetZoneId,
-        weaponId: this.selectedWeaponId,
+        weaponId: weaponId !== undefined ? weaponId : this.selectedWeaponId,
         ...(targetZombieIds && targetZombieIds.length > 0 ? { targetZombieIds } : {}),
       },
     });
@@ -589,7 +589,7 @@ export class InputController {
     ) as Zombie[];
 
     if (!isMelee || zombiesInZone.length <= 1) {
-      this.sendAttackAction(targetZoneId);
+      this.sendAttackAction(targetZoneId, undefined, weapon.id);
       return;
     }
 
@@ -657,7 +657,7 @@ export class InputController {
           const confirm = target.closest('[data-action="confirm-attack"]') as HTMLButtonElement | null;
           if (confirm && !confirm.disabled) {
             modalManager.close(modalId);
-            this.sendAttackAction(targetZoneId, selection);
+            this.sendAttackAction(targetZoneId, selection, weapon.id);
           }
         });
       },

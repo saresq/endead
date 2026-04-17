@@ -87,6 +87,43 @@
   text-shadow: 0 0 8px currentColor;
 }
 
+/* ---------- Portrait image ---------- */
+/* Character headshot — fills the clipped avatar container */
+
+.player-avatar__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 20%;
+  z-index: 1;
+  pointer-events: none;
+  /* Slight desaturation to blend with the HUD palette */
+  filter: contrast(1.05) saturate(0.92);
+}
+
+/* Hide the initial when a portrait is shown (remains in DOM as fallback if image fails) */
+.player-avatar--portrait .player-avatar__initial--fallback {
+  display: none;
+}
+
+/* Tint the portrait with the player color on hover/active to reinforce identity */
+.player-avatar--portrait::before {
+  /* Keep scanlines slightly more visible over the image for tactical readout feel */
+  opacity: calc(var(--dl-scanline-opacity, 0.12) * 1.6);
+  z-index: 2;
+}
+
+.player-avatar--portrait::after {
+  /* Reticle marks sit above the portrait */
+  z-index: 2;
+}
+
+.player-avatar--portrait.player-avatar--dead .player-avatar__img {
+  filter: grayscale(1) brightness(0.55) contrast(0.9);
+}
+
 /* ---------- Shape indicator ---------- */
 /* Positioned bottom-right — acts as operator role badge */
 

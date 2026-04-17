@@ -379,6 +379,10 @@
   overflow: visible;
 }
 
+.tde-grid-wrapper--hide-overlay > * {
+  visibility: hidden;
+}
+
 .tde-cell {
   position: absolute;
   cursor: crosshair;

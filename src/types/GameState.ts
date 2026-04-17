@@ -1,5 +1,6 @@
 
 import { TileInstance } from './Map';
+import type { RngState } from '../services/Rng';
 
 export type EntityId = string;
 export type ZoneId = string;
@@ -22,7 +23,6 @@ export interface Position {
 
 export enum EquipmentType {
   Weapon = 'WEAPON',
-  Armor = 'ARMOR',
   Item = 'ITEM',
 }
 
@@ -38,6 +38,7 @@ export interface WeaponStats {
   damage: number;
   noise: boolean;
   dualWield: boolean;
+  ammo?: 'bullets' | 'shells'; // Drives Plenty of Bullets / Plenty of Shells re-rolls
   special?: 'molotov'; // Special weapon handler flag
 }
 
@@ -47,10 +48,9 @@ export interface EquipmentCard {
   type: EquipmentType;
   stats?: WeaponStats; // Only for weapons
   inHand: boolean; // true if equipped in hand, false if in backpack
-  slot?: 'BODY' | 'HAND_1' | 'HAND_2' | 'BACKPACK' | 'BACKPACK_0' | 'BACKPACK_1' | 'BACKPACK_2' | 'DISCARD';
+  slot?: 'HAND_1' | 'HAND_2' | 'BACKPACK' | 'BACKPACK_0' | 'BACKPACK_1' | 'BACKPACK_2' | 'DISCARD';
   canOpenDoor?: boolean;
   openDoorNoise?: boolean;
-  armorValue?: number; // Damage reduction when equipped (e.g. Goalie Mask = 1)
   keywords?: string[]; // e.g. ['sniper'], ['reload']
 }
 
@@ -94,7 +94,7 @@ export enum WoundLevel {
 export interface Survivor extends Entity {
   playerId: PlayerId;
   name: string;
-  characterClass: string; // e.g. "Wanda", "Doug", "Amy", "Ned", "Phil", "Josh"
+  characterClass: string; // e.g. "Wanda", "Doug", "Amy", "Ned", "Elle", "Josh"
   
   // Stats
   actionsPerTurn: number;
@@ -135,6 +135,7 @@ export interface Survivor extends Entity {
   bloodlustUsedThisTurn: boolean;
   lifesaverUsedThisTurn: boolean;
   hitAndRunFreeMove: boolean;
+  luckyUsedThisTurn: boolean;
 
   // Pending wounds for "Is That All You've Got?" resolution
   pendingWounds?: number;
@@ -245,7 +246,7 @@ export interface TradeSession {
 
 export interface GameState {
   id: string; // Game Session ID
-  seed: string; // RNG Seed for deterministic replay
+  seed: RngState; // xoshiro128** state — 4×uint32 tuple, serializes as JSON array
   turn: number;
   phase: GamePhase;
   gameResult?: GameResult;
@@ -329,7 +330,8 @@ export interface GameState {
     damagePerHit?: number;
     bonusDice?: number;
     bonusDamage?: number;
-    luckyRerollOriginal?: number[];
+    rerolledFrom?: number[];
+    rerollSource?: 'lucky' | 'plenty_of_bullets' | 'plenty_of_shells';
     usedFreeAction?: boolean;
     freeActionType?: string;
     // Spawn context for END_TURN entries
@@ -346,12 +348,30 @@ export interface GameState {
     description?: string;
     timestamp: number;
     // Combat feedback metadata
-    luckyRerollOriginal?: number[];  // Original dice before Lucky reroll
+    rerolledFrom?: number[];         // Original dice before a reroll (Lucky or ammo)
+    rerollSource?: 'lucky' | 'plenty_of_bullets' | 'plenty_of_shells';
     bonusDice?: number;              // Skill bonus dice applied
     bonusDamage?: number;            // Skill bonus damage applied
     damagePerHit?: number;           // Effective damage per hit
     usedFreeAction?: boolean;        // Whether a free action was consumed
     freeActionType?: string;         // Which free action type was used
+    // Captured on ATTACK when the actor has Lucky unspent — enables rollback-and-reroll.
+    rollbackSnapshot?: {
+      /** RNG state AFTER the dice were rolled but BEFORE any side effects consumed seed.
+       *  On reroll, the fresh roll starts here → fresh rolls differ from the first attempt. */
+      seedAfterRoll: RngState;
+      zombies: Record<string, import('./GameState').Zombie>;
+      survivors: Record<string, import('./GameState').Survivor>;
+      equipmentDeck: import('./GameState').EquipmentCard[];
+      equipmentDiscard: import('./GameState').EquipmentCard[];
+      objectives: import('./GameState').Objective[];
+      noiseTokens: number;
+      zoneNoise: Record<string, number>;
+      /** Original attack intent — re-dispatched verbatim on reroll. */
+      attackPayload: Record<string, unknown>;
+      /** Original dice, surfaced as `rerolledFrom` after the reroll completes. */
+      originalDice: number[];
+    };
   };
   
   spawnContext?: {
@@ -384,7 +404,7 @@ export interface GameState {
 
 export const initialGameState: GameState = {
   id: 'session-12345',
-  seed: 'seed-987654321',
+  seed: [0xdeadbeef, 0xcafef00d, 0x13579bdf, 0x2468ace0],
   turn: 0, // 0 means not started
   phase: GamePhase.Lobby, // Start in Lobby
   currentDangerLevel: DangerLevel.Blue,

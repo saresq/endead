@@ -55,12 +55,6 @@ export const BOARD_THEME = {
     alpha: 0.7,
   },
 
-  // ─── Seams (tile boundaries) ──────────────────────
-  seam: {
-    streetColor: 0x3d3a2f,       // matches --surface-4
-    alpha: 0.7,
-  },
-
   // ─── Zone indicators ─────────────────────────────
   noise: {
     triangleFill: 0xd4a84b,     // matches --accent

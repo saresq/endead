@@ -108,6 +108,12 @@ export const SKILL_DEFINITIONS: Record<string, SkillDefinition> = {
     description: 'The Survivor gets +1 to the maximum Range of all Ranged weapons.',
     type: 'STAT_MOD'
   },
+  'plus_1_to_dice_roll_ranged': {
+    id: 'plus_1_to_dice_roll_ranged',
+    name: '+1 to Dice Roll: Ranged',
+    description: 'The Survivor adds +1 to each die result when performing a Ranged Action. Max result is always 6.',
+    type: 'STAT_MOD'
+  },
   'steady_hand': {
     id: 'steady_hand',
     name: 'Steady Hand',
@@ -301,11 +307,11 @@ export const SURVIVOR_CLASSES: Record<string, ClassProgression> = {
     [DangerLevel.Orange]: ['hold_your_nose', 'plus_1_free_search'],
     [DangerLevel.Red]: ['sniper', 'lucky', 'tough'],
   },
-  'Phil': {
-    [DangerLevel.Blue]: ['plus_1_die_melee'],
+  'Elle': {
+    [DangerLevel.Blue]: ['sniper'],
     [DangerLevel.Yellow]: ['plus_1_action'],
-    [DangerLevel.Orange]: ['barbarian', 'tough'],
-    [DangerLevel.Red]: ['plus_1_damage_melee', 'reaper_melee', 'born_leader'],
+    [DangerLevel.Orange]: ['plus_1_die_combat', 'plus_1_free_ranged'],
+    [DangerLevel.Red]: ['plus_1_die_ranged', 'plus_1_free_combat', 'plus_1_to_dice_roll_ranged'],
   },
   'Amy': {
     [DangerLevel.Blue]: ['plus_1_free_move'],

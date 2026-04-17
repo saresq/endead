@@ -41,6 +41,7 @@ export const EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'inHand'
       damage: 1,
       noise: true,
       dualWield: true,
+      ammo: 'bullets',
     }
   },
   'shotgun': {
@@ -53,6 +54,7 @@ export const EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'inHand'
       damage: 2,
       noise: true,
       dualWield: false,
+      ammo: 'shells',
     }
   },
   'rifle': {
@@ -66,19 +68,7 @@ export const EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'inHand'
       damage: 2,
       noise: true,
       dualWield: false,
-    }
-  },
-  // Homebrew — not in base Zombicide v2
-  'pan': {
-    name: 'Frying Pan',
-    type: EquipmentType.Weapon,
-    stats: {
-      range: [0, 0],
-      dice: 1,
-      accuracy: 6,
-      damage: 1,
-      noise: true,
-      dualWield: false,
+      ammo: 'bullets',
     }
   },
   'canned_food': {
@@ -117,7 +107,7 @@ export const EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'inHand'
       dice: 2,
       accuracy: 4,
       damage: 1,
-      noise: true,
+      noise: false,
       dualWield: false
     }
   },
@@ -169,7 +159,8 @@ export const EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'inHand'
       accuracy: 4,
       damage: 1,
       noise: true,
-      dualWield: false
+      dualWield: false,
+      ammo: 'shells',
     }
   },
   'sub_mg': {
@@ -181,26 +172,21 @@ export const EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'inHand'
       accuracy: 5,
       damage: 1,
       noise: true,
-      dualWield: false
+      dualWield: true,
+      ammo: 'bullets',
     }
   },
-  'plenty_of_ammo': {
-    name: 'Plenty of Ammo',
+  'plenty_of_bullets': {
+    name: 'Plenty of Bullets',
     type: EquipmentType.Item,
     stats: undefined
-  },
-  'go_hockey': {
-    name: 'Goalie Mask',
-    type: EquipmentType.Armor,
-    stats: undefined,
-    armorValue: 1
   },
   'kukri': {
     name: 'Kukri',
     type: EquipmentType.Weapon,
     stats: {
       range: [0, 0],
-      dice: 2,
+      dice: 1,
       accuracy: 4,
       damage: 1,
       noise: false,
@@ -215,7 +201,6 @@ export const EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'inHand'
   'plenty_of_shells': {
     name: 'Plenty of Shells',
     type: EquipmentType.Item,
-    keywords: ['reload'],
     stats: undefined
   },
   'aaahh': {
@@ -226,34 +211,38 @@ export const EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'inHand'
   }
 };
 
+// Zombicide 2nd Edition — Standard Equipment deck (45 cards, blue backs).
+// Starting Equipment (Baseball Bat, Crowbar, Fire Axe, Pistol x3) is dealt
+// at setup from a separate grey-back deck and is NOT part of this deck.
 export const INITIAL_DECK_CONFIG = [
-  // Melee
-  'fire_axe', 'fire_axe',
-  'crowbar', 'crowbar',
-  'pan', 'pan', 'pan', // Homebrew
-  'baseball_bat', 'baseball_bat',
+  // Melee weapons
+  'fire_axe',
+  'crowbar',
+  'chainsaw', 'chainsaw',
   'katana', 'katana',
-  'machete', 'machete',
-  'chainsaw',
   'kukri', 'kukri',
+  'machete', 'machete', 'machete', 'machete',
 
-  // Ranged
-  'pistol', 'pistol', 'pistol',
-  'sawed_off', 'sawed_off',
-  'sub_mg', 'sub_mg',
+  // Ranged weapons
+  'pistol',
+  'sawed_off', 'sawed_off', 'sawed_off', 'sawed_off',
   'shotgun', 'shotgun',
+  'sub_mg', 'sub_mg',
   'rifle', 'rifle',
 
-  // Items
-  'canned_food', 'canned_food', 'canned_food',
-  'water', 'water', 'water',
+  // Throwables
+  'molotov', 'molotov', 'molotov', 'molotov',
+
+  // Utility
   'flashlight', 'flashlight',
-  'molotov', 'molotov', 'molotov',
-  'plenty_of_ammo', 'plenty_of_ammo', 'plenty_of_ammo',
+  'plenty_of_bullets', 'plenty_of_bullets', 'plenty_of_bullets',
   'plenty_of_shells', 'plenty_of_shells', 'plenty_of_shells',
+
+  // Food
   'bag_of_rice', 'bag_of_rice',
-  'go_hockey',
+  'canned_food', 'canned_food',
+  'water', 'water',
 
   // Trap cards
-  'aaahh', 'aaahh', 'aaahh', 'aaahh'
+  'aaahh', 'aaahh', 'aaahh', 'aaahh',
 ];

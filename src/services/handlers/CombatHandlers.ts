@@ -5,8 +5,31 @@ import { XPManager } from '../XPManager';
 import { DeckService } from '../DeckService';
 import { EquipmentManager } from '../EquipmentManager';
 import { ZombiePhaseManager } from '../ZombiePhaseManager';
-import { rollDice, rollDiceWithReroll } from '../DiceService';
-import { handleSurvivorDeath, getDistance, hasLineOfSight, getZombieToughness, getZombieXP } from './handlerUtils';
+import { Rng } from '../Rng';
+import { rollAttack, applyLuckyReroll, AttackRollResult } from '../CombatDice';
+import { handleSurvivorDeath, getDistance, hasLineOfSight, getZombieToughness, getZombieXP, deductAPWithFreeCheck } from './handlerUtils';
+
+/**
+ * Capture pre-attack entity state for a potential Lucky reroll.
+ * The `seedAfterRoll` field is stamped once we know where the dice consumption
+ * ended, so the reroll picks up fresh dice from there.
+ */
+function captureAttackState(state: GameState): Pick<
+  NonNullable<NonNullable<GameState['lastAction']>['rollbackSnapshot']>,
+  'zombies' | 'survivors' | 'equipmentDeck' | 'equipmentDiscard' | 'objectives' | 'noiseTokens' | 'zoneNoise'
+> {
+  const zoneNoise: Record<string, number> = {};
+  for (const [zid, zone] of Object.entries(state.zones)) zoneNoise[zid] = zone.noiseTokens ?? 0;
+  return {
+    zombies: structuredClone(state.zombies),
+    survivors: structuredClone(state.survivors),
+    equipmentDeck: structuredClone(state.equipmentDeck),
+    equipmentDiscard: structuredClone(state.equipmentDiscard),
+    objectives: structuredClone(state.objectives),
+    noiseTokens: state.noiseTokens,
+    zoneNoise,
+  };
+}
 
 export function handleAttack(state: GameState, intent: ActionRequest): GameState {
   const newState = structuredClone(state);
@@ -109,11 +132,6 @@ export function handleAttack(state: GameState, intent: ActionRequest): GameState
           target.wounds += 1;
           if (target.wounds >= target.maxHealth) {
               handleSurvivorDeath(newState, target.id);
-          } else if (target.inventory.length > 0) {
-              const backpackIdx = target.inventory.findIndex((c: EquipmentCard) => !c.inHand);
-              const discardIdx = backpackIdx >= 0 ? backpackIdx : target.inventory.length - 1;
-              const [discarded] = target.inventory.splice(discardIdx, 1);
-              newState.equipmentDiscard.push(discarded);
           }
       }
 
@@ -179,15 +197,12 @@ export function handleAttack(state: GameState, intent: ActionRequest): GameState
     }
   }
 
-  // Plenty of Ammo: equipped in hand grants +1 die to ranged attacks
-  if (isRangedWeapon) {
-    const hasPlentyOfAmmo = survivor.inventory.some(
-      (c: EquipmentCard) => c.name === 'Plenty of Ammo' && c.inHand
-    );
-    if (hasPlentyOfAmmo) bonusDice++;
-  }
-
-  const hasLucky = survivor.skills.includes('lucky');
+  // Plenty of Bullets / Plenty of Shells: re-roll misses once when the weapon
+  // matches the ammo type. Usable from any inventory slot (Hand or Backpack).
+  const ammo = stats.ammo;
+  const hasAmmoReroll = !!ammo && survivor.inventory.some(
+    (c: EquipmentCard) => c.name === (ammo === 'bullets' ? 'Plenty of Bullets' : 'Plenty of Shells')
+  );
 
   // Barbarian: substitute weapon dice with zombie count in zone (melee only)
   let baseDice = stats.dice;
@@ -197,28 +212,54 @@ export function handleAttack(state: GameState, intent: ActionRequest): GameState
   }
 
   const diceCount = baseDice + bonusDice;
-  // Minimum accuracy is always 2+ (per rulebook §4, §10)
-  const threshold = Math.max(2, stats.accuracy);
+  // +1 to Dice Roll: Ranged — adds +1 to each die result (max 6) on Ranged Actions
+  const diceBonus = (isRangedWeapon && survivor.skills.includes('plus_1_to_dice_roll_ranged')) ? 1 : 0;
+
+  // Capture pre-attack entity state if this survivor could Lucky-reroll the result.
+  const luckyAvailable = survivor.skills.includes('lucky') && !survivor.luckyUsedThisTurn;
+  const attackEntitySnapshot = luckyAvailable ? captureAttackState(newState) : undefined;
 
   // Perform attack(s) — dual wield = two separate attacks
   const attackCount = isDualWielding ? 2 : 1;
+  const rng = Rng.from(newState.seed);
   let allRolls: number[] = [];
-  let luckyOriginalRolls: number[] = [];
+  let rerolledFromRolls: number[] = [];
+  let rerollSourceSeen: 'plenty_of_bullets' | 'plenty_of_shells' | undefined;
   let totalHits = 0;
   let totalMisses = 0;
+  let effectiveThreshold = Math.max(2, stats.accuracy);
+
+  const ammoSource: 'plenty_of_bullets' | 'plenty_of_shells' | undefined =
+    ammo === 'bullets' ? 'plenty_of_bullets' : ammo === 'shells' ? 'plenty_of_shells' : undefined;
 
   for (let atk = 0; atk < attackCount; atk++) {
-    const result = hasLucky
-      ? rollDiceWithReroll(newState.seed, diceCount, threshold)
-      : rollDice(newState.seed, diceCount, threshold);
-    newState.seed = result.newSeed;
+    const result: AttackRollResult = rollAttack(rng, {
+      count: diceCount,
+      accuracy: stats.accuracy,
+      diceBonus,
+      ammoReroll: hasAmmoReroll,
+      ammoSource,
+    });
+    effectiveThreshold = result.effectiveThreshold;
     allRolls = allRolls.concat(result.rolls);
-    if (result.luckyOriginal) {
-      luckyOriginalRolls = luckyOriginalRolls.concat(result.luckyOriginal);
+    if (result.rerolledFrom) {
+      rerolledFromRolls = rerolledFromRolls.concat(result.rerolledFrom);
+      if (result.rerollSource && result.rerollSource !== 'lucky') rerollSourceSeen = result.rerollSource;
     }
     totalHits += result.hits;
     totalMisses += (diceCount - result.hits);
   }
+  newState.seed = rng.snapshot();
+  const seedAfterRoll = rng.snapshot();
+
+  const rollbackSnapshot = attackEntitySnapshot
+    ? {
+        ...attackEntitySnapshot,
+        seedAfterRoll,
+        attackPayload: { ...(intent.payload || {}) },
+        originalDice: allRolls.slice(),
+      }
+    : undefined;
 
   newState.lastAction = {
       type: ActionType.ATTACK,
@@ -227,11 +268,13 @@ export function handleAttack(state: GameState, intent: ActionRequest): GameState
       dice: allRolls,
       hits: totalHits,
       timestamp: Date.now(),
-      description: `Attacked with ${weapon.name}${isDualWielding ? ' (Dual Wield)' : ''} (Need ${threshold}+)`,
-      luckyRerollOriginal: luckyOriginalRolls.length > 0 ? luckyOriginalRolls : undefined,
+      description: `Attacked with ${weapon.name}${isDualWielding ? ' (Dual Wield)' : ''} (Need ${effectiveThreshold}+)`,
+      rerolledFrom: rerolledFromRolls.length > 0 ? rerolledFromRolls : undefined,
+      rerollSource: rerolledFromRolls.length > 0 ? rerollSourceSeen : undefined,
       bonusDice: bonusDice > 0 ? bonusDice : undefined,
       bonusDamage: bonusDamage > 0 ? bonusDamage : undefined,
       damagePerHit: stats.damage + bonusDamage,
+      rollbackSnapshot,
   };
 
   // Zombicide 2E targeting priority (ranged default):
@@ -309,14 +352,8 @@ export function handleAttack(state: GameState, intent: ActionRequest): GameState
           }
           friendly.wounds += effectiveDamageFF;
           missesToApply--;
-          // Check if friendly died
           if (friendly.wounds >= friendly.maxHealth) {
               handleSurvivorDeath(newState, friendly.id);
-          } else if (friendly.inventory.length > 0) {
-              const backpackIdx = friendly.inventory.findIndex((c: EquipmentCard) => !c.inHand);
-              const discardIdx = backpackIdx >= 0 ? backpackIdx : friendly.inventory.length - 1;
-              const [discarded] = friendly.inventory.splice(discardIdx, 1);
-              newState.equipmentDiscard.push(discarded);
           }
       }
   }
@@ -455,13 +492,6 @@ export function handleResolveWounds(state: GameState, intent: ActionRequest): Ga
       handleSurvivorDeath(newState, survivor.id);
       break;
     }
-    // Standard wound equipment discard for each wound taken
-    if (survivor.inventory.length > 0) {
-      const backpackIdx = survivor.inventory.findIndex((c: EquipmentCard) => !c.inHand);
-      const discardIdx = backpackIdx >= 0 ? backpackIdx : survivor.inventory.length - 1;
-      const [discarded] = survivor.inventory.splice(discardIdx, 1);
-      newState.equipmentDiscard.push(discarded);
-    }
   }
 
   survivor.pendingWounds = 0;
@@ -512,16 +542,6 @@ export function handleDistributeZombieWounds(state: GameState, intent: ActionReq
         continue;
       }
 
-      // Armor check
-      const armorIndex = survivor.inventory.findIndex(
-        (c: EquipmentCard) => c.type === 'ARMOR' && c.inHand && c.armorValue && c.armorValue > 0
-      );
-      if (armorIndex >= 0) {
-        const armor = survivor.inventory.splice(armorIndex, 1)[0];
-        newState.equipmentDiscard.push(armor);
-        continue;
-      }
-
       // "Is That All You've Got?" — defer to equipment discard choice
       if (survivor.skills?.includes('is_that_all_youve_got') && survivor.inventory.length > 0) {
         survivor.pendingWounds = (survivor.pendingWounds || 0) + 1;
@@ -532,11 +552,6 @@ export function handleDistributeZombieWounds(state: GameState, intent: ActionReq
 
       if (survivor.wounds >= survivor.maxHealth) {
         handleSurvivorDeath(newState, survivor.id);
-      } else if (survivor.inventory.length > 0) {
-        const backpackIdx = survivor.inventory.findIndex((c: EquipmentCard) => !c.inHand);
-        const discardIdx = backpackIdx >= 0 ? backpackIdx : survivor.inventory.length - 1;
-        const [discarded] = survivor.inventory.splice(discardIdx, 1);
-        newState.equipmentDiscard.push(discarded);
       }
     }
   }
@@ -548,4 +563,74 @@ export function handleDistributeZombieWounds(state: GameState, intent: ActionReq
   }
 
   return newState;
+}
+
+/**
+ * Player-initiated Lucky reroll. Rule-faithful: the reroll result is binding,
+ * even if worse than the first attempt.
+ *
+ * Mechanics:
+ *   1. Validate Lucky is owned + unspent and the survivor's last action was an ATTACK.
+ *   2. Restore zombies/survivors/deck/objectives/noise from the pre-attack snapshot.
+ *   3. Leave `state.seed` at the post-first-roll position — the fresh roll picks up there,
+ *      so the new dice are deterministically different from the original.
+ *   4. Mark Lucky spent on the survivor, then re-dispatch handleAttack with the saved intent.
+ *   5. Merge: surface original dice as `rerolledFrom`, tag `rerollSource = 'lucky'`.
+ */
+export function handleRerollLucky(state: GameState, intent: ActionRequest): GameState {
+  const survivor = state.survivors[intent.survivorId!];
+  if (!survivor) throw new Error('Survivor not found');
+  if (!survivor.skills.includes('lucky')) throw new Error('Survivor does not have Lucky');
+  if (survivor.luckyUsedThisTurn) throw new Error('Lucky already used this turn');
+
+  const last = state.lastAction;
+  if (!last || last.type !== ActionType.ATTACK || last.survivorId !== intent.survivorId) {
+    throw new Error('No recent attack to reroll');
+  }
+  const snap = last.rollbackSnapshot;
+  if (!snap) throw new Error('Attack has no rollback snapshot — Lucky cannot apply');
+
+  // 1. Rebuild pre-attack entity state
+  const restored = structuredClone(state) as GameState;
+  restored.zombies = structuredClone(snap.zombies);
+  restored.survivors = structuredClone(snap.survivors);
+  restored.equipmentDeck = structuredClone(snap.equipmentDeck);
+  restored.equipmentDiscard = structuredClone(snap.equipmentDiscard);
+  restored.objectives = structuredClone(snap.objectives);
+  restored.noiseTokens = snap.noiseTokens;
+  for (const [zid, n] of Object.entries(snap.zoneNoise)) {
+    if (restored.zones[zid]) restored.zones[zid].noiseTokens = n;
+  }
+  restored.seed = [snap.seedAfterRoll[0], snap.seedAfterRoll[1], snap.seedAfterRoll[2], snap.seedAfterRoll[3]];
+
+  // 2. Burn the skill before recursing so the rerun doesn't capture a new snapshot.
+  restored.survivors[intent.survivorId!].luckyUsedThisTurn = true;
+
+  // 3. Re-run the attack with the same payload from the seed-advanced position
+  const rerunIntent: ActionRequest = {
+    playerId: intent.playerId,
+    survivorId: intent.survivorId,
+    type: ActionType.ATTACK,
+    payload: snap.attackPayload as Record<string, unknown>,
+  };
+  let reran = handleAttack(restored, rerunIntent);
+
+  // 4. Re-apply the AP cost of the ATTACK. The recursive handleAttack does NOT deduct AP
+  // (deduction normally happens in ActionProcessor after the handler returns), and
+  // REROLL_LUCKY is not a game-action so the processor won't deduct for the reroll either.
+  // Without this, Lucky would refund the AP the original attack spent.
+  const extraCost = reran._extraAPCost || 0;
+  delete reran._extraAPCost;
+  delete (reran as { _attackIsMelee?: boolean })._attackIsMelee;
+  reran = deductAPWithFreeCheck(reran, intent.survivorId!, ActionType.ATTACK, extraCost);
+
+  // 5. Annotate the new lastAction with reroll provenance
+  if (reran.lastAction && reran.lastAction.type === ActionType.ATTACK) {
+    reran.lastAction.rerolledFrom = snap.originalDice;
+    reran.lastAction.rerollSource = 'lucky';
+    // Drop the now-stale snapshot; a second reroll is not allowed anyway
+    delete reran.lastAction.rollbackSnapshot;
+  }
+
+  return reran;
 }
