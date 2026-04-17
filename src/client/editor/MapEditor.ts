@@ -238,6 +238,14 @@ export class MapEditor {
     `;
     toolbar.appendChild(btnRow);
 
+    const ioRow = document.createElement('div');
+    ioRow.className = 'editor-btn-row';
+    ioRow.innerHTML = `
+      ${renderButton({ label: 'Import', variant: 'secondary', size: 'sm', dataAction: 'map-import', icon: 'Upload' })}
+      ${renderButton({ label: 'Export', variant: 'secondary', size: 'sm', dataAction: 'map-export', icon: 'Download' })}
+    `;
+    toolbar.appendChild(ioRow);
+
     // Edit Tiles button
     const editTilesRow = document.createElement('div');
     editTilesRow.innerHTML = renderButton({ label: 'Edit Tiles', variant: 'ghost', size: 'sm', fullWidth: true, dataAction: 'edit-tiles', icon: 'Settings' });
@@ -249,6 +257,8 @@ export class MapEditor {
       if (action === 'map-save') this.saveMap(nameInput.value);
       else if (action === 'map-clear') this.clearAll();
       else if (action === 'map-load') this.showLoadDialog();
+      else if (action === 'map-export') this.exportCurrentMap(nameInput.value);
+      else if (action === 'map-import') this.triggerImport();
       else if (action === 'edit-tiles') this.openTileEditor();
     });
 
@@ -472,7 +482,13 @@ export class MapEditor {
 
     canvas.style.display = 'block';
     const size = canvas.width;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, size, size);
+
+    // Rotate around the canvas center
+    ctx.translate(size / 2, size / 2);
+    ctx.rotate((this.currentRotation * Math.PI) / 180);
+    ctx.translate(-size / 2, -size / 2);
 
     // Draw the tile image scaled to fit the preview canvas
     const frame = texture.frame;
@@ -481,6 +497,7 @@ export class MapEditor {
       frame.x, frame.y, frame.width, frame.height,
       0, 0, size, size,
     );
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
   }
 
   // =============================================
@@ -520,6 +537,7 @@ export class MapEditor {
         this.currentRotation = (this.currentRotation + 90) % 360 as any;
         if (this.selectedTileId) {
           this.statusText.innerText = `Tile: ${this.selectedTileId} (${this.currentRotation}\u00B0)`;
+          this.updateTilePreview(this.selectedTileId);
         }
       }
       // Number keys for tool switching
@@ -1227,15 +1245,7 @@ export class MapEditor {
       return;
     }
 
-    const mapData: ScenarioMap = {
-      id: `map-${Date.now()}`,
-      name: name,
-      width: Math.max(...this.tiles.map(t => t.x)) + 1,
-      height: Math.max(...this.tiles.map(t => t.y)) + 1,
-      gridSize: TILE_CELLS_PER_SIDE,
-      tiles: this.tiles,
-      markers: this.markers,
-    };
+    const mapData: ScenarioMap = this.buildScenarioMap(name);
 
     try {
       const response = await fetch('/api/maps', {
@@ -1281,6 +1291,14 @@ export class MapEditor {
                   dataId: String(i),
                 })}
                 ${renderButton({
+                  icon: 'Download',
+                  variant: 'secondary',
+                  size: 'sm',
+                  dataAction: 'export-map',
+                  dataId: String(i),
+                  title: 'Export map to file',
+                })}
+                ${renderButton({
                   icon: 'Trash2',
                   variant: 'destructive',
                   size: 'sm',
@@ -1299,6 +1317,15 @@ export class MapEditor {
               if (idx >= 0 && idx < maps.length) {
                 modalManager.close();
                 this.loadMap(maps[idx]);
+              }
+              return;
+            }
+            const exportBtn = (ev.target as HTMLElement).closest('[data-action="export-map"]') as HTMLElement | null;
+            if (exportBtn) {
+              const idx = parseInt(exportBtn.dataset.id || '');
+              if (idx >= 0 && idx < maps.length) {
+                this.downloadMapJson(maps[idx]);
+                notificationManager.show({ variant: 'success', message: `Exported "${maps[idx].name}"` });
               }
               return;
             }
@@ -1341,6 +1368,65 @@ export class MapEditor {
     } catch (e) {
       console.error('Failed to load maps:', e);
     }
+  }
+
+  private buildScenarioMap(name: string): ScenarioMap {
+    return {
+      id: `map-${Date.now()}`,
+      name,
+      width: Math.max(...this.tiles.map(t => t.x)) + 1,
+      height: Math.max(...this.tiles.map(t => t.y)) + 1,
+      gridSize: TILE_CELLS_PER_SIDE,
+      tiles: this.tiles,
+      markers: this.markers,
+    };
+  }
+
+  private downloadMapJson(map: ScenarioMap) {
+    const safeName = (map.name || 'map').replace(/[^a-z0-9-_]+/gi, '_').toLowerCase() || 'map';
+    const blob = new Blob([JSON.stringify(map, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${safeName}.endead-map.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  private exportCurrentMap(name: string) {
+    if (this.tiles.length === 0) {
+      notificationManager.show({ variant: 'warning', message: 'Map is empty — nothing to export' });
+      return;
+    }
+    const finalName = name || `map-${Date.now()}`;
+    const map = this.buildScenarioMap(finalName);
+    this.downloadMapJson(map);
+    notificationManager.show({ variant: 'success', message: `Exported "${finalName}"` });
+  }
+
+  private triggerImport() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,application/json';
+    input.addEventListener('change', async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        if (!data || !Array.isArray(data.tiles)) {
+          notificationManager.show({ variant: 'danger', message: 'Invalid map file — missing tiles array' });
+          return;
+        }
+        if (!Array.isArray(data.markers)) data.markers = [];
+        this.loadMap(data);
+        notificationManager.show({ variant: 'success', message: `Imported "${data.name || 'map'}" — click Save to persist` });
+      } catch (e) {
+        console.error('Import error:', e);
+        notificationManager.show({ variant: 'danger', message: 'Error importing — check JSON format' });
+      }
+    });
+    input.click();
   }
 
   private loadMap(mapData: any) {
