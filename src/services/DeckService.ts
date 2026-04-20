@@ -1,7 +1,7 @@
 // src/services/DeckService.ts
 
 import { GameState, EquipmentCard, SpawnCard } from '../types/GameState';
-import { EQUIPMENT_CARDS, INITIAL_DECK_CONFIG } from '../config/EquipmentRegistry';
+import { EQUIPMENT_CARDS, INITIAL_DECK_CONFIG, EPIC_EQUIPMENT_CARDS, INITIAL_EPIC_DECK_CONFIG } from '../config/EquipmentRegistry';
 import { SPAWN_CARDS } from '../config/SpawnRegistry';
 import { Rng, RngState } from './Rng';
 
@@ -17,18 +17,58 @@ export class DeckService {
     for (const cardKey of INITIAL_DECK_CONFIG) {
       const template = EQUIPMENT_CARDS[cardKey];
       if (template) {
-        deck.push({
+        const card: EquipmentCard = {
           id: `card-${cardKey}-${cardCounter++}`,
           ...template,
           inHand: false,
-          slot: 'BACKPACK'
-        });
+          slot: 'BACKPACK',
+        };
+        if (template.keywords?.includes('reload')) card.reloaded = true;
+        deck.push(card);
       }
     }
 
     const rng = Rng.from(seed);
     const shuffled = this.shuffle(deck, rng);
     return { deck: shuffled, newSeed: rng.snapshot() };
+  }
+
+  /**
+   * Initializes the Epic Weapons Deck (red-back). Granted by Epic Weapon Crate
+   * objectives (RULEBOOK §9, Mission Elements).
+   */
+  public static initializeEpicDeck(seed: RngState): { deck: EquipmentCard[], newSeed: RngState } {
+    const deck: EquipmentCard[] = [];
+    let cardCounter = 0;
+    for (const cardKey of INITIAL_EPIC_DECK_CONFIG) {
+      const template = EPIC_EQUIPMENT_CARDS[cardKey];
+      if (template) {
+        const card: EquipmentCard = {
+          id: `epic-${cardKey}-${cardCounter++}`,
+          ...template,
+          inHand: false,
+          slot: 'BACKPACK',
+        };
+        if (template.keywords?.includes('reload')) card.reloaded = true;
+        deck.push(card);
+      }
+    }
+    const rng = Rng.from(seed);
+    const shuffled = this.shuffle(deck, rng);
+    return { deck: shuffled, newSeed: rng.snapshot() };
+  }
+
+  /**
+   * Draws from the Epic deck (separate from the standard Equipment deck).
+   * Epic cards don't reshuffle from discard by default — once used, they stay gone.
+   */
+  public static drawEpicCard(state: GameState): { card: EquipmentCard | null, newState: GameState } {
+    const newState = structuredClone(state);
+    if (!newState.epicDeck || newState.epicDeck.length === 0) {
+      return { card: null, newState };
+    }
+    const card = newState.epicDeck.shift();
+    return { card: card || null, newState };
   }
 
   /**
@@ -56,6 +96,11 @@ export class DeckService {
       newState.equipmentDeck = this.shuffle(newState.equipmentDiscard, rng);
       newState.equipmentDiscard = [];
       newState.seed = rng.snapshot();
+      // Reshuffled reloadables re-enter the deck as fresh (B5). A card can only
+      // rejoin play via reshuffle, so this is the single choke point.
+      for (const c of newState.equipmentDeck) {
+        if (c.keywords?.includes('reload')) c.reloaded = true;
+      }
     }
 
     const card = newState.equipmentDeck.shift();

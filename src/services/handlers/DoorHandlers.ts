@@ -83,31 +83,31 @@ export function handleOpenDoor(state: GameState, intent: ActionRequest): GameSta
       }
     }
 
-    const currentLevel: DangerLevel = newState.currentDangerLevel;
-    for (const zid of zonesToSpawn) {
+    // Use the live Danger Level at spawn time (rule: highest among living survivors).
+    const currentLevel: DangerLevel = ZombiePhaseManager.getCurrentDangerLevel(newState);
+    newState.currentDangerLevel = currentLevel;
+
+    const drawAndApply = (zid: ZoneId) => {
       if (newState.spawnDeck.length === 0 && newState.spawnDiscard.length === 0) {
         const deckResult = DeckService.initializeSpawnDeck(newState.seed);
         newState.spawnDeck = deckResult.deck;
         newState.seed = deckResult.newSeed;
       }
-
       const drawResult = DeckService.drawSpawnCard(newState);
       newState.spawnDeck = drawResult.newState.spawnDeck;
       newState.spawnDiscard = drawResult.newState.spawnDiscard;
       newState.seed = drawResult.newState.seed;
       const card = drawResult.card;
-      if (!card) continue;
-
+      if (!card) return null;
       const detail = card[currentLevel] as SpawnDetail;
-      if (!detail || detail.extraActivation) continue;
+      if (!detail) return null;
+      ZombiePhaseManager.applySpawnDetail(newState, zid, detail);
+      return detail;
+    };
 
-      if (detail.zombies) {
-        for (const [type, count] of Object.entries(detail.zombies)) {
-          for (let i = 0; i < (count as number); i++) {
-            ZombiePhaseManager.spawnZombie(newState, zid, type as ZombieType);
-          }
-        }
-      }
+    for (const zid of zonesToSpawn) {
+      const detail = drawAndApply(zid);
+      if (detail?.doubleSpawn) drawAndApply(zid);
     }
   }
 

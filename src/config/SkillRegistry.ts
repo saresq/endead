@@ -114,6 +114,18 @@ export const SKILL_DEFINITIONS: Record<string, SkillDefinition> = {
     description: 'The Survivor adds +1 to each die result when performing a Ranged Action. Max result is always 6.',
     type: 'STAT_MOD'
   },
+  'plus_1_to_dice_roll_melee': {
+    id: 'plus_1_to_dice_roll_melee',
+    name: '+1 to Dice Roll: Melee',
+    description: 'The Survivor adds +1 to each die result when performing a Melee Action. Max result is always 6.',
+    type: 'STAT_MOD'
+  },
+  'plus_1_to_dice_roll_combat': {
+    id: 'plus_1_to_dice_roll_combat',
+    name: '+1 to Dice Roll: Combat',
+    description: 'The Survivor adds +1 to each die result when performing a Combat Action. Max result is always 6.',
+    type: 'STAT_MOD'
+  },
   'steady_hand': {
     id: 'steady_hand',
     name: 'Steady Hand',
@@ -195,18 +207,6 @@ export const SKILL_DEFINITIONS: Record<string, SkillDefinition> = {
     name: 'Super Strength',
     description: 'Melee weapons used by this Survivor have Damage 3.',
     type: 'STAT_MOD'
-  },
-  'reaper_combat': {
-    id: 'reaper_combat',
-    name: 'Reaper: Combat',
-    description: 'Each hit can freely eliminate 1 additional identical Zombie. Earns AP for the additional kill.',
-    type: 'PASSIVE'
-  },
-  'reaper_melee': {
-    id: 'reaper_melee',
-    name: 'Reaper: Melee',
-    description: 'Each Melee hit can freely eliminate 1 additional identical Zombie. Earns AP for the additional kill.',
-    type: 'PASSIVE'
   },
   'point_blank': {
     id: 'point_blank',
@@ -340,7 +340,7 @@ export const SURVIVOR_CLASSES: Record<string, ClassProgression> = {
   //     'plus_1_damage_melee', 'plus_1_damage_ranged', 'plus_1_damage_combat',
   //     'plus_1_die_melee', 'plus_1_die_ranged', 'plus_1_die_combat',
   //     'plus_1_max_range', 'lucky', 'sniper', 'tough', 'steady_hand',
-  //     'search_anywhere', 'super_strength', 'reaper_combat', 'reaper_melee',
+  //     'search_anywhere', 'super_strength',
   //     'point_blank', 'born_leader', 'bloodlust_melee', 'lifesaver',
   //     'ambidextrous', 'swordmaster', 'barbarian', 'medic',
   //     'hold_your_nose', 'matching_set', 'search_plus_1',

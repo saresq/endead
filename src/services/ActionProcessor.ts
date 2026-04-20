@@ -8,7 +8,7 @@ import { deductAPWithFreeCheck, ActionHandler } from './handlers/handlerUtils';
 // --- Handler imports ---
 import { handleJoinLobby, handleUpdateNickname, handleSelectCharacter, handleStartGame, handleEndGame } from './handlers/LobbyHandlers';
 import { handleMove, handleSprint } from './handlers/MovementHandlers';
-import { handleAttack, handleResolveWounds, handleDistributeZombieWounds, handleRerollLucky } from './handlers/CombatHandlers';
+import { handleAttack, handleResolveWounds, handleDistributeZombieWounds, handleRerollLucky, handleAssignFriendlyFire, handleReload } from './handlers/CombatHandlers';
 import { handleCharge, handleBornLeader, handleBloodlustMelee, handleLifesaver, handleChooseSkill } from './handlers/SkillHandlers';
 import { handleUseItem, handleSearch, handleResolveSearch, handleOrganize } from './handlers/ItemHandlers';
 import { handleOpenDoor, handleMakeNoise } from './handlers/DoorHandlers';
@@ -46,6 +46,8 @@ const handlers: Partial<Record<ActionType, ActionHandler>> = {
   [ActionType.RESOLVE_WOUNDS]: handleResolveWounds,
   [ActionType.DISTRIBUTE_ZOMBIE_WOUNDS]: handleDistributeZombieWounds,
   [ActionType.REROLL_LUCKY]: handleRerollLucky,
+  [ActionType.ASSIGN_FRIENDLY_FIRE]: handleAssignFriendlyFire,
+  [ActionType.RELOAD]: handleReload,
 };
 
 // --- Game End Logic ---
@@ -124,7 +126,8 @@ export function processAction(state: GameState, intent: ActionRequest): ActionRe
       if ((intent.type === ActionType.CHOOSE_SKILL || intent.type === ActionType.RESOLVE_SEARCH
           || intent.type === ActionType.CHARGE || intent.type === ActionType.BORN_LEADER
           || intent.type === ActionType.LIFESAVER || intent.type === ActionType.RESOLVE_WOUNDS
-          || intent.type === ActionType.END_TURN || intent.type === ActionType.REROLL_LUCKY)
+          || intent.type === ActionType.END_TURN || intent.type === ActionType.REROLL_LUCKY
+          || intent.type === ActionType.ASSIGN_FRIENDLY_FIRE)
           && turnError && turnError.code === 'NO_ACTIONS') {
         turnError = null;
       }
@@ -150,7 +153,7 @@ export function processAction(state: GameState, intent: ActionRequest): ActionRe
     const gameActions = [
         ActionType.MOVE, ActionType.ATTACK, ActionType.SEARCH, ActionType.SPRINT, ActionType.USE_ITEM,
         ActionType.OPEN_DOOR, ActionType.MAKE_NOISE, ActionType.ORGANIZE,
-        ActionType.TAKE_OBJECTIVE,
+        ActionType.TAKE_OBJECTIVE, ActionType.RELOAD,
         ActionType.TRADE_START, ActionType.TRADE_OFFER,
         ActionType.TRADE_ACCEPT, ActionType.TRADE_CANCEL, ActionType.END_TURN,
         ActionType.CHARGE, ActionType.BORN_LEADER, ActionType.BLOODLUST_MELEE, ActionType.LIFESAVER
@@ -183,8 +186,12 @@ export function processAction(state: GameState, intent: ActionRequest): ActionRe
            // Consume transient extra AP cost (e.g. zombie zone control penalty on MOVE)
            const extraCost = newState._extraAPCost || 0;
            delete newState._extraAPCost;
+           const pref = intent.payload?.preferredFreePool as
+               | 'combat' | 'melee' | 'ranged' | 'move' | 'search' | undefined;
+           newState = deductAPWithFreeCheck(newState, intent.survivorId!, intent.type, extraCost, pref);
+           // `_attackIsMelee` must survive until AFTER deductAPWithFreeCheck so
+           // tryMelee/tryRanged (handlerUtils) can key on it (B2).
            delete (newState as any)._attackIsMelee;
-           newState = deductAPWithFreeCheck(newState, intent.survivorId!, intent.type, extraCost);
        }
     } else if (intent.type === ActionType.RESOLVE_SEARCH) {
         // Since RESOLVE_SEARCH doesn't cost AP (cost was paid in SEARCH),
@@ -195,6 +202,9 @@ export function processAction(state: GameState, intent: ActionRequest): ActionRe
         newState = checkEndTurn(newState);
     } else if (intent.type === ActionType.DISTRIBUTE_ZOMBIE_WOUNDS) {
         // No AP cost — distributing zombie wounds among survivors
+        newState = checkEndTurn(newState);
+    } else if (intent.type === ActionType.ASSIGN_FRIENDLY_FIRE) {
+        // No AP cost — assigning friendly-fire misses from the last attack
         newState = checkEndTurn(newState);
     }
 

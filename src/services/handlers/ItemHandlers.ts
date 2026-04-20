@@ -106,20 +106,12 @@ export function handleSearch(state: GameState, intent: ActionRequest): GameState
     equipCards.push(...matchingCards);
   }
 
-  // Give non-trap cards to survivor
-  for (const card of equipCards) {
-    const handFull = EquipmentManager.isHandFull(survivor);
-    const hasSpace = EquipmentManager.hasSpace(survivor);
-
-    if (!handFull && hasSpace) {
-      newState.survivors[intent.survivorId!] = EquipmentManager.addCard(
-        newState.survivors[intent.survivorId!], card
-      );
-    } else {
-      // Hand Full or Inventory Full -> Trigger Modal with first overflow card
-      newState.survivors[intent.survivorId!].drawnCard = card;
-      // Remaining cards go to discard if we can't hold them
-      break;
+  // RULEBOOK §7: the player always decides keep/equip/discard for searched cards.
+  // Route every drawn card through the resolution picker — never auto-equip.
+  if (equipCards.length > 0) {
+    newState.survivors[intent.survivorId!].drawnCard = equipCards[0];
+    if (equipCards.length > 1) {
+      newState.survivors[intent.survivorId!].drawnCardsQueue = equipCards.slice(1);
     }
   }
 
@@ -144,40 +136,46 @@ export function handleResolveSearch(state: GameState, intent: ActionRequest): Ga
   if (!survivor.drawnCard) throw new Error('No drawn card to resolve');
 
   const action = intent.payload?.action;
+  let newState: GameState;
 
   if (action === 'DISCARD') {
-    const newState = structuredClone(state);
+    newState = structuredClone(state);
     newState.equipmentDiscard.push(survivor.drawnCard);
     newState.survivors[intent.survivorId!].drawnCard = undefined;
-    return newState;
   } else if (action === 'EQUIP') {
     const targetSlot = intent.payload?.targetSlot;
     if (!targetSlot) throw new Error('Target slot required for EQUIP');
 
-    const newState = structuredClone(state);
+    newState = structuredClone(state);
     const s = newState.survivors[intent.survivorId!];
 
-    // Check if slot occupied
     const occupied = s.inventory.some((c: EquipmentCard) => c.slot === targetSlot);
     if (occupied) throw new Error(`Slot ${targetSlot} is occupied. Move item first.`);
 
-    // Equip
     const newCard = s.drawnCard!;
     newCard.slot = targetSlot;
     newCard.inHand = (targetSlot === 'HAND_1' || targetSlot === 'HAND_2');
 
     s.inventory.push(newCard);
     s.drawnCard = undefined;
-
-    return newState;
   } else if (action === 'KEEP') {
     const discardId = intent.payload?.discardCardId;
     if (!discardId) throw new Error('Must specify which card to replace');
 
-    return EquipmentManager.swapDrawnCard(state, intent.survivorId!, discardId);
+    newState = EquipmentManager.swapDrawnCard(state, intent.survivorId!, discardId);
+  } else {
+    throw new Error('Invalid resolve action');
   }
 
-  throw new Error('Invalid resolve action');
+  // Pop next queued draw into the picker slot.
+  const s = newState.survivors[intent.survivorId!];
+  const queue = s.drawnCardsQueue;
+  if (queue && queue.length > 0) {
+    s.drawnCard = queue.shift();
+    if (queue.length === 0) s.drawnCardsQueue = undefined;
+  }
+
+  return newState;
 }
 
 export function handleOrganize(state: GameState, intent: ActionRequest): GameState {

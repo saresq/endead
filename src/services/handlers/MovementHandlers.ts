@@ -129,15 +129,17 @@ export function handleSprint(state: GameState, intent: ActionRequest): GameState
 
     currentZoneId = targetZoneId;
 
-    // Entering a zone with zombies stops movement immediately
-    const hasZombiesInTarget = Object.values(newState.zombies)
-      .some((z: any) => z.position.zoneId === targetZoneId);
-    if (hasZombiesInTarget) {
-      // Must have moved at least 2 zones for a valid sprint
-      if (i + 1 < 2) {
-        throw new Error('Sprint requires moving at least 2 zones but was stopped by zombies');
+    // Entering a zone with zombies stops movement immediately (unless Slippery)
+    if (!survivor.skills.includes('slippery')) {
+      const hasZombiesInTarget = Object.values(newState.zombies)
+        .some((z: any) => z.position.zoneId === targetZoneId);
+      if (hasZombiesInTarget) {
+        // Must have moved at least 2 zones for a valid sprint
+        if (i + 1 < 2) {
+          throw new Error('Sprint requires moving at least 2 zones but was stopped by zombies');
+        }
+        break;
       }
-      break;
     }
   }
 

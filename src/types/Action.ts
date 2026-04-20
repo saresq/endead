@@ -37,6 +37,8 @@ export enum ActionType {
   DISTRIBUTE_ZOMBIE_WOUNDS = 'DISTRIBUTE_ZOMBIE_WOUNDS',
   KICK_PLAYER = 'KICK_PLAYER',
   REROLL_LUCKY = 'REROLL_LUCKY',
+  ASSIGN_FRIENDLY_FIRE = 'ASSIGN_FRIENDLY_FIRE',
+  RELOAD = 'RELOAD',
 }
 
 // --- Action Payload Types ---
@@ -117,6 +119,14 @@ export interface DistributeZombieWoundsPayload {
   assignments: Record<string, number>;  // survivorId -> number of wounds assigned
 }
 
+export interface AssignFriendlyFirePayload {
+  assignments: Record<string, number>;  // survivorId -> number of misses assigned
+}
+
+export interface ReloadPayload {
+  weaponId?: EntityId;  // Specific weapon to reload; omit to reload all reloadable weapons in hand
+}
+
 export interface KickPlayerPayload {
   targetPlayerId: string;
 }
@@ -153,6 +163,8 @@ export interface ActionPayloadMap {
   [ActionType.DISTRIBUTE_ZOMBIE_WOUNDS]: DistributeZombieWoundsPayload;
   [ActionType.KICK_PLAYER]: KickPlayerPayload;
   [ActionType.REROLL_LUCKY]: undefined;
+  [ActionType.ASSIGN_FRIENDLY_FIRE]: AssignFriendlyFirePayload;
+  [ActionType.RELOAD]: ReloadPayload;
 }
 
 export type ActionPayload = ActionPayloadMap[ActionType];

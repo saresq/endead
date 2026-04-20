@@ -211,6 +211,77 @@ export const EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'inHand'
   }
 };
 
+// --- Epic Weapons (red-back deck, granted by Epic Weapon Crate objectives) ---
+
+export const EPIC_EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'inHand' | 'slot'>> = {
+  'epic_golden_kukri': {
+    name: 'Golden Kukri',
+    type: EquipmentType.Weapon,
+    stats: { range: [0, 0], dice: 2, accuracy: 3, damage: 2, noise: false, dualWield: true }
+  },
+  'epic_mas_shotgun': {
+    name: "Ma's Shotgun",
+    type: EquipmentType.Weapon,
+    keywords: ['reload'],
+    stats: { range: [0, 1], dice: 3, accuracy: 4, damage: 2, noise: true, dualWield: false, ammo: 'shells' }
+  },
+  'epic_zantetsuken': {
+    name: 'Zantetsuken',
+    type: EquipmentType.Weapon,
+    stats: { range: [0, 0], dice: 2, accuracy: 4, damage: 3, noise: false, dualWield: false }
+  },
+  'epic_gunblade': {
+    name: 'Gunblade',
+    type: EquipmentType.Weapon,
+    stats: { range: [0, 1], dice: 2, accuracy: 4, damage: 2, noise: true, dualWield: false, ammo: 'bullets', hybrid: true }
+  },
+  'epic_evil_twins': {
+    name: 'Evil Twins',
+    type: EquipmentType.Weapon,
+    stats: { range: [0, 1], dice: 2, accuracy: 3, damage: 1, noise: true, dualWield: true, ammo: 'bullets' }
+  },
+  'epic_golden_ak47': {
+    name: 'Golden AK-47',
+    type: EquipmentType.Weapon,
+    stats: { range: [0, 2], dice: 3, accuracy: 4, damage: 1, noise: true, dualWield: false, ammo: 'bullets' }
+  },
+  'epic_army_sniper_rifle': {
+    name: 'Army Sniper Rifle',
+    type: EquipmentType.Weapon,
+    keywords: ['sniper'],
+    stats: { range: [1, 3], dice: 1, accuracy: 2, damage: 3, noise: true, dualWield: false, ammo: 'bullets' }
+  },
+  'epic_automatic_shotgun': {
+    name: 'Automatic Shotgun',
+    type: EquipmentType.Weapon,
+    stats: { range: [0, 1], dice: 3, accuracy: 4, damage: 2, noise: true, dualWield: false, ammo: 'shells' }
+  },
+  'epic_nailbat': {
+    name: 'Nailbat',
+    type: EquipmentType.Weapon,
+    stats: { range: [0, 0], dice: 2, accuracy: 3, damage: 2, noise: false, dualWield: false }
+  },
+  'epic_aaahh': {
+    name: 'Aaahh!!',
+    type: EquipmentType.Item,
+    keywords: ['aaahh'],
+    stats: undefined
+  },
+};
+
+export const INITIAL_EPIC_DECK_CONFIG = [
+  'epic_golden_kukri',
+  'epic_mas_shotgun',
+  'epic_zantetsuken',
+  'epic_gunblade',
+  'epic_evil_twins',
+  'epic_golden_ak47',
+  'epic_army_sniper_rifle',
+  'epic_automatic_shotgun',
+  'epic_nailbat',
+  'epic_aaahh', 'epic_aaahh',
+];
+
 // Zombicide 2nd Edition — Standard Equipment deck (45 cards, blue backs).
 // Starting Equipment (Baseball Bat, Crowbar, Fire Axe, Pistol x3) is dealt
 // at setup from a separate grey-back deck and is NOT part of this deck.

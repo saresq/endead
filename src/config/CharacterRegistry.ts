@@ -62,10 +62,12 @@ export function buildStartingEquipment(characterClass: string, index: number): E
   const template = EQUIPMENT_CARDS[charDef.startingEquipmentKey];
   if (!template) return null;
 
-  return {
+  const card: EquipmentCard = {
     id: `card-start-${charDef.startingEquipmentKey}-${index}`,
     ...template,
     inHand: true,
     slot: 'HAND_1',
   };
+  if (template.keywords?.includes('reload')) card.reloaded = true;
+  return card;
 }

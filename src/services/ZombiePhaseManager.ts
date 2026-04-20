@@ -190,6 +190,10 @@ export class ZombiePhaseManager {
         state.equipmentDiscard.push(survivor.drawnCard);
         survivor.drawnCard = undefined;
       }
+      if (survivor.drawnCardsQueue && survivor.drawnCardsQueue.length > 0) {
+        for (const card of survivor.drawnCardsQueue) state.equipmentDiscard.push(card);
+        survivor.drawnCardsQueue = undefined;
+      }
       survivor.actionsRemaining = 0;
     }
   }
@@ -224,12 +228,27 @@ export class ZombiePhaseManager {
     const currentLevel = this.getCurrentDangerLevel(newState);
     newState.currentDangerLevel = currentLevel; // Update global state for UI
 
+    // Promote any zones queued for activation (matching-color Objective taken).
+    // RULEBOOK §9: activated zones begin spawning on the next Zombie Phase (this one).
+    for (const z of Object.values(newState.zones)) {
+      if (z.activateNextPhase) {
+        z.activated = true;
+        z.activateNextPhase = false;
+      }
+    }
+
     // 2. Identify Spawn Zones — use spawnZoneIds order (placement order from map editor)
     const orderedSpawnIds = newState.spawnZoneIds
       ?? Object.values(newState.zones).filter(z => z.spawnPoint).map(z => z.id).sort();
     const spawnZones = orderedSpawnIds
       .map(id => newState.zones[id])
-      .filter(z => z && z.spawnPoint);
+      .filter(z => z && z.spawnPoint)
+      .filter(z => {
+        // Red zones always spawn. Blue/Green zones only once activated.
+        const color = z.spawnColor ?? 'red';
+        if (color === 'red') return true;
+        return !!z.activated;
+      });
 
     for (const zone of spawnZones) {
        // Self-healing: Initialize Spawn Deck if empty
@@ -361,7 +380,7 @@ export class ZombiePhaseManager {
     }
   }
 
-  private static applySpawnDetail(state: GameState, zoneId: ZoneId, detail: SpawnDetail) {
+  public static applySpawnDetail(state: GameState, zoneId: ZoneId, detail: SpawnDetail) {
       // Handle Extra Activation: re-activate ALL zombies of that type
       // Per rulebook §9/§15: Extra Activation cards have no effect at Blue Danger Level
       if (detail.extraActivation) {
@@ -466,7 +485,7 @@ export class ZombiePhaseManager {
     state.zombies[id] = zombie;
   }
 
-  private static getCurrentDangerLevel(state: GameState): DangerLevel {
+  public static getCurrentDangerLevel(state: GameState): DangerLevel {
     let maxDangerVal = 0;
     let maxLevel = DangerLevel.Blue;
 
@@ -526,6 +545,10 @@ export class ZombiePhaseManager {
       survivor.actionsRemaining = survivor.actionsPerTurn;
       survivor.hasMoved = false;
       survivor.hasSearched = false;
+      // RULEBOOK §End Phase: reloadable weapons are freely reloaded.
+      for (const card of survivor.inventory) {
+        if (card.keywords?.includes('reload')) card.reloaded = true;
+      }
       // Compute free actions from skills
       survivor.freeMovesRemaining = survivor.skills.includes('plus_1_free_move') ? 1 : 0;
       survivor.freeSearchesRemaining = survivor.skills.includes('plus_1_free_search') ? 1 : 0;

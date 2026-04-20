@@ -31,6 +31,32 @@ function captureAttackState(state: GameState): Pick<
   };
 }
 
+/**
+ * Apply N friendly-fire misses to a single survivor (RULEBOOK §10).
+ * Respects Tough (absorbs 1 miss once per turn) and Is That All You've Got?
+ * (defers wounds to discard-to-negate picker).
+ */
+function applyFriendlyFireMiss(state: GameState, survivorId: string, damagePerMiss: number, missCount: number): void {
+  const friendly = state.survivors[survivorId];
+  if (!friendly || friendly.wounds >= friendly.maxHealth) return;
+
+  for (let i = 0; i < missCount; i++) {
+    if (friendly.skills?.includes('tough') && !friendly.toughUsedFriendlyFire) {
+      friendly.toughUsedFriendlyFire = true;
+      continue;
+    }
+    if (friendly.skills?.includes('is_that_all_youve_got') && friendly.inventory.length > 0) {
+      friendly.pendingWounds = (friendly.pendingWounds || 0) + damagePerMiss;
+      continue;
+    }
+    friendly.wounds += damagePerMiss;
+    if (friendly.wounds >= friendly.maxHealth) {
+      handleSurvivorDeath(state, survivorId);
+      return;
+    }
+  }
+}
+
 export function handleAttack(state: GameState, intent: ActionRequest): GameState {
   const newState = structuredClone(state);
   const survivor = newState.survivors[intent.survivorId!];
@@ -52,6 +78,11 @@ export function handleAttack(state: GameState, intent: ActionRequest): GameState
 
   if (!weapon) throw new Error('No weapon found');
   if (weapon.type !== 'WEAPON' || !weapon.stats) throw new Error('Item is not a weapon');
+
+  // Reload weapons (e.g. Sawed-Off) must be reloaded between shots.
+  if (weapon.keywords?.includes('reload') && weapon.reloaded === false) {
+    throw new Error(`${weapon.name} must be reloaded before firing`);
+  }
 
   const stats = weapon.stats;
 
@@ -80,8 +111,9 @@ export function handleAttack(state: GameState, intent: ActionRequest): GameState
       throw new Error(`Target out of range (${distance}). Weapon range: ${stats.range.join('-')}`);
   }
 
-  // Melee attacks can only target the attacker's own zone
-  const isMelee = stats.range[1] === 0;
+  // Melee attacks can only target the attacker's own zone.
+  // Hybrid weapons (e.g. Gunblade) resolve as melee at distance 0 and ranged otherwise.
+  const isMelee = stats.range[1] === 0 || (!!stats.hybrid && distance === 0);
   (newState as any)._attackIsMelee = isMelee;
   if (isMelee && targetZoneId !== currentZoneId) {
       throw new Error('Melee attacks can only target your own zone');
@@ -186,6 +218,7 @@ export function handleAttack(state: GameState, intent: ActionRequest): GameState
 
   // Dual-wield check: both hands hold weapons capable of dual-wielding
   let isDualWielding = false;
+  let dualWieldIds: string[] = [];
   const canDual = stats.dualWield ||
     survivor.skills.includes('ambidextrous') ||
     (isMelee && survivor.skills.includes('swordmaster'));
@@ -194,6 +227,7 @@ export function handleAttack(state: GameState, intent: ActionRequest): GameState
     const hand2 = survivor.inventory.find((c: EquipmentCard) => c.slot === 'HAND_2' && c.type === 'WEAPON');
     if (hand1 && hand2 && hand1.name === hand2.name) {
       isDualWielding = true;
+      dualWieldIds = [hand1.id, hand2.id];
     }
   }
 
@@ -212,8 +246,11 @@ export function handleAttack(state: GameState, intent: ActionRequest): GameState
   }
 
   const diceCount = baseDice + bonusDice;
-  // +1 to Dice Roll: Ranged — adds +1 to each die result (max 6) on Ranged Actions
-  const diceBonus = (isRangedWeapon && survivor.skills.includes('plus_1_to_dice_roll_ranged')) ? 1 : 0;
+  // +1 to Dice Roll: adds +1 to each die result (clamped to 6) on matching actions.
+  const rangedDiceBonus = isRangedWeapon && survivor.skills.includes('plus_1_to_dice_roll_ranged');
+  const meleeDiceBonus = isMelee && survivor.skills.includes('plus_1_to_dice_roll_melee');
+  const combatDiceBonus = survivor.skills.includes('plus_1_to_dice_roll_combat');
+  const diceBonus = (rangedDiceBonus || meleeDiceBonus || combatDiceBonus) ? 1 : 0;
 
   // Capture pre-attack entity state if this survivor could Lucky-reroll the result.
   const luckyAvailable = survivor.skills.includes('lucky') && !survivor.luckyUsedThisTurn;
@@ -296,8 +333,9 @@ export function handleAttack(state: GameState, intent: ActionRequest): GameState
   // Free target choice: melee always, plus Sniper / Point-Blank for ranged.
   const canChooseTargets = isMelee || hasSniper || isPointBlankShot;
 
-  if (canChooseTargets && intent.payload?.targetZombieIds?.length > 0) {
-    const targetIds: string[] = intent.payload!.targetZombieIds;
+  const targetIds: string[] = intent.payload?.targetZombieIds || [];
+
+  if (canChooseTargets && targetIds.length > 0) {
     const orderedZombies: Zombie[] = [];
     for (const tid of targetIds) {
       const z = zombiesInZone.find(zz => zz.id === tid);
@@ -307,6 +345,30 @@ export function handleAttack(state: GameState, intent: ActionRequest): GameState
       if (!orderedZombies.includes(z)) orderedZombies.push(z);
     }
     zombiesInZone = orderedZombies;
+  } else if (targetIds.length > 0) {
+    // Ranged without Sniper/Point-Blank: player may still pick among equal-priority
+    // targets (e.g. Brute vs. Abomination). Reorder only within each priority tier.
+    const buckets = new Map<number, Zombie[]>();
+    for (const z of zombiesInZone) {
+      const p = priorityMap[z.type];
+      if (!buckets.has(p)) buckets.set(p, []);
+      buckets.get(p)!.push(z);
+    }
+    const sortedPriorities = [...buckets.keys()].sort((a, b) => a - b);
+    const reordered: Zombie[] = [];
+    for (const p of sortedPriorities) {
+      const bucket = buckets.get(p)!;
+      const picked: Zombie[] = [];
+      for (const tid of targetIds) {
+        const z = bucket.find(zz => zz.id === tid);
+        if (z && !picked.includes(z)) picked.push(z);
+      }
+      for (const z of bucket) {
+        if (!picked.includes(z)) picked.push(z);
+      }
+      reordered.push(...picked);
+    }
+    zombiesInZone = reordered;
   }
 
   let hits = totalHits;
@@ -314,9 +376,10 @@ export function handleAttack(state: GameState, intent: ActionRequest): GameState
 
   // Friendly fire: per rules, MISSES wound survivors in the target zone.
   // Hits go to zombies. Only applies to ranged attacks with friendlies present.
-  // Melee (range 0) is never subject to friendly fire.
-  const isRanged = stats.range[1] >= 1;
-  const friendliesInZone = isRanged && newState.config.friendlyFire && !isPointBlankShot
+  // Melee (range 0) is never subject to friendly fire. Hybrid weapons (Gunblade)
+  // also skip FF when resolving as melee at distance 0 — use `isRangedWeapon`
+  // rather than raw weapon range.
+  const friendliesInZone = isRangedWeapon && newState.config.friendlyFire && !isPointBlankShot
       ? (Object.values(newState.survivors) as Survivor[]).filter(
             s => s.position.zoneId === targetZoneId && s.id !== survivor.id && s.wounds < s.maxHealth
         )
@@ -332,35 +395,26 @@ export function handleAttack(state: GameState, intent: ActionRequest): GameState
     ? ffAfterLowProfile.filter(f => !protectedIds.includes(f.id))
     : ffAfterLowProfile;
 
-  // Misses wound friendly survivors (each miss = weapon damage in wounds)
-  if (ffTargets.length > 0 && !hasSniper) {
-      let missesToApply = totalMisses;
-      const effectiveDamageFF = stats.damage + bonusDamage;
-      for (const friendly of ffTargets) {
-          if (missesToApply <= 0) break;
-          // Tough skill: absorb first FF wound independently from zombie attacks
-          if (friendly.skills?.includes('tough') && !friendly.toughUsedFriendlyFire) {
-              friendly.toughUsedFriendlyFire = true;
-              missesToApply--;
-              continue; // Wound absorbed
-          }
-          // "Is That All You've Got?" — defer wounds to player choice
-          if (friendly.skills?.includes('is_that_all_youve_got') && friendly.inventory.length > 0) {
-              friendly.pendingWounds = (friendly.pendingWounds || 0) + effectiveDamageFF;
-              missesToApply--;
-              continue;
-          }
-          friendly.wounds += effectiveDamageFF;
-          missesToApply--;
-          if (friendly.wounds >= friendly.maxHealth) {
-              handleSurvivorDeath(newState, friendly.id);
-          }
-      }
+  // Friendly fire (RULEBOOK §10): player assigns misses in any way they want.
+  //   - 0 eligible targets or 0 misses: nothing to do
+  //   - 1 eligible target: apply directly (no choice)
+  //   - 2+ eligible targets: stash pendingFriendlyFire for player assignment
+  if (ffTargets.length > 0 && totalMisses > 0 && !hasSniper) {
+    const damagePerMiss = stats.damage + bonusDamage;
+    if (ffTargets.length === 1) {
+      applyFriendlyFireMiss(newState, ffTargets[0].id, damagePerMiss, totalMisses);
+    } else {
+      newState.pendingFriendlyFire = {
+        shooterId: survivor.id,
+        targetZoneId,
+        missCount: totalMisses,
+        damagePerMiss,
+        eligibleSurvivorIds: ffTargets.map(f => f.id),
+      };
+    }
   }
 
   // Hits go to zombies in targeting priority order
-  let reaperUsed = false; // Reaper: max 1 bonus kill per Action
-  let firstKilledType: ZombieType | null = null;
   for (const zombie of zombiesInZone) {
       if (hits <= 0) break;
 
@@ -384,36 +438,9 @@ export function handleAttack(state: GameState, intent: ActionRequest): GameState
                   }
               });
           }
-
-          // Track first kill type for Reaper
-          if (!firstKilledType) firstKilledType = zombie.type;
       } else {
           hits--;
       }
-  }
-
-  // Reaper: auto-kill 1 additional identical zombie (once per Action, not per hit)
-  const hasReaperCombat = survivor.skills.includes('reaper_combat');
-  const hasReaperMelee = survivor.skills.includes('reaper_melee');
-  if (!reaperUsed && firstKilledType && (hasReaperCombat || (hasReaperMelee && isMelee))) {
-    const sameTypeZombie = Object.values(newState.zombies).find(
-      (z: any) => z.position.zoneId === targetZoneId && z.type === firstKilledType
-    ) as Zombie | undefined;
-    if (sameTypeZombie) {
-      delete newState.zombies[sameTypeZombie.id];
-      xpGained += getZombieXP(sameTypeZombie.type);
-      reaperUsed = true;
-      if (newState.objectives) {
-        newState.objectives.forEach((obj: Objective) => {
-          if (obj.type === ObjectiveType.KillZombie && !obj.completed) {
-            if (!obj.targetId || obj.targetId === sameTypeZombie.type) {
-              obj.amountCurrent += 1;
-              if (obj.amountCurrent >= obj.amountRequired) obj.completed = true;
-            }
-          }
-        });
-      }
-    }
   }
 
   if (xpGained > 0) {
@@ -426,14 +453,13 @@ export function handleAttack(state: GameState, intent: ActionRequest): GameState
       (z: any) => z.position.zoneId === targetZoneId
     );
     if (remainingZombies.length === 0 && zombiesInZone.length > 0) {
-      // Zone was cleared — draw 1 equipment card (not a search action)
+      // Zone was cleared — draw 1 equipment card (not a search action).
+      // Route through picker so the player decides keep/equip/discard.
       const drawResult = DeckService.drawCard(newState);
       if (drawResult.card) {
-        if (!EquipmentManager.isHandFull(survivor) && EquipmentManager.hasSpace(survivor)) {
-          newState.survivors[intent.survivorId!] = EquipmentManager.addCard(survivor, drawResult.card);
-        } else {
-          survivor.drawnCard = drawResult.card;
-        }
+        const s = newState.survivors[intent.survivorId!];
+        if (!s.drawnCard) s.drawnCard = drawResult.card;
+        else (s.drawnCardsQueue ||= []).push(drawResult.card);
       }
       newState.equipmentDeck = drawResult.newState.equipmentDeck;
       newState.equipmentDiscard = drawResult.newState.equipmentDiscard;
@@ -450,6 +476,17 @@ export function handleAttack(state: GameState, intent: ActionRequest): GameState
       const zone = newState.zones[survivor.position.zoneId];
       zone.noiseTokens = (zone.noiseTokens || 0) + 1;
       newState.noiseTokens = (newState.noiseTokens || 0) + 1;
+  }
+
+  // Reload weapons expend their shot — must be reloaded before firing again.
+  // Dual-wield fires both copies, so flip both hand ids (B4).
+  if (weapon.keywords?.includes('reload')) {
+    const inv = newState.survivors[intent.survivorId!].inventory;
+    const idsToFlip = isDualWielding ? dualWieldIds : [weapon.id];
+    for (const id of idsToFlip) {
+      const inst = inv.find(c => c.id === id);
+      if (inst) inst.reloaded = false;
+    }
   }
 
   return newState;
@@ -565,6 +602,68 @@ export function handleDistributeZombieWounds(state: GameState, intent: ActionReq
   return newState;
 }
 
+export function handleReload(state: GameState, intent: ActionRequest): GameState {
+  const newState = structuredClone(state);
+  const survivor = newState.survivors[intent.survivorId!];
+  const weaponId = intent.payload?.weaponId;
+
+  const candidates = survivor.inventory.filter(
+    (c: EquipmentCard) => c.inHand && c.keywords?.includes('reload') && c.reloaded === false,
+  );
+  if (candidates.length === 0) throw new Error('No reloadable weapon to reload');
+
+  const toReload = weaponId
+    ? candidates.filter((c: EquipmentCard) => c.id === weaponId)
+    : candidates;
+  if (toReload.length === 0) throw new Error('Weapon is not reloadable or already loaded');
+
+  for (const w of toReload) w.reloaded = true;
+
+  newState.lastAction = {
+    type: ActionType.RELOAD,
+    playerId: intent.playerId,
+    survivorId: intent.survivorId,
+    timestamp: Date.now(),
+    description: `Reloaded ${toReload.map(w => w.name).join(', ')}`,
+  };
+
+  return newState;
+}
+
+export function handleAssignFriendlyFire(state: GameState, intent: ActionRequest): GameState {
+  const pending = state.pendingFriendlyFire;
+  if (!pending) throw new Error('No pending friendly fire to assign');
+
+  // Strict auth: the caller must own the shooter survivor.
+  const shooter = state.survivors[pending.shooterId];
+  if (!shooter) throw new Error('Shooter not found');
+  if (intent.survivorId !== pending.shooterId) {
+    throw new Error('Only the shooter can assign friendly fire');
+  }
+  if (intent.playerId !== shooter.playerId) {
+    throw new Error('Only the shooter\'s player can assign friendly fire');
+  }
+
+  const assignments: Record<string, number> = intent.payload?.assignments || {};
+  const totalAssigned = Object.values(assignments).reduce((sum, n) => sum + n, 0);
+  if (totalAssigned !== pending.missCount) {
+    throw new Error(`Must assign exactly ${pending.missCount} misses (got ${totalAssigned})`);
+  }
+  for (const [sid, count] of Object.entries(assignments)) {
+    if (!pending.eligibleSurvivorIds.includes(sid)) {
+      throw new Error(`Survivor ${sid} is not an eligible friendly-fire target`);
+    }
+    if (count < 0) throw new Error('Cannot assign negative misses');
+  }
+
+  const newState = structuredClone(state);
+  for (const [sid, count] of Object.entries(assignments)) {
+    if (count > 0) applyFriendlyFireMiss(newState, sid, pending.damagePerMiss, count);
+  }
+  delete newState.pendingFriendlyFire;
+  return newState;
+}
+
 /**
  * Player-initiated Lucky reroll. Rule-faithful: the reroll result is binding,
  * even if worse than the first attempt.
@@ -598,6 +697,9 @@ export function handleRerollLucky(state: GameState, intent: ActionRequest): Game
   restored.equipmentDiscard = structuredClone(snap.equipmentDiscard);
   restored.objectives = structuredClone(snap.objectives);
   restored.noiseTokens = snap.noiseTokens;
+  // Clear any pending friendly-fire from the original attack — the reroll will
+  // recompute misses and re-stash if still applicable.
+  delete restored.pendingFriendlyFire;
   for (const [zid, n] of Object.entries(snap.zoneNoise)) {
     if (restored.zones[zid]) restored.zones[zid].noiseTokens = n;
   }
@@ -621,8 +723,12 @@ export function handleRerollLucky(state: GameState, intent: ActionRequest): Game
   // Without this, Lucky would refund the AP the original attack spent.
   const extraCost = reran._extraAPCost || 0;
   delete reran._extraAPCost;
+  const pref = snap.attackPayload?.preferredFreePool as
+    | 'combat' | 'melee' | 'ranged' | 'move' | 'search' | undefined;
+  reran = deductAPWithFreeCheck(reran, intent.survivorId!, ActionType.ATTACK, extraCost, pref);
+  // Must strip _attackIsMelee AFTER deductAPWithFreeCheck so tryMelee/tryRanged
+  // (handlerUtils) can key on it when resolving the free-pool choice (B2).
   delete (reran as { _attackIsMelee?: boolean })._attackIsMelee;
-  reran = deductAPWithFreeCheck(reran, intent.survivorId!, ActionType.ATTACK, extraCost);
 
   // 5. Annotate the new lastAction with reroll provenance
   if (reran.lastAction && reran.lastAction.type === ActionType.ATTACK) {

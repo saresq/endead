@@ -40,6 +40,10 @@ export interface WeaponStats {
   dualWield: boolean;
   ammo?: 'bullets' | 'shells'; // Drives Plenty of Bullets / Plenty of Shells re-rolls
   special?: 'molotov'; // Special weapon handler flag
+  /** Melee/Ranged hybrid weapon (e.g. Gunblade). At range 0 it resolves as
+   *  melee (no Friendly Fire, melee bonuses apply); at range >0 it resolves
+   *  as ranged. */
+  hybrid?: boolean;
 }
 
 export interface EquipmentCard {
@@ -52,6 +56,9 @@ export interface EquipmentCard {
   canOpenDoor?: boolean;
   openDoorNoise?: boolean;
   keywords?: string[]; // e.g. ['sniper'], ['reload']
+  /** For weapons with keyword 'reload': false after firing, must be reloaded
+   *  before firing again. Initialized to true when the card enters play. */
+  reloaded?: boolean;
 }
 
 export enum ZombieType {
@@ -114,6 +121,10 @@ export interface Survivor extends Entity {
   hasMoved: boolean;
   hasSearched: boolean;
   drawnCard?: EquipmentCard; // Temporary holding slot for Search/Draw
+  /** Queue of additional drawn cards awaiting keep/discard resolution (e.g.
+   *  Search +1, Flashlight, Matching Set). Popped into `drawnCard` as each
+   *  one is resolved. */
+  drawnCardsQueue?: EquipmentCard[];
 
   // Free action tracking (reset each turn in endRound)
   freeMovesRemaining: number;
@@ -165,9 +176,22 @@ export interface Zone {
   hasNoise: boolean;
   noiseTokens: number;
   spawnPoint?: boolean;
+  /** Spawn zone color (RULEBOOK §9). Red = always active; Blue/Green activate
+   *  on taking the matching-color Objective. Omitted = Red. */
+  spawnColor?: 'red' | 'blue' | 'green';
+  /** Whether a Blue/Green spawn zone has been activated. Red zones ignore this. */
+  activated?: boolean;
+  /** Set when a matching objective is taken; flipped to `activated` at the next
+   *  Zombie Phase. */
+  activateNextPhase?: boolean;
   exitPoint?: boolean;
   isExit?: boolean;
   hasObjective?: boolean;
+  /** Objective color, mirrors spawn colors. Omitted = Red. */
+  objectiveColor?: 'red' | 'blue' | 'green';
+  /** Marks an Epic Weapon Crate objective. Taking grants a random Epic weapon
+   *  plus a free inventory reorganize (RULEBOOK §9, Mission Elements). */
+  isEpicCrate?: boolean;
   searchable: boolean;
   isDark: boolean;
   hasBeenSpawned: boolean;
@@ -303,6 +327,9 @@ export interface GameState {
   equipmentDiscard: EquipmentCard[];
   spawnDeck: SpawnCard[];
   spawnDiscard: SpawnCard[];
+  /** Epic Weapons deck (red-back). Drawn from only when a Survivor takes an
+   *  Epic Weapon Crate objective. */
+  epicDeck?: EquipmentCard[];
   
   // Global State
   noiseTokens: number; // Total noise on board (if limited) or just logic handling
@@ -390,6 +417,17 @@ export interface GameState {
     totalWounds: number;
     survivorIds: string[];
   }>;
+
+  // Pending friendly-fire distribution from the last ranged attack.
+  // Shooter must assign misses among eligible (non-Low-Profile, non-Steady-Hand-protected)
+  // friendlies in the target zone before taking any other action.
+  pendingFriendlyFire?: {
+    shooterId: string;
+    targetZoneId: string;
+    missCount: number;
+    damagePerMiss: number;
+    eligibleSurvivorIds: string[];
+  };
 
   // Monotonic counter for unique zombie IDs
   nextZombieId: number;

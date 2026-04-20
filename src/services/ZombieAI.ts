@@ -1,5 +1,6 @@
 
 import { GameState, Zombie, Zone, ZoneId, Survivor, Position } from '../types/GameState';
+import { hasLineOfSight as hasLineOfSightUtil } from './handlers/handlerUtils';
 
 // Direction vectors for grid movement logic
 const DIRECTIONS = [
@@ -171,90 +172,8 @@ export class ZombieAI {
     return null;
   }
 
-  /**
-   * Get all grid cells for a zone. Uses zoneGeometry if available,
-   * otherwise falls back to parsing z_x_y format.
-   */
-  /**
-   * Get all grid cells for a zone from zoneGeometry.
-   */
-  private static getZoneCells(state: GameState, zoneId: string): { col: number; row: number }[] {
-    if (state.zoneGeometry?.zoneCells[zoneId]) {
-      return state.zoneGeometry.zoneCells[zoneId].map(c => ({ col: c.x, row: c.y }));
-    }
-    return [];
-  }
-
-  /**
-   * Checks Line of Sight between two zones.
-   * LOS requires that at least one cell pair (one from each zone)
-   * shares the same row or column with an unobstructed path between them.
-   */
   private static hasLineOfSight(state: GameState, zoneAId: string, zoneBId: string): boolean {
-    if (zoneAId === zoneBId) return true;
-
-    const cellsA = this.getZoneCells(state, zoneAId);
-    const cellsB = this.getZoneCells(state, zoneBId);
-
-    if (cellsA.length === 0 || cellsB.length === 0) return false;
-
-    // Check all cell pairs for orthogonal alignment
-    for (const a of cellsA) {
-      for (const b of cellsB) {
-        const sameRow = a.row === b.row;
-        const sameCol = a.col === b.col;
-        if (!sameRow && !sameCol) continue;
-
-        // Found an aligned pair — check if the path between them is clear
-        if (this.checkRaycast(state, zoneAId, zoneBId, sameRow ? 'row' : 'col', sameRow ? a.row : a.col)) {
-          return true;
-        }
-      }
-    }
-
-    return false;
-  }
-
-  /**
-   * BFS raycast along a single axis (row or col) from start zone to end zone.
-   * Only follows connections that stay on the given axis line.
-   */
-  private static checkRaycast(
-    state: GameState,
-    startId: string,
-    endId: string,
-    axis: 'row' | 'col',
-    axisValue: number,
-  ): boolean {
-    const queue = [startId];
-    const visited = new Set<string>();
-    visited.add(startId);
-
-    while (queue.length > 0) {
-      const currentId = queue.shift()!;
-      if (currentId === endId) return true;
-
-      const currentZone = state.zones[currentId];
-      for (const connEntry of currentZone.connections) {
-        const neighborId = connEntry.toZoneId;
-        if (visited.has(neighborId)) continue;
-
-        // Check if the neighbor zone has any cell on the same axis line
-        const neighborCells = this.getZoneCells(state, neighborId);
-        const onAxis = neighborCells.some(c =>
-          axis === 'row' ? c.row === axisValue : c.col === axisValue
-        );
-        if (!onAxis) continue;
-
-        // Closed doors block LOS
-        const conn = connEntry;
-        if (conn && conn.hasDoor && !conn.doorOpen) continue;
-
-        visited.add(neighborId);
-        queue.push(neighborId);
-      }
-    }
-    return false;
+    return hasLineOfSightUtil(state, zoneAId, zoneBId);
   }
 
   /**

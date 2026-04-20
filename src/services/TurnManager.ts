@@ -15,6 +15,17 @@ export function validateTurn(state: GameState, request: ActionRequest): ActionEr
     };
   }
 
+  // 1b. If a friendly-fire assignment is pending, only allow ASSIGN_FRIENDLY_FIRE
+  //     or REROLL_LUCKY (Lucky re-derives the attack, including miss count).
+  if (state.pendingFriendlyFire
+      && request.type !== 'ASSIGN_FRIENDLY_FIRE'
+      && request.type !== 'REROLL_LUCKY') {
+    return {
+      code: 'PENDING_FRIENDLY_FIRE',
+      message: 'Assign friendly-fire misses before taking another action.',
+    };
+  }
+
   // 2. Check Active Player (Turn Lock)
   const activePlayerId = state.players[state.activePlayerIndex];
   
@@ -120,7 +131,9 @@ export function checkEndTurn(state: GameState): GameState {
 
   // CRITICAL: Do NOT auto-pass if ANY survivor has a pending drawn card 
   // or if a Trade is active.
-  const anyDrawnCard = Object.values(newState.survivors).some(s => s.drawnCard);
+  const anyDrawnCard = Object.values(newState.survivors).some(
+    s => s.drawnCard || (s.drawnCardsQueue && s.drawnCardsQueue.length > 0),
+  );
   
   if (anyDrawnCard || newState.activeTrade) {
       return newState;
