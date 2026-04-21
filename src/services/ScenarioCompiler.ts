@@ -36,6 +36,25 @@ export interface CompiledScenario {
 
 // --- Utilities ---
 
+/**
+ * Rejects maps whose compiled zoneGeometry is incomplete. Every zone must
+ * have at least one cell — LOS, ranged attack targeting and spawn placement
+ * all require cell coordinates, and a silent fallback would hide broken maps.
+ */
+export function assertZoneGeometryComplete(
+  zones: Record<ZoneId, Zone>,
+  zoneCells: Record<ZoneId, { x: number; y: number }[]>,
+): void {
+  for (const zoneId of Object.keys(zones)) {
+    const cells = zoneCells[zoneId];
+    if (!cells || cells.length === 0) {
+      throw new Error(
+        `ScenarioCompiler: zone "${zoneId}" has no cells in zoneGeometry. Every zone must have at least one cell; check the map's tile layout.`,
+      );
+    }
+  }
+}
+
 function edgeKey(x1: number, y1: number, x2: number, y2: number): string {
   const a = `${x1},${y1}`;
   const b = `${x2},${y2}`;
@@ -371,7 +390,10 @@ export function compileScenario(map: ScenarioMap): CompiledScenario {
       hasBeenSpawned: false,
       spawnPoint: allMarkers.some(m => m.type === MarkerType.ZombieSpawn),
       isExit: allMarkers.some(m => m.type === MarkerType.Exit),
-      hasObjective: allMarkers.some(m => m.type === MarkerType.Objective),
+      hasObjective: allMarkers.some(
+        m => m.type === MarkerType.Objective || m.type === MarkerType.EpicCrate,
+      ),
+      isEpicCrate: allMarkers.some(m => m.type === MarkerType.EpicCrate) || undefined,
     };
   }
 
@@ -461,6 +483,7 @@ export function compileScenario(map: ScenarioMap): CompiledScenario {
         if (!exitZoneIds.includes(zid)) exitZoneIds.push(zid);
         break;
       case MarkerType.Objective:
+      case MarkerType.EpicCrate:
         if (!objectiveZoneIds.includes(zid)) objectiveZoneIds.push(zid);
         break;
     }
@@ -486,14 +509,18 @@ export function compileScenario(map: ScenarioMap): CompiledScenario {
     });
   }
 
-  if (objectiveZoneIds.length > 0) {
+  // One TakeObjective per token zone, so XP awards stay tied to the specific
+  // token that was taken rather than the first-unmatched entry in the list.
+  for (const zid of objectiveZoneIds) {
     objectives.push({
-      id: 'obj-take-objectives',
+      id: `obj-take-${zid}`,
       type: ObjectiveType.TakeObjective,
-      description: `Collect all objective tokens (${objectiveZoneIds.length})`,
-      amountRequired: objectiveZoneIds.length,
+      description: `Take the objective in ${zid}`,
+      zoneId: zid,
+      amountRequired: 1,
       amountCurrent: 0,
       completed: false,
+      xpValue: 5,
     });
   }
 
@@ -519,6 +546,10 @@ export function compileScenario(map: ScenarioMap): CompiledScenario {
   for (const [ck, info] of cellInfoMap) {
     cellTypeRecord[ck] = info.type;
   }
+
+  // Fail-fast: every zone must have non-empty cells. LOS and spawn placement
+  // require zoneGeometry; silent fallbacks would mask broken maps. See B3.
+  assertZoneGeometryComplete(zones, zoneCellsRecord);
 
   return {
     zones,

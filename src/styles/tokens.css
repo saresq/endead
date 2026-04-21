@@ -98,8 +98,6 @@
   --zombie-brute-muted: rgba(88, 32, 112, 0.2);
   --zombie-abom: #781010;
   --zombie-abom-muted: rgba(120, 16, 16, 0.22);
-  --zombie-necromancer: #204860;
-  --zombie-necromancer-muted: rgba(32, 72, 96, 0.22);
 
   /* ---------- Typography ---------- */
   --font-display: 'Barlow Condensed', 'Oswald', 'Impact', 'Arial Narrow', sans-serif;

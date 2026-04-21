@@ -34,9 +34,11 @@ export interface AttackOptions {
 
 /** Minimum accuracy per Zombicide 2E — auto-hits on any face are never allowed. */
 const MIN_THRESHOLD = 2;
+/** Upper clamp preserves "a natural 6 always hits" even if weapon data ships > 6. */
+const MAX_THRESHOLD = 6;
 
 function clampThreshold(raw: number): number {
-  return Math.max(MIN_THRESHOLD, raw);
+  return Math.min(MAX_THRESHOLD, Math.max(MIN_THRESHOLD, raw));
 }
 
 function countHits(rolls: number[], threshold: number): number {

@@ -5,8 +5,7 @@ import { networkManager } from '../NetworkManager';
 import { getPlayerIdentity } from '../config/PlayerIdentities';
 import { CHARACTER_DEFINITIONS } from '../../config/CharacterRegistry';
 import { SURVIVOR_CLASSES, SKILL_DEFINITIONS } from '../../config/SkillRegistry';
-import { EQUIPMENT_CARDS } from '../../config/EquipmentRegistry';
-import { renderItemCard } from './components/ItemCard';
+import { EQUIPMENT_CARDS, STARTER_DECK_POOL } from '../../config/EquipmentRegistry';
 import { renderAvatar } from './components/PlayerAvatar';
 import { renderButton } from './components/Button';
 import { icon } from './components/icons';
@@ -157,6 +156,13 @@ export class LobbyUI {
           ${myPlayer.characterClass ? this.renderCharacterPanel(myPlayer.characterClass) : ''}
         </div>
 
+        <div>
+          <div class="lobby__class-title">Claim Starter Card</div>
+          <div class="lobby__class-grid" role="radiogroup" aria-label="Starter card selection">
+            ${this.renderStarterGrid(myPlayer.starterEquipmentKey)}
+          </div>
+        </div>
+
         ${isHost ? this.renderHostControls() : '<div class="lobby__waiting">Waiting for host to start...</div>'}
       </div>
     ` : '';
@@ -250,6 +256,30 @@ export class LobbyUI {
       </button>`;
   }
 
+  private renderStarterGrid(myStarter: string): string {
+    const players = this.state?.lobby.players ?? [];
+    return Object.entries(STARTER_DECK_POOL).map(([key, poolQty]) => {
+      const template = EQUIPMENT_CARDS[key];
+      if (!template) return '';
+      const takenByOthers = players.filter(p => p.starterEquipmentKey === key && p.id !== this.localPlayerId).length;
+      const remaining = poolQty - takenByOthers;
+      const isSelected = myStarter === key;
+      const isSoldOut = !isSelected && remaining <= 0;
+
+      let btnClass = 'lobby__class-btn';
+      if (isSelected) btnClass += ' lobby__class-btn--selected';
+      if (isSoldOut) btnClass += ' lobby__class-btn--taken';
+
+      const qtyLabel = `<span class="lobby__class-taken-label">${remaining}/${poolQty}</span>`;
+
+      return `
+        <button class="${btnClass}" data-action="pick-starter" data-id="${key}" ${isSoldOut ? 'disabled' : ''} role="radio" aria-checked="${isSelected}" aria-label="${template.name} (${remaining} of ${poolQty} left)">
+          ${template.name}
+          ${qtyLabel}
+        </button>`;
+    }).join('');
+  }
+
   private renderHostControls(): string {
     const mapOptions = this.availableMaps.length > 0
       ? this.availableMaps.map(m =>
@@ -259,7 +289,7 @@ export class LobbyUI {
 
     const players = this.state?.lobby.players ?? [];
     const playerCount = players.length;
-    const allPicked = playerCount > 0 && players.every(p => !!p.characterClass);
+    const allPicked = playerCount > 0 && players.every(p => !!p.characterClass && !!p.starterEquipmentKey);
 
     return `
       <div class="form-group">
@@ -295,25 +325,6 @@ export class LobbyUI {
     const progression = SURVIVOR_CLASSES[charClass];
     if (!charDef || !progression) return '';
 
-    const weaponTemplate = EQUIPMENT_CARDS[charDef.startingEquipmentKey];
-    const weaponCard = weaponTemplate ? {
-      id: 'preview',
-      ...weaponTemplate,
-      inHand: true,
-      slot: 'HAND_1' as const,
-    } : null;
-
-    const doorNote = weaponCard?.canOpenDoor
-      ? '<div class="char-panel__door-note char-panel__door-note--yes">Can open doors</div>'
-      : '<div class="char-panel__door-note char-panel__door-note--no">Cannot open doors</div>';
-
-    const weaponHtml = `
-      <div class="char-panel__section">
-        <div class="char-panel__section-title">Starting Weapon</div>
-        ${renderItemCard(weaponCard, { variant: 'default', showSlot: false })}
-        ${doorNote}
-      </div>`;
-
     const dangerLevels: { level: DangerLevel; color: string; title: string; choiceNote: string }[] = [
       { level: DangerLevel.Blue, color: '#4a9eff', title: 'Blue', choiceNote: '' },
       { level: DangerLevel.Yellow, color: '#ffe119', title: 'Yellow', choiceNote: '' },
@@ -339,7 +350,6 @@ export class LobbyUI {
     return `
       <div class="char-panel" style="border-left-color:${charDef.color}">
         <div class="char-panel__header">${charClass}</div>
-        ${weaponHtml}
         <div class="char-panel__section">
           <div class="char-panel__section-title">Skill Tree</div>
           <div class="char-panel__skills">${skillsHtml}</div>
@@ -384,6 +394,18 @@ export class LobbyUI {
             playerId: this.localPlayerId,
             type: ActionType.SELECT_CHARACTER,
             payload: { characterClass: charClass, name: nameInput?.value },
+          });
+        }
+        return;
+      }
+
+      if (action === 'pick-starter') {
+        const starterKey = actionEl.dataset.id;
+        if (starterKey) {
+          networkManager.sendAction({
+            playerId: this.localPlayerId,
+            type: ActionType.PICK_STARTER,
+            payload: { starterEquipmentKey: starterKey },
           });
         }
         return;

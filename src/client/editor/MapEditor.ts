@@ -4,6 +4,7 @@
 import * as PIXI from 'pixi.js';
 import { TileService, tileService } from '../../services/TileService';
 import { TileInstance, ScenarioMap, MapMarker, MarkerType } from '../../types/Map';
+import { EPIC_DECK_SIZE } from '../../config/EquipmentRegistry';
 import { PixiBoardRenderer } from '../PixiBoardRenderer';
 import { GameState, initialGameState, Zone, ZoneConnection } from '../../types/GameState';
 import { TILE_SIZE, TILE_CELLS_PER_SIDE, TILE_PIXEL_SIZE } from '../../config/Layout';
@@ -98,6 +99,7 @@ enum EditorTool {
   ZombieSpawn = 'ZOMBIE_SPAWN',
   Exit = 'EXIT',
   Objective = 'OBJECTIVE',
+  EpicCrate = 'EPIC_CRATE',
   Eraser = 'ERASER',
 }
 
@@ -300,6 +302,7 @@ export class MapEditor {
       { tool: EditorTool.ZombieSpawn, label: 'Z. Spawn', key: '3' },
       { tool: EditorTool.Exit, label: 'Exit', key: '4' },
       { tool: EditorTool.Objective, label: 'Objective', key: '5' },
+      { tool: EditorTool.EpicCrate, label: 'Epic Crate', key: '6' },
       { tool: EditorTool.Eraser, label: 'Eraser', key: 'E' },
     ];
 
@@ -433,6 +436,7 @@ export class MapEditor {
       [EditorTool.ZombieSpawn]: 'Click STREET zone cells to place Zombie Spawn points.',
       [EditorTool.Exit]: 'Click STREET zone cells to place Exit points.',
       [EditorTool.Objective]: 'Click any zone cell to place Objective tokens.',
+      [EditorTool.EpicCrate]: `Click any zone cell to place Epic Crate objectives (max ${EPIC_DECK_SIZE}).`,
       [EditorTool.Eraser]: 'Click to remove markers from cells.',
     };
     this.statusText.innerText = hints[tool] || '';
@@ -543,7 +547,7 @@ export class MapEditor {
       // Number keys for tool switching
       const toolMap: Record<string, EditorTool> = {
         '1': EditorTool.Tile, '2': EditorTool.PlayerStart, '3': EditorTool.ZombieSpawn,
-        '4': EditorTool.Exit, '5': EditorTool.Objective, 'e': EditorTool.Eraser,
+        '4': EditorTool.Exit, '5': EditorTool.Objective, '6': EditorTool.EpicCrate, 'e': EditorTool.Eraser,
       };
       if (toolMap[key]) this.setTool(toolMap[key]);
     });
@@ -645,6 +649,9 @@ export class MapEditor {
         break;
       case EditorTool.Objective:
         this.handleMarkerPlacement(wx, wy, MarkerType.Objective, false);
+        break;
+      case EditorTool.EpicCrate:
+        this.handleMarkerPlacement(wx, wy, MarkerType.EpicCrate, false);
         break;
       case EditorTool.Eraser:
         this.handleErase(wx, wy);
@@ -1011,6 +1018,18 @@ export class MapEditor {
           g.circle(cx, cy, 5);
           g.fill({ color: EDITOR_THEME.marker.objective.dotColor });
           break;
+        case MarkerType.EpicCrate:
+          // Gold star-ish: square rotated 45° with filled center dot.
+          g.moveTo(cx, cy - 16);
+          g.lineTo(cx + 16, cy);
+          g.lineTo(cx, cy + 16);
+          g.lineTo(cx - 16, cy);
+          g.closePath();
+          g.fill({ color: 0xFFD000, alpha: 0.9 });
+          g.stroke({ width: 2, color: 0xB8860B });
+          g.circle(cx, cy, 5);
+          g.fill({ color: 0x7A4F00 });
+          break;
       }
     });
 
@@ -1097,6 +1116,11 @@ export class MapEditor {
 
     const hasExit = this.markers.some(m => m.type === MarkerType.Exit);
     if (!hasExit) warnings.push('Optional: No Exit point');
+
+    const epicCount = this.markers.filter(m => m.type === MarkerType.EpicCrate).length;
+    if (epicCount > EPIC_DECK_SIZE) {
+      warnings.push(`${epicCount} Epic Crates placed — max is ${EPIC_DECK_SIZE} (Epic deck size)`);
+    }
 
     this.markers.forEach(m => {
       if (!this.isZoneCellValid(m.x, m.y)) {
@@ -1242,6 +1266,15 @@ export class MapEditor {
 
     if (this.tiles.length === 0) {
       notificationManager.show({ variant: 'warning', message: 'Map is empty!' });
+      return;
+    }
+
+    const epicCount = this.markers.filter(m => m.type === MarkerType.EpicCrate).length;
+    if (epicCount > EPIC_DECK_SIZE) {
+      notificationManager.show({
+        variant: 'warning',
+        message: `Too many Epic Crates (${epicCount}) — max ${EPIC_DECK_SIZE} (Epic deck size)`,
+      });
       return;
     }
 

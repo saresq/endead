@@ -8,6 +8,7 @@ export enum ActionType {
   JOIN_LOBBY = 'JOIN_LOBBY',
   UPDATE_NICKNAME = 'UPDATE_NICKNAME',
   SELECT_CHARACTER = 'SELECT_CHARACTER',
+  PICK_STARTER = 'PICK_STARTER',
   START_GAME = 'START_GAME',
   END_GAME = 'END_GAME',
 
@@ -31,14 +32,12 @@ export enum ActionType {
   END_TURN = 'END_TURN',
   CHARGE = 'CHARGE',
   BORN_LEADER = 'BORN_LEADER',
-  BLOODLUST_MELEE = 'BLOODLUST_MELEE',
-  LIFESAVER = 'LIFESAVER',
-  RESOLVE_WOUNDS = 'RESOLVE_WOUNDS',
   DISTRIBUTE_ZOMBIE_WOUNDS = 'DISTRIBUTE_ZOMBIE_WOUNDS',
   KICK_PLAYER = 'KICK_PLAYER',
   REROLL_LUCKY = 'REROLL_LUCKY',
   ASSIGN_FRIENDLY_FIRE = 'ASSIGN_FRIENDLY_FIRE',
   RELOAD = 'RELOAD',
+  RESOLVE_ZOMBIE_SPLIT = 'RESOLVE_ZOMBIE_SPLIT',
 }
 
 // --- Action Payload Types ---
@@ -56,6 +55,10 @@ export interface SelectCharacterPayload {
   name?: string;
 }
 
+export interface PickStarterPayload {
+  starterEquipmentKey: string;
+}
+
 export interface StartGamePayload {
   map?: ScenarioMap;
 }
@@ -64,11 +67,16 @@ export interface MovePayload {
   targetZoneId: ZoneId;
 }
 
+/** Narrow free-pool preference for ATTACK payloads. Move/search pools aren't reachable from this branch. */
+export type AttackFreePool = 'combat' | 'melee' | 'ranged';
+
 export interface AttackPayload {
   targetZoneId: ZoneId;
   weaponId?: EntityId;
   /** Player-specified kill priority (melee: free choice per 2E rules; ranged: Sniper/Point-Blank). */
   targetZombieIds?: EntityId[];
+  /** Player-preferred free-action pool to consume for this attack, if any is available. */
+  preferredFreePool?: AttackFreePool;
 }
 
 export interface OpenDoorPayload {
@@ -110,10 +118,6 @@ export interface TradeAcceptPayload {
   receiveLayout?: Record<EntityId, string>;
 }
 
-export interface ResolveWoundsPayload {
-  discardCardIds: string[];  // Equipment card IDs to discard (each negates 1 wound)
-}
-
 export interface DistributeZombieWoundsPayload {
   zoneId: string;
   assignments: Record<string, number>;  // survivorId -> number of wounds assigned
@@ -127,6 +131,11 @@ export interface ReloadPayload {
   weaponId?: EntityId;  // Specific weapon to reload; omit to reload all reloadable weapons in hand
 }
 
+export interface ResolveZombieSplitPayload {
+  zombieId: EntityId;
+  toZoneId: ZoneId;
+}
+
 export interface KickPlayerPayload {
   targetPlayerId: string;
 }
@@ -136,6 +145,7 @@ export interface ActionPayloadMap {
   [ActionType.JOIN_LOBBY]: JoinLobbyPayload;
   [ActionType.UPDATE_NICKNAME]: UpdateNicknamePayload;
   [ActionType.SELECT_CHARACTER]: SelectCharacterPayload;
+  [ActionType.PICK_STARTER]: PickStarterPayload;
   [ActionType.START_GAME]: StartGamePayload;
   [ActionType.END_GAME]: undefined;
   [ActionType.MOVE]: MovePayload;
@@ -157,14 +167,12 @@ export interface ActionPayloadMap {
   [ActionType.END_TURN]: undefined;
   [ActionType.CHARGE]: undefined;
   [ActionType.BORN_LEADER]: undefined;
-  [ActionType.BLOODLUST_MELEE]: undefined;
-  [ActionType.LIFESAVER]: undefined;
-  [ActionType.RESOLVE_WOUNDS]: ResolveWoundsPayload;
   [ActionType.DISTRIBUTE_ZOMBIE_WOUNDS]: DistributeZombieWoundsPayload;
   [ActionType.KICK_PLAYER]: KickPlayerPayload;
   [ActionType.REROLL_LUCKY]: undefined;
   [ActionType.ASSIGN_FRIENDLY_FIRE]: AssignFriendlyFirePayload;
   [ActionType.RELOAD]: ReloadPayload;
+  [ActionType.RESOLVE_ZOMBIE_SPLIT]: ResolveZombieSplitPayload;
 }
 
 export type ActionPayload = ActionPayloadMap[ActionType];
@@ -192,6 +200,18 @@ export interface ActionError {
 
 export interface ActionResponse {
   success: boolean;
+  /** SwarmComms: same reference as the input `state` on success
+   *  (mutation-in-place per §3.4). */
   newState?: GameState;
+  /** Raw events emitted during dispatch (SwarmComms §3.10). Private events
+   *  appear in their full form — do NOT fan out directly to room sockets.
+   *  Use `taggedEvents` for broadcast routing (private events include
+   *  recipient tags). */
+  events?: import('./Events').GameEvent[];
+  /** Tagged events (SwarmComms §3.7 private channels). Each entry carries
+   *  the event plus its recipients — `'public'` or a list of survivor IDs.
+   *  The server-side `broadcastEvents` function inspects these to route
+   *  private events and auto-emit hidden variants. */
+  taggedEvents?: import('../services/EventCollector').CollectedEvent[];
   error?: ActionError;
 }

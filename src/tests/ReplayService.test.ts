@@ -1,18 +1,21 @@
 // src/tests/ReplayService.test.ts
+//
+// Legacy standalone script (CLAUDE.md: do not convert to vitest unless asked).
+// Updated for SwarmComms §3.5.1: replayGame now consumes ActionRequest[] instead
+// of the deleted GameState.history shape. The vitest equivalent lives at
+// src/services/__tests__/ReplayService.test.ts.
 
 import { initialGameState, type GameState } from '../types/GameState';
-import { ActionType } from '../types/Action';
+import { ActionType, type ActionRequest } from '../types/Action';
 import { replayGame, compareStates } from '../services/ReplayService';
 
-// Mock simple test case
-const mockHistory = [
+const mockActionLog: ActionRequest[] = [
   {
     playerId: 'player-1',
     survivorId: 'survivor-1',
-    actionType: ActionType.MOVE,
-    timestamp: 123456789,
-    payload: { targetZoneId: 'street-intersection' }
-  }
+    type: ActionType.MOVE,
+    payload: { targetZoneId: 'street-intersection' },
+  },
 ];
 
 // Test the replay logic
@@ -40,16 +43,13 @@ try {
       hasSearched: false
   };
 
-  const replayedState = replayGame(testStart, mockHistory);
-  
-  // 2. Expected final state (manually calculated or presumed from a live run)
-  // For this test, we assume the move happens correctly.
-  // Let's create a manual "expected" state to compare against.
+  const replayedState = replayGame(testStart, mockActionLog);
+
+  // 2. Expected final state — assume the move resolves cleanly.
   const expectedState = JSON.parse(JSON.stringify(testStart));
   expectedState.survivors['survivor-1'].position.zoneId = 'street-intersection';
   expectedState.survivors['survivor-1'].hasMoved = true;
   expectedState.survivors['survivor-1'].actionsRemaining = 2; // Default 3 - 1
-  expectedState.history = []; // Replay result won't have history in comparison
 
   // 3. Compare
   const comparison = compareStates(expectedState, replayedState);

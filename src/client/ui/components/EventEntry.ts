@@ -84,7 +84,6 @@ export interface SpawnCardData {
   detail: {
     zombies?: { [key in ZombieType]?: number };
     extraActivation?: ZombieType;
-    doubleSpawn?: boolean;
   };
 }
 
@@ -103,14 +102,10 @@ export function renderSpawnEntry(cards: SpawnCardData[]): string {
       ? `<span class="event-entry__extra">Extra: All ${c.detail.extraActivation} activate!</span>`
       : '';
 
-    const double = c.detail.doubleSpawn
-      ? '<span class="event-entry__double">DOUBLE SPAWN</span>'
-      : '';
-
     return `
       <div class="event-entry event-entry--spawn">
         <span class="event-entry__zone">Zone ${c.zoneId}</span>
-        ${double}${extra}
+        ${extra}
         <div class="event-entry__badges">${zombieBadges}</div>
       </div>`;
   }).join('');

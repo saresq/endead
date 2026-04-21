@@ -31,7 +31,6 @@
 .zombie-badge--runner   .zombie-badge__dot { background: var(--zombie-runner);       color: var(--zombie-runner); }
 .zombie-badge--brute    .zombie-badge__dot { background: var(--zombie-brute);        color: var(--zombie-brute); }
 .zombie-badge--abomination .zombie-badge__dot { background: var(--zombie-abom);      color: var(--zombie-abom); }
-.zombie-badge--necromancer .zombie-badge__dot { background: var(--zombie-necromancer); color: var(--zombie-necromancer); }
 
 .zombie-badge__label {
   font-size: var(--text-xs);
@@ -113,12 +112,6 @@
   background: var(--zombie-abom-muted);
   border-left-color: var(--zombie-abom);
   box-shadow: var(--shadow-cutout), -1px 0 8px rgba(136, 24, 24, 0.28);
-}
-
-.zombie-chip--necromancer {
-  background: var(--zombie-necromancer-muted);
-  border-left-color: var(--zombie-necromancer);
-  box-shadow: var(--shadow-cutout), -1px 0 8px rgba(42, 80, 104, 0.25);
 }
 
 .zombie-chip__icon {

@@ -9,7 +9,6 @@ import { AnimationController } from './client/AnimationController';
 import { GameHUD } from './client/ui/GameHUD';
 import { LobbyUI } from './client/ui/LobbyUI';
 import { MenuUI } from './client/ui/MenuUI';
-import { generateDiff } from './utils/StateDiff';
 import { GamePhase } from './types/GameState';
 import { MapEditor } from './client/editor/MapEditor';
 import { loadTileDefinitionsFromServer } from './config/TileDefinitions';
@@ -27,6 +26,7 @@ let pixiApp: PIXI.Application | null = null;
 let inputController: InputController | null = null;
 let keyboardManager: KeyboardManager | null = null;
 let unsubscribeStore: (() => void) | null = null;
+let unsubscribeEvents: (() => void) | null = null;
 let currentRoomId: string | null = null;
 let roomInitToken = 0;
 
@@ -108,6 +108,10 @@ function cleanupRoomUi(): void {
   if (unsubscribeStore) {
     unsubscribeStore();
     unsubscribeStore = null;
+  }
+  if (unsubscribeEvents) {
+    unsubscribeEvents();
+    unsubscribeEvents = null;
   }
 
   inputController = null;
@@ -251,26 +255,20 @@ async function startRoom(roomId: string): Promise<void> {
       if (!selected) inputController.selectMySurvivor(newState);
     }
 
-    if (prevState && prevState.phase !== GamePhase.Lobby) {
-      const diffs = generateDiff(prevState.zombies, newState.zombies);
-      for (const op of diffs) {
-        if (op.op === 'add' && op.path.length === 1) {
-          animationController.handleEvent({
-            type: 'SPAWN',
-            entityId: op.path[0] as string,
-          });
-          audioManager.playSFX('zombie_spawn');
-        } else if (op.op === 'remove' && op.path.length === 1) {
-          animationController.handleEvent({
-            type: 'DEATH',
-            entityId: op.path[0] as string,
-          });
-        }
-      }
-    }
-
     renderer.render(newState, inputController.getRenderOptions(newState));
     gameHud.update(newState, inputController.selection);
+  });
+
+  // Event-driven spawn/death animations (SwarmComms §3.9, D1). Replaces the
+  // generateDiff-on-zombies hack that previously walked two snapshots to
+  // infer additions/removals.
+  unsubscribeEvents = gameStore.subscribeEvents((event) => {
+    if (event.type === 'ZOMBIE_SPAWNED') {
+      animationController.handleEvent({ type: 'SPAWN', entityId: event.zombieId });
+      audioManager.playSFX('zombie_spawn');
+    } else if (event.type === 'ZOMBIE_KILLED') {
+      animationController.handleEvent({ type: 'DEATH', entityId: event.zombieId });
+    }
   });
 
   networkManager.onReconnecting = (attempt, maxAttempts) => {

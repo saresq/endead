@@ -62,91 +62,70 @@ export class EquipmentManager {
   }
 
   /**
-   * Discards a specific card from the survivor's inventory.
+   * Discards a specific card from the survivor's inventory. Mutates `state` in place.
    */
-  public static discardCard(state: GameState, survivorId: EntityId, cardId: EntityId): GameState {
-    const newState = structuredClone(state);
-    const survivor = newState.survivors[survivorId];
+  public static discardCard(state: GameState, survivorId: EntityId, cardId: EntityId): void {
+    const survivor = state.survivors[survivorId];
 
     const cardIndex = survivor.inventory.findIndex((c: EquipmentCard) => c.id === cardId);
     if (cardIndex === -1) {
       // Check if it's the pending drawn card
       if (survivor.drawnCard && survivor.drawnCard.id === cardId) {
-        newState.equipmentDiscard.push(survivor.drawnCard);
+        state.equipmentDiscard.push(survivor.drawnCard);
         survivor.drawnCard = undefined;
-        return newState;
+        return;
       }
       throw new Error('Card not found in inventory');
     }
 
     const [discarded] = survivor.inventory.splice(cardIndex, 1);
-    newState.equipmentDiscard.push(discarded);
-
-    return newState;
+    state.equipmentDiscard.push(discarded);
   }
 
   /**
-   * Swaps items between the `drawnCard` temporary slot and the inventory.
-   * effectively "Equip New, Discard Old".
+   * Swaps the pending `drawnCard` with an inventory card; old goes to discard.
+   * Mutates `state` in place. Validates first — throws before any mutation.
    */
-  public static swapDrawnCard(state: GameState, survivorId: EntityId, discardCardId: EntityId): GameState {
-    const newState = structuredClone(state);
-    const survivor = newState.survivors[survivorId];
+  public static swapDrawnCard(state: GameState, survivorId: EntityId, discardCardId: EntityId): void {
+    const survivor = state.survivors[survivorId];
 
     if (!survivor.drawnCard) throw new Error('No pending card to resolve');
-
-    // Remove the chosen card to discard
     const discardIndex = survivor.inventory.findIndex((c: EquipmentCard) => c.id === discardCardId);
     if (discardIndex === -1) throw new Error('Discard target not found');
 
     const [oldCard] = survivor.inventory.splice(discardIndex, 1);
 
-    // Add the new card (it takes the old card's slot ideally, or auto-slots)
     const newCard = survivor.drawnCard;
-    newCard.slot = oldCard.slot; // Inherit slot
+    newCard.slot = oldCard.slot;
     newCard.inHand = oldCard.inHand;
 
     survivor.inventory.push(newCard);
-
-    // Move old to discard pile
-    newState.equipmentDiscard.push(oldCard);
-
-    // Clear pending
+    state.equipmentDiscard.push(oldCard);
     survivor.drawnCard = undefined;
-
-    return newState;
   }
 
   /**
-   * Organizes inventory (moves card to a specific slot).
+   * Organizes inventory (moves card to a specific slot). Mutates `survivor`
+   * in place — the caller already holds a live reference into `state.survivors`.
    */
-  public static moveCardToSlot(survivor: Survivor, cardId: EntityId, targetSlot: string): Survivor {
-    const newSurvivor = { ...survivor }; // Shallow clone
-    // Deep clone inventory to mutate
-    newSurvivor.inventory = survivor.inventory.map(c => ({...c}));
-
-    const card = newSurvivor.inventory.find(c => c.id === cardId);
-
+  public static moveCardToSlot(survivor: Survivor, cardId: EntityId, targetSlot: string): void {
+    const card = survivor.inventory.find(c => c.id === cardId);
     if (!card) throw new Error('Card not found');
 
-    // Handle DISCARD slot
     if (targetSlot === 'DISCARD') {
-        card.slot = 'DISCARD';
-        card.inHand = false;
-        return newSurvivor;
+      card.slot = 'DISCARD';
+      card.inHand = false;
+      return;
     }
 
-    // If target slot is occupied by another item, swap
-    const occupant = newSurvivor.inventory.find(c => c.slot === targetSlot && c.id !== cardId);
+    const occupant = survivor.inventory.find(c => c.slot === targetSlot && c.id !== cardId);
     if (occupant) {
       occupant.slot = card.slot;
       occupant.inHand = (card.slot === 'HAND_1' || card.slot === 'HAND_2');
     }
 
-    card.slot = targetSlot as any;
+    card.slot = targetSlot as EquipmentCard['slot'];
     card.inHand = (targetSlot === 'HAND_1' || targetSlot === 'HAND_2');
-
-    return newSurvivor;
   }
 
   /**

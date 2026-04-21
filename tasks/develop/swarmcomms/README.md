@@ -9,14 +9,14 @@ Strategy: replace STATE_PATCH / full-clone broadcast pipeline with a stream of s
 Per analysis §8 (corrected via D16): preflight bugfixes → 1 → 2 → 3 → 4 (with 7) → 5 → 6. Steps 3+5 are one PR. Step 4 folds in Step 7 (private channels) and B12 (broadcast leaks).
 
 - [x] `00a-bugfixes-combat.md` — B2, B4, B5 (dual-wield reload, `_attackIsMelee` ordering, reloaded-on-discard)
-- [ ] `00b-bugfixes-phases.md` — B1, B7 (end-turn guard for `pendingFriendlyFire`; per-FF Tough flag reset)
-- [ ] `00c-bugfixes-map-and-spawn.md` — B3, B6, B9 (fail-fast missing `zoneCells`, `doubleSpawn` Rush routing, red-objective comment)
-- [ ] `00d-bugfixes-polish.md` — B8, B10, B11 (narrow `preferredFreePool`, optional `EquipmentCard.stats`, Reaper residuals)
-- [ ] `01-strip-persistence.md` — Step 1 (DB off hot path; quiescence scheduler)
-- [ ] `02-event-protocol-types.md` — Step 2 (types-only; no runtime usage yet)
-- [ ] `03-handlers-mutation-and-events.md` — Steps 3 + 5 (collector contract flip, validate-first rule, kill ~50 clones)
-- [ ] `04-broadcast-events-and-redaction.md` — Steps 4 + 7 + B12 (`projectForSocket`, EVENTS wire, private channels)
-- [ ] `05-optimistic-client.md` — Step 6 (Tier-1 whitelist only)
+- [x] `00b-bugfixes-phases.md` — B1, B7 (end-turn guard for `pendingFriendlyFire`; per-FF Tough flag reset)
+- [x] `00c-bugfixes-map-and-spawn.md` — B3, B6, B9 (fail-fast missing `zoneCells`, `doubleSpawn` Rush routing, red-objective comment)
+- [x] `00d-bugfixes-polish.md` — B8, B10, B11 (narrow `preferredFreePool`, optional `EquipmentCard.stats`, Reaper residuals)
+- [x] `01-strip-persistence.md` — Step 1 (DB off hot path; quiescence scheduler)
+- [x] `02-event-protocol-types.md` — Step 2 (types-only; no runtime usage yet)
+- [x] `03-handlers-mutation-and-events.md` — Steps 3 + 5 (collector contract flip, validate-first rule, kill ~50 clones)
+- [x] `04-broadcast-events-and-redaction.md` — Steps 4 + 7 + B12 (`projectForSocket`, EVENTS wire, private channels)
+- [x] `05-optimistic-client.md` — Step 6 (Tier-1 whitelist only)
 
 ## Review Protocol (applies to every task)
 
@@ -43,3 +43,11 @@ The reviewer's charter: default to "what could be broken?" NEVER rubber-stamp. T
 (Updated as tasks pass review.)
 
 - 2026-04-20 — `00a-bugfixes-combat.md` PASS (B2/B4/B5)
+- 2026-04-20 — `00b-bugfixes-phases.md` PASS (B1/B7)
+- 2026-04-20 — `00c-bugfixes-map-and-spawn.md` PASS (B3/B6/B9)
+- 2026-04-20 — `00d-bugfixes-polish.md` PASS (B8/B10/B11)
+- 2026-04-20 — `01-strip-persistence.md` PASS (Step 1 — DB off hot path; quiescence scheduler)
+- 2026-04-20 — `02-event-protocol-types.md` PASS (Step 2 — Events/Wire types + GameState.version)
+- 2026-04-20 — `03-handlers-mutation-and-events.md` PASS (Steps 3 + 5 — EventCollector + mutation-in-place + D18/D19 validate-first + history removal)
+- 2026-04-20 — `04-broadcast-events-and-redaction.md` PASS (Steps 4 + 7 + B12 — projectForSocket choke point, per-socket EVENTS routing, SNAPSHOT + log-tail resync, redaction matrix, B12 widened)
+- 2026-04-20 — `05-optimistic-client.md` PASS (Step 6 — Tier-1 whitelist optimism, path-targeted snapshot rollback, D10 skill-pending suppression, D20 snapshot-only). SwarmComms rollout complete.

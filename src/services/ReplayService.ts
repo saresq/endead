@@ -1,37 +1,29 @@
 // src/services/ReplayService.ts
 
 import { type GameState } from '../types/GameState';
-import { type ActionRequest, ActionType } from '../types/Action';
+import { type ActionRequest } from '../types/Action';
 import { processAction } from './ActionProcessor';
 
 /**
  * Replays a sequence of actions from an initial state to verify the final state.
- * 
+ *
+ * SwarmComms §3.5.1: input is now `ActionRequest[]` (`room.actionLog`) rather
+ * than the deleted `state.history`. The reconstruction block (history-entry →
+ * intent mapping, D8) collapses to a pass-through.
+ *
  * @param initialState The pristine starting state of the game (seed must match).
- * @param actionHistory The list of historical actions (log entries) to re-apply.
+ * @param actionLog The list of accepted intents to re-apply.
  * @returns The calculated final GameState.
  */
 export function replayGame(
-  initialState: GameState, 
-  actionHistory: GameState['history']
+  initialState: GameState,
+  actionLog: ActionRequest[],
 ): GameState {
-  // 1. Deep clone the initial state to ensure purity
-  let currentState: GameState = structuredClone(initialState);
-  
-  // Reset history on the replay instance so we don't duplicate the logs
-  // (ActionProcessor will generate new logs with new timestamps)
-  currentState.history = [];
+  // Deep clone via JSON round-trip so the replay never shares references
+  // with the input state. (No structuredClone — D21 acceptance grep.)
+  const currentState: GameState = JSON.parse(JSON.stringify(initialState));
 
-  // 2. Iterate and apply actions
-  for (const logEntry of actionHistory) {
-    // Map the history log format back to an ActionRequest
-    const intent: ActionRequest = {
-      playerId: logEntry.playerId,
-      survivorId: logEntry.survivorId,
-      type: logEntry.actionType as ActionType,
-      payload: logEntry.payload,
-    };
-
+  for (const intent of actionLog) {
     const result = processAction(currentState, intent);
 
     if (!result.success) {
@@ -43,10 +35,10 @@ export function replayGame(
     }
 
     if (!result.newState) {
-       throw new Error('Replay Error: Action succeeded but returned no state.');
+      throw new Error('Replay Error: Action succeeded but returned no state.');
     }
-
-    currentState = result.newState;
+    // Note: with mutation-in-place, result.newState === currentState. The
+    // reassignment is harmless and keeps the loop readable.
   }
 
   return currentState;
@@ -54,30 +46,28 @@ export function replayGame(
 
 /**
  * Deterministically compares two GameStates for equality.
- * 
- * NOTE: This function deliberately excludes the 'history' property from comparison.
- * Timestamps in the history log will naturally differ between the original run 
- * and the replay run. We strictly compare the resulting game board, entities, 
- * decks, and RNG seed.
- * 
- * @param stateA The original state
- * @param stateB The replayed state
- * @returns { boolean, diff?: string }
+ *
+ * SwarmComms D9 / D22 allowlist — fields that legitimately diverge between
+ * replay and live, stripped before comparison:
+ *   - `version` (Step 2; bumps once per accepted action; replay has identical
+ *     count by definition, but if the comparison runs at different points the
+ *     version differs harmlessly).
+ *   - `lastAction.timestamp`, `spawnContext.timestamp` — `Date.now()` capture.
+ *   - `_attackIsMelee`, `_extraAPCost` — lifted off `GameState` in Step 3
+ *     (no longer present), but stripped defensively in case stale snapshots
+ *     are compared.
+ *   - `history` — removed in Step 3; not on `GameState` anymore. Stripped
+ *     defensively.
  */
 export function compareStates(stateA: GameState, stateB: GameState): { equal: boolean; diff?: string } {
-  // 1. Strip history for comparison
-  const cleanA = removeHistory(stateA);
-  const cleanB = removeHistory(stateB);
+  const cleanA = stripVolatileFields(stateA);
+  const cleanB = stripVolatileFields(stateB);
 
-  // 2. Sort keys to ensure deterministic JSON stringification
   const jsonA = JSON.stringify(sortKeys(cleanA));
   const jsonB = JSON.stringify(sortKeys(cleanB));
 
-  if (jsonA === jsonB) {
-    return { equal: true };
-  }
+  if (jsonA === jsonB) return { equal: true };
 
-  // 3. If different, find a basic diff (first mismatch)
   return {
     equal: false,
     diff: findFirstDiff(cleanA, cleanB),
@@ -86,31 +76,34 @@ export function compareStates(stateA: GameState, stateB: GameState): { equal: bo
 
 // --- Helpers ---
 
-function removeHistory(state: GameState): Omit<GameState, 'history'> {
-  const { history, ...rest } = state;
-  return rest;
+function stripVolatileFields(state: GameState): unknown {
+  // Defensive copy via JSON round-trip — we mutate the result.
+  const out: Record<string, unknown> = JSON.parse(JSON.stringify(state));
+  delete out.version;
+  delete out.history;
+  delete out._attackIsMelee;
+  delete out._extraAPCost;
+  const last = out.lastAction as Record<string, unknown> | undefined;
+  if (last && typeof last === 'object') delete last.timestamp;
+  const ctx = out.spawnContext as Record<string, unknown> | undefined;
+  if (ctx && typeof ctx === 'object') delete ctx.timestamp;
+  return out;
 }
 
-function sortKeys(obj: any): any {
-  if (obj === null || typeof obj !== 'object') {
-    return obj;
-  }
-
-  if (Array.isArray(obj)) {
-    return obj.map(sortKeys);
-  }
-
-  return Object.keys(obj)
+function sortKeys(obj: unknown): unknown {
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(sortKeys);
+  return Object.keys(obj as Record<string, unknown>)
     .sort()
     .reduce((acc, key) => {
-      acc[key] = sortKeys(obj[key]);
+      acc[key] = sortKeys((obj as Record<string, unknown>)[key]);
       return acc;
-    }, {} as any);
+    }, {} as Record<string, unknown>);
 }
 
-function findFirstDiff(objA: any, objB: any, path = ''): string {
+function findFirstDiff(objA: unknown, objB: unknown, path = ''): string {
   if (objA === objB) return '';
-  
+
   if (typeof objA !== typeof objB) {
     return `Type mismatch at ${path}: ${typeof objA} vs ${typeof objB}`;
   }
@@ -119,11 +112,12 @@ function findFirstDiff(objA: any, objB: any, path = ''): string {
     return `Value mismatch at ${path}: ${objA} vs ${objB}`;
   }
 
-  const keysA = Object.keys(objA).sort();
-  const keysB = Object.keys(objB).sort();
+  const a = objA as Record<string, unknown>;
+  const b = objB as Record<string, unknown>;
+  const keysA = Object.keys(a).sort();
+  const keysB = Object.keys(b).sort();
 
   if (keysA.length !== keysB.length) {
-    // Find missing key
     const missingInB = keysA.find(k => !keysB.includes(k));
     if (missingInB) return `Missing key in State B at ${path}: ${missingInB}`;
     const missingInA = keysB.find(k => !keysA.includes(k));
@@ -131,7 +125,7 @@ function findFirstDiff(objA: any, objB: any, path = ''): string {
   }
 
   for (const key of keysA) {
-    const diff = findFirstDiff(objA[key], objB[key], path ? `${path}.${key}` : key);
+    const diff = findFirstDiff(a[key], b[key], path ? `${path}.${key}` : key);
     if (diff) return diff;
   }
 

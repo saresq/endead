@@ -74,17 +74,14 @@ export const EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'inHand'
   'canned_food': {
     name: 'Canned Food',
     type: EquipmentType.Item,
-    stats: undefined
   },
   'water': {
     name: 'Water',
     type: EquipmentType.Item,
-    stats: undefined
   },
   'flashlight': {
     name: 'Flashlight',
     type: EquipmentType.Item,
-    stats: undefined
   },
   'molotov': {
     name: 'Molotov',
@@ -179,7 +176,6 @@ export const EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'inHand'
   'plenty_of_bullets': {
     name: 'Plenty of Bullets',
     type: EquipmentType.Item,
-    stats: undefined
   },
   'kukri': {
     name: 'Kukri',
@@ -196,18 +192,15 @@ export const EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'inHand'
   'bag_of_rice': {
     name: 'Bag of Rice',
     type: EquipmentType.Item,
-    stats: undefined
   },
   'plenty_of_shells': {
     name: 'Plenty of Shells',
     type: EquipmentType.Item,
-    stats: undefined
   },
   'aaahh': {
     name: 'Aaahh!!',
     type: EquipmentType.Item,
     keywords: ['aaahh'],
-    stats: undefined
   }
 };
 
@@ -265,7 +258,6 @@ export const EPIC_EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'in
     name: 'Aaahh!!',
     type: EquipmentType.Item,
     keywords: ['aaahh'],
-    stats: undefined
   },
 };
 
@@ -281,6 +273,21 @@ export const INITIAL_EPIC_DECK_CONFIG = [
   'epic_nailbat',
   'epic_aaahh', 'epic_aaahh',
 ];
+
+/** Upper bound on Epic Crate objectives an authored map may contain. Each
+ *  crate consumes one Epic draw; placing more than the deck holds would
+ *  force an `EPIC_DECK_EXHAUSTED` event during play. Enforced at save time
+ *  by the `/api/maps` endpoint (see src/server/server.ts). */
+export const EPIC_DECK_SIZE = INITIAL_EPIC_DECK_CONFIG.length;
+
+// Grey-back starter deck (RULEBOOK §Setup). Each seat claims one card at
+// lobby time via the starter-pick flow. Total 6 cards — max 6 players.
+export const STARTER_DECK_POOL: Record<string, number> = {
+  baseball_bat: 1,
+  crowbar: 1,
+  fire_axe: 1,
+  pistol: 3,
+};
 
 // Zombicide 2nd Edition — Standard Equipment deck (45 cards, blue backs).
 // Starting Equipment (Baseball Bat, Crowbar, Fire Axe, Pistol x3) is dealt

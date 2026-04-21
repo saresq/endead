@@ -2,96 +2,89 @@
 import { GameState } from '../../types/GameState';
 import { ActionRequest, ActionType } from '../../types/Action';
 import { getConnection, isDoorBlocked } from './handlerUtils';
+import type { EventCollector } from '../EventCollector';
 
-export function handleMove(state: GameState, intent: ActionRequest): GameState {
-  const newState = structuredClone(state);
-  const survivor = newState.survivors[intent.survivorId!];
+export function handleMove(state: GameState, intent: ActionRequest, collector: EventCollector): void {
+  const survivor = state.survivors[intent.survivorId!];
   const targetId = intent.payload?.targetZoneId;
-  const path: string[] = intent.payload?.path; // Optional 2-zone path
+  const path: string[] | undefined = intent.payload?.path;
 
+  // --- Validate-first: pure reads + throws, no mutation ---
   if (!targetId && (!path || path.length === 0)) throw new Error('Target zone required');
 
   const hasExtraZone = survivor.skills.includes('plus_1_zone_per_move');
-
-  // Build the movement path
-  let movePath: string[];
-  if (path && path.length > 0) {
-    movePath = path;
-  } else {
-    movePath = [targetId];
-  }
+  const movePath: string[] = (path && path.length > 0) ? path : [targetId];
 
   if (movePath.length > 2) throw new Error('Cannot move more than 2 zones');
   if (movePath.length > 1 && !hasExtraZone) throw new Error('Survivor cannot move 2 zones');
 
-  let currentZoneId = survivor.position.zoneId;
+  // Walk the path computing cost + final landing zone — all reads, no writes.
+  const isSlippery = survivor.skills.includes('slippery');
+  let walkZoneId = survivor.position.zoneId;
   let extraAPCost = 0;
-
+  let finalZoneId = walkZoneId;
   for (let i = 0; i < movePath.length; i++) {
     const nextZoneId = movePath[i];
-    const currentZone = newState.zones[currentZoneId];
+    const currentZone = state.zones[walkZoneId];
     if (!currentZone) throw new Error('Current zone invalid');
 
-    const nextZone = newState.zones[nextZoneId];
+    const nextZone = state.zones[nextZoneId];
     if (!nextZone) throw new Error('Target zone invalid');
 
     if (!getConnection(currentZone, nextZoneId)) {
-      throw new Error(`Zones not connected: ${currentZoneId} -> ${nextZoneId}`);
+      throw new Error(`Zones not connected: ${walkZoneId} -> ${nextZoneId}`);
     }
-
     if (isDoorBlocked(currentZone, nextZoneId)) {
       throw new Error('Door is closed. You must open it first.');
     }
 
-    // Zombie zone control: leaving a zone with zombies costs +1 AP per zombie
-    if (!survivor.skills.includes('slippery')) {
-      const zombieCount = Object.values(newState.zombies)
-        .filter((z: any) => z.position.zoneId === currentZoneId).length;
-      extraAPCost += zombieCount;
+    if (!isSlippery) {
+      const hasZombiesHere = Object.values(state.zombies)
+        .some(z => z.position.zoneId === walkZoneId);
+      if (hasZombiesHere) extraAPCost += 1;
     }
 
-    currentZoneId = nextZoneId;
+    walkZoneId = nextZoneId;
+    finalZoneId = walkZoneId;
 
-    // Entering a zone with zombies stops movement (unless Slippery)
-    if (i < movePath.length - 1) {
-      const hasZombiesInNext = Object.values(newState.zombies)
-        .some((z: any) => z.position.zoneId === nextZoneId);
-      if (hasZombiesInNext && !survivor.skills.includes('slippery')) {
-        // Stop here — can't continue to second zone
-        break;
-      }
+    // Entering a zone with zombies stops further movement (unless Slippery).
+    if (i < movePath.length - 1 && !isSlippery) {
+      const hasZombiesInNext = Object.values(state.zombies)
+        .some(z => z.position.zoneId === nextZoneId);
+      if (hasZombiesInNext) break;
     }
   }
+
+  // --- Mutations + emits below ---
+  const fromZoneId = survivor.position.zoneId;
 
   if (extraAPCost > 0) {
-    newState._extraAPCost = extraAPCost;
+    collector.extraAPCost = extraAPCost;
   }
 
-  // Hit & Run free move: no zombie zone penalty
-  if (survivor.hitAndRunFreeMove) {
-    delete newState._extraAPCost;
-    survivor.hitAndRunFreeMove = false;
-  }
-
-  const fromZoneId = state.survivors[intent.survivorId!].position.zoneId;
-  survivor.position.zoneId = currentZoneId;
+  survivor.position.zoneId = finalZoneId;
   survivor.hasMoved = true;
 
-  newState.lastAction = {
+  state.lastAction = {
     type: ActionType.MOVE,
     playerId: intent.playerId,
     survivorId: intent.survivorId,
     timestamp: Date.now(),
-    description: `Moved from ${fromZoneId} to ${currentZoneId}`,
+    description: `Moved from ${fromZoneId} to ${finalZoneId}`,
   };
 
-  return newState;
+  collector.emit({
+    type: 'SURVIVOR_MOVED',
+    survivorId: intent.survivorId!,
+    fromZoneId,
+    toZoneId: finalZoneId,
+  });
 }
 
-export function handleSprint(state: GameState, intent: ActionRequest): GameState {
-  const newState = structuredClone(state);
-  const survivor = newState.survivors[intent.survivorId!];
+export function handleSprint(state: GameState, intent: ActionRequest, collector: EventCollector): void {
+  const survivor = state.survivors[intent.survivorId!];
 
+  // --- Validate-first ---
   if (!survivor.skills.includes('sprint')) {
     throw new Error('Survivor does not have Sprint skill');
   }
@@ -104,52 +97,57 @@ export function handleSprint(state: GameState, intent: ActionRequest): GameState
     throw new Error('Sprint requires a path of 2-3 zones');
   }
 
-  let currentZoneId = survivor.position.zoneId;
+  const isSlippery = survivor.skills.includes('slippery');
+  let walkZoneId = survivor.position.zoneId;
   let extraAPCost = 0;
+  let finalZoneId = walkZoneId;
+  let stoppedByZombies = false;
 
   for (let i = 0; i < path.length; i++) {
     const targetZoneId = path[i];
-    const currentZone = newState.zones[currentZoneId];
-    if (!currentZone) throw new Error(`Zone ${currentZoneId} invalid`);
+    const currentZone = state.zones[walkZoneId];
+    if (!currentZone) throw new Error(`Zone ${walkZoneId} invalid`);
 
     if (!getConnection(currentZone, targetZoneId)) {
-      throw new Error(`Zones not connected: ${currentZoneId} -> ${targetZoneId}`);
+      throw new Error(`Zones not connected: ${walkZoneId} -> ${targetZoneId}`);
     }
-
     if (isDoorBlocked(currentZone, targetZoneId)) {
       throw new Error('Door is closed along sprint path');
     }
 
-    // Leaving a zone with zombies costs +1 AP per zombie (same as regular move)
-    if (!survivor.skills.includes('slippery')) {
-      const zombieCount = Object.values(newState.zombies)
-        .filter((z: any) => z.position.zoneId === currentZoneId).length;
-      extraAPCost += zombieCount;
+    if (!isSlippery) {
+      const hasZombiesHere = Object.values(state.zombies)
+        .some(z => z.position.zoneId === walkZoneId);
+      if (hasZombiesHere) extraAPCost += 1;
     }
 
-    currentZoneId = targetZoneId;
+    walkZoneId = targetZoneId;
+    finalZoneId = walkZoneId;
 
-    // Entering a zone with zombies stops movement immediately (unless Slippery)
-    if (!survivor.skills.includes('slippery')) {
-      const hasZombiesInTarget = Object.values(newState.zombies)
-        .some((z: any) => z.position.zoneId === targetZoneId);
+    if (!isSlippery) {
+      const hasZombiesInTarget = Object.values(state.zombies)
+        .some(z => z.position.zoneId === targetZoneId);
       if (hasZombiesInTarget) {
-        // Must have moved at least 2 zones for a valid sprint
-        if (i + 1 < 2) {
-          throw new Error('Sprint requires moving at least 2 zones but was stopped by zombies');
-        }
+        stoppedByZombies = true;
         break;
       }
     }
   }
 
-  if (extraAPCost > 0) {
-    newState._extraAPCost = extraAPCost;
-  }
+  // --- Mutations + emits ---
+  const fromZoneId = survivor.position.zoneId;
+  if (extraAPCost > 0) collector.extraAPCost = extraAPCost;
 
-  survivor.position.zoneId = currentZoneId;
+  survivor.position.zoneId = finalZoneId;
   survivor.hasMoved = true;
   survivor.sprintUsedThisTurn = true;
 
-  return newState;
+  // SURVIVOR_SPRINTED carries the actual path walked (truncate when stopped).
+  const walkedPath = stoppedByZombies ? path.slice(0, path.findIndex(z => z === finalZoneId) + 1) : path;
+  collector.emit({
+    type: 'SURVIVOR_SPRINTED',
+    survivorId: intent.survivorId!,
+    fromZoneId,
+    path: walkedPath,
+  });
 }

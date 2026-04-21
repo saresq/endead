@@ -152,13 +152,6 @@ export const SKILL_DEFINITIONS: Record<string, SkillDefinition> = {
     description: 'Once per Turn, for free: Move up to 2 Zones to a Zone with at least 1 Zombie.',
     type: 'ACTION'
   },
-  'hit_and_run': {
-    id: 'hit_and_run',
-    name: 'Hit & Run',
-    description: 'After resolving a Melee or Ranged Action that kills at least 1 Zombie: free Move Action. No extra Actions for Zombies in Zone.',
-    type: 'PASSIVE'
-  },
-
   // Combat Skills
   'plus_1_die_combat': {
     id: 'plus_1_die_combat',
@@ -190,18 +183,6 @@ export const SKILL_DEFINITIONS: Record<string, SkillDefinition> = {
     description: 'Treats all weapons as having the Dual symbol.',
     type: 'PASSIVE'
   },
-  'barbarian': {
-    id: 'barbarian',
-    name: 'Barbarian',
-    description: 'When resolving a Melee Action, may substitute the weapon Dice number with the number of Zombies in the Zone.',
-    type: 'ACTION'
-  },
-  'swordmaster': {
-    id: 'swordmaster',
-    name: 'Swordmaster',
-    description: 'Treats all Melee weapons as having the Dual symbol.',
-    type: 'PASSIVE'
-  },
   'super_strength': {
     id: 'super_strength',
     name: 'Super Strength',
@@ -220,24 +201,6 @@ export const SKILL_DEFINITIONS: Record<string, SkillDefinition> = {
     id: 'born_leader',
     name: 'Born Leader',
     description: 'During this Survivor\'s Turn: give 1 free Action to another Survivor in the same Zone (used immediately).',
-    type: 'ACTION'
-  },
-  'bloodlust_melee': {
-    id: 'bloodlust_melee',
-    name: 'Bloodlust: Melee',
-    description: 'Once per Turn: spend 1 Action to Move up to 2 Zones to a Zone with at least 1 Zombie, then gain 1 free Melee Action.',
-    type: 'ACTION'
-  },
-  'is_that_all_youve_got': {
-    id: 'is_that_all_youve_got',
-    name: 'Is That All You\'ve Got?',
-    description: 'When about to endure Wounds: negate 1 Wound per Equipment card discarded.',
-    type: 'PASSIVE'
-  },
-  'lifesaver': {
-    id: 'lifesaver',
-    name: 'Lifesaver',
-    description: 'Once per Turn, free: Select a Zone at Range 1 with Zombie(s) and Survivor(s). Drag chosen Survivors to your Zone.',
     type: 'ACTION'
   },
   'hold_your_nose': {
@@ -268,12 +231,6 @@ export const SKILL_DEFINITIONS: Record<string, SkillDefinition> = {
     id: 'can_search_more_than_once',
     name: 'Can Search More Than Once',
     description: 'Can Search multiple times per Turn (1 Action per Search).',
-    type: 'PASSIVE'
-  },
-  'low_profile': {
-    id: 'low_profile',
-    name: 'Low Profile',
-    description: 'Can\'t be hit by Friendly Fire (Molotov still applies).',
     type: 'PASSIVE'
   },
   'starts_with_equipment': {
@@ -331,23 +288,4 @@ export const SURVIVOR_CLASSES: Record<string, ClassProgression> = {
     [DangerLevel.Orange]: ['ambidextrous', 'born_leader'],
     [DangerLevel.Red]: ['plus_1_die_ranged', 'plus_1_die_melee', 'lucky'],
   },
-  // // Test character — all skills unlocked at Blue level
-  // 'H4x0r': {
-  //   [DangerLevel.Blue]: [
-  //     'plus_1_action', 'slippery', 'sprint', 'charge',
-  //     'hit_and_run', 'plus_1_free_move', 'plus_1_free_search', 'plus_1_free_combat',
-  //     'plus_1_free_melee', 'plus_1_free_ranged',
-  //     'plus_1_damage_melee', 'plus_1_damage_ranged', 'plus_1_damage_combat',
-  //     'plus_1_die_melee', 'plus_1_die_ranged', 'plus_1_die_combat',
-  //     'plus_1_max_range', 'lucky', 'sniper', 'tough', 'steady_hand',
-  //     'search_anywhere', 'super_strength',
-  //     'point_blank', 'born_leader', 'bloodlust_melee', 'lifesaver',
-  //     'ambidextrous', 'swordmaster', 'barbarian', 'medic',
-  //     'hold_your_nose', 'matching_set', 'search_plus_1',
-  //     'can_search_more_than_once', 'low_profile', 'is_that_all_youve_got',
-  //   ],
-  //   [DangerLevel.Yellow]: [],
-  //   [DangerLevel.Orange]: [],
-  //   [DangerLevel.Red]: [],
-  // },
 };

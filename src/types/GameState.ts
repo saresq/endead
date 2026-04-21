@@ -73,7 +73,6 @@ export interface SpawnDetail {
     [key in ZombieType]?: number;
   };
   extraActivation?: ZombieType; // e.g. "All Walkers move"
-  doubleSpawn?: boolean;
   rush?: boolean; // Spawned zombies immediately activate (only the just-spawned ones)
 }
 
@@ -143,13 +142,6 @@ export interface Survivor extends Entity {
   sprintUsedThisTurn: boolean;
   chargeUsedThisTurn: boolean;
   bornLeaderUsedThisTurn: boolean;
-  bloodlustUsedThisTurn: boolean;
-  lifesaverUsedThisTurn: boolean;
-  hitAndRunFreeMove: boolean;
-  luckyUsedThisTurn: boolean;
-
-  // Pending wounds for "Is That All You've Got?" resolution
-  pendingWounds?: number;
 }
 
 export interface Zombie extends Entity {
@@ -232,6 +224,9 @@ export interface Objective {
   type: ObjectiveType;
   description: string;
   targetId?: string; // ZoneId (for ReachExit), ZombieType (for Kill), ItemName (for Collect)
+  /** Zone this objective lives in. Required for TakeObjective so XP awards can
+   *  be matched to the specific token that was taken. */
+  zoneId?: string;
   amountRequired: number;
   amountCurrent: number;
   completed: boolean;
@@ -245,6 +240,8 @@ export interface LobbyState {
     name: string; // Display name
     ready: boolean;
     characterClass: string; // Selected character
+    /** Starter card key claimed from the grey-back pool (STARTER_DECK_POOL). */
+    starterEquipmentKey: string;
   }[];
 }
 
@@ -271,6 +268,11 @@ export interface TradeSession {
 export interface GameState {
   id: string; // Game Session ID
   seed: RngState; // xoshiro128** state — 4×uint32 tuple, serializes as JSON array
+  /** Monotonic per-room state version (SwarmComms §3.1, §3.8). Bumped by 1
+   *  for each accepted action; every EVENTS frame carries the resulting v so
+   *  the client can detect gaps and request a SNAPSHOT. Initialized to 0.
+   *  Stripped from client payloads before Step 4 ships the wire change. */
+  version: number;
   turn: number;
   phase: GamePhase;
   gameResult?: GameResult;
@@ -337,34 +339,10 @@ export interface GameState {
   // Meta
   config: {
     maxSurvivors: number;
-    friendlyFire: boolean;
     abominationFest?: boolean; // Allow unlimited Abominations (default: false = max 1)
     zombiePool: { [key in ZombieType]: number }; // Miniature pool limits
   };
   
-  // History
-  history: Array<{
-    playerId: string;
-    survivorId: string;
-    actionType: string;
-    timestamp: number;
-    turn?: number;
-    payload?: any;
-    // Rich action feedback (captured from lastAction)
-    description?: string;
-    dice?: number[];
-    hits?: number;
-    damagePerHit?: number;
-    bonusDice?: number;
-    bonusDamage?: number;
-    rerolledFrom?: number[];
-    rerollSource?: 'lucky' | 'plenty_of_bullets' | 'plenty_of_shells';
-    usedFreeAction?: boolean;
-    freeActionType?: string;
-    // Spawn context for END_TURN entries
-    spawnContext?: GameState['spawnContext'];
-  }>;
-
   // UI / Feedback State
   lastAction?: {
     type: string;
@@ -382,6 +360,7 @@ export interface GameState {
     damagePerHit?: number;           // Effective damage per hit
     usedFreeAction?: boolean;        // Whether a free action was consumed
     freeActionType?: string;         // Which free action type was used
+    luckyUsed?: boolean;             // Lucky reroll already burned for this ATTACK Action
     // Captured on ATTACK when the actor has Lucky unspent — enables rollback-and-reroll.
     rollbackSnapshot?: {
       /** RNG state AFTER the dice were rolled but BEFORE any side effects consumed seed.
@@ -418,6 +397,22 @@ export interface GameState {
     survivorIds: string[];
   }>;
 
+  // Pending zombie movement-split prompts (M4).
+  // Set when pass 2 (or Runner 2nd) produces tied noise routes with a remainder:
+  // `prompts` is the list of zombies that need the active player to pick a
+  // next-step zone; `plannedMoves` accumulates fully-forced placements plus any
+  // prompt resolutions. The Zombie Phase halts until `prompts` is empty.
+  pendingZombieSplit?: {
+    stage: 'pass2' | 'pass3';
+    plannedMoves: Record<string, string>;
+    prompts: Array<{
+      zombieId: string;
+      type: ZombieType;
+      sourceZoneId: string;
+      options: string[];
+    }>;
+  };
+
   // Pending friendly-fire distribution from the last ranged attack.
   // Shooter must assign misses among eligible (non-Low-Profile, non-Steady-Hand-protected)
   // friendlies in the target zone before taking any other action.
@@ -431,11 +426,6 @@ export interface GameState {
 
   // Monotonic counter for unique zombie IDs
   nextZombieId: number;
-
-  // Transient: extra AP cost stashed by a handler for the dispatcher to consume
-  _extraAPCost?: number;
-  // Transient: whether current attack is melee (for free melee/ranged action deduction)
-  _attackIsMelee?: boolean;
 }
 
 // --- Example Initial State ---
@@ -443,6 +433,7 @@ export interface GameState {
 export const initialGameState: GameState = {
   id: 'session-12345',
   seed: [0xdeadbeef, 0xcafef00d, 0x13579bdf, 0x2468ace0],
+  version: 0,
   turn: 0, // 0 means not started
   phase: GamePhase.Lobby, // Start in Lobby
   currentDangerLevel: DangerLevel.Blue,
@@ -475,15 +466,14 @@ export const initialGameState: GameState = {
   
   config: {
     maxSurvivors: 6,
-    friendlyFire: true,
     abominationFest: false,
     zombiePool: {
       [ZombieType.Walker]: 40,
       [ZombieType.Runner]: 16,
       [ZombieType.Brute]: 16,
-      [ZombieType.Abomination]: 4,
+      // Standard mode caps at 1 Abomination on board (RULEBOOK §Zombies).
+      // Abomination Fest scenarios override this explicitly via config.
+      [ZombieType.Abomination]: 1,
     },
   },
-
-  history: []
 };

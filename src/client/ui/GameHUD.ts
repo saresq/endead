@@ -31,8 +31,6 @@ export class GameHUD {
   private backpackModalId: string | null = null;
   private endGameModalId: string | null = null;
   private historyModalId: string | null = null;
-  private woundPickerModalId: string | null = null;
-  private woundPickerSelected: Set<string> = new Set();
   private woundDistModalId: string | null = null;
   private woundDistAssignments: Record<string, number> = {};
   private dismissedFeedTimestamp: number | null = null;
@@ -156,12 +154,6 @@ export class GameHUD {
       return;
     }
 
-    // --- Wound picker (not turn-gated — can resolve during any phase) ---
-    if (action === 'resolve-wounds' && activeSurvivor) {
-      this.openWoundPicker(activeSurvivor);
-      return;
-    }
-
     // --- Turn-gated actions ---
     if (!isMyTurn || !isOwner || !activeSurvivor) return;
 
@@ -210,17 +202,6 @@ export class GameHUD {
       this.openBornLeaderPicker(activeSurvivor);
       return;
     }
-    if (id === 'btn-bloodlust') {
-      this.inputController.setMode('BLOODLUST_MELEE');
-      notificationManager.show({ variant: 'info', message: 'Select a zone with zombies (up to 2 zones away).', duration: 5000 });
-      return;
-    }
-    if (id === 'btn-lifesaver') {
-      this.inputController.setMode('LIFESAVER');
-      notificationManager.show({ variant: 'info', message: 'Select a zone at Range 1 with zombies and survivors.', duration: 5000 });
-      return;
-    }
-
     // --- Weapon buttons ---
     const weaponBtn = target.closest('.hud-weapon-btn') as HTMLElement;
     if (weaponBtn && !weaponBtn.hasAttribute('disabled')) {
@@ -287,13 +268,6 @@ export class GameHUD {
     if (isHost && this.state?.pendingZombieWounds && this.state.pendingZombieWounds.length > 0
         && !this.woundDistModalId) {
       this.openWoundDistribution(this.state.pendingZombieWounds[0]);
-    }
-
-    // Auto-open wound picker if survivor has pending wounds
-    if (activeSurvivor && activeSurvivor.pendingWounds && activeSurvivor.pendingWounds > 0
-        && activeSurvivor.playerId === this.localPlayerId
-        && !this.woundPickerModalId && !this.woundDistModalId) {
-      this.openWoundPicker(activeSurvivor);
     }
   }
 
@@ -387,8 +361,11 @@ export class GameHUD {
     const survivor = state.survivors[last.survivorId];
     if (!survivor) return '';
     if (!survivor.skills.includes('lucky')) return '';
-    if (survivor.luckyUsedThisTurn) return '';
-    if (!last.rollbackSnapshot) return '';
+    if (last.luckyUsed) return '';
+    // SwarmComms §3.7.1: `rollbackSnapshot` never crosses the wire — the
+    // server projects a boolean `canLucky` gated on shooter ownership and
+    // reroll validity. Replaces the legacy `last.rollbackSnapshot` read.
+    if (!(last as { canLucky?: boolean }).canLucky) return '';
     return `<button class="action-btn action-btn--lucky" data-action="reroll-lucky" title="Reroll dice (Lucky — commits to new result even if worse)">
       ${icon('Dices', 'sm')} Reroll (Lucky)
     </button>`;
@@ -417,14 +394,6 @@ export class GameHUD {
     // --- Free action indicators ---
     const freeActions = this.renderFreeActionIndicators(survivor);
 
-    // --- Pending wounds alert ---
-    const woundAlert = survivor.pendingWounds && survivor.pendingWounds > 0
-      ? `<button class="hud-wound-alert" data-action="resolve-wounds">
-          ${icon('AlertTriangle', 'sm')}
-          <span>${survivor.pendingWounds} pending wound${survivor.pendingWounds > 1 ? 's' : ''} — tap to resolve</span>
-        </button>`
-      : '';
-
     // --- Once-per-turn skill action buttons ---
     const skillActions = this.renderSkillActionButtons(survivor, isMyTurn, noAP);
 
@@ -445,7 +414,6 @@ export class GameHUD {
             ${hp}${xp}${ap}
           </div>
           ${freeActions}
-          ${woundAlert}
           ${skillsHtml}
         </div>
 
@@ -497,8 +465,6 @@ export class GameHUD {
       if (skillId === 'sprint') used = survivor.sprintUsedThisTurn;
       else if (skillId === 'charge') used = survivor.chargeUsedThisTurn;
       else if (skillId === 'born_leader') used = survivor.bornLeaderUsedThisTurn;
-      else if (skillId === 'bloodlust_melee') used = survivor.bloodlustUsedThisTurn;
-      else if (skillId === 'lifesaver') used = survivor.lifesaverUsedThisTurn;
       else if (skillId === 'tough') used = survivor.toughUsedZombieAttack && survivor.toughUsedFriendlyFire;
 
       const typeClass = def.type === 'PASSIVE' ? 'passive' : def.type === 'ACTION' ? 'action' : 'stat-mod';
@@ -554,18 +520,6 @@ export class GameHUD {
         cost: 'FREE', disabled: !isMyTurn || survivor.bornLeaderUsedThisTurn,
       }));
     }
-    if (survivor.skills.includes('bloodlust_melee')) {
-      buttons.push(renderActionButton({
-        id: 'btn-bloodlust', icon: 'Flame', label: 'Bloodlust',
-        cost: '1 AP', disabled: !isMyTurn || noAP || survivor.bloodlustUsedThisTurn,
-      }));
-    }
-    if (survivor.skills.includes('lifesaver')) {
-      buttons.push(renderActionButton({
-        id: 'btn-lifesaver', icon: 'HeartHandshake', label: 'Lifesaver',
-        cost: 'FREE', disabled: !isMyTurn || survivor.lifesaverUsedThisTurn,
-      }));
-    }
 
     return buttons.join('');
   }
@@ -597,110 +551,6 @@ export class GameHUD {
     }
 
     return boosts;
-  }
-
-  // ─── Wound Picker Modal ──────────────────────────────────────
-
-  private openWoundPicker(survivor: Survivor): void {
-    if (this.woundPickerModalId && modalManager.isOpen(this.woundPickerModalId)) return;
-    if (!survivor.pendingWounds || survivor.pendingWounds <= 0) return;
-
-    this.woundPickerSelected = new Set();
-    const pendingCount = survivor.pendingWounds;
-
-    this.woundPickerModalId = modalManager.open({
-      title: `Is That All You've Got?`,
-      size: 'md',
-      persistent: true,
-      renderBody: () => {
-        const desc = `<p class="text-secondary mb-3">You have <strong>${pendingCount}</strong> incoming wound${pendingCount > 1 ? 's' : ''}. Discard equipment to negate wounds (1 card = 1 wound negated).</p>`;
-        const negated = Math.min(this.woundPickerSelected.size, pendingCount);
-        const remaining = pendingCount - negated;
-        const summary = `<div class="wound-picker__summary">
-          <span>Negated: <strong class="text-success">${negated}</strong></span>
-          <span>Wounds taken: <strong class="${remaining > 0 ? 'text-danger' : 'text-success'}">${remaining}</strong></span>
-        </div>`;
-
-        const cards = survivor.inventory.map(card => {
-          const selected = this.woundPickerSelected.has(card.id);
-          return `<div class="wound-picker__card ${selected ? 'wound-picker__card--selected' : ''}" data-action="toggle-wound-card" data-card-id="${card.id}">
-            ${renderItemCard(card, { variant: selected ? 'ghost' : 'default', showSlot: true })}
-          </div>`;
-        }).join('');
-
-        return `${desc}${summary}<div class="grid grid--2 gap-2 mt-3">${cards}</div>`;
-      },
-      renderFooter: () => {
-        const negated = Math.min(this.woundPickerSelected.size, pendingCount);
-        const remaining = pendingCount - negated;
-        return `
-          ${renderButton({ label: `Take ${remaining} Wound${remaining !== 1 ? 's' : ''}`, variant: remaining > 0 ? 'destructive' : 'primary', dataAction: 'confirm-wounds' })}
-        `;
-      },
-      onOpen: (el) => {
-        el.addEventListener('click', (e) => {
-          const cardEl = (e.target as HTMLElement).closest('[data-action="toggle-wound-card"]') as HTMLElement;
-          if (cardEl) {
-            const cardId = cardEl.dataset.cardId;
-            if (cardId) {
-              if (this.woundPickerSelected.has(cardId)) {
-                this.woundPickerSelected.delete(cardId);
-              } else if (this.woundPickerSelected.size < pendingCount) {
-                this.woundPickerSelected.add(cardId);
-              }
-              // Re-render modal content
-              modalManager.updateBody(this.woundPickerModalId!, modalManager.getElement(this.woundPickerModalId!)?.querySelector('.modal__body')?.innerHTML
-                ? this.renderWoundPickerBody(survivor, pendingCount) : '');
-              modalManager.updateBody(this.woundPickerModalId!, this.renderWoundPickerBody(survivor, pendingCount));
-              modalManager.updateFooter(this.woundPickerModalId!, this.renderWoundPickerFooter(pendingCount));
-            }
-            return;
-          }
-
-          const confirmBtn = (e.target as HTMLElement).closest('[data-action="confirm-wounds"]');
-          if (confirmBtn) {
-            networkManager.sendAction({
-              playerId: this.localPlayerId,
-              survivorId: survivor.id,
-              type: ActionType.RESOLVE_WOUNDS,
-              payload: { discardCardIds: [...this.woundPickerSelected] },
-            });
-            modalManager.close(this.woundPickerModalId!);
-            this.woundPickerModalId = null;
-            this.woundPickerSelected = new Set();
-          }
-        });
-      },
-      onClose: () => {
-        this.woundPickerModalId = null;
-        this.woundPickerSelected = new Set();
-      },
-    });
-  }
-
-  private renderWoundPickerBody(survivor: Survivor, pendingCount: number): string {
-    const negated = Math.min(this.woundPickerSelected.size, pendingCount);
-    const remaining = pendingCount - negated;
-    const desc = `<p class="text-secondary mb-3">You have <strong>${pendingCount}</strong> incoming wound${pendingCount > 1 ? 's' : ''}. Discard equipment to negate wounds (1 card = 1 wound negated).</p>`;
-    const summary = `<div class="wound-picker__summary">
-      <span>Negated: <strong class="text-success">${negated}</strong></span>
-      <span>Wounds taken: <strong class="${remaining > 0 ? 'text-danger' : 'text-success'}">${remaining}</strong></span>
-    </div>`;
-
-    const cards = survivor.inventory.map(card => {
-      const selected = this.woundPickerSelected.has(card.id);
-      return `<div class="wound-picker__card ${selected ? 'wound-picker__card--selected' : ''}" data-action="toggle-wound-card" data-card-id="${card.id}">
-        ${renderItemCard(card, { variant: selected ? 'ghost' : 'default', showSlot: true })}
-      </div>`;
-    }).join('');
-
-    return `${desc}${summary}<div class="grid grid--2 gap-2 mt-3">${cards}</div>`;
-  }
-
-  private renderWoundPickerFooter(pendingCount: number): string {
-    const negated = Math.min(this.woundPickerSelected.size, pendingCount);
-    const remaining = pendingCount - negated;
-    return renderButton({ label: `Take ${remaining} Wound${remaining !== 1 ? 's' : ''}`, variant: remaining > 0 ? 'destructive' : 'primary', dataAction: 'confirm-wounds' });
   }
 
   // ─── Wound Distribution Modal ─────────────────────────────────
@@ -996,62 +846,38 @@ export class GameHUD {
       return;
     }
 
+    // SwarmComms Step 3: state.history was removed (§3.5 — history is no
+    // longer broadcast). Step 4 wires this modal to the client-side event
+    // ring buffer (§3.5 "subscribe to the incoming event stream and maintain
+    // their own bounded ring buffer (last ~200)"). Placeholder until then.
     this.historyModalId = modalManager.open({
       title: 'Turn History',
       size: 'md',
-      renderBody: () => {
-        if (!this.state || this.state.history.length === 0) {
-          return '<div class="text-center-muted">No actions yet.</div>';
-        }
-
-        const entries = [...this.state.history];
-
-        // Filter out non-display actions
-        const displayEntries = entries.filter(e =>
-          e.actionType !== 'JOIN_LOBBY' && e.actionType !== 'START_GAME'
-          && e.actionType !== 'RESOLVE_SEARCH' && e.actionType !== 'CHOOSE_SKILL'
-          && e.actionType !== 'KICK_PLAYER'
-        );
-
-        // Group entries by turn using stored turn number or END_TURN boundaries
-        const turnGroups: { turn: number; actions: typeof displayEntries }[] = [];
-        let currentTurn = 1;
-        let currentGroup: typeof displayEntries = [];
-
-        for (const entry of displayEntries) {
-          currentGroup.push(entry);
-          if (entry.actionType === 'END_TURN') {
-            turnGroups.push({ turn: entry.turn || currentTurn, actions: currentGroup });
-            currentGroup = [];
-            currentTurn = (entry.turn || currentTurn) + 1;
-          }
-        }
-        if (currentGroup.length > 0) {
-          turnGroups.push({ turn: currentGroup[0]?.turn || currentTurn, actions: currentGroup });
-        }
-
-        // Render most recent first
-        const reversed = [...turnGroups].reverse();
-
-        return `<div class="history-list">${reversed.map(group => {
-          const isCurrentTurn = group === reversed[0];
-          const header = isCurrentTurn
-            ? `<div class="history-turn-header">Turn ${group.turn} (current)</div>`
-            : `<div class="history-turn-header">Turn ${group.turn}</div>`;
-
-          const actionRows = group.actions.map(entry => {
-            return this.renderHistoryEntry(entry);
-          }).join('');
-
-          return `${header}${actionRows}`;
-        }).join('')}</div>`;
-      },
+      renderBody: () => '<div class="text-center-muted">Turn history is being rebuilt — coming back in the next update.</div>',
       renderFooter: () => renderButton({ label: 'Close', variant: 'secondary', dataAction: 'modal-close' }),
       onClose: () => { this.historyModalId = null; },
     });
   }
 
-  private renderHistoryEntry(entry: GameState['history'][0]): string {
+  // Kept for the SwarmComms Step-4 event-stream rewire. Argument shape matches
+  // the legacy history entry; no longer reads from `state.history`.
+  private renderHistoryEntry(entry: {
+    actionType: string;
+    survivorId?: string;
+    payload?: Record<string, unknown> & { targetZoneId?: string; targetSurvivorId?: string; path?: string[]; zoneId?: string; assignments?: Record<string, number> };
+    turn?: number;
+    description?: string;
+    dice?: number[];
+    hits?: number;
+    damagePerHit?: number;
+    bonusDice?: number;
+    bonusDamage?: number;
+    rerolledFrom?: number[];
+    rerollSource?: 'lucky' | 'plenty_of_bullets' | 'plenty_of_shells';
+    usedFreeAction?: boolean;
+    freeActionType?: string;
+    spawnContext?: GameState['spawnContext'];
+  }): string {
     const survivor = entry.survivorId && entry.survivorId !== 'system' && this.state
       ? this.state.survivors[entry.survivorId]
       : null;

@@ -1,25 +1,29 @@
 
-import { GameState, GamePhase, GameResult, ObjectiveType, Objective, Survivor, ZombieType } from '../types/GameState';
-import { ActionRequest, ActionResponse, ActionType, ActionError } from '../types/Action';
-import { validateTurn, advanceTurnState, checkEndTurn } from './TurnManager';
+import { GameState, GamePhase, GameResult, ObjectiveType } from '../types/GameState';
+import { ActionRequest, ActionResponse, ActionType, ActionError, AttackFreePool } from '../types/Action';
+import { validateTurn, checkEndTurn } from './TurnManager';
 import { ZombiePhaseManager } from './ZombiePhaseManager';
 import { deductAPWithFreeCheck, ActionHandler } from './handlers/handlerUtils';
+import { EventCollector } from './EventCollector';
+import type { GameEvent } from '../types/Events';
 
 // --- Handler imports ---
-import { handleJoinLobby, handleUpdateNickname, handleSelectCharacter, handleStartGame, handleEndGame } from './handlers/LobbyHandlers';
+import { handleJoinLobby, handleUpdateNickname, handleSelectCharacter, handlePickStarter, handleStartGame, handleEndGame } from './handlers/LobbyHandlers';
 import { handleMove, handleSprint } from './handlers/MovementHandlers';
-import { handleAttack, handleResolveWounds, handleDistributeZombieWounds, handleRerollLucky, handleAssignFriendlyFire, handleReload } from './handlers/CombatHandlers';
-import { handleCharge, handleBornLeader, handleBloodlustMelee, handleLifesaver, handleChooseSkill } from './handlers/SkillHandlers';
+import { handleAttack, handleDistributeZombieWounds, handleRerollLucky, handleAssignFriendlyFire, handleReload } from './handlers/CombatHandlers';
+import { handleCharge, handleBornLeader, handleChooseSkill } from './handlers/SkillHandlers';
 import { handleUseItem, handleSearch, handleResolveSearch, handleOrganize } from './handlers/ItemHandlers';
 import { handleOpenDoor, handleMakeNoise } from './handlers/DoorHandlers';
 import { handleTradeStart, handleTradeOffer, handleTradeAccept, handleTradeCancel } from './handlers/TradeHandlers';
 import { handleTakeObjective } from './handlers/ObjectiveHandlers';
 import { handleNothing, handleEndTurn } from './handlers/TurnHandlers';
+import { handleResolveZombieSplit } from './handlers/ZombieHandlers';
 
 const handlers: Partial<Record<ActionType, ActionHandler>> = {
   [ActionType.JOIN_LOBBY]: handleJoinLobby,
   [ActionType.UPDATE_NICKNAME]: handleUpdateNickname,
   [ActionType.SELECT_CHARACTER]: handleSelectCharacter,
+  [ActionType.PICK_STARTER]: handlePickStarter,
   [ActionType.START_GAME]: handleStartGame,
   [ActionType.END_GAME]: handleEndGame,
   [ActionType.MOVE]: handleMove,
@@ -41,13 +45,11 @@ const handlers: Partial<Record<ActionType, ActionHandler>> = {
   [ActionType.END_TURN]: handleEndTurn,
   [ActionType.CHARGE]: handleCharge,
   [ActionType.BORN_LEADER]: handleBornLeader,
-  [ActionType.BLOODLUST_MELEE]: handleBloodlustMelee,
-  [ActionType.LIFESAVER]: handleLifesaver,
-  [ActionType.RESOLVE_WOUNDS]: handleResolveWounds,
   [ActionType.DISTRIBUTE_ZOMBIE_WOUNDS]: handleDistributeZombieWounds,
   [ActionType.REROLL_LUCKY]: handleRerollLucky,
   [ActionType.ASSIGN_FRIENDLY_FIRE]: handleAssignFriendlyFire,
   [ActionType.RELOAD]: handleReload,
+  [ActionType.RESOLVE_ZOMBIE_SPLIT]: handleResolveZombieSplit,
 };
 
 // --- Game End Logic ---
@@ -58,7 +60,6 @@ function checkGameEndConditions(state: GameState): GameResult | undefined {
 
   if (survivors.length === 0) return undefined;
 
-  // Per Zombicide rules: the game is lost when ANY single survivor dies
   const anyDead = survivors.some(s => s.wounds >= s.maxHealth);
   if (anyDead) return GameResult.Defeat;
 
@@ -66,78 +67,71 @@ function checkGameEndConditions(state: GameState): GameResult | undefined {
 
   const livingSurvivors = survivors.filter(s => s.wounds < s.maxHealth);
 
-  // Check if ALL objectives are met
   const allObjectivesMet = state.objectives.every(obj => {
-      if (obj.completed) return true;
+    if (obj.completed) return true;
 
-      if (obj.type === ObjectiveType.ReachExit) {
-          if (!obj.targetId) return false;
+    if (obj.type === ObjectiveType.ReachExit) {
+      if (!obj.targetId) return false;
+      const exitZoneId = obj.targetId;
+      const allInExit = livingSurvivors.every(s => s.position.zoneId === exitZoneId);
+      if (!allInExit) return false;
+      const zombiesInExit = zombies.some(z => z.position.zoneId === exitZoneId);
+      if (zombiesInExit) return false;
+      return true;
+    }
 
-          const exitZoneId = obj.targetId;
-          const allInExit = livingSurvivors.every(s => s.position.zoneId === exitZoneId);
-          if (!allInExit) return false;
-
-          const zombiesInExit = zombies.some(z => z.position.zoneId === exitZoneId);
-          if (zombiesInExit) return false;
-
-          return true;
-      }
-
-      if (obj.type === ObjectiveType.CollectItem) {
-        const requiredAmount = obj.amountRequired;
-        let foundAmount = 0;
-
-        livingSurvivors.forEach(s => {
-          s.inventory.forEach(card => {
-            if (obj.targetId && card.name.includes(obj.targetId)) {
-               foundAmount++;
-            }
-          });
+    if (obj.type === ObjectiveType.CollectItem) {
+      const requiredAmount = obj.amountRequired;
+      let foundAmount = 0;
+      livingSurvivors.forEach(s => {
+        s.inventory.forEach(card => {
+          if (obj.targetId && card.name.includes(obj.targetId)) foundAmount++;
         });
+      });
+      return foundAmount >= requiredAmount;
+    }
 
-        return foundAmount >= requiredAmount;
-      }
-
-      return obj.amountCurrent >= obj.amountRequired;
+    return obj.amountCurrent >= obj.amountRequired;
   });
 
-  if (allObjectivesMet) {
-      return GameResult.Victory;
-  }
-
-  return undefined;
+  return allObjectivesMet ? GameResult.Victory : undefined;
 }
 
+/**
+ * Process one action against `state`. SwarmComms semantics (§3.1, §3.10):
+ *   - Mutation-in-place: handlers mutate `state` directly. The returned
+ *     `newState` is the SAME reference as `state` on success.
+ *   - `state.version` bumps by 1 per accepted action.
+ *   - Events are collected during handler dispatch and surfaced via `events`.
+ *   - On thrown error, the partial `state` may be corrupt — handlers MUST
+ *     validate-first to avoid this (§3.10 rule 1).
+ */
 export function processAction(state: GameState, intent: ActionRequest): ActionResponse {
-  // 0. Pre-check: Lobby Actions don't check Turns
+  // 0. Pre-check: lobby/cooperative actions skip the turn lock.
   if (
     intent.type === ActionType.UPDATE_NICKNAME ||
     intent.type === ActionType.SELECT_CHARACTER ||
+    intent.type === ActionType.PICK_STARTER ||
     intent.type === ActionType.START_GAME ||
     intent.type === ActionType.END_GAME ||
-    intent.type === ActionType.DISTRIBUTE_ZOMBIE_WOUNDS
+    intent.type === ActionType.DISTRIBUTE_ZOMBIE_WOUNDS ||
+    intent.type === ActionType.RESOLVE_ZOMBIE_SPLIT
   ) {
-      // Allow through (lobby actions + cooperative wound distribution)
+    // pass
   } else {
-      // 1. Validate Turn Ownership
-      let turnError: ActionError | null = validateTurn(state, intent);
+    let turnError: ActionError | null = validateTurn(state, intent);
 
-      // Special Cases
-      if ((intent.type === ActionType.CHOOSE_SKILL || intent.type === ActionType.RESOLVE_SEARCH
-          || intent.type === ActionType.CHARGE || intent.type === ActionType.BORN_LEADER
-          || intent.type === ActionType.LIFESAVER || intent.type === ActionType.RESOLVE_WOUNDS
-          || intent.type === ActionType.END_TURN || intent.type === ActionType.REROLL_LUCKY
-          || intent.type === ActionType.ASSIGN_FRIENDLY_FIRE)
-          && turnError && turnError.code === 'NO_ACTIONS') {
-        turnError = null;
-      }
+    if ((intent.type === ActionType.CHOOSE_SKILL || intent.type === ActionType.RESOLVE_SEARCH
+        || intent.type === ActionType.CHARGE || intent.type === ActionType.BORN_LEADER
+        || intent.type === ActionType.END_TURN || intent.type === ActionType.REROLL_LUCKY
+        || intent.type === ActionType.ASSIGN_FRIENDLY_FIRE)
+        && turnError && turnError.code === 'NO_ACTIONS') {
+      turnError = null;
+    }
 
-      if (turnError) {
-        return { success: false, error: turnError };
-      }
+    if (turnError) return { success: false, error: turnError };
   }
 
-  // 2. Dispatch Handler
   const handler = handlers[intent.type];
   if (!handler) {
     return {
@@ -146,124 +140,81 @@ export function processAction(state: GameState, intent: ActionRequest): ActionRe
     };
   }
 
+  const collector = new EventCollector();
   try {
-    let newState = handler(state, intent);
+    handler(state, intent, collector);
 
-    // 4. Advance Turn State (Deduct AP) - ONLY for Game Actions
+    // 4. Advance Turn State (Deduct AP) — ONLY for game actions
     const gameActions = [
-        ActionType.MOVE, ActionType.ATTACK, ActionType.SEARCH, ActionType.SPRINT, ActionType.USE_ITEM,
-        ActionType.OPEN_DOOR, ActionType.MAKE_NOISE, ActionType.ORGANIZE,
-        ActionType.TAKE_OBJECTIVE, ActionType.RELOAD,
-        ActionType.TRADE_START, ActionType.TRADE_OFFER,
-        ActionType.TRADE_ACCEPT, ActionType.TRADE_CANCEL, ActionType.END_TURN,
-        ActionType.CHARGE, ActionType.BORN_LEADER, ActionType.BLOODLUST_MELEE, ActionType.LIFESAVER
+      ActionType.MOVE, ActionType.ATTACK, ActionType.SEARCH, ActionType.SPRINT, ActionType.USE_ITEM,
+      ActionType.OPEN_DOOR, ActionType.MAKE_NOISE, ActionType.ORGANIZE,
+      ActionType.TAKE_OBJECTIVE, ActionType.RELOAD,
+      ActionType.TRADE_START, ActionType.TRADE_OFFER,
+      ActionType.TRADE_ACCEPT, ActionType.TRADE_CANCEL, ActionType.END_TURN,
+      ActionType.CHARGE, ActionType.BORN_LEADER
     ];
 
     if (gameActions.includes(intent.type)) {
-       // Filter out Trade Session Sub-Actions from AP Cost
-       if (intent.type === ActionType.TRADE_START ||
-           intent.type === ActionType.TRADE_OFFER ||
-           intent.type === ActionType.TRADE_ACCEPT ||
-           intent.type === ActionType.TRADE_CANCEL) {
-           // No AP cost yet
-       }
-       else if (intent.type === ActionType.ORGANIZE && newState.activeTrade) {
-           const trade = newState.activeTrade;
-           if (intent.survivorId === trade.activeSurvivorId || intent.survivorId === trade.targetSurvivorId) {
-               // Free Organize during trade
-           } else {
-               newState = deductAPWithFreeCheck(newState, intent.survivorId!, intent.type);
-           }
-       }
-       else if (intent.type === ActionType.ORGANIZE && newState.survivors[intent.survivorId!]?.drawnCard) {
-           // Free Organize during Pickup/Search Resolution
-       }
-       else if (intent.type === ActionType.CHARGE || intent.type === ActionType.BORN_LEADER || intent.type === ActionType.LIFESAVER) {
-           // Charge, Born Leader, and Lifesaver are free actions — no AP cost
-           newState = checkEndTurn(newState);
-       }
-       else {
-           // Consume transient extra AP cost (e.g. zombie zone control penalty on MOVE)
-           const extraCost = newState._extraAPCost || 0;
-           delete newState._extraAPCost;
-           const pref = intent.payload?.preferredFreePool as
-               | 'combat' | 'melee' | 'ranged' | 'move' | 'search' | undefined;
-           newState = deductAPWithFreeCheck(newState, intent.survivorId!, intent.type, extraCost, pref);
-           // `_attackIsMelee` must survive until AFTER deductAPWithFreeCheck so
-           // tryMelee/tryRanged (handlerUtils) can key on it (B2).
-           delete (newState as any)._attackIsMelee;
-       }
-    } else if (intent.type === ActionType.RESOLVE_SEARCH) {
-        // Since RESOLVE_SEARCH doesn't cost AP (cost was paid in SEARCH),
-        // we only need to check if the turn should end now that the blocking condition (drawnCard) is cleared.
-        newState = checkEndTurn(newState);
-    } else if (intent.type === ActionType.RESOLVE_WOUNDS) {
-        // No AP cost — resolving pending wounds from ITAYG skill
-        newState = checkEndTurn(newState);
-    } else if (intent.type === ActionType.DISTRIBUTE_ZOMBIE_WOUNDS) {
-        // No AP cost — distributing zombie wounds among survivors
-        newState = checkEndTurn(newState);
-    } else if (intent.type === ActionType.ASSIGN_FRIENDLY_FIRE) {
-        // No AP cost — assigning friendly-fire misses from the last attack
-        newState = checkEndTurn(newState);
+      if (intent.type === ActionType.TRADE_START ||
+          intent.type === ActionType.TRADE_OFFER ||
+          intent.type === ActionType.TRADE_ACCEPT ||
+          intent.type === ActionType.TRADE_CANCEL ||
+          intent.type === ActionType.ORGANIZE) {
+        // Trade sub-actions + Reorganize own their AP accounting inside the
+        // handler so pre-mutation state (drawnCard, activeTrade membership)
+        // determines the free-vs-charged path.
+      }
+      else if (intent.type === ActionType.CHARGE || intent.type === ActionType.BORN_LEADER) {
+        // Charge / Born Leader are free actions
+        checkEndTurn(state, collector);
+      }
+      else {
+        // Pull scratch off the collector (lifted off GameState per D2/D18).
+        const extraCost = collector.extraAPCost ?? 0;
+        const isMelee = collector.attackIsMelee;
+        const rawPref = intent.payload?.preferredFreePool;
+        const pref: AttackFreePool | undefined =
+          rawPref === 'combat' || rawPref === 'melee' || rawPref === 'ranged'
+            ? rawPref
+            : undefined;
+        deductAPWithFreeCheck(state, intent.survivorId!, intent.type, extraCost, pref, isMelee, collector);
+      }
+    } else if (intent.type === ActionType.RESOLVE_SEARCH
+            || intent.type === ActionType.DISTRIBUTE_ZOMBIE_WOUNDS
+            || intent.type === ActionType.ASSIGN_FRIENDLY_FIRE) {
+      // No AP cost — just check if turn should end after the blocking condition cleared.
+      checkEndTurn(state, collector);
     }
 
     // 5. Check for Zombie Phase Transition
-    if (newState.phase === GamePhase.Zombies) {
-      newState = ZombiePhaseManager.executeZombiePhase(newState);
+    if (state.phase === GamePhase.Zombies) {
+      ZombiePhaseManager.executeZombiePhase(state, collector);
     }
 
     // 5b. Check Game End Conditions
-    if (newState.phase === GamePhase.Players || newState.phase === GamePhase.Zombies) {
-        const result = checkGameEndConditions(newState);
-        if (result) {
-          newState.gameResult = result;
-          newState.phase = GamePhase.GameOver; // Lock game
-        }
+    if (state.phase === GamePhase.Players || state.phase === GamePhase.Zombies) {
+      const result = checkGameEndConditions(state);
+      if (result) {
+        state.gameResult = result;
+        state.phase = GamePhase.GameOver;
+      }
     }
 
-    // 6. Log History — merge lastAction feedback into history entry for rich display
-    if (intent.type !== ActionType.SELECT_CHARACTER && intent.type !== ActionType.UPDATE_NICKNAME) {
-        const historyEntry: any = {
-            playerId: intent.playerId,
-            survivorId: intent.survivorId || 'system',
-            actionType: intent.type,
-            timestamp: Date.now(),
-            payload: intent.payload,
-            turn: newState.turn,
-        };
+    // 6. Bump version exactly once per accepted action (§3.1).
+    state.version = (state.version ?? 0) + 1;
 
-        // Capture rich combat/action feedback from lastAction
-        if (newState.lastAction) {
-            historyEntry.description = newState.lastAction.description;
-            historyEntry.dice = newState.lastAction.dice;
-            historyEntry.hits = newState.lastAction.hits;
-            historyEntry.damagePerHit = newState.lastAction.damagePerHit;
-            historyEntry.bonusDice = newState.lastAction.bonusDice;
-            historyEntry.bonusDamage = newState.lastAction.bonusDamage;
-            historyEntry.rerolledFrom = newState.lastAction.rerolledFrom;
-            historyEntry.rerollSource = newState.lastAction.rerollSource;
-            historyEntry.usedFreeAction = newState.lastAction.usedFreeAction;
-            historyEntry.freeActionType = newState.lastAction.freeActionType;
-        }
+    const tagged = collector.drainTagged();
+    const rawEvents = tagged.map((t) => t.event);
+    return { success: true, newState: state, events: rawEvents, taggedEvents: tagged };
 
-        // Capture spawn context for zombie phase entries
-        if (newState.spawnContext?.cards?.length) {
-            historyEntry.spawnContext = newState.spawnContext;
-        }
-
-        newState.history = [
-          ...(newState.history || []),
-          historyEntry,
-        ];
-    }
-
-    return { success: true, newState };
-
-  } catch (e: any) {
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
     return {
       success: false,
-      error: { code: 'ACTION_FAILED', message: e.message }
+      error: { code: 'ACTION_FAILED', message }
     };
   }
 }
+
+// Re-export so consumers can introspect the event payload type.
+export type { GameEvent };

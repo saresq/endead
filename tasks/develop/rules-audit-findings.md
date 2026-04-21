@@ -128,14 +128,24 @@ Surfaced during the uncommitted-diff review. All land **before** SwarmComms Step
   2. If any character in `CharacterRegistry.ts` referenced Reaper, pick a replacement core-box skill (e.g. `plus_1_damage_melee`, `bloodlust_melee`) per that character's published skill tree and flag the change in the character's entry.
 - **Rule:** Reaper is not in Z2E core box; this is the U1 cleanup.
 
-### B12. `GameState.seed` leaks to clients
-- **Where:** broadcast pipeline — `src/server/server.ts:276, 280` include the full `GameState` (seed in tuple form) in outbound `STATE_UPDATE`.
-- **Problem:** client with seed can replay `Rng.from(seed).d6()` and peek future dice — 3-line cheat. This is a **security leak**, not just a cleanup.
-- **Fix:**
-  1. Add a `redactForClient(state)` helper that deep-clones outbound state minus `seed` (and any other server-only fields — audit: `_attackIsMelee`, `_extraAPCost`).
-  2. Every server→client payload (current `STATE_UPDATE` / `STATE_PATCH`, future `SNAPSHOT` and `EVENTS`) goes through this helper.
-  3. Tests: add a regression test that asserts no broadcast message contains a `seed` key.
-- **Cross-ref:** SwarmComms §0, §6 — promoted to a hard blocker on SwarmComms Step 4.
+### B12. Server-authoritative fields leak to clients (seed + rollbackSnapshot + private info)
+- **Where:** broadcast pipeline — `src/server/server.ts:276, 280` include the full `GameState` (seed in tuple form) in outbound `STATE_UPDATE`. Further leak sites widened by the SwarmComms audit (§3.7.1, D3):
+  - `GameState.seed` — xoshiro128** state, recoverable as 3 lines `Rng.from(seed).d6()` to peek upcoming dice.
+  - `lastAction.rollbackSnapshot` — captured at `CombatHandlers.ts:17-32`; its payload includes `seedAfterRoll`, `equipmentDeck` (ordered), `zombies`, `survivors`, `objectives`, `noiseTokens`, `zoneNoise`, and the attack intent. Worse than seed alone: it hands the attacker visibility into future draws.
+  - Transient handler scratch `_attackIsMelee` / `_extraAPCost` — lifted off `GameState` in Step 3, but §3.7.1 belt-and-braces drop is mandatory so regressions can't re-introduce them.
+  - Other-player `survivors[sid].drawnCard` and `drawnCardsQueue` — the card IDs leak during Search / Epic Crate / Hold Your Nose.
+  - `activeTrade.offers` — card IDs leak to non-participants.
+  - `equipmentDeck` / `spawnDeck` / `epicDeck` contents — peeks every upcoming draw. Discards stay public.
+- **Problem:** every field above is a cheat surface, not cosmetic. A client with `seed` or `rollbackSnapshot` has deterministic foresight of dice, spawns, and draws.
+- **Fix:** single choke point `src/server/projectForSocket.ts` (SwarmComms §3.7.1). Every client-bound payload — SNAPSHOT, EVENTS (per-socket branch), error-path resync — routes through `projectForSocket(state, socket)`. Redactions:
+  1. Omit `seed` (and defensively `_attackIsMelee` / `_extraAPCost` / `history`).
+  2. Replace `lastAction.rollbackSnapshot` with a boolean `lastAction.canLucky` gated on shooter ownership + Lucky-unspent. Surface `originalDice` (UI rendering) but never `seedAfterRoll` / deck contents.
+  3. Strip `drawnCard` / `drawnCardsQueue` for non-owners; expose `{ hasDrawnCard, queueLength }` instead.
+  4. Strip `activeTrade.offers` for non-participants; expose `{ offerCounts }` instead.
+  5. Strip `equipmentDeck` / `spawnDeck` / `epicDeck` contents; expose counts only.
+  6. Private events (`CARD_DRAWN`, `TRADE_OFFER_UPDATED`) route to recipient sockets only; others receive `CARD_DRAWN_HIDDEN` / `TRADE_OFFER_UPDATED_HIDDEN`.
+- **Regression gate:** `src/server/__tests__/projectForSocket.test.ts` — 7 fields × 3 roles (owner, non-owner, spectator) + server-local (`socket=null`). Every cell explicitly asserted. No drive-by "redacted somewhere" checks.
+- **Cross-ref:** SwarmComms §0.1, §3.7, §3.7.1, Step 4, Step 7, D3, D6 — hard blocker on SwarmComms Step 4 (shipped with it, not a follow-up).
 
 ---
 

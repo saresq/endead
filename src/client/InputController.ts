@@ -18,7 +18,7 @@ export class InputController {
   private selectedSurvivorId: EntityId | null = null;
   private pendingMoveZoneId: ZoneId | null = null;
   private localPlayerId: PlayerId;
-  private interactionMode: 'DEFAULT' | 'ATTACK' | 'OPEN_DOOR' | 'SPRINT' | 'CHARGE' | 'BLOODLUST_MELEE' | 'LIFESAVER' = 'DEFAULT';
+  private interactionMode: 'DEFAULT' | 'ATTACK' | 'OPEN_DOOR' | 'SPRINT' | 'CHARGE' = 'DEFAULT';
   private selectedWeaponId: EntityId | null = null;
   
   // Callback for when selection changes (so the Renderer can highlight)
@@ -47,7 +47,7 @@ export class InputController {
     return this.selectedWeaponId;
   }
 
-  public setMode(mode: 'DEFAULT' | 'ATTACK' | 'OPEN_DOOR' | 'SPRINT' | 'CHARGE' | 'BLOODLUST_MELEE' | 'LIFESAVER', weaponId?: EntityId): void {
+  public setMode(mode: 'DEFAULT' | 'ATTACK' | 'OPEN_DOOR' | 'SPRINT' | 'CHARGE', weaponId?: EntityId): void {
     const nextWeaponId = weaponId || null;
     // Toggle off when re-selecting the same mode (and same weapon, for ATTACK)
     if (mode !== 'DEFAULT' && mode === this.interactionMode && nextWeaponId === this.selectedWeaponId) {
@@ -183,12 +183,6 @@ export class InputController {
           this.setMode('DEFAULT');
         } else if (this.interactionMode === 'CHARGE') {
           this.sendSkillZoneAction(ActionType.CHARGE, clickedZoneId);
-          this.setMode('DEFAULT');
-        } else if (this.interactionMode === 'BLOODLUST_MELEE') {
-          this.sendSkillZoneAction(ActionType.BLOODLUST_MELEE, clickedZoneId);
-          this.setMode('DEFAULT');
-        } else if (this.interactionMode === 'LIFESAVER') {
-          this.sendLifesaverAction(clickedZoneId, currentState);
           this.setMode('DEFAULT');
         } else {
           // DEFAULT = MOVE (tap once to preview, tap again to confirm)
@@ -675,7 +669,7 @@ export class InputController {
     });
   }
 
-  /** Send Sprint/Charge/Bloodlust — uses path=[targetZoneId] for single-zone targeting */
+  /** Send Sprint/Charge — uses path=[targetZoneId] for single-zone targeting */
   private sendSkillZoneAction(actionType: ActionType, targetZoneId: ZoneId): void {
     if (!this.selectedSurvivorId) return;
 
@@ -684,22 +678,6 @@ export class InputController {
       survivorId: this.selectedSurvivorId,
       type: actionType,
       payload: { path: [targetZoneId] },
-    });
-  }
-
-  /** Send Lifesaver — rescues all survivors in the target zone */
-  private sendLifesaverAction(targetZoneId: ZoneId, state: GameState): void {
-    if (!this.selectedSurvivorId) return;
-
-    const survivorIds = Object.values(state.survivors)
-      .filter(s => s.position.zoneId === targetZoneId && s.id !== this.selectedSurvivorId && s.wounds < s.maxHealth)
-      .map(s => s.id);
-
-    networkManager.sendAction({
-      playerId: this.localPlayerId,
-      survivorId: this.selectedSurvivorId,
-      type: ActionType.LIFESAVER,
-      payload: { targetZoneId, targetSurvivorIds: survivorIds },
     });
   }
 

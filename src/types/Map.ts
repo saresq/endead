@@ -22,6 +22,9 @@ export enum MarkerType {
   ZombieSpawn = 'ZOMBIE_SPAWN',
   Exit = 'EXIT',
   Objective = 'OBJECTIVE',
+  /** Epic Weapon Crate — taking it grants a random Epic weapon. Count is
+   *  capped at the Epic deck size at map-save time (see EPIC_DECK_SIZE). */
+  EpicCrate = 'EPIC_CRATE',
 }
 
 /** A marker placed on a specific zone cell */

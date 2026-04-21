@@ -98,11 +98,25 @@ export class XPManager {
       skills: [...survivor.skills, skillId],
     };
 
-    // Apply immediate effects
+    // Apply immediate effects. Zombicide rules: skills take effect the
+    // moment they are acquired (RULEBOOK "Skills take effect immediately when
+    // acquired"). For the per-turn free-pool skills the end-of-round reseed
+    // handles subsequent turns, but the current turn's pool has to be
+    // bumped here or the player silently loses the free Action they just
+    // earned.
     if (skillId === 'plus_1_action') {
       updated.actionsPerTurn = survivor.actionsPerTurn + 1;
-      // Zombicide rules: "Immediately gains the benefit".
       updated.actionsRemaining = survivor.actionsRemaining + 1;
+    } else if (skillId === 'plus_1_free_move') {
+      updated.freeMovesRemaining = survivor.freeMovesRemaining + 1;
+    } else if (skillId === 'plus_1_free_search') {
+      updated.freeSearchesRemaining = survivor.freeSearchesRemaining + 1;
+    } else if (skillId === 'plus_1_free_melee') {
+      updated.freeMeleeRemaining = survivor.freeMeleeRemaining + 1;
+    } else if (skillId === 'plus_1_free_ranged') {
+      updated.freeRangedRemaining = survivor.freeRangedRemaining + 1;
+    } else if (skillId === 'plus_1_free_combat') {
+      updated.freeCombatsRemaining = survivor.freeCombatsRemaining + 1;
     }
 
     return updated;

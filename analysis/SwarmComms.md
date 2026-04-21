@@ -245,7 +245,7 @@ Every accepted action bumps the room's `v`. Every `EVENTS` message carries the r
 - Client tracks last-seen `v`. If it receives `v = N+2` without having seen `N+1`, it requests a `SNAPSHOT`.
 - `room.eventLog` entries are `{ v, events[] }` — supports O(log n) seek on resync-from-version. A flat event array loses this.
 - No out-of-order delivery is possible on a single WS, so gap detection is a safety net for reconnection, not a hot-path concern.
-- Optimistic events on the client are tagged `{ v: null, pending: actionId }` until confirmed. On confirmation the client drops the tag; on `ERROR` it walks backward applying inverse events (restricted whitelist only, where inverses are trivial) or restores a per-action snapshot of the touched subtree.
+- Optimistic events on the client are tagged `{ v: null, pending: actionId }` until confirmed. On confirmation the client drops the tag; on `ERROR` it restores a per-action path-targeted snapshot of the touched subtree (D20 — snapshot-only rollback; there is no "inverse events" path).
 
 ### 3.9 Renderer integration
 

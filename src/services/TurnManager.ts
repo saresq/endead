@@ -1,6 +1,7 @@
 
 import { GamePhase, type GameState } from '../types/GameState';
-import type { ActionRequest, ActionError } from '../types/Action';
+import { ActionType, type ActionRequest, type ActionError } from '../types/Action';
+import type { EventCollector } from './EventCollector';
 
 /**
  * Validates if an action request is permissible under the current game state.
@@ -77,6 +78,19 @@ export function validateTurn(state: GameState, request: ActionRequest): ActionEr
         };
       }
 
+      // 1 Search per Turn — free Searches count toward the limit (rulebook:
+      // Search). Free search pool only waives the AP cost; it does NOT grant
+      // a second Search. Enforce in the validator so the error matches the
+      // handler's gate before any state churn.
+      if (request.type === ActionType.SEARCH
+          && survivor.hasSearched
+          && !survivor.skills.includes('can_search_more_than_once')) {
+        return {
+          code: 'ALREADY_SEARCHED',
+          message: 'Already searched this turn',
+        };
+      }
+
       // 4. Check Action Economy
       // Exception: Passive player in a trade does not need actions
       // Exception: Resolve Search/Pickup or Organize during Pickup is allowed with 0 actions
@@ -122,31 +136,30 @@ export function validateTurn(state: GameState, request: ActionRequest): ActionEr
 }
 
 /**
- * Checks if the turn should automatically end (pass to next player)
- * based on remaining actions of the active player.
+ * Checks if the turn should automatically end (pass to next player) based on
+ * remaining actions of the active player. Mutates `state` in place.
+ *
+ * When passed a `collector`, emits ACTIVE_PLAYER_CHANGED (and
+ * ZOMBIE_PHASE_STARTED when the rotation wraps into the zombie phase) so
+ * client UIs learn the turn transitioned. See analysis/SwarmComms.md §3.2.
  */
-export function checkEndTurn(state: GameState): GameState {
-  // Create shallow copy
-  const newState = { ...state };
-
-  // CRITICAL: Do NOT auto-pass if ANY survivor has a pending drawn card 
-  // or if a Trade is active.
-  const anyDrawnCard = Object.values(newState.survivors).some(
+export function checkEndTurn(state: GameState, collector?: EventCollector): void {
+  // CRITICAL: Do NOT auto-pass if ANY survivor has a pending drawn card,
+  // if a Trade is active, or if a friendly-fire assignment is outstanding.
+  const anyDrawnCard = Object.values(state.survivors).some(
     s => s.drawnCard || (s.drawnCardsQueue && s.drawnCardsQueue.length > 0),
   );
-  
-  if (anyDrawnCard || newState.activeTrade) {
-      return newState;
+
+  if (anyDrawnCard || state.activeTrade || state.pendingFriendlyFire) {
+    return;
   }
 
-  const activePlayerId = newState.players[newState.activePlayerIndex];
-  
-  // Find all living survivors belonging to the active player
-  const playerSurvivors = Object.values(newState.survivors).filter(
+  const activePlayerId = state.players[state.activePlayerIndex];
+
+  const playerSurvivors = Object.values(state.survivors).filter(
     (s) => s.playerId === activePlayerId && s.wounds < s.maxHealth
   );
 
-  // Check if ANY living survivor has actions remaining
   const hasActionsLeft = playerSurvivors.some((s) =>
     s.actionsRemaining > 0 ||
     s.freeMovesRemaining > 0 ||
@@ -157,46 +170,44 @@ export function checkEndTurn(state: GameState): GameState {
   );
 
   if (!hasActionsLeft) {
-    // Player is done, move to next player (wrap around)
-    const nextIndex = (newState.activePlayerIndex + 1) % newState.players.length;
-
-    // Check for Phase Change (End of Round) — all players have had their turn
-    // when we wrap back to the first player token holder
-    if (nextIndex === newState.firstPlayerTokenIndex) {
-      newState.activePlayerIndex = nextIndex;
-      newState.phase = GamePhase.Zombies;
-    } else {
-      newState.activePlayerIndex = nextIndex;
+    const oldIndex = state.activePlayerIndex;
+    const nextIndex = (state.activePlayerIndex + 1) % state.players.length;
+    state.activePlayerIndex = nextIndex;
+    collector?.emit({
+      type: 'ACTIVE_PLAYER_CHANGED',
+      oldPlayerIndex: oldIndex,
+      newPlayerIndex: nextIndex,
+      newActivePlayerId: state.players[nextIndex],
+    });
+    if (nextIndex === state.firstPlayerTokenIndex) {
+      state.phase = GamePhase.Zombies;
+      collector?.emit({
+        type: 'ZOMBIE_PHASE_STARTED',
+        turnNumber: state.turn,
+      });
     }
   }
-
-  return newState;
 }
 
 /**
- * Advances the turn state after a successful action.
- * Handles:
- * - Decrementing action points
- * - Auto-ending player turn if all survivors are exhausted
- * - Auto-advancing to Zombie phase if all players are done
+ * Advances the turn state after a successful action. Mutates `state` in place.
  */
-export function advanceTurnState(state: GameState, survivorId: string): GameState {
-  // Create a shallow copy of the state to modify
-  const newState: GameState = { ...state };
-  
-  // 1. Decrement Actions
-  // Clone survivors map and the specific survivor to avoid mutation
-  const newSurvivors = { ...newState.survivors };
-  const survivor = { ...newSurvivors[survivorId] };
-  
-  // Ensure we don't go below 0, though validation should prevent this
-  const newActionsRemaining = Math.max(0, survivor.actionsRemaining - 1);
-  survivor.actionsRemaining = newActionsRemaining;
-  newSurvivors[survivorId] = survivor;
-  newState.survivors = newSurvivors;
-
-  // 2. Check for Turn End
-  return checkEndTurn(newState);
+export function advanceTurnState(
+  state: GameState,
+  survivorId: string,
+  collector?: EventCollector,
+): void {
+  const survivor = state.survivors[survivorId];
+  const prev = survivor.actionsRemaining;
+  survivor.actionsRemaining = Math.max(0, survivor.actionsRemaining - 1);
+  if (survivor.actionsRemaining !== prev) {
+    collector?.emit({
+      type: 'SURVIVOR_ACTIONS_REMAINING_CHANGED',
+      survivorId,
+      newCount: survivor.actionsRemaining,
+    });
+  }
+  checkEndTurn(state, collector);
 }
 
 /**

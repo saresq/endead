@@ -1,9 +1,21 @@
 
 import { GameState, ZoneId, Zone, ZoneConnection, EquipmentCard, ZombieType } from '../../types/GameState';
-import { ActionType } from '../../types/Action';
+import { ActionType, AttackFreePool, ActionRequest } from '../../types/Action';
 import { advanceTurnState, checkEndTurn } from '../TurnManager';
+import type { EventCollector } from '../EventCollector';
 
-export type ActionHandler = (state: GameState, intent: any) => GameState;
+/**
+ * SwarmComms handler contract (analysis §3.10).
+ *   - Validate-first: throw before any mutation or emit.
+ *   - Mutation-in-place: do not clone `state`; assign in place.
+ *   - Emit through `collector` (server-authoritative event stream).
+ *   - No return value: the dispatcher reads the same `state` object after.
+ */
+export type ActionHandler = (
+  state: GameState,
+  intent: ActionRequest,
+  collector: EventCollector,
+) => void;
 
 // --- Helper: Get edge connection between two zones ---
 export function getConnection(zone: Zone, targetZoneId: ZoneId): ZoneConnection | undefined {
@@ -56,37 +68,47 @@ export function handleSurvivorDeath(state: GameState, survivorId: string): void 
  * Checks if a free action is available for this action type.
  * If so, consumes the free action instead of deducting AP.
  * Otherwise falls through to normal AP deduction via advanceTurnState.
+ *
+ * Mutates `state` in place. `isMelee` is passed explicitly (lifted off
+ * `GameState._attackIsMelee` per D2) — required for ATTACK to key the
+ * melee/ranged free pool correctly.
+ *
+ * Emits SURVIVOR_FREE_ACTION_CONSUMED / SURVIVOR_ACTIONS_REMAINING_CHANGED
+ * via the collector so client UIs learn AP accounting happened. Turn
+ * transitions flow through checkEndTurn / advanceTurnState which emit
+ * ACTIVE_PLAYER_CHANGED + ZOMBIE_PHASE_STARTED as needed.
  */
-export type FreePool = 'combat' | 'melee' | 'ranged' | 'move' | 'search';
-
 export function deductAPWithFreeCheck(
   state: GameState,
   survivorId: string,
   actionType: ActionType,
   extraCost: number = 0,
-  preferredFreePool?: FreePool,
-): GameState {
-  const newState = { ...state };
-  const newSurvivors = { ...newState.survivors };
-  const survivor = { ...newSurvivors[survivorId] };
+  preferredFreePool?: AttackFreePool,
+  isMelee?: boolean,
+  collector?: EventCollector,
+): void {
+  const survivor = state.survivors[survivorId];
 
   let usedFree = false;
   let freeType = '';
+  let freePool: 'move' | 'search' | 'combat' | 'melee' | 'ranged' | null = null;
 
   const tryMelee = () => {
-    if (survivor.freeMeleeRemaining > 0 && state._attackIsMelee) {
+    if (survivor.freeMeleeRemaining > 0 && isMelee === true) {
       survivor.freeMeleeRemaining--;
       usedFree = true;
       freeType = 'Free Melee';
+      freePool = 'melee';
       return true;
     }
     return false;
   };
   const tryRanged = () => {
-    if (survivor.freeRangedRemaining > 0 && state._attackIsMelee === false) {
+    if (survivor.freeRangedRemaining > 0 && isMelee === false) {
       survivor.freeRangedRemaining--;
       usedFree = true;
       freeType = 'Free Ranged';
+      freePool = 'ranged';
       return true;
     }
     return false;
@@ -96,6 +118,7 @@ export function deductAPWithFreeCheck(
       survivor.freeCombatsRemaining--;
       usedFree = true;
       freeType = 'Free Combat';
+      freePool = 'combat';
       return true;
     }
     return false;
@@ -105,10 +128,12 @@ export function deductAPWithFreeCheck(
     survivor.freeMovesRemaining--;
     usedFree = true;
     freeType = 'Free Move';
+    freePool = 'move';
   } else if (actionType === ActionType.SEARCH && survivor.freeSearchesRemaining > 0) {
     survivor.freeSearchesRemaining--;
     usedFree = true;
     freeType = 'Free Search';
+    freePool = 'search';
   } else if (actionType === ActionType.ATTACK) {
     // Honor player-preferred pool when specified and available; otherwise
     // default to combat → melee → ranged (legacy order).
@@ -121,32 +146,39 @@ export function deductAPWithFreeCheck(
   }
 
   if (usedFree) {
-    // Tag lastAction with free action info
-    if (newState.lastAction) {
-      newState.lastAction.usedFreeAction = true;
-      newState.lastAction.freeActionType = freeType;
+    if (state.lastAction) {
+      state.lastAction.usedFreeAction = true;
+      state.lastAction.freeActionType = freeType;
     }
-    // Free action covers the base cost; only apply extra cost (e.g. zombie zone penalty)
+    if (freePool) {
+      collector?.emit({
+        type: 'SURVIVOR_FREE_ACTION_CONSUMED',
+        survivorId,
+        pool: freePool,
+      });
+    }
     if (extraCost > 0) {
       survivor.actionsRemaining = Math.max(0, survivor.actionsRemaining - extraCost);
+      collector?.emit({
+        type: 'SURVIVOR_ACTIONS_REMAINING_CHANGED',
+        survivorId,
+        newCount: survivor.actionsRemaining,
+      });
     }
-    newSurvivors[survivorId] = survivor;
-    newState.survivors = newSurvivors;
-    return checkEndTurn(newState);
+    checkEndTurn(state, collector);
+    return;
   }
-
-  // No free action — normal AP deduction (including any extra cost)
-  newSurvivors[survivorId] = survivor;
-  newState.survivors = newSurvivors;
 
   if (extraCost > 0) {
-    // Deduct extra cost on top of the normal 1 AP from advanceTurnState
-    const s = { ...newState.survivors[survivorId] };
-    s.actionsRemaining = Math.max(0, s.actionsRemaining - extraCost);
-    newState.survivors = { ...newState.survivors, [survivorId]: s };
+    survivor.actionsRemaining = Math.max(0, survivor.actionsRemaining - extraCost);
+    collector?.emit({
+      type: 'SURVIVOR_ACTIONS_REMAINING_CHANGED',
+      survivorId,
+      newCount: survivor.actionsRemaining,
+    });
   }
 
-  return advanceTurnState(newState, survivorId);
+  advanceTurnState(state, survivorId, collector);
 }
 
 export function getDistance(state: GameState, startZoneId: ZoneId, endZoneId: ZoneId): number {
@@ -176,13 +208,19 @@ export function getDistance(state: GameState, startZoneId: ZoneId, endZoneId: Zo
 }
 
 /**
- * Grid cells that make up a zone (from zoneGeometry). Empty when no geometry.
+ * Grid cells that make up a zone (from zoneGeometry).
+ * Throws if geometry is missing — maps without zoneGeometry are rejected at
+ * compile time (see ScenarioCompiler.ts), so reaching here with missing cells
+ * is a programmer error, not a runtime condition.
  */
 export function getZoneCells(state: GameState, zoneId: ZoneId): { col: number; row: number }[] {
-  if (state.zoneGeometry?.zoneCells[zoneId]) {
-    return state.zoneGeometry.zoneCells[zoneId].map(c => ({ col: c.x, row: c.y }));
+  const cells = state.zoneGeometry?.zoneCells[zoneId];
+  if (!cells || cells.length === 0) {
+    throw new Error(
+      `getZoneCells: zone "${zoneId}" has no cells in zoneGeometry. This map should have been rejected at compile time.`,
+    );
   }
-  return [];
+  return cells.map(c => ({ col: c.x, row: c.y }));
 }
 
 /**
@@ -211,7 +249,6 @@ export function hasLineOfSight(state: GameState, startZoneId: ZoneId, endZoneId:
 
   const cellsA = getZoneCells(state, startZoneId);
   const cellsB = getZoneCells(state, endZoneId);
-  if (cellsA.length === 0 || cellsB.length === 0) return false;
 
   for (const a of cellsA) {
     for (const b of cellsB) {
