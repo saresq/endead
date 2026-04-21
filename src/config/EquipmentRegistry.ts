@@ -211,6 +211,151 @@ export const EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'inHand'
   }
 };
 
+// Zombicide 2nd Edition — Epic Weapons deck (11 cards, red backs, RULEBOOK §14).
+// Drawn only when a Survivor takes an Epic Weapon Crate token.
+export const EPIC_EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'inHand' | 'slot'>> = {
+  'aaahh_epic': {
+    name: 'Aaahh!!',
+    type: EquipmentType.Item,
+    keywords: ['aaahh'],
+    stats: undefined
+  },
+  'army_sniper_rifle': {
+    name: 'Army Sniper Rifle',
+    type: EquipmentType.Weapon,
+    keywords: ['sniper'],
+    stats: {
+      range: [1, 3],
+      dice: 1,
+      accuracy: 2,
+      damage: 3,
+      noise: true,
+      dualWield: false,
+      ammo: 'bullets',
+    }
+  },
+  'automatic_shotgun': {
+    name: 'Automatic Shotgun',
+    type: EquipmentType.Weapon,
+    stats: {
+      range: [0, 1],
+      dice: 3,
+      accuracy: 4,
+      damage: 2,
+      noise: true,
+      dualWield: false,
+      ammo: 'shells',
+    }
+  },
+  'evil_twins': {
+    name: 'Evil Twins',
+    type: EquipmentType.Weapon,
+    stats: {
+      range: [0, 1],
+      dice: 2,
+      accuracy: 3,
+      damage: 1,
+      noise: true,
+      dualWield: true,
+      ammo: 'bullets',
+    }
+  },
+  'golden_ak47': {
+    name: 'Golden AK-47',
+    type: EquipmentType.Weapon,
+    stats: {
+      range: [0, 2],
+      dice: 3,
+      accuracy: 4,
+      damage: 1,
+      noise: true,
+      dualWield: false,
+      ammo: 'bullets',
+    }
+  },
+  'golden_kukri': {
+    name: 'Golden Kukri',
+    type: EquipmentType.Weapon,
+    stats: {
+      range: [0, 0],
+      dice: 2,
+      accuracy: 3,
+      damage: 2,
+      noise: false,
+      dualWield: true,
+    }
+  },
+  'gunblade': {
+    name: 'Gunblade',
+    type: EquipmentType.Weapon,
+    stats: {
+      range: [0, 1],
+      dice: 2,
+      accuracy: 4,
+      damage: 2,
+      noise: true,
+      dualWield: false,
+      ammo: 'bullets',
+    }
+  },
+  'mas_shotgun': {
+    name: "Ma's Shotgun",
+    type: EquipmentType.Weapon,
+    keywords: ['reload'],
+    stats: {
+      range: [0, 1],
+      dice: 3,
+      accuracy: 4,
+      damage: 2,
+      noise: true,
+      dualWield: false,
+      ammo: 'shells',
+    }
+  },
+  'nailbat': {
+    name: 'Nailbat',
+    type: EquipmentType.Weapon,
+    stats: {
+      range: [0, 0],
+      dice: 2,
+      accuracy: 3,
+      damage: 2,
+      noise: false,
+      dualWield: false,
+    }
+  },
+  'zantetsuken': {
+    name: 'Zantetsuken',
+    type: EquipmentType.Weapon,
+    stats: {
+      range: [0, 0],
+      dice: 2,
+      accuracy: 4,
+      damage: 3,
+      noise: false,
+      dualWield: false,
+    }
+  },
+};
+
+// RULEBOOK §14 — Epic Weapons deck: 11 cards total. Aaahh!! x2, all others x1.
+export const INITIAL_EPIC_DECK_CONFIG = [
+  'aaahh_epic', 'aaahh_epic',
+  'army_sniper_rifle',
+  'automatic_shotgun',
+  'evil_twins',
+  'golden_ak47',
+  'golden_kukri',
+  'gunblade',
+  'mas_shotgun',
+  'nailbat',
+  'zantetsuken',
+];
+
+// Hard cap on Epic Weapon Crates placeable in the map editor: one crate per card.
+// Placing more crates than the deck can pay out would leave later takes unfulfilled.
+export const EPIC_CRATE_LIMIT = INITIAL_EPIC_DECK_CONFIG.length;
+
 // Zombicide 2nd Edition — Standard Equipment deck (45 cards, blue backs).
 // Starting Equipment (Baseball Bat, Crowbar, Fire Axe, Pistol x3) is dealt
 // at setup from a separate grey-back deck and is NOT part of this deck.

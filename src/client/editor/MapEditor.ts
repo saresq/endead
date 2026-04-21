@@ -7,6 +7,7 @@ import { TileInstance, ScenarioMap, MapMarker, MarkerType } from '../../types/Ma
 import { PixiBoardRenderer } from '../PixiBoardRenderer';
 import { GameState, initialGameState, Zone, ZoneConnection } from '../../types/GameState';
 import { TILE_SIZE, TILE_CELLS_PER_SIDE, TILE_PIXEL_SIZE } from '../../config/Layout';
+import { EPIC_CRATE_LIMIT } from '../../config/EquipmentRegistry';
 import { compileScenario } from '../../services/ScenarioCompiler';
 import { getRotatedTileDefinition, getCellAt } from '../../services/TileDefinitionService';
 import { setZoneGeometry } from '../utils/zoneLayout';
@@ -88,6 +89,12 @@ const EDITOR_THEME = {
       strokeWidth: 2,
       dotColor: 0x000000,
     },
+    epicCrate: {
+      fill: 0xCC2222,
+      fillAlpha: 0.85,
+      stroke: 0xFFCC00,
+      strokeWidth: 2,
+    },
   },
 } as const;
 
@@ -98,6 +105,7 @@ enum EditorTool {
   ZombieSpawn = 'ZOMBIE_SPAWN',
   Exit = 'EXIT',
   Objective = 'OBJECTIVE',
+  EpicCrate = 'EPIC_CRATE',
   Eraser = 'ERASER',
 }
 
@@ -300,6 +308,7 @@ export class MapEditor {
       { tool: EditorTool.ZombieSpawn, label: 'Z. Spawn', key: '3' },
       { tool: EditorTool.Exit, label: 'Exit', key: '4' },
       { tool: EditorTool.Objective, label: 'Objective', key: '5' },
+      { tool: EditorTool.EpicCrate, label: `Epic Crate (0/${EPIC_CRATE_LIMIT})`, key: '6' },
       { tool: EditorTool.Eraser, label: 'Eraser', key: 'E' },
     ];
 
@@ -388,6 +397,7 @@ export class MapEditor {
     this.markers = JSON.parse(JSON.stringify(snap.markers));
     this.rebuildPreviewState();
     this.updateValidation();
+    this.refreshEpicCrateButtonLabel();
   }
 
   private pushUndo(): void {
@@ -433,6 +443,7 @@ export class MapEditor {
       [EditorTool.ZombieSpawn]: 'Click STREET zone cells to place Zombie Spawn points.',
       [EditorTool.Exit]: 'Click STREET zone cells to place Exit points.',
       [EditorTool.Objective]: 'Click any zone cell to place Objective tokens.',
+      [EditorTool.EpicCrate]: `Click any zone cell to place Epic Weapon Crate (max ${EPIC_CRATE_LIMIT}).`,
       [EditorTool.Eraser]: 'Click to remove markers from cells.',
     };
     this.statusText.innerText = hints[tool] || '';
@@ -543,7 +554,8 @@ export class MapEditor {
       // Number keys for tool switching
       const toolMap: Record<string, EditorTool> = {
         '1': EditorTool.Tile, '2': EditorTool.PlayerStart, '3': EditorTool.ZombieSpawn,
-        '4': EditorTool.Exit, '5': EditorTool.Objective, 'e': EditorTool.Eraser,
+        '4': EditorTool.Exit, '5': EditorTool.Objective, '6': EditorTool.EpicCrate,
+        'e': EditorTool.Eraser,
       };
       if (toolMap[key]) this.setTool(toolMap[key]);
     });
@@ -646,6 +658,9 @@ export class MapEditor {
       case EditorTool.Objective:
         this.handleMarkerPlacement(wx, wy, MarkerType.Objective, false);
         break;
+      case EditorTool.EpicCrate:
+        this.handleMarkerPlacement(wx, wy, MarkerType.EpicCrate, false);
+        break;
       case EditorTool.Eraser:
         this.handleErase(wx, wy);
         break;
@@ -736,6 +751,15 @@ export class MapEditor {
       this.markers.splice(existingIndex, 1);
       this.statusText.innerText = `Removed ${type} at (${zx},${zy})`;
     } else {
+      // Epic Crates are capped at the deck size — one crate per epic weapon card.
+      if (type === MarkerType.EpicCrate) {
+        const placed = this.markers.filter(m => m.type === MarkerType.EpicCrate).length;
+        if (placed >= EPIC_CRATE_LIMIT) {
+          this.statusText.innerText = `Epic Crate limit reached (${EPIC_CRATE_LIMIT}). Remove one before placing another.`;
+          return;
+        }
+      }
+
       // Check: only one marker of same type per zone
       if (zoneId) {
         const sameTypeInZone = this.markers.find(m => {
@@ -755,6 +779,16 @@ export class MapEditor {
       this.markers.push({ type, x: zx, y: zy });
       this.statusText.innerText = `Placed ${type} at (${zx},${zy})`;
     }
+    if (type === MarkerType.EpicCrate) {
+      this.refreshEpicCrateButtonLabel();
+    }
+  }
+
+  private refreshEpicCrateButtonLabel() {
+    const btn = this.toolButtons.get(EditorTool.EpicCrate);
+    if (!btn) return;
+    const placed = this.markers.filter(m => m.type === MarkerType.EpicCrate).length;
+    btn.innerText = `Epic Crate (${placed}/${EPIC_CRATE_LIMIT})`;
   }
 
   // --- Eraser ---
@@ -767,6 +801,7 @@ export class MapEditor {
 
   private removeAllAtCell(zx: number, zy: number) {
     this.markers = this.markers.filter(m => m.x !== zx || m.y !== zy);
+    this.refreshEpicCrateButtonLabel();
   }
 
   // =============================================
@@ -1011,6 +1046,17 @@ export class MapEditor {
           g.circle(cx, cy, 5);
           g.fill({ color: EDITOR_THEME.marker.objective.dotColor });
           break;
+        case MarkerType.EpicCrate:
+          // Red square crate with yellow 'E' inside to differentiate from Exit.
+          g.rect(cx - 14, cy - 14, 28, 28);
+          g.fill({ color: EDITOR_THEME.marker.epicCrate.fill, alpha: EDITOR_THEME.marker.epicCrate.fillAlpha });
+          g.stroke({ width: EDITOR_THEME.marker.epicCrate.strokeWidth, color: EDITOR_THEME.marker.epicCrate.stroke });
+          g.rect(cx - 8, cy - 8, 3, 16);
+          g.rect(cx - 8, cy - 8, 12, 3);
+          g.rect(cx - 8, cy - 2, 8, 3);
+          g.rect(cx - 8, cy + 5, 12, 3);
+          g.fill({ color: EDITOR_THEME.marker.epicCrate.stroke });
+          break;
       }
     });
 
@@ -1228,6 +1274,7 @@ export class MapEditor {
             this.state.zoneGeometry = undefined;
             setZoneGeometry(null);
             this.updateValidation();
+            this.refreshEpicCrateButtonLabel();
           }
         });
       },
@@ -1445,6 +1492,7 @@ export class MapEditor {
 
     this.rebuildPreviewState();
     this.updateValidation();
+    this.refreshEpicCrateButtonLabel();
     this.statusText.innerText = `Loaded: ${mapData.name}${isLegacy ? ' (migrated from 3x3)' : ''}`;
   }
 

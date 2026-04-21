@@ -1,10 +1,11 @@
 
 import { SpawnCard, DangerLevel, ZombieType } from '../types/GameState';
 
-// Zombicide 2nd Edition Spawn Deck — 40 cards total
+// Zombicide 2nd Edition Spawn Deck — 40 cards total (RULEBOOK §15)
 // #001-#018: Easier spawns (lower counts, no Abominations at Blue)
 // #019-#036: Harder spawns (higher counts, Abominations can appear earlier)
-// #037-#040: Extra Activation cards
+// #037-#040: Extra Activation cards (no spawn, activate all zombies of one type;
+//            no effect at Blue). Distribution: 2× Walker, 1× Runner, 1× Brute.
 
 export const SPAWN_CARDS: SpawnCard[] = [
   // ═══════════════════════════════════════════════════════
@@ -306,76 +307,43 @@ export const SPAWN_CARDS: SpawnCard[] = [
   },
 
   // ═══════════════════════════════════════════════════════
-  // TIER 3: Rush Cards (#037-#040)
-  // Spawn zombies AND those zombies immediately activate.
+  // TIER 3: Extra Activation Cards (#037-#040) — RULEBOOK §15
+  // No zombies spawn. All zombies of the indicated type perform
+  // an extra Activation. No effect at Blue Danger Level.
+  // Canonical Z2E core deck: 2× Walker, 1× Runner, 1× Brute.
+  //
+  // Rush (spawn-then-activate) is runtime-supported via
+  // SpawnDetail.rush but is not part of the canonical 40-card
+  // deck; it belongs to mission/expansion-specific spawn sets.
   // ═══════════════════════════════════════════════════════
 
-  // #037 — Walker Rush
+  // #037 — Extra Activation: Walkers
   {
     id: 'spawn-037',
-    [DangerLevel.Blue]: { zombies: { [ZombieType.Walker]: 2 }, rush: true },
-    [DangerLevel.Yellow]: { zombies: { [ZombieType.Walker]: 4 }, rush: true },
-    [DangerLevel.Orange]: { zombies: { [ZombieType.Walker]: 4, [ZombieType.Runner]: 1 }, rush: true },
-    [DangerLevel.Red]: { zombies: { [ZombieType.Walker]: 6, [ZombieType.Runner]: 1 }, rush: true },
+    [DangerLevel.Blue]: { zombies: {} },
+    [DangerLevel.Yellow]: { extraActivation: ZombieType.Walker },
+    [DangerLevel.Orange]: { extraActivation: ZombieType.Walker },
+    [DangerLevel.Red]: { extraActivation: ZombieType.Walker },
   },
-  // #038 — Runner Rush
+  // #038 — Extra Activation: Walkers
   {
     id: 'spawn-038',
     [DangerLevel.Blue]: { zombies: {} },
-    [DangerLevel.Yellow]: { zombies: { [ZombieType.Runner]: 2 }, rush: true },
-    [DangerLevel.Orange]: { zombies: { [ZombieType.Runner]: 3 }, rush: true },
-    [DangerLevel.Red]: { zombies: { [ZombieType.Runner]: 4 }, rush: true },
+    [DangerLevel.Yellow]: { extraActivation: ZombieType.Walker },
+    [DangerLevel.Orange]: { extraActivation: ZombieType.Walker },
+    [DangerLevel.Red]: { extraActivation: ZombieType.Walker },
   },
-  // #039 — Brute Rush
+  // #039 — Extra Activation: Runners
   {
     id: 'spawn-039',
-    [DangerLevel.Blue]: { zombies: { [ZombieType.Walker]: 1 } },
-    [DangerLevel.Yellow]: { zombies: { [ZombieType.Brute]: 1 }, rush: true },
-    [DangerLevel.Orange]: { zombies: { [ZombieType.Brute]: 1, [ZombieType.Walker]: 2 }, rush: true },
-    [DangerLevel.Red]: { zombies: { [ZombieType.Brute]: 2, [ZombieType.Walker]: 2 }, rush: true },
-  },
-  // #040 — Mixed Rush
-  {
-    id: 'spawn-040',
-    [DangerLevel.Blue]: { zombies: { [ZombieType.Walker]: 1 } },
-    [DangerLevel.Yellow]: { zombies: { [ZombieType.Walker]: 2, [ZombieType.Runner]: 1 }, rush: true },
-    [DangerLevel.Orange]: { zombies: { [ZombieType.Walker]: 3, [ZombieType.Runner]: 2 }, rush: true },
-    [DangerLevel.Red]: { zombies: { [ZombieType.Walker]: 4, [ZombieType.Runner]: 2 }, rush: true },
-  },
-
-  // ═══════════════════════════════════════════════════════
-  // TIER 4: Extra Activation Cards (#041-#044)
-  // No zombies spawned — all zombies of the indicated type
-  // get an extra activation. No effect at Blue danger level.
-  // ═══════════════════════════════════════════════════════
-
-  // #041 — Extra Activation: Walkers
-  {
-    id: 'spawn-041',
-    [DangerLevel.Blue]: { zombies: {} },
-    [DangerLevel.Yellow]: { extraActivation: ZombieType.Walker },
-    [DangerLevel.Orange]: { extraActivation: ZombieType.Walker },
-    [DangerLevel.Red]: { extraActivation: ZombieType.Walker },
-  },
-  // #042 — Extra Activation: Walkers 2
-  {
-    id: 'spawn-042',
-    [DangerLevel.Blue]: { zombies: {} },
-    [DangerLevel.Yellow]: { extraActivation: ZombieType.Walker },
-    [DangerLevel.Orange]: { extraActivation: ZombieType.Walker },
-    [DangerLevel.Red]: { extraActivation: ZombieType.Walker },
-  },
-  // #043 — Extra Activation: Runners
-  {
-    id: 'spawn-043',
     [DangerLevel.Blue]: { zombies: {} },
     [DangerLevel.Yellow]: { extraActivation: ZombieType.Runner },
     [DangerLevel.Orange]: { extraActivation: ZombieType.Runner },
     [DangerLevel.Red]: { extraActivation: ZombieType.Runner },
   },
-  // #044 — Extra Activation: Brutes
+  // #040 — Extra Activation: Brutes
   {
-    id: 'spawn-044',
+    id: 'spawn-040',
     [DangerLevel.Blue]: { zombies: {} },
     [DangerLevel.Yellow]: { extraActivation: ZombieType.Brute },
     [DangerLevel.Orange]: { extraActivation: ZombieType.Brute },

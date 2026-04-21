@@ -463,6 +463,10 @@ export function compileScenario(map: ScenarioMap): CompiledScenario {
       case MarkerType.Objective:
         if (!objectiveZoneIds.includes(zid)) objectiveZoneIds.push(zid);
         break;
+      case MarkerType.EpicCrate:
+        // Editor-authored Epic Weapon Crate positions. Not yet wired into
+        // gameplay (draw-from-epic-deck on take) — preserved in map data only.
+        break;
     }
   }
 

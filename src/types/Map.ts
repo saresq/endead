@@ -22,6 +22,7 @@ export enum MarkerType {
   ZombieSpawn = 'ZOMBIE_SPAWN',
   Exit = 'EXIT',
   Objective = 'OBJECTIVE',
+  EpicCrate = 'EPIC_CRATE',
 }
 
 /** A marker placed on a specific zone cell */
