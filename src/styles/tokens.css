@@ -1,75 +1,109 @@
 /* ==========================================================================
-   Design Tokens — Single Source of Truth
+   Design Tokens — Single Source of Truth — Field Manual direction
 
-   ALL raw color hex values, pixel sizes, font sizes, timing values, and
-   other design constants live here and ONLY here. Every other CSS file
-   references var(--token-name). To re-theme the app, edit this file.
+   Aesthetic: military / tactical survival field manual.
+   Stenciled type, hazard-tape accents, corner-bracketed panels.
+   Olive + rust + amber on near-black with cool olive undertone.
 
-   DESIGN INTENT: Industrial decay. Corroded steel plating, pitted concrete,
-   rust-bleeding seams, furnace glow behind cracked gauges. Surfaces read as
-   abandoned factory infrastructure — not digital, not clean. The danger
-   level system doesn't just tint — it accelerates the decay.
+   Variable naming: legacy names (--accent, --surface-0, --text-primary, ...)
+   are preserved for component-CSS compatibility, but their values are now
+   the Field Manual equivalents. New-system tokens (--bg-0, --olive-*,
+   --rust-*, --amber-*, --bone-*, --hazard, --ready, --font-stencil,
+   --font-body) are additive.
    ========================================================================== */
 
 :root {
-  /* ---------- Surfaces (industrial void — cold concrete, not warm) ---------- */
-  --surface-0: #07080a;                          /* Deep factory floor — oil-stained void */
-  --surface-1: #0e1012;                          /* Steel panel — cold-rolled, unlit */
-  --surface-2: #161819;                          /* Elevated plate — galvanized, scratched */
-  --surface-3: #1f2224;                          /* Hover — pitted concrete slab */
-  --surface-4: #2c3033;                          /* Border — oxidized steel flange */
-  --surface-5: #3a4044;                          /* High border — weathered I-beam */
-  --surface-inset: #05060804;                    /* Deep recess — drainage channel */
+  /* ---------- Field Manual core palette (new) ---------- */
+  --bg-0: #0b0d0a;                 /* near-black, cool olive undertone */
+  --bg-1: #12140f;                 /* panel base */
+  --bg-2: #1a1d16;                 /* raised surface */
+  --bg-3: #24281e;                 /* input / sunken */
+
+  --olive-900: #2a2e1f;
+  --olive-700: #3e432c;
+  --olive-500: #5a6339;
+  --olive-300: #8a9560;
+
+  --rust-700: #6b2a12;
+  --rust-500: #9c3f1c;
+  --rust-400: #c45a2c;
+  --rust-300: #e07548;
+
+  --amber-500: #d99336;
+  --amber-400: #f0a94a;
+  --amber-200: #f7d28a;
+
+  --bone-100: #e8e1cc;
+  --bone-300: #b8b39e;
+  --bone-500: #8a8674;
+
+  --hazard: #d4c24a;
+  --ready: #7aa64a;
+
+  /* Rank / danger anchor colors (progression track + squad plates) */
+  --rank-blue: #4a90d9;
+  --rank-yellow: var(--amber-400);
+  --rank-orange: var(--rust-400);
+  --rank-red: #b23025;
+
+  /* ---------- Legacy surface aliases (remapped to Field Manual values) ---------- */
+  --surface-0: var(--bg-0);
+  --surface-1: var(--bg-1);
+  --surface-2: var(--bg-2);
+  --surface-3: var(--bg-3);
+  --surface-4: var(--olive-700);
+  --surface-5: var(--olive-500);
+  --surface-inset: rgba(11, 13, 10, 0.6);
 
   /* ---------- Text ---------- */
-  --text-primary: #d0cdc4;                       /* Stencil-sprayed concrete white */
-  --text-secondary: #848078;                     /* Faded safety marking */
-  --text-muted: #555250;                         /* Worn floor paint */
-  --text-disabled: #383634;
-  --text-inverse: #07080a;
-  --text-danger-red: #e05040;                    /* Emergency shutoff label */
-  --text-hud: #a8c890;                           /* Gauge phosphor — sickly green */
-  --text-hud-amber: #c8a040;                     /* Pressure readout amber */
-  --text-hud-dim: rgba(168, 200, 144, 0.4);
+  --text-primary: var(--bone-100);
+  --text-secondary: var(--bone-300);
+  --text-muted: var(--bone-500);
+  --text-disabled: #4a4a3c;
+  --text-inverse: var(--bg-0);
+  --text-danger-red: #d94a3a;
+  --text-hud: var(--amber-200);
+  --text-hud-amber: var(--amber-400);
+  --text-hud-dim: rgba(247, 210, 138, 0.4);
 
-  /* ---------- Accent / Brand (rust-furnace orange) ---------- */
-  --accent: #b87030;
-  --accent-bright: #d88840;
-  --accent-hover: #c87838;
-  --accent-muted: rgba(184, 112, 48, 0.14);
-  --accent-glow: rgba(184, 112, 48, 0.3);
-  --accent-border: rgba(184, 112, 48, 0.35);
+  /* ---------- Accent / Brand (amber) ---------- */
+  --accent: var(--amber-400);
+  --accent-bright: var(--amber-200);
+  --accent-hover: var(--amber-500);
+  --accent-muted: rgba(240, 169, 74, 0.14);
+  --accent-glow: rgba(240, 169, 74, 0.3);
+  --accent-border: rgba(240, 169, 74, 0.35);
 
   /* ---------- Semantic / Status ---------- */
-  --success: #48803a;
-  --success-bright: #60a850;
-  --success-muted: rgba(72, 128, 58, 0.18);
-  --success-border: rgba(72, 128, 58, 0.35);
-  --warning: #b08028;
-  --warning-muted: rgba(176, 128, 40, 0.18);
-  --warning-border: rgba(176, 128, 40, 0.35);
-  --danger: #a83028;
-  --danger-bright: #cc3830;
-  --danger-muted: rgba(168, 48, 40, 0.2);
-  --danger-border: rgba(168, 48, 40, 0.45);
-  --info: #407090;
-  --info-muted: rgba(64, 112, 144, 0.18);
+  --success: var(--ready);
+  --success-bright: #9cca70;
+  --success-muted: rgba(122, 166, 74, 0.18);
+  --success-border: rgba(122, 166, 74, 0.4);
+  --warning: var(--hazard);
+  --warning-muted: rgba(212, 194, 74, 0.18);
+  --warning-border: rgba(212, 194, 74, 0.4);
+  --danger: #b23025;
+  --danger-bright: #d94a3a;
+  --danger-muted: rgba(178, 48, 37, 0.2);
+  --danger-border: rgba(178, 48, 37, 0.45);
+  --info: var(--rank-blue);
+  --info-muted: rgba(74, 144, 217, 0.18);
 
-  /* ---------- Danger Level Palette (base chromatic anchors) ---------- */
-  --danger-blue: #4a7ea0;
-  --danger-blue-bright: #6aa8d0;
-  --danger-blue-glow: rgba(74, 126, 160, 0.35);
-  --danger-yellow: #b08020;
-  --danger-yellow-bright: #d0a030;
-  --danger-yellow-glow: rgba(176, 128, 32, 0.4);
-  --danger-orange: #a85418;
-  --danger-orange-bright: #c86820;
-  --danger-orange-glow: rgba(168, 84, 24, 0.55);
+  /* ---------- Danger level palette (base chromatic anchors) ---------- */
+  --danger-blue: var(--rank-blue);
+  --danger-blue-bright: #6aa8ee;
+  --danger-blue-glow: rgba(74, 144, 217, 0.35);
+  --danger-yellow: var(--amber-500);
+  --danger-yellow-bright: var(--amber-400);
+  --danger-yellow-glow: rgba(240, 169, 74, 0.4);
+  --danger-orange: var(--rust-500);
+  --danger-orange-bright: var(--rust-400);
+  --danger-orange-glow: rgba(196, 90, 44, 0.55);
   --danger-red: #982018;
   --danger-red-bright: #c02820;
   --danger-red-glow: rgba(152, 32, 24, 0.65);
 
-  /* ---------- Player Colors ---------- */
+  /* ---------- Player colors ---------- */
   --player-1: #c03838;
   --player-1-bright: #e04848;
   --player-1-muted: rgba(192, 56, 56, 0.18);
@@ -89,23 +123,25 @@
   --player-6-bright: #38a8b8;
   --player-6-muted: rgba(32, 136, 152, 0.18);
 
-  /* ---------- Zombie Type Colors ---------- */
-  --zombie-walker: #405838;
-  --zombie-walker-muted: rgba(64, 88, 56, 0.2);
-  --zombie-runner: #a87018;
-  --zombie-runner-muted: rgba(168, 112, 24, 0.2);
+  /* ---------- Zombie type colors ---------- */
+  --zombie-walker: #556240;
+  --zombie-walker-muted: rgba(85, 98, 64, 0.22);
+  --zombie-runner: var(--rust-400);
+  --zombie-runner-muted: rgba(196, 90, 44, 0.22);
   --zombie-brute: #582070;
-  --zombie-brute-muted: rgba(88, 32, 112, 0.2);
+  --zombie-brute-muted: rgba(88, 32, 112, 0.22);
   --zombie-abom: #781010;
   --zombie-abom-muted: rgba(120, 16, 16, 0.22);
   --zombie-necromancer: #204860;
   --zombie-necromancer-muted: rgba(32, 72, 96, 0.22);
 
   /* ---------- Typography ---------- */
-  --font-display: 'Barlow Condensed', 'Oswald', 'Impact', 'Arial Narrow', sans-serif;
-  --font-sans: 'IBM Plex Sans', 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-mono: 'IBM Plex Mono', 'Share Tech Mono', 'Fira Code', 'Consolas', monospace;
-  --font-hud: 'Share Tech Mono', 'IBM Plex Mono', 'Fira Code', monospace;
+  --font-stencil: "Black Ops One", "Stencil Std", "Impact", sans-serif;
+  --font-display: "Oswald", "Stencil Std", "Impact", sans-serif;
+  --font-body: "Barlow Condensed", "Roboto Condensed", system-ui, sans-serif;
+  --font-sans: var(--font-body);
+  --font-mono: "JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace;
+  --font-hud: var(--font-mono);
 
   --text-2xs: 0.65rem;
   --text-xs: 0.75rem;
@@ -125,11 +161,11 @@
 
   --letter-spacing-tight: -0.02em;
   --letter-spacing-normal: 0;
-  --letter-spacing-wide: 0.06em;
-  --letter-spacing-wider: 0.12em;
-  --letter-spacing-widest: 0.22em;            /* Stencil / industrial caps */
+  --letter-spacing-wide: 0.08em;
+  --letter-spacing-wider: 0.14em;
+  --letter-spacing-widest: 0.24em;
 
-  /* ---------- Spacing (4px base) ---------- */
+  /* ---------- Spacing ---------- */
   --space-px: 1px;
   --space-1: 4px;
   --space-2: 8px;
@@ -144,66 +180,73 @@
   --space-20: 80px;
   --space-24: 96px;
 
-  /* ---------- Border Radii (industrial — brutally sharp) ---------- */
+  /* ---------- Border radii (sharp; chamfers via clip-path) ---------- */
+  --r-0: 0px;
+  --r-1: 2px;
+  --r-2: 4px;
   --radius-none: 0px;
   --radius-sm: 2px;
-  --radius-md: 3px;
+  --radius-md: 2px;
   --radius-lg: 4px;
-  --radius-xl: 6px;
+  --radius-xl: 4px;
   --radius-full: 9999px;
 
-  /* ---------- Border Widths ---------- */
+  /* ---------- Border widths ---------- */
   --border-thin: 1px;
-  --border-thick: 2px;
-  --border-heavy: 3px;
+  --border-thick: 1.5px;
+  --border-heavy: 2px;
 
-  /* ---------- Shadows & Glows ---------- */
+  /* ---------- Touch ---------- */
+  --hit: 44px;
+
+  /* ---------- Shadows & glows ---------- */
+  --shadow-hard: 0 2px 0 rgba(0,0,0,0.6), 0 8px 24px rgba(0,0,0,0.5);
+  --shadow-inset: inset 0 0 0 1px rgba(255,255,255,0.03), inset 0 1px 0 rgba(255,255,255,0.04);
   --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.55);
   --shadow-md: 0 2px 12px rgba(0, 0, 0, 0.7);
   --shadow-lg: 0 6px 28px rgba(0, 0, 0, 0.8);
   --shadow-xl: 0 12px 52px rgba(0, 0, 0, 0.88);
-  --shadow-inset: inset 0 2px 6px rgba(0, 0, 0, 0.6);
-  --shadow-panel: inset 0 1px 0 rgba(255,255,255,0.03), inset 0 -1px 0 rgba(0,0,0,0.5), 0 4px 20px rgba(0,0,0,0.65);
+  --shadow-panel: var(--shadow-inset), var(--shadow-hard);
   --shadow-raised: 0 0 0 1px rgba(255,255,255,0.04), 0 4px 24px rgba(0,0,0,0.75);
   --shadow-glow-accent: 0 0 14px var(--accent-glow), 0 0 36px var(--accent-muted);
   --shadow-glow-danger: 0 0 18px var(--danger-muted);
   --shadow-glow-success: 0 0 14px var(--success-muted);
   --shadow-cutout: inset 0 2px 4px rgba(0,0,0,0.75), inset 0 0 0 1px rgba(0,0,0,0.5);
 
-  /* ---------- HUD-Specific Tokens ---------- */
-  --hud-bg: rgba(7, 8, 10, 0.94);
-  --hud-panel-bg: rgba(14, 16, 18, 0.9);
-  --hud-border: rgba(168, 200, 144, 0.15);
-  --hud-border-bright: rgba(168, 200, 144, 0.4);
+  /* ---------- HUD-specific tokens ---------- */
+  --hud-bg: rgba(11, 13, 10, 0.94);
+  --hud-panel-bg: rgba(18, 20, 15, 0.9);
+  --hud-border: rgba(138, 149, 96, 0.22);
+  --hud-border-bright: rgba(240, 169, 74, 0.4);
   --hud-scanline-color: rgba(0, 0, 0, 0.22);
   --hud-scanline-size: 2px;
-  --hud-phosphor: #a8c890;
-  --hud-phosphor-dim: rgba(168, 200, 144, 0.3);
-  --hud-amber: #c8a040;
-  --hud-amber-dim: rgba(200, 160, 64, 0.3);
-  --hud-reticle: rgba(168, 200, 144, 0.65);
-  --hud-reticle-center: #d0e8b8;
+  --hud-phosphor: var(--amber-200);
+  --hud-phosphor-dim: rgba(247, 210, 138, 0.3);
+  --hud-amber: var(--amber-400);
+  --hud-amber-dim: rgba(240, 169, 74, 0.3);
+  --hud-reticle: rgba(240, 169, 74, 0.65);
+  --hud-reticle-center: var(--amber-200);
   --hud-readout-bg: rgba(0, 0, 0, 0.6);
-  --hud-readout-border: rgba(168, 200, 144, 0.1);
-  --hud-stat-fill: rgba(168, 200, 144, 0.22);
-  --hud-critical-flash: rgba(180, 32, 24, 0.88);
+  --hud-readout-border: rgba(138, 149, 96, 0.1);
+  --hud-stat-fill: rgba(240, 169, 74, 0.22);
+  --hud-critical-flash: rgba(178, 48, 37, 0.88);
   --hud-noise-opacity: 0.06;
   --hud-corner-size: 8px;
 
-  /* ---------- Card / Item Tokens ---------- */
-  --card-bg: var(--surface-2);
-  --card-border: var(--surface-4);
-  --card-bg-hover: var(--surface-3);
-  --card-border-hover: var(--surface-5);
+  /* ---------- Card / item tokens ---------- */
+  --card-bg: var(--bg-2);
+  --card-border: var(--olive-700);
+  --card-bg-hover: var(--bg-3);
+  --card-border-hover: var(--olive-500);
   --card-shadow: var(--shadow-md);
   --card-shadow-hover: var(--shadow-lg);
-  --card-wear-opacity: 0.09;                    /* Heavy scratches/pitting overlay */
-  --card-corner-clip: 6px;                       /* Sheared corner bevel */
+  --card-wear-opacity: 0.06;
+  --card-corner-clip: 6px;
 
-  /* ---------- Menu / Lobby Tokens ---------- */
-  --menu-bg: #050608;
-  --menu-overlay: rgba(5, 6, 8, 0.88);
-  --menu-title-glow: rgba(184, 112, 48, 0.35);
+  /* ---------- Menu / lobby tokens ---------- */
+  --menu-bg: var(--bg-0);
+  --menu-overlay: rgba(11, 13, 10, 0.88);
+  --menu-title-glow: rgba(240, 169, 74, 0.35);
   --menu-vignette: radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,0.88) 100%);
   --menu-scanlines: repeating-linear-gradient(
     0deg,
@@ -212,46 +255,55 @@
     rgba(0, 0, 0, 0.1) 2px,
     rgba(0, 0, 0, 0.1) 4px
   );
-  --menu-grid-color: rgba(184, 112, 48, 0.03);  /* Rusted grid overlay */
-  --lobby-slot-empty-bg: rgba(14, 16, 18, 0.65);
-  --lobby-slot-empty-border: rgba(44, 48, 51, 0.85);
-  --lobby-slot-ready: rgba(72, 128, 58, 0.15);
-  --lobby-slot-ready-border: rgba(72, 128, 58, 0.4);
+  --menu-grid-color: rgba(240, 169, 74, 0.035);
+  --lobby-slot-empty-bg: rgba(18, 20, 15, 0.65);
+  --lobby-slot-empty-border: rgba(62, 67, 44, 0.85);
+  --lobby-slot-ready: rgba(122, 166, 74, 0.15);
+  --lobby-slot-ready-border: rgba(122, 166, 74, 0.4);
 
-  /* ---------- Modal Tokens ---------- */
-  --modal-backdrop: rgba(3, 4, 5, 0.9);
-  --modal-bg: var(--surface-1);
-  --modal-border: var(--surface-5);
+  /* ---------- Modal tokens ---------- */
+  --modal-backdrop: rgba(5, 6, 4, 0.9);
+  --modal-bg: var(--bg-1);
+  --modal-border: var(--olive-500);
   --modal-shadow: 0 0 0 1px rgba(255,255,255,0.03), 0 24px 80px rgba(0,0,0,0.92);
-  --modal-header-border: var(--surface-4);
-  --modal-corner-inset: 12px;                   /* Sheared modal corners */
+  --modal-header-border: var(--olive-700);
+  --modal-corner-inset: 10px;
 
-  /* ---------- Trade UI Tokens ---------- */
-  --trade-bg: var(--surface-1);
-  --trade-divider: var(--surface-4);
-  --trade-slot-bg: var(--surface-0);
-  --trade-slot-border: var(--surface-4);
+  /* ---------- Trade UI tokens ---------- */
+  --trade-bg: var(--bg-1);
+  --trade-divider: var(--olive-700);
+  --trade-slot-bg: var(--bg-0);
+  --trade-slot-border: var(--olive-700);
   --trade-slot-accept: var(--success-border);
   --trade-slot-reject: var(--danger-border);
   --trade-arrow-color: var(--text-muted);
-  --trade-highlight: rgba(184, 112, 48, 0.08);
+  --trade-highlight: rgba(240, 169, 74, 0.08);
 
-  /* ---------- Texture / Grain / Wear ---------- */
+  /* ---------- Texture / grain ---------- */
   --grain-opacity: 0.06;
-  --grain-url: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='5' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
-  --scratch-opacity: 0.05;
-  --vignette-base: radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,0.8) 100%);
+  --grain-url: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.9 0 0 0 0 0.85 0 0 0 0 0.6 0 0 0 0.5 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.35'/%3E%3C/svg%3E");
+  --scratch-opacity: 0.04;
+  --vignette-base: radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,0.78) 100%);
 
-  /* ---------- Rust / Corrosion Texture ---------- */
-  --rust-url: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='r'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.04' numOctaves='3' seed='42' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0.3'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23r)' opacity='0.5'/%3E%3C/svg%3E");
+  /* ---------- Rust / corrosion texture ---------- */
+  --rust-url: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='r'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.04' numOctaves='3' seed='42' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0.35'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23r)' opacity='0.5'/%3E%3C/svg%3E");
   --rust-opacity: 0.04;
 
-  /* ---------- Danger-Level Reactive Tokens (defaults = blue/calm) ---------- */
-  --dl-bg: var(--surface-0);
-  --dl-surface-1: var(--surface-1);
-  --dl-surface-2: var(--surface-2);
-  --dl-border: var(--surface-4);
-  --dl-panel-border: var(--surface-4);
+  /* ---------- Hazard-tape (diagonal yellow/dark stripe) ---------- */
+  --hazard-tape-bg: repeating-linear-gradient(
+    -45deg,
+    #1a1a0a,
+    #1a1a0a 10px,
+    var(--hazard) 10px,
+    var(--hazard) 20px
+  );
+
+  /* ---------- Danger-level reactive tokens (defaults = calm) ---------- */
+  --dl-bg: var(--bg-0);
+  --dl-surface-1: var(--bg-1);
+  --dl-surface-2: var(--bg-2);
+  --dl-border: var(--olive-700);
+  --dl-panel-border: var(--olive-700);
   --dl-topbar-border: transparent;
   --dl-topbar-glow: transparent;
   --dl-glow: transparent;
@@ -265,17 +317,17 @@
   --dl-accent-pulse: none;
   --dl-hud-tint: var(--hud-phosphor);
   --dl-hud-border: var(--hud-border);
-  --dl-scanline-opacity: 0.15;
+  --dl-scanline-opacity: 0.14;
   --dl-text-readout: var(--text-hud);
   --dl-card-edge: transparent;
   --dl-modal-shadow: var(--modal-shadow);
   --dl-flicker-duration: none;
   --dl-alert-bg: transparent;
-  --dl-status-indicator: var(--danger-blue);
-  --dl-spawn-indicator: var(--danger-blue);
+  --dl-status-indicator: var(--rank-blue);
+  --dl-spawn-indicator: var(--rank-blue);
   --dl-menu-logo-glow: var(--menu-title-glow);
 
-  /* ---------- Motion / Transitions ---------- */
+  /* ---------- Motion / transitions ---------- */
   --duration-instant: 50ms;
   --duration-fast: 100ms;
   --duration-normal: 180ms;
@@ -284,9 +336,9 @@
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --ease-military: cubic-bezier(0.0, 0.0, 0.2, 1);  /* Snap-to-position */
+  --ease-military: cubic-bezier(0.0, 0.0, 0.2, 1);
 
-  /* ---------- Z-Index Scale ---------- */
+  /* ---------- Z-index scale ---------- */
   --z-base: 0;
   --z-card: 10;
   --z-dropdown: 100;
@@ -297,7 +349,7 @@
   --z-toast: 500;
   --z-critical: 600;
 
-  /* ---------- Icon Sizes ---------- */
+  /* ---------- Icon sizes ---------- */
   --icon-xs: 12px;
   --icon-sm: 16px;
   --icon-md: 20px;
@@ -305,242 +357,151 @@
   --icon-xl: 32px;
   --icon-2xl: 48px;
 
-  /* ---------- Game-Specific Sizing ---------- */
-  --hud-topbar-height: 52px;
+  /* ---------- Game-specific sizing ---------- */
+  --hud-topbar-height: 44px;
   --hud-sidebar-width: 220px;
-  --hud-bottombar-height: 80px;
+  --hud-squad-rail-width: 220px;
+  --hud-right-panel-width: 260px;
+  --hud-desktop-squad-rail-width: 260px;
+  --hud-desktop-right-panel-width: 300px;
+  --hud-bottombar-height: 76px;
   --card-min-width: 140px;
   --card-max-width: 180px;
   --token-size-sm: 32px;
   --token-size-md: 48px;
   --token-size-lg: 64px;
-  --avatar-size-sm: 36px;
+  --avatar-size-sm: 40px;
   --avatar-size-md: 52px;
-  --avatar-size-lg: 72px;
+  --avatar-size-lg: 96px;
 }
 
 /* ==========================================================================
-   DANGER LEVEL OVERRIDES
-   Each level completely transforms the chromatic environment.
+   DANGER LEVEL OVERRIDES — Field Manual palette
    ========================================================================== */
 
-/* ---------- BLUE — Cold infrastructure. Fluorescent hum. Idle machinery. ---------- */
 [data-danger="blue"] {
-  --dl-bg: #060a0e;
-  --dl-surface-1: #0a1018;
-  --dl-surface-2: #101820;
-  --dl-border: rgba(74, 126, 160, 0.25);
-  --dl-panel-border: rgba(74, 126, 160, 0.2);
-  --dl-topbar-border: #4a7ea0;
-  --dl-topbar-glow: rgba(74, 126, 160, 0.4);
-  --dl-glow: rgba(74, 126, 160, 0.07);
-  --dl-glow-intense: rgba(74, 126, 160, 0.2);
-  --dl-grain-opacity: 0.04;
+  --dl-bg: #080b10;
+  --dl-surface-1: #0d1219;
+  --dl-surface-2: #141a22;
+  --dl-border: rgba(74, 144, 217, 0.22);
+  --dl-panel-border: rgba(74, 144, 217, 0.18);
+  --dl-topbar-border: var(--rank-blue);
+  --dl-topbar-glow: rgba(74, 144, 217, 0.4);
+  --dl-glow: rgba(74, 144, 217, 0.08);
+  --dl-glow-intense: rgba(74, 144, 217, 0.22);
+  --dl-grain-opacity: 0.05;
   --dl-vignette-opacity: 0.15;
   --dl-vignette-color: rgba(20, 50, 80, 0.2);
   --dl-vignette-radius: 65%;
-  --dl-rust-bleed: 0;
-  --dl-heat-distort: 0;
-  --dl-accent-pulse: none;
-  --dl-hud-tint: #80b8d8;
-  --dl-hud-border: rgba(100, 168, 200, 0.22);
+  --dl-hud-tint: #88b4e6;
+  --dl-hud-border: rgba(120, 168, 220, 0.22);
   --dl-scanline-opacity: 0.12;
-  --dl-text-readout: #80b8d8;
-  --dl-card-edge: rgba(74, 126, 160, 0.18);
-  --dl-modal-shadow: 0 0 0 1px rgba(74,126,160,0.14), 0 24px 80px rgba(0,0,0,0.93);
-  --dl-flicker-duration: none;
-  --dl-alert-bg: rgba(74, 126, 160, 0.06);
-  --dl-status-indicator: var(--danger-blue-bright);
-  --dl-spawn-indicator: var(--danger-blue);
-  --dl-menu-logo-glow: rgba(74, 126, 160, 0.35);
-
-  /* Accent shifts toward cold galvanized steel */
-  --accent: #5890b0;
-  --accent-hover: #70aad0;
-  --accent-muted: rgba(88, 144, 176, 0.12);
-  --accent-glow: rgba(88, 144, 176, 0.3);
-  --accent-border: rgba(88, 144, 176, 0.32);
-  --text-hud: #80b8d8;
-  --text-hud-amber: #6898b8;
-  --text-hud-dim: rgba(128, 184, 216, 0.38);
-  --hud-phosphor: #80b8d8;
-  --hud-phosphor-dim: rgba(128, 184, 216, 0.28);
-  --hud-border: rgba(100, 168, 200, 0.18);
-  --hud-reticle: rgba(128, 184, 216, 0.6);
-  --hud-reticle-center: #b0d8f0;
+  --dl-text-readout: #88b4e6;
+  --dl-card-edge: rgba(74, 144, 217, 0.18);
+  --dl-modal-shadow: 0 0 0 1px rgba(74,144,217,0.14), 0 24px 80px rgba(0,0,0,0.93);
+  --dl-alert-bg: rgba(74, 144, 217, 0.06);
+  --dl-status-indicator: var(--rank-blue);
+  --dl-spawn-indicator: var(--rank-blue);
+  --dl-menu-logo-glow: rgba(74, 144, 217, 0.35);
 }
 
-/* ---------- YELLOW — Corrosion warning. Acid seep. Infrastructure stress. ---------- */
 [data-danger="yellow"] {
-  --dl-bg: #0b0a06;
-  --dl-surface-1: #131008;
-  --dl-surface-2: #1a1608;
-  --dl-border: rgba(176, 128, 32, 0.32);
-  --dl-panel-border: rgba(176, 128, 32, 0.24);
-  --dl-topbar-border: #b08020;
-  --dl-topbar-glow: rgba(176, 128, 32, 0.5);
-  --dl-glow: rgba(176, 128, 32, 0.08);
-  --dl-glow-intense: rgba(176, 128, 32, 0.24);
+  --dl-bg: #0d0d08;
+  --dl-surface-1: #15140c;
+  --dl-surface-2: #1d1c10;
+  --dl-border: rgba(212, 194, 74, 0.3);
+  --dl-panel-border: rgba(212, 194, 74, 0.24);
+  --dl-topbar-border: var(--hazard);
+  --dl-topbar-glow: rgba(212, 194, 74, 0.5);
+  --dl-glow: rgba(212, 194, 74, 0.08);
+  --dl-glow-intense: rgba(212, 194, 74, 0.24);
   --dl-grain-opacity: 0.08;
-  --dl-vignette-opacity: 0.45;
-  --dl-vignette-color: rgba(100, 70, 0, 0.3);
-  --dl-vignette-radius: 48%;
-  --dl-rust-bleed: 0.06;
-  --dl-heat-distort: 0;
+  --dl-vignette-opacity: 0.4;
+  --dl-vignette-color: rgba(120, 100, 20, 0.3);
+  --dl-vignette-radius: 50%;
+  --dl-rust-bleed: 0.04;
   --dl-accent-pulse: dl-amber-pulse 2.4s ease-in-out infinite;
-  --dl-hud-tint: #c89838;
-  --dl-hud-border: rgba(200, 152, 56, 0.25);
+  --dl-hud-tint: var(--amber-400);
+  --dl-hud-border: rgba(240, 169, 74, 0.26);
   --dl-scanline-opacity: 0.16;
-  --dl-text-readout: #c89838;
-  --dl-card-edge: rgba(176, 128, 32, 0.24);
-  --dl-modal-shadow: 0 0 0 1px rgba(176,128,32,0.22), 0 24px 80px rgba(0,0,0,0.91), 0 0 60px rgba(176,128,32,0.08);
+  --dl-text-readout: var(--amber-400);
+  --dl-card-edge: rgba(212, 194, 74, 0.24);
+  --dl-modal-shadow: 0 0 0 1px rgba(212,194,74,0.22), 0 24px 80px rgba(0,0,0,0.91), 0 0 60px rgba(212,194,74,0.08);
   --dl-flicker-duration: 8s;
-  --dl-alert-bg: rgba(176, 128, 32, 0.08);
-  --dl-status-indicator: var(--danger-yellow-bright);
-  --dl-spawn-indicator: var(--danger-yellow);
-  --dl-menu-logo-glow: rgba(176, 128, 32, 0.45);
-
-  /* Accent burns amber — industrial caution */
-  --accent: #c09028;
-  --accent-hover: #d8a838;
-  --accent-muted: rgba(192, 144, 40, 0.15);
-  --accent-glow: rgba(192, 144, 40, 0.38);
-  --accent-border: rgba(192, 144, 40, 0.42);
-  --text-hud: #c89838;
-  --text-hud-amber: #d8b050;
-  --text-hud-dim: rgba(200, 152, 56, 0.38);
-  --hud-phosphor: #c89838;
-  --hud-phosphor-dim: rgba(200, 152, 56, 0.32);
-  --hud-border: rgba(200, 152, 56, 0.2);
-  --hud-reticle: rgba(200, 152, 56, 0.65);
-  --hud-reticle-center: #e8c870;
-  --surface-4: #342a18;
-  --surface-5: #443820;
+  --dl-alert-bg: rgba(212, 194, 74, 0.08);
+  --dl-status-indicator: var(--amber-400);
+  --dl-spawn-indicator: var(--hazard);
+  --dl-menu-logo-glow: rgba(240, 169, 74, 0.45);
 }
 
-/* ---------- ORANGE — Furnace breach. Molten rust. Structural failure. ---------- */
 [data-danger="orange"] {
-  --dl-bg: #0c0704;
-  --dl-surface-1: #140c05;
-  --dl-surface-2: #1c1208;
-  --dl-border: rgba(168, 84, 24, 0.42);
-  --dl-panel-border: rgba(168, 84, 24, 0.32);
-  --dl-topbar-border: #a85418;
-  --dl-topbar-glow: rgba(168, 84, 24, 0.65);
-  --dl-glow: rgba(168, 84, 24, 0.12);
-  --dl-glow-intense: rgba(168, 84, 24, 0.35);
+  --dl-bg: #0e0905;
+  --dl-surface-1: #17100a;
+  --dl-surface-2: #20160d;
+  --dl-border: rgba(196, 90, 44, 0.38);
+  --dl-panel-border: rgba(196, 90, 44, 0.3);
+  --dl-topbar-border: var(--rust-400);
+  --dl-topbar-glow: rgba(196, 90, 44, 0.6);
+  --dl-glow: rgba(196, 90, 44, 0.12);
+  --dl-glow-intense: rgba(196, 90, 44, 0.34);
   --dl-grain-opacity: 0.1;
-  --dl-vignette-opacity: 0.72;
-  --dl-vignette-color: rgba(120, 40, 8, 0.42);
-  --dl-vignette-radius: 38%;
-  --dl-rust-bleed: 0.12;
-  --dl-heat-distort: 0.3;
+  --dl-vignette-opacity: 0.65;
+  --dl-vignette-color: rgba(120, 50, 20, 0.4);
+  --dl-vignette-radius: 40%;
+  --dl-rust-bleed: 0.1;
+  --dl-heat-distort: 0.25;
   --dl-accent-pulse: dl-ember-pulse 1.8s ease-in-out infinite;
-  --dl-hud-tint: #c86020;
-  --dl-hud-border: rgba(200, 96, 32, 0.3);
+  --dl-hud-tint: var(--rust-300);
+  --dl-hud-border: rgba(224, 117, 72, 0.3);
   --dl-scanline-opacity: 0.2;
-  --dl-text-readout: #c86020;
-  --dl-card-edge: rgba(168, 84, 24, 0.35);
-  --dl-modal-shadow: 0 0 0 1px rgba(168,84,24,0.28), 0 24px 80px rgba(0,0,0,0.93), 0 0 80px rgba(168,84,24,0.12);
+  --dl-text-readout: var(--rust-300);
+  --dl-card-edge: rgba(196, 90, 44, 0.34);
+  --dl-modal-shadow: 0 0 0 1px rgba(196,90,44,0.28), 0 24px 80px rgba(0,0,0,0.93), 0 0 80px rgba(196,90,44,0.12);
   --dl-flicker-duration: 5s;
-  --dl-alert-bg: rgba(168, 84, 24, 0.12);
-  --dl-status-indicator: var(--danger-orange-bright);
-  --dl-spawn-indicator: var(--danger-orange);
-  --dl-menu-logo-glow: rgba(168, 84, 24, 0.55);
-
-  /* Accent burns toward furnace red-orange */
-  --accent: #b86018;
-  --accent-hover: #d07020;
-  --accent-muted: rgba(184, 96, 24, 0.18);
-  --accent-glow: rgba(184, 96, 24, 0.45);
-  --accent-border: rgba(184, 96, 24, 0.5);
-  --text-hud: #c86020;
-  --text-hud-amber: #d88030;
-  --text-hud-dim: rgba(200, 96, 32, 0.4);
-  --hud-phosphor: #c86020;
-  --hud-phosphor-dim: rgba(200, 96, 32, 0.32);
-  --hud-border: rgba(200, 96, 32, 0.22);
-  --hud-reticle: rgba(200, 96, 32, 0.7);
-  --hud-reticle-center: #e08040;
-  --surface-0: #0d0704;
-  --surface-1: #150c05;
-  --surface-2: #1e1308;
-  --surface-4: #382414;
-  --surface-5: #48301c;
-  --text-primary: #ccc0a8;
-  --text-secondary: #886058;
+  --dl-alert-bg: rgba(196, 90, 44, 0.12);
+  --dl-status-indicator: var(--rust-300);
+  --dl-spawn-indicator: var(--rust-400);
+  --dl-menu-logo-glow: rgba(196, 90, 44, 0.55);
 }
 
-/* ---------- RED — Meltdown. Containment failed. Furnace core exposed. ---------- */
 [data-danger="red"] {
-  --dl-bg: #0c0504;
-  --dl-surface-1: #140805;
-  --dl-surface-2: #1e0c08;
-  --dl-border: rgba(152, 32, 24, 0.5);
-  --dl-panel-border: rgba(152, 32, 24, 0.4);
-  --dl-topbar-border: #982018;
-  --dl-topbar-glow: rgba(152, 32, 24, 0.8);
-  --dl-glow: rgba(152, 32, 24, 0.2);
-  --dl-glow-intense: rgba(152, 32, 24, 0.5);
+  --dl-bg: #0e0605;
+  --dl-surface-1: #180806;
+  --dl-surface-2: #220c0a;
+  --dl-border: rgba(178, 48, 37, 0.48);
+  --dl-panel-border: rgba(178, 48, 37, 0.38);
+  --dl-topbar-border: var(--rank-red);
+  --dl-topbar-glow: rgba(178, 48, 37, 0.8);
+  --dl-glow: rgba(178, 48, 37, 0.2);
+  --dl-glow-intense: rgba(178, 48, 37, 0.48);
   --dl-grain-opacity: 0.13;
-  --dl-vignette-opacity: 0.95;
-  --dl-vignette-color: rgba(100, 16, 8, 0.6);
-  --dl-vignette-radius: 25%;
-  --dl-rust-bleed: 0.2;
-  --dl-heat-distort: 0.6;
+  --dl-vignette-opacity: 0.9;
+  --dl-vignette-color: rgba(100, 16, 8, 0.55);
+  --dl-vignette-radius: 28%;
+  --dl-rust-bleed: 0.18;
+  --dl-heat-distort: 0.55;
   --dl-accent-pulse: dl-blood-pulse 1.2s ease-in-out infinite;
-  --dl-hud-tint: #b83020;
-  --dl-hud-border: rgba(184, 48, 32, 0.32);
+  --dl-hud-tint: #d94a3a;
+  --dl-hud-border: rgba(217, 74, 58, 0.32);
   --dl-scanline-opacity: 0.25;
-  --dl-text-readout: #c04030;
-  --dl-card-edge: rgba(152, 32, 24, 0.45);
-  --dl-modal-shadow: 0 0 0 1px rgba(152,32,24,0.35), 0 24px 80px rgba(0,0,0,0.95), 0 0 100px rgba(152,32,24,0.18);
+  --dl-text-readout: #d94a3a;
+  --dl-card-edge: rgba(178, 48, 37, 0.45);
+  --dl-modal-shadow: 0 0 0 1px rgba(178,48,37,0.35), 0 24px 80px rgba(0,0,0,0.95), 0 0 100px rgba(178,48,37,0.18);
   --dl-flicker-duration: 3s;
-  --dl-alert-bg: rgba(152, 32, 24, 0.14);
-  --dl-status-indicator: var(--danger-red-bright);
-  --dl-spawn-indicator: var(--danger-red);
-  --dl-menu-logo-glow: rgba(152, 32, 24, 0.65);
-
-  /* Accent burns blood-red — all warmth is furnace heat */
-  --accent: #a82820;
-  --accent-bright: #c03828;
-  --accent-hover: #b83020;
-  --accent-muted: rgba(168, 40, 32, 0.18);
-  --accent-glow: rgba(168, 40, 32, 0.5);
-  --accent-border: rgba(168, 40, 32, 0.55);
-  --text-hud: #b83020;
-  --text-hud-amber: #c04030;
-  --text-hud-dim: rgba(184, 48, 32, 0.38);
-  --hud-phosphor: #b83020;
-  --hud-phosphor-dim: rgba(184, 48, 32, 0.32);
-  --hud-border: rgba(184, 48, 32, 0.2);
-  --hud-reticle: rgba(184, 48, 32, 0.7);
-  --hud-reticle-center: #d04838;
-  --surface-0: #0e0504;
-  --surface-1: #160905;
-  --surface-2: #200c08;
-  --surface-4: #3a1c14;
-  --surface-5: #4c241c;
-  --text-primary: #c0b0a0;
-  --text-secondary: #785850;
-  --text-muted: #483030;
-
-  /* Desaturate success/info in red — systems failing */
-  --success: #345838;
-  --success-bright: #487848;
-  --success-muted: rgba(52, 88, 56, 0.14);
-  --info: #284050;
-  --info-muted: rgba(40, 64, 80, 0.14);
+  --dl-alert-bg: rgba(178, 48, 37, 0.14);
+  --dl-status-indicator: #d94a3a;
+  --dl-spawn-indicator: var(--rank-red);
+  --dl-menu-logo-glow: rgba(178, 48, 37, 0.65);
 }
 
 /* ==========================================================================
-   KEYFRAME ANIMATIONS (danger-level pulses referenced by --dl-accent-pulse)
+   KEYFRAMES
    ========================================================================== */
 
 @keyframes dl-amber-pulse {
   0%, 100% { opacity: 1; }
-  45%      { opacity: 0.7; }
-  55%      { opacity: 0.78; }
+  45%      { opacity: 0.72; }
+  55%      { opacity: 0.8; }
 }
 
 @keyframes dl-ember-pulse {
@@ -579,7 +540,7 @@
 
 @keyframes critical-strobe {
   0%, 100% { background-color: transparent; }
-  50%      { background-color: rgba(168, 40, 32, 0.08); }
+  50%      { background-color: rgba(178, 48, 37, 0.08); }
 }
 
 @keyframes item-drop-in {
@@ -590,4 +551,14 @@
 @keyframes spawn-warn {
   0%, 100% { box-shadow: 0 0 0 0 transparent; }
   50%      { box-shadow: 0 0 0 4px var(--dl-spawn-indicator); }
+}
+
+@keyframes panel-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes hp-flash {
+  0%, 100% { filter: brightness(1); }
+  50%      { filter: brightness(1.4); }
 }

@@ -1,7 +1,9 @@
 /* ==========================================================================
-   Menu — Main menu / room create+join screen
-   Abandoned control room. Rust-stained walls, flickering overhead lights.
-   The title burns through the decay. Everything else is corroded chrome.
+   Menu — Field Manual entry screen
+   Single bracketed dossier panel on a dark olive field. Hazard tape top and
+   bottom, bracketed stencil wordmark, CALL SIGN entry, then a dashed divider
+   before the ROOM ID join row. Tokens and primitives come from tokens.css,
+   utilities.css, and components/field-manual.css.
    ========================================================================== */
 
 /* ---------- Full-screen wrapper ---------- */
@@ -11,341 +13,238 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background:
-    /* reinforcement grid — faint rusted crosshatch */
-    repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 39px,
-      var(--menu-grid-color) 39px,
-      var(--menu-grid-color) 40px
-    ),
-    repeating-linear-gradient(
-      90deg,
-      transparent,
-      transparent 39px,
-      var(--menu-grid-color) 39px,
-      var(--menu-grid-color) 40px
-    ),
-    /* scanline texture — industrial CRT */
-    var(--menu-scanlines),
-    /* rust stain bleeding from top-right corner */
-    radial-gradient(
-      ellipse 40% 50% at 85% 10%,
-      rgba(100, 45, 15, 0.06) 0%,
-      transparent 70%
-    ),
-    /* radial depth — concrete bleeds from center then drops to void */
-    radial-gradient(
-      ellipse 80% 70% at 50% 48%,
-      var(--surface-2) 0%,
-      var(--surface-1) 25%,
-      var(--surface-0) 55%,
-      var(--menu-bg) 100%
-    );
+  background: var(--bg-0);
+  color: var(--bone-100);
   z-index: var(--z-overlay);
-  padding: var(--space-4);
+  padding: var(--space-4, 1rem);
   overflow: hidden;
+  font-family: var(--font-body);
 }
 
-/* Vignette overlay — deepens at corners, hints at darkness beyond */
-#menu-ui::before {
-  content: '';
+/* ---------- Background field: grid + vignette ---------- */
+.menu-field {
   position: absolute;
   inset: 0;
-  background: var(--menu-vignette);
   pointer-events: none;
   z-index: 0;
 }
 
-/* Film grain overlay */
-#menu-ui::after {
-  content: '';
+.menu-field__grid {
   position: absolute;
-  inset: -50%;
-  width: 200%;
-  height: 200%;
-  background-image: var(--grain-url);
-  background-repeat: repeat;
-  background-size: 200px 200px;
-  opacity: var(--dl-grain-opacity, var(--grain-opacity));
-  pointer-events: none;
-  z-index: 1;
-  animation: menu-grain-drift 12s steps(4) infinite;
+  inset: 0;
+  background-image:
+    linear-gradient(to right, rgba(240, 169, 74, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(240, 169, 74, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  background-position: center center;
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 50%, #000 30%, transparent 95%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 50%, #000 30%, transparent 95%);
 }
 
-@keyframes menu-grain-drift {
-  0%   { transform: translate(0, 0); }
-  25%  { transform: translate(-3%, -2%); }
-  50%  { transform: translate(2%, 3%); }
-  75%  { transform: translate(-1%, 1%); }
-  100% { transform: translate(0, 0); }
+.menu-field__vignette {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(
+      ellipse 120% 90% at 50% 50%,
+      transparent 40%,
+      rgba(0, 0, 0, 0.55) 85%,
+      rgba(0, 0, 0, 0.8) 100%
+    );
 }
 
-/* ---------- Menu card — corroded steel control panel ---------- */
+/* ---------- Menu card ---------- */
 .menu-card {
   position: relative;
   z-index: 2;
-  width: 440px;
+
+  width: 420px;
   max-width: 92vw;
 
-  background: var(--dl-surface-1, var(--surface-1));
-  border: var(--border-thin) solid var(--dl-panel-border, var(--surface-4));
-  border-radius: var(--radius-none);
-  padding: var(--space-8) var(--space-6);
-  color: var(--text-primary);
-
+  /* fm-panel already provides chamfered clip-path + hairline + bg gradient.
+     We extend it here with explicit padding and flow. */
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
 
-  /* Heavy steel panel — deep shadows, oxidized edges */
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.04),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.55),
-    inset 1px 0 0 rgba(255, 255, 255, 0.02),
-    inset -1px 0 0 rgba(0, 0, 0, 0.4),
-    0 0 0 1px rgba(0, 0, 0, 0.7),
-    0 8px 48px rgba(0, 0, 0, 0.85),
-    0 0 80px var(--dl-glow, transparent);
-
-  transition:
-    border-color var(--duration-slow) var(--ease-out),
-    box-shadow var(--duration-slow) var(--ease-out);
+    var(--shadow-hard, 0 12px 48px rgba(0, 0, 0, 0.6)),
+    var(--shadow-inset, inset 0 1px 0 rgba(255, 255, 255, 0.03));
 }
 
-/* Clipped corner — top-right (weathered bevel) */
-.menu-card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border: var(--border-thin) solid var(--dl-border, var(--surface-5));
-  border-radius: var(--radius-none);
-  /* Corner notch via clip-path */
-  clip-path: polygon(
-    0 0,
-    calc(100% - 14px) 0,
-    100% 14px,
-    100% 100%,
-    14px 100%,
-    0 calc(100% - 14px)
-  );
-  pointer-events: none;
-  opacity: 0.5;
+/* Hazard-tape stripes sit flush against the top and bottom edges of the card. */
+.menu-card__stripe {
+  width: 100%;
+  flex: 0 0 auto;
+  display: block;
 }
 
-/* Accent edge glow — left border bleeds the danger color */
-.menu-card::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 10%;
-  bottom: 10%;
-  width: 2px;
-  background: linear-gradient(
-    to bottom,
-    transparent,
-    var(--dl-topbar-border, var(--surface-5)) 30%,
-    var(--dl-topbar-border, var(--surface-5)) 70%,
-    transparent
-  );
-  opacity: 0.6;
-  pointer-events: none;
-  transition: background var(--duration-slow) var(--ease-out),
-              opacity var(--duration-slow) var(--ease-out);
-}
-
-/* ---------- Title block ---------- */
-.menu-title-block {
+/* ---------- Header block ---------- */
+.menu-header {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-2);
-  padding-bottom: var(--space-4);
-  border-bottom: var(--border-thin) solid var(--surface-4);
+  gap: 8px;
+  padding: 28px 32px 20px;
+  text-align: center;
+}
+
+.menu-header__kicker {
+  color: var(--bone-500);
+}
+
+/* Wordmark — bracketed stencil title. */
+.menu-wordmark {
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 28px 12px;
+  margin: 4px 0 2px;
 }
 
-/* Horizontal rule decoration under title */
-.menu-title-block::after {
-  content: '';
-  position: absolute;
-  bottom: -1px;
-  left: 20%;
-  right: 20%;
-  height: 1px;
-  background: linear-gradient(
-    to right,
-    transparent,
-    var(--dl-topbar-border, var(--accent)),
-    transparent
-  );
-  opacity: 0.6;
-}
-
-/* The game title — this hits hard */
-.menu-card h1 {
+.menu-wordmark__text {
   margin: 0;
-  text-align: center;
-  font-family: var(--font-display);
-  font-size: clamp(3rem, 10vw, 4.5rem);
-  font-weight: var(--font-black);
+  font-family: var(--font-stencil);
+  font-size: 56px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-widest);
-  line-height: 0.9;
-
-  /* Layered text shadow — depth, glow, color */
-  color: var(--accent-bright);
+  color: var(--amber-400);
   text-shadow:
-    0 0 20px var(--dl-menu-logo-glow, var(--menu-title-glow)),
-    0 0 60px var(--dl-menu-logo-glow, var(--menu-title-glow)),
-    0 2px 0 rgba(0, 0, 0, 0.8),
-    0 4px 8px rgba(0, 0, 0, 0.6);
-
-  animation: var(--dl-accent-pulse, none);
-  transition: color var(--duration-slow) var(--ease-out),
-              text-shadow var(--duration-slow) var(--ease-out);
+    0 0 18px rgba(240, 169, 74, 0.35),
+    0 0 44px rgba(240, 169, 74, 0.18),
+    0 2px 0 rgba(0, 0, 0, 0.85);
 }
 
-/* Sub-tagline beneath the title */
-.menu-subtitle {
+.menu-header__subline {
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--bone-500);
+}
+
+/* ---------- Form body ---------- */
+.menu-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 8px 32px 28px;
+}
+
+.menu-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Make our inputs align with the tactical amber left-border treatment. */
+.menu-input {
+  width: 100%;
   font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  font-weight: var(--font-normal);
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-wider);
-  color: var(--text-muted);
-  text-align: center;
+  font-size: 14px;
+  letter-spacing: 0.04em;
 }
 
-/* ---------- Section label — stamped field marking ---------- */
-.menu-section-label {
-  font-family: var(--font-display);
-  font-size: var(--text-2xs);
-  font-weight: var(--font-bold);
+.menu-input::placeholder {
+  color: var(--bone-500);
+  opacity: 0.6;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-widest);
-  color: var(--text-muted);
-  margin-bottom: calc(var(--space-2) * -1);
 }
 
-/* ---------- Error / info message strip ---------- */
+/* ---------- Info / error strip ---------- */
 .menu-message {
-  background: var(--danger-muted);
-  border: var(--border-thin) solid var(--danger-border);
-  border-left: 3px solid var(--danger);
-  color: var(--text-danger-red);
-  border-radius: var(--radius-none);
-  padding: var(--space-3) var(--space-4);
-  text-align: left;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  line-height: 1.5;
-  letter-spacing: 0.02em;
-
-  /* Recessed inset look */
-  box-shadow: var(--shadow-cutout);
-
+  margin: 0 32px;
   display: flex;
   align-items: flex-start;
-  gap: var(--space-2);
+  gap: 10px;
+  padding: 10px 12px;
+  background: rgba(156, 63, 28, 0.12);
+  border-left: 3px solid var(--rust-400);
+  color: var(--bone-100);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
 }
 
-/* Warning marker prefix — auto-injected visually */
-.menu-message::before {
-  content: '!';
-  font-family: var(--font-display);
-  font-size: var(--text-base);
-  font-weight: var(--font-black);
-  color: var(--danger);
+.menu-message__marker {
+  font-family: var(--font-stencil);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--rust-300);
   line-height: 1;
   flex-shrink: 0;
+  margin-top: 1px;
 }
 
-/* ---------- Divider with text ("or") ---------- */
+.menu-message__text {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+
+/* ---------- Divider with centered kicker ---------- */
 .menu-divider {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  text-align: center;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: var(--letter-spacing-wide);
-  text-transform: uppercase;
+  gap: 12px;
+  margin: 2px 0;
 }
 
-.menu-divider::before,
-.menu-divider::after {
-  content: '';
+.menu-divider__line {
   flex: 1;
-  height: 1px;
-  background: linear-gradient(
-    to right,
-    transparent,
-    var(--surface-4)
-  );
+  height: 0;
+  border-top: 1px dashed var(--olive-500);
+  opacity: 0.8;
 }
 
-.menu-divider::after {
-  background: linear-gradient(
-    to left,
-    transparent,
-    var(--surface-4)
-  );
+.menu-divider__label {
+  color: var(--bone-500);
+  white-space: nowrap;
 }
 
-/* ---------- Join row — code input + button side by side ---------- */
+/* ---------- Join row — room-id + button ---------- */
 .menu-join-row {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: var(--space-2);
-  align-items: end;
+  gap: 10px;
+  align-items: stretch;
 }
 
-/* ---------- Version / build stamp — bottom of card ---------- */
-.menu-version {
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  color: var(--text-disabled, var(--text-muted));
-  text-align: center;
-  letter-spacing: var(--letter-spacing-wide);
-  opacity: 0.5;
-  margin-top: calc(var(--space-2) * -1);
-}
-
-/* ---------- Corner reticle marks — tactical HUD corners ---------- */
-/* Applied to menu-card when it has class .menu-card--hud-corners */
-.menu-card--hud-corners::before {
-  background: none;
-  border: none;
-  /* Four corner marks via box-shadow tricks */
-  box-shadow:
-    /* top-left H */
-    -1px -1px 0 0 var(--dl-hud-border, var(--hud-border)),
-    /* top-right H */
-    1px -1px 0 0 var(--dl-hud-border, var(--hud-border)),
-    /* bottom-left H */
-    -1px 1px 0 0 var(--dl-hud-border, var(--hud-border)),
-    /* bottom-right H */
-    1px 1px 0 0 var(--dl-hud-border, var(--hud-border));
+.menu-join-row .fm-btn {
+  align-self: stretch;
 }
 
 /* ---------- Mobile adjustments ---------- */
 @media (max-width: 480px) {
   .menu-card {
-    padding: var(--space-6) var(--space-4);
-    gap: var(--space-4);
+    width: 100%;
   }
 
-  .menu-card h1 {
-    font-size: 3rem;
-    letter-spacing: 0.18em;
+  .menu-header {
+    padding: 22px 20px 16px;
+  }
+
+  .menu-form {
+    padding: 8px 20px 22px;
+    gap: 14px;
+  }
+
+  .menu-message {
+    margin: 0 20px;
+  }
+
+  .menu-wordmark__text {
+    font-size: 44px;
+    letter-spacing: 0.12em;
   }
 
   .menu-join-row {
     grid-template-columns: 1fr;
-    gap: var(--space-2);
+    gap: 8px;
   }
 
   .menu-join-row > *:last-child {
@@ -355,11 +254,8 @@
 
 /* ---------- Reduced motion ---------- */
 @media (prefers-reduced-motion: reduce) {
-  .menu-card h1 {
-    animation: none;
-  }
-
-  #menu-ui::after {
+  .menu-card,
+  .menu-wordmark__text {
     animation: none;
   }
 }

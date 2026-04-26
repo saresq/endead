@@ -1,24 +1,88 @@
 
-import { GameState, PlayerId, EntityId, Survivor, GameResult, ZombieType, EquipmentCard } from '../../types/GameState';
+import { GameState, PlayerId, EntityId, Survivor, GameResult } from '../../types/GameState';
 import { ActionType } from '../../types/Action';
 import { networkManager } from '../NetworkManager';
 import { InputController } from '../InputController';
 import { TradeUI } from './TradeUI';
 import { PickupUI } from './PickupUI';
-import { getPlayerIdentity, getPlayerColorHex } from '../config/PlayerIdentities';
-import { assetManager } from '../AssetManager';
+import { getPlayerIdentity } from '../config/PlayerIdentities';
 import { audioManager } from '../AudioManager';
 import { icon } from './components/icons';
 import { renderAvatar } from './components/PlayerAvatar';
-import { renderStatBar } from './components/StatBar';
 import { renderActionButton } from './components/ActionButton';
 import { renderLastActionEntry, renderSpawnEntry, type SpawnCardData } from './components/EventEntry';
 import { renderButton } from './components/Button';
 import { renderItemCard } from './components/ItemCard';
+import { renderStatCell } from './components/StatCell';
+import { renderSquadPlate, type SquadPlateRank } from './components/SquadPlate';
+import { renderPhotoSlot } from './components/PhotoSlot';
 import { modalManager } from './overlays/ModalManager';
 import { notificationManager } from './NotificationManager';
 import { formatZoneId, formatActionType } from '../utils/zoneFormat';
 import { SKILL_DEFINITIONS } from '../../config/SkillRegistry';
+
+/** Map Zombicide danger level → SquadPlate rank color. */
+function dangerToRank(level: string): SquadPlateRank {
+  switch ((level || '').toLowerCase()) {
+    case 'yellow': return 'yellow';
+    case 'orange': return 'orange';
+    case 'red':    return 'red';
+    default:       return 'blue';
+  }
+}
+
+/** XP threshold required to reach the *next* danger level (mirrors XPManager). */
+const XP_NEXT_THRESHOLD: Record<string, number | null> = {
+  BLUE: 7,
+  YELLOW: 19,
+  ORANGE: 43,
+  RED: null,
+};
+
+const XP_CURRENT_THRESHOLD: Record<string, number> = {
+  BLUE: 0,
+  YELLOW: 7,
+  ORANGE: 19,
+  RED: 43,
+};
+
+/** Map a skill id to a Lucide icon name. Falls back to Star. */
+function iconForSkill(skillId: string): string {
+  if (skillId.includes('search')) return 'Search';
+  if (skillId.includes('melee') || skillId === 'swordmaster' || skillId === 'barbarian'
+      || skillId === 'super_strength' || skillId === 'reaper_melee') return 'Swords';
+  if (skillId.includes('ranged') || skillId === 'sniper' || skillId === 'point_blank'
+      || skillId === 'plus_1_max_range') return 'Crosshair';
+  if (skillId.includes('combat') || skillId === 'reaper_combat') return 'Target';
+  if (skillId === 'sprint' || skillId === 'charge' || skillId === 'hit_and_run'
+      || skillId === 'plus_1_zone_per_move' || skillId === 'plus_1_free_move'
+      || skillId === 'slippery' || skillId === 'start_move'
+      || skillId === 'bloodlust_melee') return 'Footprints';
+  if (skillId === 'tough' || skillId === 'low_profile' || skillId === 'is_that_all_youve_got'
+      || skillId === 'steady_hand') return 'ShieldCheck';
+  if (skillId === 'lucky') return 'Sparkles';
+  if (skillId === 'born_leader' || skillId === 'lifesaver' || skillId === 'medic') return 'Heart';
+  if (skillId === 'ambidextrous' || skillId === 'matching_set') return 'ArrowLeftRight';
+  if (skillId === 'plus_1_action') return 'Zap';
+  if (skillId === 'hold_your_nose' || skillId === 'starts_with_equipment') return 'Star';
+  return 'Star';
+}
+
+/** Short OP callsign for squad plates (e.g. "P-01"). */
+function callsignFor(_survivor: Survivor, idx: number): string {
+  const n = String(idx + 1).padStart(2, '0');
+  return `P-${n}`;
+}
+
+function escapeHtml(s: string): string {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+const FEED_TTL_MS = 3000;
 
 export class GameHUD {
   private container: HTMLElement;
@@ -36,11 +100,15 @@ export class GameHUD {
   private woundDistModalId: string | null = null;
   private woundDistAssignments: Record<string, number> = {};
   private dismissedFeedTimestamp: number | null = null;
+  private feedAutoDismissTimer: ReturnType<typeof setTimeout> | null = null;
+  private feedAutoDismissScheduledFor: number | null = null;
   private boundDelegateHandler: (e: Event) => void;
   // Stable shell elements — created once, updated per-section
   private elTopBar: HTMLDivElement | null = null;
+  private elRailLeft: HTMLElement | null = null;
+  private elRailRight: HTMLElement | null = null;
+  private elCenterActions: HTMLDivElement | null = null;
   private elFeed: HTMLDivElement | null = null;
-  private elDashboard: HTMLDivElement | null = null;
   private elFab: HTMLDivElement | null = null;
   private shellBuilt = false;
 
@@ -75,6 +143,7 @@ export class GameHUD {
   public update(state: GameState, selectedSurvivorId: EntityId | null): void {
     this.state = state;
     this.selectedSurvivorId = selectedSurvivorId;
+    this.scheduleFeedAutoDismiss();
     this.render();
   }
 
@@ -85,11 +154,43 @@ export class GameHUD {
   public destroy(): void {
     document.documentElement.removeAttribute('data-danger');
     this.container.removeEventListener('click', this.boundDelegateHandler);
+    if (this.feedAutoDismissTimer) {
+      clearTimeout(this.feedAutoDismissTimer);
+      this.feedAutoDismissTimer = null;
+    }
     this.container.innerHTML = '';
     this.shellBuilt = false;
   }
 
-  // ─── Click Delegation ────────────────────────────────────────
+  /**
+   * Event feed is short-lived — after ~6s the latest entry auto-dismisses so
+   * the map stays unobstructed. Players can reopen full history via the Turn
+   * chip.
+   */
+  private scheduleFeedAutoDismiss(): void {
+    const latest = Math.max(
+      this.state?.lastAction?.timestamp ?? 0,
+      this.state?.spawnContext?.timestamp ?? 0,
+    );
+    if (latest <= 0) return;
+    if (this.dismissedFeedTimestamp && latest <= this.dismissedFeedTimestamp) return;
+    if (this.feedAutoDismissScheduledFor === latest) return;
+
+    if (this.feedAutoDismissTimer) clearTimeout(this.feedAutoDismissTimer);
+    this.feedAutoDismissScheduledFor = latest;
+
+    const elapsed = Math.max(0, Date.now() - latest);
+    const delay = Math.max(0, FEED_TTL_MS - elapsed);
+
+    this.feedAutoDismissTimer = setTimeout(() => {
+      this.dismissedFeedTimestamp = latest;
+      this.feedAutoDismissTimer = null;
+      this.feedAutoDismissScheduledFor = null;
+      this.render();
+    }, delay);
+  }
+
+  // ─── Click Delegation (unchanged behavior) ──────────────────
 
   private handleDelegatedClick(e: Event): void {
     const target = e.target as HTMLElement;
@@ -140,8 +241,8 @@ export class GameHUD {
       return;
     }
 
-    // --- Backpack FAB ---
-    if (id === 'btn-backpack-fab' || action === 'open-backpack') {
+    // --- Backpack ---
+    if (action === 'open-backpack') {
       this.openBackpack();
       return;
     }
@@ -233,25 +334,48 @@ export class GameHUD {
     }
   }
 
-  // ─── Rendering ───────────────────────────────────────────────
+  // ─── Rendering shell — Field Manual three-column grid ───────
 
   private buildShell(): void {
     if (this.shellBuilt) return;
     this.container.innerHTML = '';
 
     this.elTopBar = document.createElement('div');
-    this.elTopBar.style.display = 'contents';
+    this.elTopBar.className = 'hud-topbar';
+
+    this.elRailLeft = document.createElement('aside');
+    this.elRailLeft.className = 'hud-rail hud-rail--left';
+
+    // Center column holds: feed overlay + action row at the bottom.
+    // The map "window" inside it is transparent so the PIXI canvas (mounted in #app) shows through.
+    const center = document.createElement('div');
+    center.className = 'hud-center';
 
     this.elFeed = document.createElement('div');
-    this.elFeed.style.display = 'contents';
+    this.elFeed.className = 'hud-feed-slot';
 
-    this.elDashboard = document.createElement('div');
-    this.elDashboard.style.display = 'contents';
+    const mapWindow = document.createElement('div');
+    mapWindow.className = 'hud-map-window fm-brackets';
+    mapWindow.innerHTML = '<span class="fm-bracket-tr"></span><span class="fm-bracket-bl"></span>';
+
+    this.elCenterActions = document.createElement('div');
+    this.elCenterActions.className = 'hud-center__actions';
+
+    center.append(this.elFeed, mapWindow, this.elCenterActions);
+
+    this.elRailRight = document.createElement('aside');
+    this.elRailRight.className = 'hud-rail hud-rail--right fm-brackets fm-brackets--amber';
 
     this.elFab = document.createElement('div');
-    this.elFab.style.display = 'contents';
+    this.elFab.className = 'hud-fab-slot';
 
-    this.container.append(this.elTopBar, this.elFeed, this.elDashboard, this.elFab);
+    this.container.append(
+      this.elTopBar,
+      this.elRailLeft,
+      center,
+      this.elRailRight,
+      this.elFab,
+    );
     this.shellBuilt = true;
   }
 
@@ -276,9 +400,14 @@ export class GameHUD {
     const activeSurvivor = this.selectedSurvivorId ? this.state.survivors[this.selectedSurvivorId] : null;
 
     this.elTopBar!.innerHTML = this.renderTopBar(isMyTurn);
+    this.elRailLeft!.innerHTML = this.renderSquadRail();
+    this.elRailRight!.innerHTML = activeSurvivor && activeSurvivor.playerId === this.localPlayerId
+      ? this.renderRightPanel(activeSurvivor, isMyTurn)
+      : '<span class="fm-bracket-tr"></span><span class="fm-bracket-bl"></span>';
+
+    this.elCenterActions!.innerHTML = '';
     this.elFeed!.innerHTML = this.renderFeed();
-    this.elDashboard!.innerHTML = activeSurvivor ? this.renderBottomDashboard(activeSurvivor, isMyTurn) : '';
-    this.elFab!.innerHTML = activeSurvivor ? this.renderBackpackFab(activeSurvivor) : '';
+    this.elFab!.innerHTML = '';
 
     this.syncTradeAndPickup(activeSurvivor);
 
@@ -297,65 +426,115 @@ export class GameHUD {
     }
   }
 
+  // ─── Top phase bar ──────────────────────────────────────────
+
   private renderTopBar(isMyTurn: boolean): string {
     const state = this.state!;
-    const dangerClass = `hud-pill--danger-${state.currentDangerLevel.toLowerCase()}`;
-    const myTurnClass = isMyTurn ? ' hud-top--my-turn' : '';
+    const activePid = state.players[state.activePlayerIndex];
+    const activeSurvivor = Object.values(state.survivors).find(s => s.playerId === activePid);
+    const activeName = activeSurvivor?.name ?? '';
 
-    const turnBadge = isMyTurn
-      ? '<span class="hud-turn-badge">Your Turn</span>'
-      : '';
+    const phaseRaw = (state.phase || '').toUpperCase();
+    const isPlayerPhase = phaseRaw.includes('PLAYER') || phaseRaw === 'SURVIVOR';
+    const isZombiePhase = phaseRaw.includes('ZOMBIE');
+    const isEndPhase    = phaseRaw.includes('END');
 
-    const playerStrip = this.renderPlayerStrip();
+    const channel = this.channelTag(state);
+    const myTurnClass = isMyTurn ? ' hud-topbar--my-turn' : '';
+    const dangerClass = ` hud-topbar--danger-${state.currentDangerLevel.toLowerCase()}`;
+
+    const phaseCell = (label: string, active: boolean) =>
+      `<span class="hud-phasecell${active ? ' hud-phasecell--active' : ''}">${label}</span>`;
 
     return `
-      <div class="hud-top${myTurnClass}">
-        <div class="hud-top__left">
-          <button class="hud-pill hud-pill--clickable" data-action="open-history" title="View turn history" aria-label="Turn ${state.turn} — click to view history">${icon('Clock', 'sm')} Turn ${state.turn}</button>
-          <span class="hud-pill">${state.phase}</span>
-          <span class="hud-pill ${dangerClass}">${state.currentDangerLevel}</span>
-          ${turnBadge}
+      <div class="hud-topbar__inner${myTurnClass}${dangerClass}">
+        <div class="hud-topbar__left">
+          <button class="hud-turnchip" data-action="open-history" title="View turn history" aria-label="Turn ${state.turn} — click to view history">
+            <span class="hud-turnchip__label">TURN</span>
+            <span class="hud-turnchip__value">${String(state.turn).padStart(2, '0')}</span>
+          </button>
+          <div class="hud-phasecells">
+            ${phaseCell(`PLAYER${activeName ? ' · ' + escapeHtml(activeName.toUpperCase()) : ''}`, isPlayerPhase)}
+            ${phaseCell('ZOMBIE', isZombiePhase)}
+            ${phaseCell('END', isEndPhase)}
+          </div>
         </div>
-        <div class="hud-top__center">
-          ${playerStrip}
+        <div class="hud-topbar__right">
+          <span class="hud-channel">CH ${channel}</span>
+          <button id="btn-menu" class="hud-iconbtn" data-action="open-menu" title="Menu" aria-label="Menu">${icon('Menu', 'sm')}</button>
         </div>
-        <div class="hud-top__right">
-          ${renderButton({ icon: 'Menu', variant: 'icon', size: 'sm', dataAction: 'open-menu', title: 'Menu' })}
-        </div>
-        <div class="hud-danger-bar hud-danger-bar--${state.currentDangerLevel.toLowerCase()}"></div>
+        <div class="hud-topbar__bar"></div>
       </div>`;
   }
 
-  private renderPlayerStrip(): string {
+  private channelTag(state: GameState): string {
+    // Stable 6-char alphanumeric channel derived from turn + active player.
+    const seed = `${state.turn}-${state.players[state.activePlayerIndex] || ''}`;
+    let h = 0;
+    for (let i = 0; i < seed.length; i++) {
+      h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+    }
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let out = '';
+    for (let i = 0; i < 6; i++) {
+      out += alphabet[h % alphabet.length];
+      h = Math.floor(h / alphabet.length) + (i * 7);
+    }
+    return out;
+  }
+
+  // ─── Squad rail ─────────────────────────────────────────────
+
+  private renderSquadRail(): string {
     if (!this.state) return '';
     const players = this.state.players;
-    const activePlayerId = players[this.state.activePlayerIndex];
+    const activePid = players[this.state.activePlayerIndex];
+    const survivorsByPlayer: Survivor[] = [];
+    for (const pid of players) {
+      const s = Object.values(this.state.survivors).find(sv => sv.playerId === pid);
+      if (s) survivorsByPlayer.push(s);
+    }
 
-    const chips = players.map(pid => {
-      const survivor = Object.values(this.state!.survivors).find(s => s.playerId === pid);
-      if (!survivor) return '';
-      const identity = getPlayerIdentity(this.state!, pid);
-      const isDead = survivor.wounds >= survivor.maxHealth;
-      const isActive = pid === activePlayerId;
-      const state = isDead ? 'dead' as const : isActive ? 'active' as const : undefined;
-      return renderAvatar(survivor.name, identity, 'sm', state, survivor.characterClass);
+    const plates = survivorsByPlayer.map((s) => {
+      const active = s.playerId === activePid;
+      const playerColor = getPlayerIdentity(this.state!, s.playerId).primary;
+      return renderSquadPlate({
+        name: s.name,
+        rank: dangerToRank(s.dangerLevel),
+        playerColor,
+        hp: Math.max(0, s.maxHealth - s.wounds),
+        hpMax: s.maxHealth,
+        actions: s.actionsRemaining,
+        actionsMax: s.actionsPerTurn,
+        active,
+      });
     }).join('');
 
-    return `<div class="hud-player-strip">${chips}</div>`;
+    const kicker = `<div class="fm-kicker hud-rail__kicker">SQUAD · ${survivorsByPlayer.length}</div>`;
+    return `${kicker}<div class="hud-rail__list">${plates}</div>`;
   }
+
+  // ─── Feed (center overlay) ──────────────────────────────────
 
   private renderFeed(): string {
     if (!this.state) return '';
 
-    // Check if current feed content has been dismissed
-    const feedTimestamp = this.state.lastAction?.timestamp || this.state.spawnContext?.timestamp || 0;
+    const lastActionTs = this.state.lastAction?.timestamp ?? 0;
+    const spawnTs = this.state.spawnContext?.timestamp ?? 0;
+    const feedTimestamp = Math.max(lastActionTs, spawnTs);
+    if (feedTimestamp <= 0) return '';
     if (this.dismissedFeedTimestamp && feedTimestamp <= this.dismissedFeedTimestamp) {
       return '';
     }
 
-    const lastAction = this.state.lastAction ? renderLastActionEntry(this.state.lastAction) : '';
-    const spawnInfo = this.state.spawnContext?.cards
-      ? renderSpawnEntry(this.state.spawnContext.cards as SpawnCardData[])
+    // Only the most recent event renders — once a player acts after a zombie
+    // spawn, the older spawnContext must not re-display alongside the new action.
+    const showLastAction = !!this.state.lastAction && lastActionTs >= spawnTs;
+    const showSpawn = !!this.state.spawnContext?.cards?.length && spawnTs > lastActionTs;
+
+    const lastAction = showLastAction ? renderLastActionEntry(this.state.lastAction!) : '';
+    const spawnInfo = showSpawn
+      ? renderSpawnEntry(this.state.spawnContext!.cards as SpawnCardData[])
       : '';
 
     if (!lastAction && !spawnInfo) return '';
@@ -363,19 +542,21 @@ export class GameHUD {
     const dismissBtn = `<button class="btn btn--icon btn--sm hud-feed__dismiss" data-action="dismiss-feed" title="Dismiss">${icon('X', 'sm')}</button>`;
     const luckyBtn = this.renderLuckyRerollButton();
 
-    // Desktop: sidebar feed
-    const desktopFeed = `<div class="hud-feed"><div class="hud-feed__section">${dismissBtn}${lastAction}${luckyBtn}${spawnInfo}</div></div>`;
-    // Mobile: last event as floating overlay
-    const mobileFeed = lastAction ? `<div class="hud-feed-mobile">${lastAction}${luckyBtn}</div>` : '';
+    // Countdown bar — uses negative animation-delay so the visual is in sync
+    // with actual elapsed time across re-renders (state updates re-create the
+    // DOM, which would otherwise restart the animation).
+    const elapsed = Math.max(0, Date.now() - feedTimestamp);
+    const timerStyle = `animation-duration:${FEED_TTL_MS}ms;animation-delay:-${elapsed}ms;`;
+    const timerBar = `<div class="hud-feed__timer" aria-hidden="true"><div class="hud-feed__timer-bar" style="${timerStyle}"></div></div>`;
 
-    return `${desktopFeed}${mobileFeed}`;
+    return `<div class="hud-feed"><div class="hud-feed__section">${dismissBtn}${lastAction}${luckyBtn}${spawnInfo}${timerBar}</div></div>`;
   }
 
   /**
    * Lucky reroll affordance — surfaces a button in the feed when:
    * - local survivor owns the last ATTACK action,
    * - Lucky skill is unspent this turn,
-   * - the attack carried a rollback snapshot (always true for Lucky-capable attackers).
+   * - the attack carried a rollback snapshot.
    */
   private renderLuckyRerollButton(): string {
     const state = this.state;
@@ -394,30 +575,121 @@ export class GameHUD {
     </button>`;
   }
 
-  private renderBottomDashboard(survivor: Survivor, isMyTurn: boolean): string {
-    const isOwner = survivor.playerId === this.localPlayerId;
-    if (!isOwner) return '';
+  // ─── Center action row ──────────────────────────────────────
 
-    const identity = getPlayerIdentity(this.state!, survivor.playerId);
-    const avatar = renderAvatar(survivor.name, identity, 'md', undefined, survivor.characterClass);
-
-    const hp = renderStatBar({ icon: 'Heart', current: survivor.maxHealth - survivor.wounds, max: survivor.maxHealth, color: 'var(--danger)' });
-    const xp = renderStatBar({ icon: 'Star', current: survivor.experience, max: survivor.experience + 5, color: 'var(--accent)', label: `${survivor.experience} XP` });
-    const ap = renderStatBar({ icon: 'Zap', current: survivor.actionsRemaining, max: survivor.actionsPerTurn, color: 'var(--warning)' });
-
-    const weapons = survivor.inventory.filter(c => c.type === 'WEAPON' && c.inHand);
+  private renderActionRow(survivor: Survivor, isMyTurn: boolean): string {
     const canOpenDoor = survivor.inventory.some(c => c.inHand && c.canOpenDoor);
     const currentZone = this.state?.zones[survivor.position.zoneId];
     const canTakeObjective = currentZone?.hasObjective === true;
     const noAP = survivor.actionsRemaining < 1;
+    const skillActions = this.renderSkillActionButtons(survivor, isMyTurn, noAP);
 
-    // --- Skills panel ---
-    const skillsHtml = this.renderSkillBadges(survivor);
+    return `
+      <div class="hud-actions">
+        ${renderActionButton({ id: 'btn-search', icon: 'Search', label: 'Search', kbd: 'S', cost: survivor.freeSearchesRemaining > 0 ? 'FREE' : '1 AP', disabled: !isMyTurn || survivor.hasSearched || (noAP && survivor.freeSearchesRemaining <= 0) })}
+        ${renderActionButton({ id: 'btn-noise', icon: 'Volume2', label: 'Noise', kbd: 'N', cost: '1 AP', disabled: !isMyTurn || noAP })}
+        ${renderActionButton({ id: 'btn-door', icon: 'DoorOpen', label: 'Door', kbd: 'D', cost: '1 AP', disabled: !isMyTurn || noAP || !canOpenDoor })}
+        ${renderActionButton({ id: 'btn-objective', icon: 'Target', label: 'Objective', kbd: 'O', cost: '1 AP', disabled: !isMyTurn || noAP || !canTakeObjective, highlight: canTakeObjective && isMyTurn && !noAP })}
+        ${renderActionButton({ id: 'btn-trade', icon: 'Handshake', label: 'Trade', kbd: 'T', cost: '1 AP', disabled: !isMyTurn || noAP })}
+        ${renderActionButton({ id: 'btn-end-turn', icon: 'SkipForward', label: 'End Turn', kbd: 'E', disabled: !isMyTurn })}
+        ${skillActions}
+      </div>`;
+  }
 
-    // --- Free action indicators ---
-    const freeActions = this.renderFreeActionIndicators(survivor);
+  // ─── Right panel — active op readout + loadout + field log ──
 
-    // --- Pending wounds alert ---
+  private renderRightPanel(survivor: Survivor, isMyTurn: boolean): string {
+    const identity = getPlayerIdentity(this.state!, survivor.playerId);
+    const idx = Math.max(0, this.state!.players.indexOf(survivor.playerId));
+
+    const hp = Math.max(0, survivor.maxHealth - survivor.wounds);
+    const weapons = survivor.inventory.filter(c => c.type === 'WEAPON' && c.inHand);
+    const noAP = survivor.actionsRemaining < 1;
+    const weaponBoosts = this.getWeaponBoosts(survivor);
+
+    // Active Op card — photo slot + name + rank chip + callsign
+    const rankLabel = this.rankLabel(survivor.dangerLevel);
+    const avatarUrl = (identity as { avatarUrl?: string } | undefined)?.avatarUrl
+      ?? (survivor.characterClass ? `/images/characters/${survivor.characterClass.toLowerCase()}.webp` : undefined);
+    const photo = renderPhotoSlot({ size: 'sm', imageUrl: avatarUrl });
+
+    const xpBar = this.renderXpBar(survivor);
+    const skillBadges = this.renderSkillBadges(survivor);
+    const freeActionIndicators = this.renderFreeActionIndicators(survivor);
+    const tagRow = (skillBadges || freeActionIndicators)
+      ? `<div class="hud-op__tags">${freeActionIndicators}${skillBadges}</div>`
+      : '';
+
+    // Compact op card — single row header (photo + identity left, callsign
+    // right) then a horizontal stats row (VITALS · ACTIONS · XP) underneath.
+    const opCard = `
+      <div class="hud-op">
+        <div class="hud-op__head">
+          <div class="hud-op__head-left">
+            ${photo}
+            <div class="hud-op__ident">
+              <div class="hud-op__nameline">
+                <span class="hud-op__name">${escapeHtml(survivor.name)}</span>
+                <span class="hud-op__rankchip hud-op__rankchip--${dangerToRank(survivor.dangerLevel)}">${rankLabel}</span>
+              </div>
+              ${tagRow}
+            </div>
+          </div>
+          <div class="hud-op__head-right">
+            <span class="hud-op__sub">POINT · ${escapeHtml(callsignFor(survivor, idx))}</span>
+          </div>
+        </div>
+        <div class="hud-op__stats">
+          ${renderStatCell({ icon: icon('Heart', 'sm'), label: 'VITALS', value: hp, max: survivor.maxHealth, color: 'danger', size: 'sm' })}
+          ${renderStatCell({ icon: icon('Zap', 'sm'), label: 'ACTIONS', value: survivor.actionsRemaining, max: survivor.actionsPerTurn, color: 'amber', size: 'sm' })}
+          ${xpBar}
+        </div>
+      </div>`;
+
+    // Loadout — weapons + backpack
+    const rHand = weapons[0];
+    const lHand = weapons[1];
+    const freeCombatAvail = survivor.freeCombatsRemaining > 0 || survivor.freeMeleeRemaining > 0 || survivor.freeRangedRemaining > 0;
+    const attackDisabled = !isMyTurn || (noAP && !freeCombatAvail);
+
+    const weaponSlot = (w: typeof rHand, slotLabel: string) => {
+      if (!w) {
+        return `<div class="hud-slot hud-slot--empty">
+          <div class="hud-slot__label">${slotLabel}</div>
+          <div class="hud-slot__empty">— EMPTY —</div>
+        </div>`;
+      }
+      const boosts = weaponBoosts.get(w.id) || { dice: 0, damage: 0 };
+      const isActive = this.inputController.mode === 'ATTACK' && this.inputController.weaponId === w.id;
+      return `<div class="hud-slot hud-slot--weapon">
+        <div class="hud-slot__label">${slotLabel}</div>
+        <button class="hud-weapon-btn${isActive ? ' hud-weapon-btn--active' : ''}" data-id="${escapeHtml(w.id)}" ${attackDisabled ? 'disabled' : ''}>
+          ${renderItemCard(w, { variant: 'weapon', showSlot: false, bonusDice: boosts.dice, bonusDamage: boosts.damage })}
+        </button>
+      </div>`;
+    };
+
+    const bagItems = survivor.inventory.filter(c => !c.inHand);
+    const bagSlot = `
+      <div class="hud-slot hud-slot--bag">
+        <div class="hud-slot__label">BAG</div>
+        <button class="hud-bag-button" data-action="open-backpack" title="Open backpack" aria-label="Open backpack (${bagItems.length} item${bagItems.length === 1 ? '' : 's'})">
+          ${icon('Backpack', 'lg')}
+          ${bagItems.length > 0 ? `<span class="hud-bag-button__badge">${bagItems.length}</span>` : ''}
+        </button>
+      </div>`;
+
+    const loadout = `
+      <section class="hud-loadout">
+        <div class="fm-kicker hud-loadout__kicker">// LOADOUT</div>
+        <div class="hud-loadout__grid">
+          ${weaponSlot(rHand, 'R.HAND')}
+          ${weaponSlot(lHand, 'L.HAND')}
+          ${bagSlot}
+        </div>
+      </section>`;
+
+    // Skills/free actions kept as inline row above field log.
     const woundAlert = survivor.pendingWounds && survivor.pendingWounds > 0
       ? `<button class="hud-wound-alert" data-action="resolve-wounds">
           ${icon('AlertTriangle', 'sm')}
@@ -425,62 +697,71 @@ export class GameHUD {
         </button>`
       : '';
 
-    // --- Once-per-turn skill action buttons ---
-    const skillActions = this.renderSkillActionButtons(survivor, isMyTurn, noAP);
+    const fieldLog = this.renderFieldLog();
 
-    // --- Weapon stat boosts from skills ---
-    const weaponBoosts = this.getWeaponBoosts(survivor);
+    const actionRow = this.renderActionRow(survivor, isMyTurn);
 
     return `
-      <div class="hud-bottom">
-        <div>
-          <div class="hud-survivor">
-            ${avatar}
-            <div class="hud-survivor__info">
-              <span class="hud-survivor__name">${survivor.name}</span>
-              <span class="hud-survivor__class">${survivor.characterClass} &middot; ${survivor.dangerLevel}</span>
-            </div>
-          </div>
-          <div class="hud-stats mt-2">
-            ${hp}${xp}${ap}
-          </div>
-          ${freeActions}
-          ${woundAlert}
-          ${skillsHtml}
-        </div>
-
-        <div class="hud-actions">
-          ${renderActionButton({ id: 'btn-search', icon: 'Search', label: 'Search', kbd: 'S', cost: survivor.freeSearchesRemaining > 0 ? 'FREE' : '1 AP', disabled: !isMyTurn || survivor.hasSearched || (noAP && survivor.freeSearchesRemaining <= 0) })}
-          ${renderActionButton({ id: 'btn-noise', icon: 'Volume2', label: 'Noise', kbd: 'N', cost: '1 AP', disabled: !isMyTurn || noAP })}
-          ${renderActionButton({ id: 'btn-door', icon: 'DoorOpen', label: 'Door', kbd: 'D', cost: '1 AP', disabled: !isMyTurn || noAP || !canOpenDoor })}
-          ${renderActionButton({ id: 'btn-objective', icon: 'Target', label: 'Objective', kbd: 'O', cost: '1 AP', disabled: !isMyTurn || noAP || !canTakeObjective, highlight: canTakeObjective && isMyTurn && !noAP })}
-          ${renderActionButton({ id: 'btn-trade', icon: 'Handshake', label: 'Trade', kbd: 'T', cost: '1 AP', disabled: !isMyTurn || noAP })}
-          ${renderActionButton({ id: 'btn-end-turn', icon: 'SkipForward', label: 'End Turn', kbd: 'E', disabled: !isMyTurn })}
-          ${skillActions}
-        </div>
-
-        <div class="hud-weapons">
-          ${weapons.length > 0
-            ? weapons.map(w => {
-                const boosts = weaponBoosts.get(w.id) || { dice: 0, damage: 0 };
-                const isActive = this.inputController.mode === 'ATTACK' && this.inputController.weaponId === w.id;
-                return `
-                <button class="hud-weapon-btn${isActive ? ' hud-weapon-btn--active' : ''}" data-id="${w.id}" ${!isMyTurn || (noAP && survivor.freeCombatsRemaining <= 0 && survivor.freeMeleeRemaining <= 0 && survivor.freeRangedRemaining <= 0) ? 'disabled' : ''}>
-                  ${renderItemCard(w, { variant: 'weapon', showSlot: false, bonusDice: boosts.dice, bonusDamage: boosts.damage })}
-                </button>`;
-              }).join('')
-            : `<div class="text-muted-sm">No weapon equipped</div>`}
-        </div>
+      <span class="fm-bracket-tr"></span><span class="fm-bracket-bl"></span>
+      <div class="hud-rail__body">
+        ${opCard}
+        ${actionRow}
+        ${loadout}
+        ${woundAlert}
+        ${fieldLog}
       </div>`;
   }
 
-  private renderBackpackFab(survivor: Survivor): string {
-    const count = survivor.inventory.length;
+  private rankLabel(dangerLevel: string): string {
+    const rank = dangerToRank(dangerLevel);
+    return ({ blue: 'ROOKIE', yellow: 'VETERAN', orange: 'ELITE', red: 'HERO' } as const)[rank];
+  }
+
+  // ─── Field Log — condensed turn history for right panel ─────
+
+  private renderFieldLog(): string {
+    if (!this.state) return '';
+    const entries = [...this.state.history]
+      .filter(e =>
+        e.actionType !== 'JOIN_LOBBY' && e.actionType !== 'START_GAME'
+        && e.actionType !== 'RESOLVE_SEARCH' && e.actionType !== 'CHOOSE_SKILL'
+        && e.actionType !== 'KICK_PLAYER'
+      )
+      .slice(-8)
+      .reverse();
+
+    const lines = entries.map(e => {
+      const ts = this.formatTs(e.timestamp || 0);
+      const survivor = e.survivorId && e.survivorId !== 'system' ? this.state!.survivors[e.survivorId] : null;
+      const name = survivor?.name ?? 'SYSTEM';
+      const label = formatActionType(e.actionType);
+      let detail = '';
+      if (e.description) detail = e.description;
+      else if (e.payload?.targetZoneId) detail = `→ ${formatZoneId(e.payload.targetZoneId, this.state!)}`;
+      return `<div class="hud-log__line">
+        <span class="hud-log__ts">${escapeHtml(ts)}</span>
+        <span class="hud-log__actor">${escapeHtml(name)}</span>
+        <span class="hud-log__action">${escapeHtml(label)}</span>
+        ${detail ? `<span class="hud-log__detail">${escapeHtml(detail)}</span>` : ''}
+      </div>`;
+    }).join('');
+
+    const body = lines || `<div class="hud-log__empty">// AWAITING CONTACT</div>`;
+
     return `
-      <button class="hud-backpack-fab" id="btn-backpack-fab" data-action="open-backpack" title="Backpack">
-        ${icon('Backpack', 'lg')}
-        <span class="hud-backpack-fab__badge">${count}</span>
-      </button>`;
+      <section class="hud-log">
+        <div class="fm-kicker hud-log__kicker">// FIELD LOG</div>
+        <div class="hud-log__body">${body}</div>
+      </section>`;
+  }
+
+  private formatTs(ts: number): string {
+    if (!ts) return '--:--';
+    const d = new Date(ts);
+    const h = String(d.getHours()).padStart(2, '0');
+    const m = String(d.getMinutes()).padStart(2, '0');
+    const s = String(d.getSeconds()).padStart(2, '0');
+    return `${h}:${m}:${s}`;
   }
 
   // ─── Skill Visual Indicators ──────────────────────────────────
@@ -492,7 +773,6 @@ export class GameHUD {
       const def = SKILL_DEFINITIONS[skillId];
       if (!def) return '';
 
-      // Check if once-per-turn skill is used
       let used = false;
       if (skillId === 'sprint') used = survivor.sprintUsedThisTurn;
       else if (skillId === 'charge') used = survivor.chargeUsedThisTurn;
@@ -503,11 +783,48 @@ export class GameHUD {
 
       const typeClass = def.type === 'PASSIVE' ? 'passive' : def.type === 'ACTION' ? 'action' : 'stat-mod';
       const usedClass = used ? ' skill-badge--used' : '';
+      const skillIcon = icon(iconForSkill(skillId), 'sm');
 
-      return `<span class="skill-badge skill-badge--${typeClass}${usedClass}" title="${def.description}">${def.name}</span>`;
+      return `<span class="skill-badge skill-badge--${typeClass}${usedClass}" title="${escapeHtml(def.description)}">${skillIcon}<span>${escapeHtml(def.name)}</span></span>`;
     }).filter(Boolean).join('');
 
     return `<div class="hud-skills">${badges}</div>`;
+  }
+
+  private renderXpBar(survivor: Survivor): string {
+    const level = String(survivor.dangerLevel).toUpperCase();
+    const rank = dangerToRank(level);
+    const xp = Math.max(0, survivor.experience || 0);
+    const next = XP_NEXT_THRESHOLD[level];
+    const current = XP_CURRENT_THRESHOLD[level] ?? 0;
+
+    if (next === null || next === undefined) {
+      return `
+        <div class="hud-op__xp hud-op__xp--rank-${rank} hud-op__xp--max">
+          <div class="hud-op__xp-head">
+            <span class="hud-op__xp-label">Experience</span>
+            <span class="hud-op__xp-value">${xp} XP · MAX</span>
+          </div>
+          <div class="hud-op__xp-track" role="progressbar" aria-valuenow="${xp}" aria-valuemin="0" aria-valuemax="${xp}">
+            <div class="hud-op__xp-fill hud-op__xp-fill--${rank}" style="width:100%"></div>
+          </div>
+        </div>`;
+    }
+
+    const span = Math.max(1, next - current);
+    const progressed = Math.max(0, Math.min(span, xp - current));
+    const pct = Math.round((progressed / span) * 100);
+
+    return `
+      <div class="hud-op__xp hud-op__xp--rank-${rank}">
+        <div class="hud-op__xp-head">
+          <span class="hud-op__xp-label">Experience</span>
+          <span class="hud-op__xp-value">${xp} / ${next}</span>
+        </div>
+        <div class="hud-op__xp-track" role="progressbar" aria-label="Experience" aria-valuenow="${xp}" aria-valuemin="${current}" aria-valuemax="${next}">
+          <div class="hud-op__xp-fill hud-op__xp-fill--${rank}" style="width:${pct}%"></div>
+        </div>
+      </div>`;
   }
 
   private renderFreeActionIndicators(survivor: Survivor): string {
@@ -612,31 +929,8 @@ export class GameHUD {
       title: `Is That All You've Got?`,
       size: 'md',
       persistent: true,
-      renderBody: () => {
-        const desc = `<p class="text-secondary mb-3">You have <strong>${pendingCount}</strong> incoming wound${pendingCount > 1 ? 's' : ''}. Discard equipment to negate wounds (1 card = 1 wound negated).</p>`;
-        const negated = Math.min(this.woundPickerSelected.size, pendingCount);
-        const remaining = pendingCount - negated;
-        const summary = `<div class="wound-picker__summary">
-          <span>Negated: <strong class="text-success">${negated}</strong></span>
-          <span>Wounds taken: <strong class="${remaining > 0 ? 'text-danger' : 'text-success'}">${remaining}</strong></span>
-        </div>`;
-
-        const cards = survivor.inventory.map(card => {
-          const selected = this.woundPickerSelected.has(card.id);
-          return `<div class="wound-picker__card ${selected ? 'wound-picker__card--selected' : ''}" data-action="toggle-wound-card" data-card-id="${card.id}">
-            ${renderItemCard(card, { variant: selected ? 'ghost' : 'default', showSlot: true })}
-          </div>`;
-        }).join('');
-
-        return `${desc}${summary}<div class="grid grid--2 gap-2 mt-3">${cards}</div>`;
-      },
-      renderFooter: () => {
-        const negated = Math.min(this.woundPickerSelected.size, pendingCount);
-        const remaining = pendingCount - negated;
-        return `
-          ${renderButton({ label: `Take ${remaining} Wound${remaining !== 1 ? 's' : ''}`, variant: remaining > 0 ? 'destructive' : 'primary', dataAction: 'confirm-wounds' })}
-        `;
-      },
+      renderBody: () => this.renderWoundPickerBody(survivor, pendingCount),
+      renderFooter: () => this.renderWoundPickerFooter(pendingCount),
       onOpen: (el) => {
         el.addEventListener('click', (e) => {
           const cardEl = (e.target as HTMLElement).closest('[data-action="toggle-wound-card"]') as HTMLElement;
@@ -648,9 +942,6 @@ export class GameHUD {
               } else if (this.woundPickerSelected.size < pendingCount) {
                 this.woundPickerSelected.add(cardId);
               }
-              // Re-render modal content
-              modalManager.updateBody(this.woundPickerModalId!, modalManager.getElement(this.woundPickerModalId!)?.querySelector('.modal__body')?.innerHTML
-                ? this.renderWoundPickerBody(survivor, pendingCount) : '');
               modalManager.updateBody(this.woundPickerModalId!, this.renderWoundPickerBody(survivor, pendingCount));
               modalManager.updateFooter(this.woundPickerModalId!, this.renderWoundPickerFooter(pendingCount));
             }
@@ -709,12 +1000,10 @@ export class GameHUD {
     if (this.woundDistModalId && modalManager.isOpen(this.woundDistModalId)) return;
     if (!this.state) return;
 
-    // Initialize assignments: all wounds to first survivor by default
     this.woundDistAssignments = {};
     for (const sid of entry.survivorIds) {
       this.woundDistAssignments[sid] = 0;
     }
-    // Assign all to first survivor as starting point
     this.woundDistAssignments[entry.survivorIds[0]] = entry.totalWounds;
 
     this.woundDistModalId = modalManager.open({
@@ -1006,14 +1295,12 @@ export class GameHUD {
 
         const entries = [...this.state.history];
 
-        // Filter out non-display actions
         const displayEntries = entries.filter(e =>
           e.actionType !== 'JOIN_LOBBY' && e.actionType !== 'START_GAME'
           && e.actionType !== 'RESOLVE_SEARCH' && e.actionType !== 'CHOOSE_SKILL'
           && e.actionType !== 'KICK_PLAYER'
         );
 
-        // Group entries by turn using stored turn number or END_TURN boundaries
         const turnGroups: { turn: number; actions: typeof displayEntries }[] = [];
         let currentTurn = 1;
         let currentGroup: typeof displayEntries = [];
@@ -1030,7 +1317,6 @@ export class GameHUD {
           turnGroups.push({ turn: currentGroup[0]?.turn || currentTurn, actions: currentGroup });
         }
 
-        // Render most recent first
         const reversed = [...turnGroups].reverse();
 
         return `<div class="history-list">${reversed.map(group => {
@@ -1058,12 +1344,10 @@ export class GameHUD {
     const survivorName = survivor?.name ?? '';
     const actionLabel = formatActionType(entry.actionType);
 
-    // Free action label
     const freeLabel = entry.usedFreeAction
       ? `<span class="history-entry__free">${entry.freeActionType || 'FREE'}</span> `
       : '';
 
-    // Build detail string based on action type
     let detail = '';
     let subDetail = '';
 
@@ -1074,7 +1358,6 @@ export class GameHUD {
           : '';
         detail = entry.description || (targetZone ? `→ ${targetZone}` : '');
 
-        // Dice details
         if (entry.dice && entry.dice.length > 0) {
           const diceStr = entry.dice.map(d =>
             `<span class="history-die ${d >= 4 ? 'history-die--hit' : ''}">${d}</span>`
@@ -1084,7 +1367,6 @@ export class GameHUD {
           subDetail = `<div class="history-entry__dice">${diceStr} <span class="history-entry__hits">${hitsStr}${dmgStr}</span></div>`;
         }
 
-        // Reroll indicator (Lucky / Plenty of Bullets / Plenty of Shells)
         if (entry.rerolledFrom && entry.rerolledFrom.length > 0) {
           const origDice = entry.rerolledFrom.map(d =>
             `<span class="history-die history-die--discarded">${d}</span>`
@@ -1099,7 +1381,6 @@ export class GameHUD {
           subDetail = `<div class="history-entry__lucky">${label}: ${origDice}</div>${subDetail}`;
         }
 
-        // Boost info
         const boosts: string[] = [];
         if (entry.bonusDice && entry.bonusDice > 0) boosts.push(`+${entry.bonusDice} dice`);
         if (entry.bonusDamage && entry.bonusDamage > 0) boosts.push(`+${entry.bonusDamage} dmg`);
@@ -1142,7 +1423,6 @@ export class GameHUD {
       }
       case 'END_TURN': {
         detail = '';
-        // Show zombie phase summary if spawn context available
         if (entry.spawnContext?.cards?.length) {
           const spawnSummary = entry.spawnContext.cards.map((c: any) => {
             if (c.detail.extraActivation) return `Extra ${c.detail.extraActivation} activation`;

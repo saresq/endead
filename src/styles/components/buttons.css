@@ -296,10 +296,33 @@
 
 .btn:disabled,
 .btn--disabled {
-  opacity: 0.32;
+  opacity: 0.55;
   cursor: not-allowed;
   pointer-events: none;
-  filter: saturate(0.4);
+  filter: grayscale(0.3);
+}
+
+/* Purpose-built disabled state for the primary CTA: reads as a locked
+   tile rather than a washed-out accent. Flat dark surface, amber-bone
+   label, subtle inset border. */
+.btn--primary:disabled,
+.btn--primary.btn--disabled {
+  opacity: 1;
+  filter: none;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-3) 85%, black) 0%,
+      color-mix(in srgb, var(--surface-2) 85%, black) 100%
+    );
+  color: color-mix(in srgb, var(--accent) 55%, var(--text-secondary));
+  border-color: color-mix(in srgb, var(--accent) 25%, black);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.5),
+    0 1px 3px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(0, 0, 0, 0.45);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
 }
 
 .btn--loading {
@@ -914,4 +937,184 @@
 @keyframes icon-spin {
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
+}
+
+/* ==========================================================================
+   Field Manual Button System — `.fm-btn`
+   Chamfered corners, stencil typography, amber/rust gradient surfaces.
+   Emitted by renderButton() alongside legacy `.btn` classes.
+   ========================================================================== */
+
+.fm-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 12px 16px;
+  font-family: var(--font-stencil);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 0;
+  cursor: pointer;
+  transition:
+    filter 120ms ease,
+    transform 120ms ease,
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    box-shadow 120ms ease;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-user-select: none;
+  text-decoration: none;
+  line-height: 1;
+}
+
+.fm-btn:focus-visible {
+  outline: 2px solid var(--amber-400);
+  outline-offset: 2px;
+}
+
+/* ---------- Primary — amber gradient, chamfered ---------- */
+
+.fm-btn--primary {
+  background: linear-gradient(180deg, var(--amber-400), var(--amber-500));
+  color: #1a1a0a;
+  clip-path: polygon(
+    10px 0,
+    100% 0,
+    100% calc(100% - 10px),
+    calc(100% - 10px) 100%,
+    0 100%,
+    0 10px
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 2px 6px rgba(0, 0, 0, 0.5);
+}
+
+.fm-btn--primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.fm-btn--primary:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.35),
+    0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* ---------- Secondary — olive outline, bone text, chamfered ---------- */
+
+.fm-btn--secondary {
+  background: transparent;
+  color: var(--bone-100);
+  border: 1px solid var(--olive-500);
+  clip-path: polygon(
+    10px 0,
+    100% 0,
+    100% calc(100% - 10px),
+    calc(100% - 10px) 100%,
+    0 100%,
+    0 10px
+  );
+}
+
+.fm-btn--secondary:hover:not(:disabled) {
+  border-color: var(--olive-300);
+  background: rgba(138, 149, 96, 0.06);
+}
+
+.fm-btn--secondary:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+/* ---------- Destructive — rust gradient ---------- */
+
+.fm-btn--destructive {
+  background: linear-gradient(180deg, var(--rust-400), var(--rust-500));
+  color: var(--bone-100);
+  clip-path: polygon(
+    10px 0,
+    100% 0,
+    100% calc(100% - 10px),
+    calc(100% - 10px) 100%,
+    0 100%,
+    0 10px
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    0 2px 6px rgba(0, 0, 0, 0.5);
+}
+
+.fm-btn--destructive:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.fm-btn--destructive:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.35),
+    0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* ---------- Ghost — minimal, no chamfer ---------- */
+
+.fm-btn--ghost {
+  background: transparent;
+  color: var(--bone-300);
+  border: 0;
+  clip-path: none;
+}
+
+.fm-btn--ghost:hover:not(:disabled) {
+  color: var(--bone-100);
+}
+
+/* ---------- Icon — square, compact (unchanged behaviour) ---------- */
+
+.fm-btn--icon {
+  min-height: 40px;
+  min-width: 40px;
+  padding: 8px;
+  background: transparent;
+  color: var(--bone-300);
+  border: 1px solid var(--olive-500);
+}
+
+.fm-btn--icon:hover:not(:disabled) {
+  color: var(--bone-100);
+  border-color: var(--olive-300);
+}
+
+/* ---------- Size & layout modifiers ---------- */
+
+.fm-btn--small {
+  min-height: 36px;
+  font-size: 11px;
+  padding: 8px 12px;
+}
+
+.fm-btn--full {
+  width: 100%;
+  min-height: 48px;
+}
+
+/* ---------- Disabled ---------- */
+
+.fm-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.fm-btn__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fm-btn__label {
+  display: inline-block;
 }

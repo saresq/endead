@@ -107,3 +107,184 @@
 .mt-3 {
   margin-top: var(--space-3);
 }
+
+/* ==========================================================================
+   Field Manual — typography helpers
+   ========================================================================== */
+
+.fm-stencil {
+  font-family: var(--font-stencil);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+}
+
+.fm-mono {
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+}
+
+.fm-kicker {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: var(--letter-spacing-widest);
+  text-transform: uppercase;
+  color: var(--bone-500);
+}
+
+.fm-kicker::before {
+  content: "— ";
+  color: var(--olive-500);
+  letter-spacing: 0;
+}
+
+/* ==========================================================================
+   Field Manual — hazard tape stripe
+   ========================================================================== */
+
+.fm-hazard-tape {
+  background: var(--hazard-tape-bg);
+  height: 8px;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.fm-hazard-tape--thin { height: 4px; }
+
+/* ==========================================================================
+   Field Manual — corner-clipped panel chrome
+   ========================================================================== */
+
+.fm-panel {
+  position: relative;
+  background: linear-gradient(180deg, var(--bg-1), var(--bg-2));
+  clip-path: polygon(
+    0 10px, 10px 0,
+    calc(100% - 10px) 0, 100% 10px,
+    100% calc(100% - 10px), calc(100% - 10px) 100%,
+    10px 100%, 0 calc(100% - 10px)
+  );
+  box-shadow: var(--shadow-inset), var(--shadow-hard);
+  padding: var(--space-4);
+  animation: panel-fade-in 200ms var(--ease-out) both;
+}
+
+.fm-panel::after {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border: 1px solid rgba(232, 225, 204, 0.06);
+  pointer-events: none;
+  clip-path: polygon(
+    0 6px, 6px 0,
+    calc(100% - 6px) 0, 100% 6px,
+    100% calc(100% - 6px), calc(100% - 6px) 100%,
+    6px 100%, 0 calc(100% - 6px)
+  );
+}
+
+.fm-panel--flush { padding: 0; }
+
+/* Amber alignment dots at top-left / bottom-right */
+.fm-panel-dot {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: var(--amber-400);
+  box-shadow: 0 0 4px var(--amber-400);
+  pointer-events: none;
+}
+.fm-panel-dot--tl { top: 8px;    left: 8px; }
+.fm-panel-dot--br { bottom: 8px; right: 8px; }
+
+/* ==========================================================================
+   Field Manual — corner brackets
+   ========================================================================== */
+
+.fm-brackets {
+  position: relative;
+}
+
+.fm-brackets::before,
+.fm-brackets::after,
+.fm-brackets > .fm-bracket-tr,
+.fm-brackets > .fm-bracket-bl {
+  content: "";
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+  border-color: var(--olive-500);
+  border-style: solid;
+  border-width: 0;
+}
+
+.fm-brackets::before {
+  top: 0; left: 0;
+  border-top-width: 1.5px;
+  border-left-width: 1.5px;
+}
+.fm-brackets::after {
+  bottom: 0; right: 0;
+  border-bottom-width: 1.5px;
+  border-right-width: 1.5px;
+}
+.fm-brackets > .fm-bracket-tr {
+  top: 0; right: 0;
+  border-top-width: 1.5px;
+  border-right-width: 1.5px;
+}
+.fm-brackets > .fm-bracket-bl {
+  bottom: 0; left: 0;
+  border-bottom-width: 1.5px;
+  border-left-width: 1.5px;
+}
+
+.fm-brackets--amber::before,
+.fm-brackets--amber::after,
+.fm-brackets--amber > .fm-bracket-tr,
+.fm-brackets--amber > .fm-bracket-bl { border-color: var(--amber-400); }
+
+.fm-brackets--rust::before,
+.fm-brackets--rust::after,
+.fm-brackets--rust > .fm-bracket-tr,
+.fm-brackets--rust > .fm-bracket-bl { border-color: var(--rust-400); }
+
+.fm-brackets--bone::before,
+.fm-brackets--bone::after,
+.fm-brackets--bone > .fm-bracket-tr,
+.fm-brackets--bone > .fm-bracket-bl { border-color: rgba(232, 225, 204, 0.35); }
+
+.fm-brackets--lg::before,
+.fm-brackets--lg::after,
+.fm-brackets--lg > .fm-bracket-tr,
+.fm-brackets--lg > .fm-bracket-bl { width: 20px; height: 20px; }
+
+/* ==========================================================================
+   Field Manual — diagonal stripe placeholder (for photo slots)
+   ========================================================================== */
+
+.fm-diagonal-stripe {
+  background-image:
+    repeating-linear-gradient(
+      45deg,
+      rgba(138, 149, 96, 0.16),
+      rgba(138, 149, 96, 0.16) 4px,
+      transparent 4px,
+      transparent 10px
+    ),
+    linear-gradient(180deg, var(--bg-2), var(--bg-1));
+}
+
+.fm-diagonal-stripe--amber {
+  background-image:
+    repeating-linear-gradient(
+      45deg,
+      rgba(240, 169, 74, 0.22),
+      rgba(240, 169, 74, 0.22) 4px,
+      transparent 4px,
+      transparent 10px
+    ),
+    linear-gradient(180deg, var(--bg-2), var(--bg-1));
+}
+

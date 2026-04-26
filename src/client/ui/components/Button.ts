@@ -1,6 +1,10 @@
 /**
  * Button — Stateless render function for all button variants.
  *
+ * Field Manual styling: chamfered corners, stencil typography, amber/rust
+ * gradients. Emits `.fm-btn` + modifier classes. Legacy `.btn` classes
+ * retained alongside for selectors in existing CSS that target them.
+ *
  * Usage:
  *   renderButton({ label: 'Start', icon: 'Play', variant: 'primary', size: 'lg' })
  */
@@ -27,7 +31,15 @@ export function renderButton(opts: ButtonOptions): string {
   const size = opts.size ?? 'md';
   const iconPos = opts.iconPosition ?? 'left';
 
+  const sizeModifier = size === 'sm' ? 'fm-btn--small' : '';
+
   const classes = [
+    'fm-btn',
+    `fm-btn--${variant}`,
+    sizeModifier,
+    opts.fullWidth ? 'fm-btn--full' : '',
+    // Legacy class aliases kept for backwards-compat with any selectors still
+    // pointed at `.btn` / `.btn--*` in screen-specific CSS.
     'btn',
     `btn--${variant}`,
     `btn--${size}`,
@@ -46,8 +58,8 @@ export function renderButton(opts: ButtonOptions): string {
   ].filter(Boolean).join(' ');
 
   const iconSize = size === 'sm' ? 'sm' : 'md';
-  const iconHtml = opts.icon ? `<span class="btn__icon">${icon(opts.icon, iconSize)}</span>` : '';
-  const labelHtml = opts.label ? `<span class="btn__label">${opts.label}</span>` : '';
+  const iconHtml = opts.icon ? `<span class="btn__icon fm-btn__icon">${icon(opts.icon, iconSize)}</span>` : '';
+  const labelHtml = opts.label ? `<span class="btn__label fm-btn__label">${opts.label}</span>` : '';
 
   const content = iconPos === 'right'
     ? `${labelHtml}${iconHtml}`

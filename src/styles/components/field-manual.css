@@ -1,0 +1,454 @@
+/* ==========================================================================
+   Field Manual Shared Primitives
+   Styles for StatCell, SquadPlate, PhotoSlot, and fm-input.
+   Tokens defined in tokens.css; utility classes in utilities.css.
+   ========================================================================== */
+
+/* ==========================================================================
+   StatCell — labeled stat readout with pips
+   ========================================================================== */
+
+.fm-statcell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.25);
+  border-left: 2px solid var(--amber-500);
+  color: var(--bone-100);
+  font-family: var(--font-display);
+  min-width: 0;
+}
+
+.fm-statcell--sm {
+  padding: 6px 8px;
+  gap: 2px;
+}
+
+.fm-statcell__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 14px;
+}
+
+.fm-statcell__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: var(--amber-400);
+  line-height: 1;
+}
+
+.fm-statcell__label {
+  font-family: var(--font-stencil);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--bone-300);
+}
+
+.fm-statcell--sm .fm-statcell__label {
+  font-size: 9px;
+}
+
+.fm-statcell__value {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  font-family: var(--font-stencil);
+  line-height: 1;
+  color: var(--bone-100);
+}
+
+.fm-statcell__num {
+  font-size: 24px;
+}
+
+.fm-statcell--sm .fm-statcell__num {
+  font-size: 18px;
+}
+
+.fm-statcell__sep,
+.fm-statcell__max {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--bone-500);
+  font-weight: 500;
+}
+
+.fm-statcell__pips {
+  display: flex;
+  gap: 3px;
+  margin-top: 2px;
+}
+
+.fm-statcell__pip {
+  flex: 1 1 auto;
+  height: 4px;
+  min-width: 6px;
+  background: rgba(232, 225, 204, 0.12);
+  border: 1px solid rgba(232, 225, 204, 0.18);
+}
+
+.fm-statcell__pip--filled {
+  background: var(--amber-400);
+  border-color: var(--amber-500);
+  box-shadow: 0 0 4px rgba(240, 169, 74, 0.4);
+}
+
+/* Color variants — change accent border, icon, and filled-pip color */
+
+.fm-statcell--danger {
+  border-left-color: var(--rust-500);
+}
+.fm-statcell--danger .fm-statcell__icon {
+  color: var(--rust-400);
+}
+.fm-statcell--danger .fm-statcell__pip--filled {
+  background: var(--rust-400);
+  border-color: var(--rust-500);
+  box-shadow: 0 0 4px rgba(196, 90, 44, 0.4);
+}
+
+.fm-statcell--amber {
+  border-left-color: var(--amber-500);
+}
+.fm-statcell--amber .fm-statcell__icon {
+  color: var(--amber-400);
+}
+
+.fm-statcell--blue {
+  border-left-color: var(--rank-blue);
+}
+.fm-statcell--blue .fm-statcell__icon {
+  color: var(--rank-blue);
+}
+.fm-statcell--blue .fm-statcell__pip--filled {
+  background: var(--rank-blue);
+  border-color: var(--rank-blue);
+  box-shadow: 0 0 4px rgba(74, 144, 217, 0.4);
+}
+
+.fm-statcell--ready {
+  border-left-color: var(--ready);
+}
+.fm-statcell--ready .fm-statcell__icon {
+  color: var(--ready);
+}
+.fm-statcell--ready .fm-statcell__pip--filled {
+  background: var(--ready);
+  border-color: var(--ready);
+  box-shadow: 0 0 4px rgba(120, 180, 90, 0.4);
+}
+
+/* ==========================================================================
+   SquadPlate — compact roster card
+   ========================================================================== */
+
+.fm-squadplate {
+  position: relative;
+  display: grid;
+  grid-template-columns: 4px 1fr;
+  gap: 8px;
+  padding: 6px 8px 6px 0;
+  background: var(--bg-1);
+  border: 1px solid transparent;
+  color: var(--bone-100);
+  font-family: var(--font-display);
+  min-width: 0;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.fm-squadplate:hover {
+  background: var(--bg-2);
+}
+
+.fm-squadplate--active {
+  border-color: var(--amber-400);
+  background: rgba(240, 169, 74, 0.05);
+}
+
+.fm-squadplate__stripe {
+  width: 4px;
+  height: 100%;
+  background: var(--bone-500);
+  grid-column: 1;
+}
+
+.fm-squadplate__body {
+  grid-column: 2;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  justify-content: center;
+  padding-right: 4px;
+}
+
+.fm-squadplate__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.fm-squadplate__rank-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--bone-500);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45);
+}
+
+.fm-squadplate__rank-dot--blue   { background: var(--rank-blue);   box-shadow: 0 0 6px rgba(74, 144, 217, 0.5),  0 0 0 1px rgba(0, 0, 0, 0.45); }
+.fm-squadplate__rank-dot--yellow { background: var(--rank-yellow); box-shadow: 0 0 6px rgba(217, 147, 54, 0.5),  0 0 0 1px rgba(0, 0, 0, 0.45); }
+.fm-squadplate__rank-dot--orange { background: var(--rank-orange); box-shadow: 0 0 6px rgba(196, 90, 44, 0.55),  0 0 0 1px rgba(0, 0, 0, 0.45); }
+.fm-squadplate__rank-dot--red    { background: var(--rank-red);    box-shadow: 0 0 6px rgba(156, 63, 28, 0.6),   0 0 0 1px rgba(0, 0, 0, 0.45); }
+
+.fm-squadplate__name {
+  font-family: var(--font-stencil);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--bone-100);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.fm-squadplate__stats {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 4px;
+}
+
+.fm-squadplate__stat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fm-squadplate__pills {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 2px;
+  min-width: 0;
+}
+
+.fm-squadplate__pill {
+  flex: 1 1 0;
+  height: 6px;
+  min-width: 3px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(232, 225, 204, 0.1);
+  transition: background 120ms ease, box-shadow 120ms ease;
+}
+
+.fm-squadplate__pill--hp.fm-squadplate__pill--on {
+  background: var(--danger);
+  border-color: rgba(0, 0, 0, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.fm-squadplate__pill--actions.fm-squadplate__pill--on {
+  background: var(--amber-400);
+  border-color: rgba(0, 0, 0, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.fm-squadplate__qty {
+  flex: 0 0 auto;
+  font-family: var(--font-mono, var(--font-display));
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+  min-width: 24px;
+  text-align: right;
+}
+
+.fm-squadplate__stat--hp .fm-squadplate__qty {
+  color: var(--danger);
+}
+
+.fm-squadplate__stat--actions .fm-squadplate__qty {
+  color: var(--amber-400);
+}
+
+/* ==========================================================================
+   PhotoSlot — portrait / placeholder with corner notches
+   ========================================================================== */
+
+.fm-photoslot {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--bone-100);
+  font-family: var(--font-display);
+}
+
+.fm-photoslot__frame {
+  position: relative;
+  background: var(--bg-2);
+  border: 1px solid var(--olive-700);
+  overflow: hidden;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.fm-photoslot--sm .fm-photoslot__frame {
+  width: 48px;
+  height: 48px;
+}
+
+.fm-photoslot--md {
+  display: flex;
+  width: 100%;
+}
+
+.fm-photoslot--md .fm-photoslot__frame {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+}
+
+.fm-photoslot--lg .fm-photoslot__frame {
+  width: 96px;
+  height: 96px;
+}
+
+.fm-photoslot--selected .fm-photoslot__frame {
+  border-color: var(--amber-400);
+  box-shadow:
+    0 0 0 1px var(--amber-400),
+    0 0 12px rgba(240, 169, 74, 0.35);
+}
+
+.fm-photoslot__placeholder {
+  position: absolute;
+  inset: 0;
+}
+
+.fm-photoslot__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Four corner notches — small amber Ls */
+.fm-photoslot__corner {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border: 0 solid var(--amber-400);
+  pointer-events: none;
+}
+.fm-photoslot__corner--tl { top: 2px;    left: 2px;    border-top-width: 1px;    border-left-width: 1px; }
+.fm-photoslot__corner--tr { top: 2px;    right: 2px;   border-top-width: 1px;    border-right-width: 1px; }
+.fm-photoslot__corner--bl { bottom: 2px; left: 2px;    border-bottom-width: 1px; border-left-width: 1px; }
+.fm-photoslot__corner--br { bottom: 2px; right: 2px;   border-bottom-width: 1px; border-right-width: 1px; }
+
+/* Selected dot — top-right amber marker */
+.fm-photoslot__dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--amber-400);
+  box-shadow: 0 0 6px var(--amber-400);
+  pointer-events: none;
+}
+
+.fm-photoslot__caption {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+}
+
+.fm-photoslot__name {
+  font-family: var(--font-stencil);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--bone-100);
+}
+
+.fm-photoslot__role {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--bone-500);
+}
+
+/* ==========================================================================
+   fm-input — underlined monospace input with amber accent border
+   ========================================================================== */
+
+.fm-input {
+  height: 48px;
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-left: 2px solid var(--amber-500);
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.85);
+  font-family: var(--font-mono);
+  color: var(--amber-200);
+  padding: 0 12px;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  caret-color: var(--amber-400);
+  cursor: text;
+  outline: none;
+  box-shadow:
+    inset 0 1px 0 rgba(0, 0, 0, 0.35),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease,
+    color 120ms ease;
+}
+
+.fm-input::placeholder {
+  color: var(--bone-500);
+  opacity: 0.7;
+  font-style: italic;
+}
+
+.fm-input:hover:not(:focus):not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.32);
+}
+
+.fm-input:focus {
+  border-color: var(--amber-500);
+  border-left-color: var(--amber-400);
+  background: rgba(0, 0, 0, 0.9);
+  color: var(--amber-200);
+  box-shadow:
+    inset 0 1px 0 rgba(0, 0, 0, 0.35),
+    0 0 0 2px rgba(224, 168, 67, 0.22);
+}
+
+.fm-input:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.fm-input__label {
+  display: block;
+  font-family: var(--font-stencil);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--bone-300);
+  margin-bottom: 6px;
+}

@@ -65,8 +65,8 @@
 .modal-backdrop > .modal {
   position: relative;
   z-index: var(--z-modal);
-  background: var(--dl-surface-2, var(--surface-2));
-  color: var(--text-primary);
+  background: linear-gradient(180deg, var(--bg-2), var(--bg-1));
+  color: var(--bone-100);
   display: flex;
   flex-direction: column;
   max-height: 85vh;
@@ -82,8 +82,10 @@
     0% var(--modal-corner-inset)
   );
 
-  border: var(--border-thin) solid var(--dl-border);
-  box-shadow: var(--dl-modal-shadow);
+  border: 1px solid var(--olive-700);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.4),
+    0 24px 80px rgba(0, 0, 0, 0.9);
 
   /* Enter animation */
   transform: scale(0.95) translateY(-4px);
@@ -125,18 +127,17 @@
   mix-blend-mode: overlay;
 }
 
-/* Top-edge accent bar — danger-reactive */
+/* Top-edge accent bar — amber field-manual accent */
 .modal-backdrop > .modal .modal__header::before {
   content: '';
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: var(--border-thick);
-  background: var(--dl-topbar-border);
-  box-shadow: 0 0 8px var(--dl-topbar-glow), 0 0 20px var(--dl-glow-intense);
-  opacity: 0.9;
-  animation: var(--dl-accent-pulse);
+  height: 1px;
+  background: var(--amber-500);
+  box-shadow: 0 0 8px rgba(240, 169, 74, 0.35);
+  opacity: 0.85;
   pointer-events: none;
 }
 
@@ -173,16 +174,16 @@
   align-items: center;
   justify-content: space-between;
   padding: var(--space-4) var(--space-5);
-  border-bottom: var(--border-thin) solid var(--dl-border);
+  border-bottom: 1px solid var(--olive-700);
   flex-shrink: 0;
   background: linear-gradient(
     180deg,
-    rgba(255,255,255,0.025) 0%,
+    rgba(240, 169, 74, 0.04) 0%,
     transparent 100%
   );
 
-  /* Left inset accent stripe */
-  border-left: var(--border-heavy) solid var(--dl-topbar-border);
+  /* Left inset accent stripe — amber */
+  border-left: 2px solid var(--amber-500);
 }
 
 .modal__header--minimal {
@@ -209,17 +210,14 @@
 }
 
 .modal__title {
-  font-family: var(--font-display);
+  font-family: var(--font-stencil);
   font-size: var(--text-xl);
-  font-weight: var(--font-bold);
+  font-weight: var(--font-normal);
   text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-wider);
+  letter-spacing: 0.08em;
   margin: 0;
   line-height: 1.15;
-  color: var(--dl-text-readout, var(--text-primary));
-
-  /* Subtle text glow matching danger level */
-  text-shadow: 0 0 16px var(--dl-glow-intense);
+  color: var(--bone-100);
 }
 
 .modal__subtitle {
@@ -234,8 +232,8 @@
 /* Tactical designation prefix — visual field ID stamp */
 .modal__title::before {
   content: '// ';
-  color: var(--dl-hud-tint);
-  opacity: 0.5;
+  color: var(--amber-400);
+  opacity: 0.6;
   font-family: var(--font-mono);
   font-size: 0.75em;
   font-weight: var(--font-normal);
@@ -319,20 +317,20 @@
   justify-content: flex-end;
   gap: var(--space-3);
   padding: var(--space-4) var(--space-5);
-  border-top: var(--border-thin) solid var(--dl-border);
+  border-top: 1px solid var(--olive-700);
   flex-shrink: 0;
   position: relative;
   z-index: 1;
 
-  /* Bottom surface — slightly lighter inset to read as tray */
+  /* Bottom surface — slightly darker inset to read as tray */
   background: linear-gradient(
     0deg,
-    rgba(0,0,0,0.18) 0%,
+    rgba(0, 0, 0, 0.25) 0%,
     transparent 100%
   );
 }
 
-/* Corner accent tick at bottom-right */
+/* Corner accent tick at bottom-right — amber */
 .modal__footer::after {
   content: '';
   position: absolute;
@@ -340,10 +338,9 @@
   bottom: 0;
   width: var(--modal-corner-inset);
   height: var(--modal-corner-inset);
-  border-right: var(--border-thick) solid var(--dl-topbar-border);
-  border-bottom: var(--border-thick) solid var(--dl-topbar-border);
-  opacity: 0.5;
-  animation: var(--dl-accent-pulse);
+  border-right: 1px solid var(--amber-500);
+  border-bottom: 1px solid var(--amber-500);
+  opacity: 0.55;
 }
 
 /* ---------- Danger-level side glow pulse ---------- */
@@ -458,12 +455,12 @@
 
 [data-danger="red"]    .modal__title,
 [data-danger="orange"] .modal__title {
-  color: var(--dl-text-readout);
+  color: var(--bone-100);
 }
 
 [data-danger="red"] .modal__title::before,
 [data-danger="orange"] .modal__title::before {
-  color: var(--dl-hud-tint);
+  color: var(--amber-400);
   opacity: 0.7;
 }
 

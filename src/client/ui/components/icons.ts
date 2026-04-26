@@ -53,6 +53,9 @@ import {
   Trash2,
   Plus,
   Minus,
+  Footprints,
+  Sparkles,
+  ShieldCheck,
   type IconNode,
 } from 'lucide';
 
@@ -106,6 +109,9 @@ const ICON_REGISTRY: Record<string, IconNode> = {
   Trash2,
   Plus,
   Minus,
+  Footprints,
+  Sparkles,
+  ShieldCheck,
 };
 
 export function icon(name: string, size: IconSize = 'md'): string {
