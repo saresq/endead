@@ -49,7 +49,7 @@
 }
 
 .text-secondary-sm {
-  color: var(--text-secondary);
+  color: var(--bone-300);
   font-size: var(--text-sm);
 }
 
@@ -65,7 +65,7 @@
 }
 
 .text-secondary {
-  color: var(--text-secondary);
+  color: var(--bone-300);
 }
 
 /* ---------- Layout Utilities ---------- */
@@ -109,6 +109,22 @@
 }
 
 /* ==========================================================================
+   Noise opt-out — explicit override
+
+   The grain overlay is applied through pseudo-elements on dark surfaces
+   (`::before` / `::after` carrying `background-image: var(--grain-url)`).
+   The canonical coverage list lives in tokens.css. Apply `.noise--off`
+   to a surface that opts out at the component level — overriding both
+   the URL and the opacity scoped to that subtree neutralises the grain
+   without touching scanlines, hazard tape, or other co-located layers. */
+
+.noise--off {
+  --grain-url: none;
+  --grain-opacity: 0;
+  --dl-grain-opacity: 0;
+}
+
+/* ==========================================================================
    Field Manual — typography helpers
    ========================================================================== */
 
@@ -129,7 +145,11 @@
   line-height: 1;
   letter-spacing: var(--letter-spacing-widest);
   text-transform: uppercase;
-  color: var(--bone-500);
+  /* Lifted from --bone-500 (#8a8674, ~5:1 on --bg-1) to --bone-300 (#b8b39e,
+     ~9:1) — at 9–10px with widest tracking, perceived contrast is well below
+     the math, so we target AAA-ish for legibility. Size + tracking still keep
+     this clearly secondary to screen titles. See followup #04. */
+  color: var(--bone-300);
 }
 
 .fm-kicker::before {
@@ -138,11 +158,13 @@
   letter-spacing: 0;
 }
 
-/* Secondary tier — used on sub-panel labels so screen headers stay dominant. */
+/* Secondary tier — used on sub-panel labels so screen headers stay dominant.
+   Hierarchy is preserved via smaller size, tighter tracking, and 0.78 opacity
+   rather than a darker color step. */
 .fm-kicker--secondary {
   font-size: 9px;
   letter-spacing: var(--letter-spacing-wider);
-  color: var(--text-muted, var(--bone-500));
+  color: var(--bone-300);
   opacity: 0.78;
 }
 

@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en" data-danger="orange">
+<head>
+  <meta charset="utf-8" />
+  <title>HUD — Tablet (md: 768px) Mockup</title>
+  <meta name="viewport" content="width=768" />
+
+  <!--
+    DESIGN-ONLY MOCKUP — DO NOT WIRE INTO LIVE CSS.
+    Live wire-in targets:
+      - src/styles/components/hud.css       (md grid override on #game-hud,
+                                              top-bar squad pill list,
+                                              actions grid 6-up)
+      - src/styles/components/game-layout.css (no change required —
+                                              .game-layout already stacks
+                                              top/canvas/bottom; the map
+                                              flex split moves to hud.css)
+
+    Tablet behavior (md: 768px ≤ width < 1024px):
+      - Squad rail collapses to a HORIZONTAL pill list under the topbar
+        (row 2). Each squad plate becomes a compact pill: callsign +
+        HP/AP pip rail, overflow-x scroll if more than 4 operatives.
+      - Body splits 60/40 — map column ~60%, right panel (feed +
+        actions) ~40%. No left rail at this width.
+      - Actions grid renders 6 across in one row instead of 3×2.
+      - Mobile (<768) stack and laptop (≥1024) 3-column grid are
+        unchanged at their respective widths.
+  -->
+
+  <link rel="stylesheet" href="../../src/styles/tokens.css" />
+  <link rel="stylesheet" href="../../src/styles/base.css" />
+  <link rel="stylesheet" href="../../src/styles/utilities.css" />
+  <link rel="stylesheet" href="../../src/styles/layout.css" />
+  <link rel="stylesheet" href="../../src/styles/components/field-manual.css" />
+  <link rel="stylesheet" href="../../src/styles/components/buttons.css" />
+  <link rel="stylesheet" href="../../src/styles/components/hud.css" />
+
+  <style>
+    /* =============================================================
+       MOCKUP-LOCAL CSS — tablet breakpoint preview only.
+       ============================================================= */
+    html, body { background: var(--bg-0); margin: 0; }
+    body {
+      width: 768px;
+      min-height: 100vh;
+      font-family: var(--font-body);
+      color: var(--bone-100);
+    }
+
+    .mockup-frame {
+      position: relative;
+      width: 768px;
+      height: 1024px;
+      background:
+        radial-gradient(ellipse at 30% 35%, rgba(80, 70, 40, 0.25) 0%, transparent 55%),
+        linear-gradient(180deg, #1a1408 0%, #0b0d0a 100%);
+      overflow: hidden;
+    }
+
+    .mockup-caption {
+      position: fixed;
+      top: 8px;
+      right: 8px;
+      z-index: 9999;
+      padding: 4px 10px;
+      background: var(--bg-1);
+      border: 1px solid var(--olive-700);
+      color: var(--amber-200);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+
+    /* Faux PIXI canvas — same role as the real renderer mount. */
+    .mockup-canvas {
+      position: absolute;
+      inset: 0;
+      background:
+        repeating-linear-gradient(0deg, rgba(138, 149, 96, 0.06) 0 1px, transparent 1px 48px),
+        repeating-linear-gradient(90deg, rgba(138, 149, 96, 0.06) 0 1px, transparent 1px 48px),
+        radial-gradient(ellipse at 40% 50%, rgba(196, 90, 44, 0.22) 0%, transparent 45%),
+        linear-gradient(180deg, #1c1208 0%, #0d0a06 100%);
+    }
+
+    .mockup-canvas::after {
+      content: 'PIXI MAP';
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      color: rgba(232, 225, 204, 0.18);
+      font-family: var(--font-mono);
+      font-size: 24px;
+      letter-spacing: 0.4em;
+    }
+
+    /* ---------- md: 768px tablet override (mockup-local) ---------- */
+    @media (min-width: 768px) and (max-width: 1023px) {
+      #game-hud {
+        position: absolute;
+        inset: 0;
+        grid-template-rows:
+          var(--hud-topbar-height, 44px)
+          auto       /* squad rail as horizontal strip */
+          minmax(0, 1fr)
+          auto;      /* actions row */
+        grid-template-columns: minmax(0, 60fr) minmax(0, 40fr);
+        grid-template-areas:
+          "topbar  topbar"
+          "rail-l  rail-l"
+          "center  rail-r"
+          "actions actions";
+      }
+
+      /* Left rail becomes the top squad-pill strip. */
+      #game-hud > .hud-rail--left {
+        grid-area: rail-l;
+        border-right: 0;
+        border-bottom: 1px solid var(--olive-700);
+        background: linear-gradient(180deg, var(--bg-1), var(--bg-0));
+        padding: 6px 10px;
+        overflow-x: auto;
+        overflow-y: hidden;
+      }
+
+      .hud-rail--left .hud-rail__kicker {
+        display: none;
+      }
+
+      .hud-rail--left .hud-rail__list {
+        display: flex;
+        flex-direction: row;
+        gap: 8px;
+        padding: 0;
+        overflow: visible;
+      }
+
+      .hud-rail--left .fm-squadplate {
+        flex: 0 0 auto;
+        width: 168px;
+      }
+
+      /* Right rail = feed; sits in 40% column. */
+      #game-hud > .hud-rail--right {
+        grid-area: rail-r;
+        border-left: 1px solid var(--olive-700);
+      }
+
+      /* Center column = map window only at this breakpoint. */
+      #game-hud > .hud-center {
+        grid-area: center;
+      }
+
+      /* Actions grid spans full width — 6-up row. */
+      .hud-actions {
+        grid-area: actions;
+        pointer-events: auto;
+        padding: 8px 12px;
+        background: linear-gradient(0deg, var(--bg-1), var(--bg-0));
+        border-top: 1px solid var(--olive-700);
+      }
+
+      .hud-actions__grid {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 8px;
+      }
+    }
+
+    /* Inline structural fallbacks for primitives the mockup uses but
+       that the live HUD would normally hydrate from React state. */
+    .mockup-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      background: var(--bg-2);
+      border: 1px solid var(--olive-700);
+      border-left-width: 3px;
+      flex: 0 0 auto;
+      width: 168px;
+      min-height: 44px;
+    }
+    .mockup-pill--active { border-left-color: var(--amber-400); background: linear-gradient(180deg, var(--bg-2), var(--bg-1)); }
+    .mockup-pill--blue   { border-left-color: var(--rank-blue); }
+    .mockup-pill--yellow { border-left-color: var(--rank-yellow); }
+    .mockup-pill--orange { border-left-color: var(--rank-orange); }
+    .mockup-pill__name {
+      font-family: var(--font-stencil);
+      font-size: 13px;
+      letter-spacing: 0.16em;
+      color: var(--bone-100);
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .mockup-pill__pips {
+      display: flex;
+      gap: 2px;
+    }
+    .mockup-pill__pip {
+      width: 6px; height: 10px;
+      background: var(--olive-700);
+    }
+    .mockup-pill__pip--on { background: var(--ready); }
+    .mockup-pill__pip--ap { background: var(--amber-400); }
+
+    .mockup-action {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      min-height: 56px;
+      padding: 6px 4px;
+      background: linear-gradient(180deg, var(--bg-2), var(--bg-1));
+      border: 1px solid var(--olive-700);
+      border-bottom-width: 2px;
+      color: var(--bone-100);
+      font-family: var(--font-stencil);
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+    .mockup-action__kbd {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--amber-400);
+      letter-spacing: 0.12em;
+    }
+    .mockup-action--primary {
+      border-color: var(--amber-400);
+      box-shadow: 0 0 0 1px var(--accent-muted), inset 0 0 12px var(--accent-muted);
+      color: var(--amber-200);
+    }
+
+    .mockup-feed {
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      height: 100%;
+      overflow-y: auto;
+      background: linear-gradient(180deg, var(--bg-1), var(--bg-0));
+    }
+    .mockup-feed__title {
+      font-family: var(--font-stencil);
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      color: var(--bone-500);
+      text-transform: uppercase;
+      border-bottom: 1px dashed rgba(138, 149, 96, 0.3);
+      padding-bottom: 4px;
+    }
+    .mockup-feed__entry {
+      border-left: 2px solid var(--olive-700);
+      padding: 4px 8px;
+      font-size: 11px;
+      color: var(--bone-100);
+      letter-spacing: 0.04em;
+    }
+    .mockup-feed__entry--action { border-left-color: var(--amber-400); }
+    .mockup-feed__entry--spawn  { border-left-color: var(--rust-400); }
+    .mockup-feed__entry small {
+      display: block;
+      color: var(--bone-500);
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .mockup-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 100%;
+      padding: 0 12px;
+      gap: 12px;
+    }
+    .mockup-topbar__group { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .mockup-topbar__phase {
+      font-family: var(--font-stencil);
+      font-size: 14px;
+      letter-spacing: 0.2em;
+      color: var(--amber-200);
+    }
+    .mockup-topbar__round {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      color: var(--bone-500);
+    }
+    .mockup-topbar__danger {
+      padding: 4px 10px;
+      background: var(--rust-700);
+      color: var(--bone-100);
+      font-family: var(--font-stencil);
+      font-size: 11px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      border: 1px solid var(--rust-400);
+    }
+  </style>
+</head>
+<body>
+  <div class="mockup-caption">HUD · MD 768 · TABLET</div>
+
+  <div class="mockup-frame">
+    <div class="mockup-canvas"></div>
+
+    <div id="game-hud">
+      <!-- Topbar -->
+      <div class="hud-topbar hud-topbar--my-turn">
+        <div class="hud-topbar__inner">
+          <div class="mockup-topbar" style="flex:1;">
+            <div class="mockup-topbar__group">
+              <span class="mockup-topbar__phase">PLAYERS · TURN 4</span>
+              <span class="mockup-topbar__round">PHASE 2 / 3</span>
+            </div>
+            <div class="mockup-topbar__group">
+              <span class="mockup-topbar__danger">DL · ORANGE</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Squad rail collapsed to horizontal pill strip -->
+      <div class="hud-rail hud-rail--left">
+        <div class="hud-rail__kicker">SQUAD</div>
+        <div class="hud-rail__list">
+          <div class="mockup-pill mockup-pill--active mockup-pill--blue">
+            <span class="mockup-pill__name">PHIL</span>
+            <span class="mockup-pill__pips">
+              <span class="mockup-pill__pip mockup-pill__pip--on"></span>
+              <span class="mockup-pill__pip mockup-pill__pip--on"></span>
+              <span class="mockup-pill__pip mockup-pill__pip--on"></span>
+              <span class="mockup-pill__pip"></span>
+            </span>
+            <span class="mockup-pill__pips">
+              <span class="mockup-pill__pip mockup-pill__pip--ap"></span>
+              <span class="mockup-pill__pip mockup-pill__pip--ap"></span>
+              <span class="mockup-pill__pip"></span>
+            </span>
+          </div>
+          <div class="mockup-pill mockup-pill--blue">
+            <span class="mockup-pill__name">JOSH</span>
+            <span class="mockup-pill__pips">
+              <span class="mockup-pill__pip mockup-pill__pip--on"></span>
+              <span class="mockup-pill__pip mockup-pill__pip--on"></span>
+              <span class="mockup-pill__pip"></span>
+              <span class="mockup-pill__pip"></span>
+            </span>
+            <span class="mockup-pill__pips">
+              <span class="mockup-pill__pip"></span>
+              <span class="mockup-pill__pip"></span>
+              <span class="mockup-pill__pip"></span>
+            </span>
+          </div>
+          <div class="mockup-pill mockup-pill--yellow">
+            <span class="mockup-pill__name">NED</span>
+            <span class="mockup-pill__pips">
+              <span class="mockup-pill__pip mockup-pill__pip--on"></span>
+              <span class="mockup-pill__pip mockup-pill__pip--on"></span>
+              <span class="mockup-pill__pip mockup-pill__pip--on"></span>
+              <span class="mockup-pill__pip mockup-pill__pip--on"></span>
+            </span>
+            <span class="mockup-pill__pips">
+              <span class="mockup-pill__pip mockup-pill__pip--ap"></span>
+              <span class="mockup-pill__pip mockup-pill__pip--ap"></span>
+              <span class="mockup-pill__pip mockup-pill__pip--ap"></span>
+            </span>
+          </div>
+          <div class="mockup-pill mockup-pill--orange">
+            <span class="mockup-pill__name">AMY</span>
+            <span class="mockup-pill__pips">
+              <span class="mockup-pill__pip mockup-pill__pip--on"></span>
+              <span class="mockup-pill__pip"></span>
+              <span class="mockup-pill__pip"></span>
+              <span class="mockup-pill__pip"></span>
+            </span>
+            <span class="mockup-pill__pips">
+              <span class="mockup-pill__pip mockup-pill__pip--ap"></span>
+              <span class="mockup-pill__pip"></span>
+              <span class="mockup-pill__pip"></span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Center map slot — transparent so canvas shows through -->
+      <div class="hud-center"></div>
+
+      <!-- Right rail — combat / event feed -->
+      <div class="hud-rail hud-rail--right">
+        <div class="mockup-feed">
+          <div class="mockup-feed__title">EVENT FEED</div>
+          <div class="mockup-feed__entry mockup-feed__entry--action">
+            PHIL · MELEE · WALKER · 2 HITS
+            <small>ROUND 4 · 12:03</small>
+          </div>
+          <div class="mockup-feed__entry mockup-feed__entry--spawn">
+            SPAWN · 3× WALKER · ZONE 7
+            <small>ROUND 4 · 12:02</small>
+          </div>
+          <div class="mockup-feed__entry">
+            JOSH · MOVE · ZONE 4 → 5
+            <small>ROUND 4 · 12:01</small>
+          </div>
+          <div class="mockup-feed__entry mockup-feed__entry--action">
+            NED · SEARCH · PIPE WRENCH
+            <small>ROUND 4 · 12:00</small>
+          </div>
+          <div class="mockup-feed__entry">
+            DL · BLUE → YELLOW
+            <small>ROUND 3 · 11:55</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action grid — 6-up row at md -->
+      <div class="hud-actions">
+        <div class="hud-actions__grid">
+          <button class="mockup-action mockup-action--primary">
+            <span>MOVE</span>
+            <span class="mockup-action__kbd">[1]</span>
+          </button>
+          <button class="mockup-action">
+            <span>MELEE</span>
+            <span class="mockup-action__kbd">[2]</span>
+          </button>
+          <button class="mockup-action">
+            <span>RANGED</span>
+            <span class="mockup-action__kbd">[3]</span>
+          </button>
+          <button class="mockup-action">
+            <span>SEARCH</span>
+            <span class="mockup-action__kbd">[4]</span>
+          </button>
+          <button class="mockup-action">
+            <span>OBJ</span>
+            <span class="mockup-action__kbd">[5]</span>
+          </button>
+          <button class="mockup-action">
+            <span>END</span>
+            <span class="mockup-action__kbd">[E]</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

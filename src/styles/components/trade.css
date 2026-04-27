@@ -7,8 +7,8 @@
 /* ---------- Shared Section Panel ---------- */
 
 .inv-panel {
-  background: var(--dl-surface-1, var(--surface-1));
-  border: var(--border-thin) solid var(--dl-panel-border, var(--surface-4));
+  background: var(--dl-surface-1, var(--bg-1));
+  border: var(--border-thin) solid var(--dl-panel-border, var(--olive-700));
   border-radius: var(--radius-sm);
   padding: var(--space-4);
   display: flex;
@@ -59,7 +59,7 @@
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-wider);
   padding-bottom: var(--space-2);
-  border-bottom: var(--border-thin) solid var(--dl-border, var(--surface-4));
+  border-bottom: var(--border-thin) solid var(--dl-border, var(--olive-700));
   opacity: 0.75;
 }
 
@@ -95,8 +95,8 @@
 /* ---------- Individual Slot ---------- */
 
 .inv-slot {
-  background: var(--surface-0);
-  border: var(--border-thin) solid var(--dl-border, var(--surface-4));
+  background: var(--bg-0);
+  border: var(--border-thin) solid var(--dl-border, var(--olive-700));
   border-radius: var(--radius-sm);
   padding: var(--space-1);
   min-height: 52px;
@@ -120,7 +120,7 @@
   height: 0;
   border-style: solid;
   border-width: 0 6px 6px 0;
-  border-color: transparent var(--dl-border, var(--surface-4)) transparent transparent;
+  border-color: transparent var(--dl-border, var(--olive-700)) transparent transparent;
   opacity: 0.6;
   pointer-events: none;
 }
@@ -142,7 +142,7 @@
 /* Item card inside a filled slot merges cleanly */
 .inv-slot--filled > .item-card,
 .inv-slot--ghost > .item-card {
-  border: var(--border-thin) solid var(--dl-border, var(--surface-4));
+  border: var(--border-thin) solid var(--dl-border, var(--olive-700));
   background: transparent;
   width: 100%;
 }
@@ -172,8 +172,8 @@
 /* ---------- Discard Zone ---------- */
 
 .discard-zone {
-  background: var(--surface-0);
-  border: var(--border-thin) solid var(--dl-border, var(--surface-4));
+  background: var(--bg-0);
+  border: var(--border-thin) solid var(--dl-border, var(--olive-700));
   border-radius: var(--radius-sm);
   padding: var(--space-2);
   min-height: 48px;
@@ -208,7 +208,7 @@
 /* ---------- Tap-to-Select States ---------- */
 
 .tap-selected {
-  outline: var(--border-thick) solid var(--accent);
+  outline: var(--border-thick) solid var(--amber-400);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
   box-shadow:
@@ -221,7 +221,7 @@
 }
 
 .tap-target {
-  border-color: var(--accent) !important;
+  border-color: var(--amber-400) !important;
   border-style: dashed !important;
   background: var(--accent-muted) !important;
   cursor: pointer;
@@ -232,7 +232,7 @@
 }
 
 .tap-target .item-card__empty {
-  color: var(--accent);
+  color: var(--amber-400);
 }
 
 /* Discard zone as tap target uses red */
@@ -314,7 +314,7 @@
 }
 
 .pickup-hero.tap-selected {
-  outline: var(--border-thick) solid var(--accent);
+  outline: var(--border-thick) solid var(--amber-400);
   outline-offset: 2px;
   box-shadow:
     0 0 32px var(--accent-glow),
@@ -323,7 +323,7 @@
 }
 
 .pickup-hero.tap-target {
-  border-color: var(--accent);
+  border-color: var(--amber-400);
   border-style: dashed;
   background: var(--accent-muted);
   box-shadow:
@@ -348,8 +348,8 @@
 /* ---------- Trade: Offer Panels ---------- */
 
 .offer-panel {
-  background: var(--dl-surface-1, var(--surface-1));
-  border: var(--border-thin) solid var(--dl-panel-border, var(--surface-4));
+  background: var(--dl-surface-1, var(--bg-1));
+  border: var(--border-thin) solid var(--dl-panel-border, var(--olive-700));
   border-radius: var(--radius-sm);
   overflow: hidden;
   box-shadow:
@@ -422,7 +422,7 @@
 .offer-section.tap-target {
   background: var(--accent-muted) !important;
   border: none !important;
-  outline: var(--border-thick) dashed var(--accent);
+  outline: var(--border-thick) dashed var(--amber-400);
   outline-offset: -2px;
   box-shadow: inset 0 0 20px var(--accent-muted);
   animation: tap-target-breathe 1.8s var(--ease-in-out) infinite;
@@ -452,8 +452,8 @@
   background: linear-gradient(
     90deg,
     transparent,
-    var(--dl-border, var(--surface-4)) 30%,
-    var(--dl-border, var(--surface-4)) 70%,
+    var(--dl-border, var(--olive-700)) 30%,
+    var(--dl-border, var(--olive-700)) 70%,
     transparent
   );
 }
@@ -482,7 +482,7 @@
   width: 8px;
   height: 8px;
   border-radius: var(--radius-full);
-  background: var(--surface-4);
+  background: var(--olive-700);
   flex-shrink: 0;
   position: relative;
   transition: background var(--duration-fast) var(--ease-in-out),

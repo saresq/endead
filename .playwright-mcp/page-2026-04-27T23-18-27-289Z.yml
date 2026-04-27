@@ -1,0 +1,163 @@
+- generic [ref=e1]:
+  - generic [ref=e38]:
+    - generic [ref=e40]:
+      - generic [ref=e41]: — // WAITING FOR OPERATIVES · 1/6
+      - heading "LOBBY" [level=1] [ref=e42]
+      - button "Copy room code to clipboard" [ref=e43] [cursor=pointer]:
+        - generic [ref=e44]: ROOM
+        - generic [ref=e45]: 2ipze7
+        - img [ref=e47]
+    - generic [ref=e168]:
+      - img "Wanda" [ref=e170]
+      - textbox "Your call sign" [ref=e171]:
+        - /placeholder: ENTER CALL SIGN
+        - text: Hunter
+      - generic [ref=e172]: ● READY
+    - generic [ref=e56]:
+      - generic [ref=e173]:
+        - generic [ref=e174]: SQUAD
+        - generic [ref=e175]: 1/6
+      - list [ref=e176]:
+        - listitem [ref=e177]:
+          - generic [ref=e178]:
+            - generic [ref=e179]: Hunter
+            - generic [ref=e180]: YOU
+            - generic [ref=e181]: HOST
+          - generic [ref=e182]:
+            - generic [ref=e183]: WANDA
+            - generic [ref=e184]: ·
+            - generic [ref=e185]: ● READY
+    - generic [ref=e70]:
+      - generic [ref=e186]: OPERATIVE ROSTER
+      - radiogroup "Select operative" [ref=e187]:
+        - radio "Select Wanda" [checked] [ref=e188] [cursor=pointer]:
+          - generic [ref=e189]:
+            - generic [ref=e190]:
+              - img "WANDA" [ref=e191]
+              - generic: ■ SELECTED
+            - generic [ref=e192]:
+              - generic [ref=e193]: WANDA
+              - generic [ref=e194]: POINT · SCOUT
+        - radio "Select Doug" [ref=e195] [cursor=pointer]:
+          - generic [ref=e196]:
+            - img "DOUG" [ref=e198]
+            - generic [ref=e199]:
+              - generic [ref=e200]: DOUG
+              - generic [ref=e201]: SUPPORT · LEADER
+        - radio "Select Amy" [ref=e202] [cursor=pointer]:
+          - generic [ref=e203]:
+            - img "AMY" [ref=e205]
+            - generic [ref=e206]:
+              - generic [ref=e207]: AMY
+              - generic [ref=e208]: MEDIC · SLIPPERY
+        - radio "Select Ned" [ref=e209] [cursor=pointer]:
+          - generic [ref=e210]:
+            - img "NED" [ref=e212]
+            - generic [ref=e213]:
+              - generic [ref=e214]: NED
+              - generic [ref=e215]: RECON · SEARCHER
+        - radio "Select Elle" [ref=e216] [cursor=pointer]:
+          - generic [ref=e217]:
+            - img "ELLE" [ref=e219]
+            - generic [ref=e220]:
+              - generic [ref=e221]: ELLE
+              - generic [ref=e222]: MARKSMAN · SNIPER
+        - radio "Select Josh" [ref=e223] [cursor=pointer]:
+          - generic [ref=e224]:
+            - img "JOSH" [ref=e226]
+            - generic [ref=e227]:
+              - generic [ref=e228]: JOSH
+              - generic [ref=e229]: HEAVY · BRAWLER
+    - generic [ref=e116]:
+      - generic [ref=e118]:
+        - generic [ref=e119]: AREA OF OPERATION
+        - generic [ref=e120]: ENDEAD · 4×3
+        - generic [ref=e121]: "HOSTILE DENSITY: MEDIUM"
+      - generic [ref=e122]:
+        - combobox "Select map" [ref=e123] [cursor=pointer]:
+          - option "ENDEAD" [selected]
+        - generic:
+          - img
+    - generic [ref=e124]:
+      - generic [ref=e125]: RULES OF ENGAGEMENT
+      - group "Rules of engagement" [ref=e126]:
+        - generic [ref=e127] [cursor=pointer]:
+          - checkbox "ENDLESS HORDE MODE UNLIMITED ABOMINATIONS MAY SPAWN. EXPECT CASUALTIES. HIGH RISK" [ref=e128]
+          - generic [ref=e129]:
+            - generic [ref=e130]: ENDLESS HORDE MODE
+            - generic [ref=e131]: UNLIMITED ABOMINATIONS MAY SPAWN. EXPECT CASUALTIES.
+          - generic [ref=e132]: HIGH RISK
+        - generic [ref=e133] [cursor=pointer]:
+          - checkbox "FRIENDLY FIRE RANGED ATTACKS CAN STRIKE OPERATIVES IN THE TARGET ZONE. HAZARD" [ref=e134]
+          - generic [ref=e135]:
+            - generic [ref=e136]: FRIENDLY FIRE
+            - generic [ref=e137]: RANGED ATTACKS CAN STRIKE OPERATIVES IN THE TARGET ZONE.
+          - generic [ref=e138]: HAZARD
+        - generic [ref=e139] [cursor=pointer]:
+          - checkbox "SHARED VITALS WOUNDS DISTRIBUTE ACROSS THE SQUAD. NO OPERATIVE FALLS ALONE. TACTICAL" [ref=e140]
+          - generic [ref=e141]:
+            - generic [ref=e142]: SHARED VITALS
+            - generic [ref=e143]: WOUNDS DISTRIBUTE ACROSS THE SQUAD. NO OPERATIVE FALLS ALONE.
+          - generic [ref=e144]: TACTICAL
+        - generic [ref=e145] [cursor=pointer]:
+          - checkbox "PERMA-DEATH DOWNED OPERATIVES ARE LOST. NO REVIVES PERMITTED. HIGH RISK" [ref=e146]
+          - generic [ref=e147]:
+            - generic [ref=e148]: PERMA-DEATH
+            - generic [ref=e149]: DOWNED OPERATIVES ARE LOST. NO REVIVES PERMITTED.
+          - generic [ref=e150]: HIGH RISK
+    - generic [ref=e230]:
+      - button "BEGIN OPERATION · 1/1 READY" [ref=e231] [cursor=pointer]:
+        - img [ref=e233]
+        - generic [ref=e235]: BEGIN OPERATION · 1/1 READY
+      - button "LEAVE ROOM" [ref=e236] [cursor=pointer]:
+        - img [ref=e238]
+        - generic [ref=e240]: LEAVE ROOM
+  - dialog "OPERATIVE · WANDA" [ref=e242]:
+    - generic [ref=e243]:
+      - generic [ref=e244]:
+        - heading "// OPERATIVE · WANDA" [level=2] [ref=e245]
+        - generic [ref=e246]: POINT · SCOUT
+      - button "Close" [active] [ref=e247] [cursor=pointer]:
+        - img [ref=e248]
+    - generic [ref=e251]:
+      - generic [ref=e252]:
+        - generic [ref=e253]: DOSSIER
+        - generic [ref=e254]:
+          - generic [ref=e255]: WANDA
+          - generic [ref=e256]: POINT · SCOUT
+      - generic [ref=e259]:
+        - img [ref=e262]
+        - generic [ref=e271]:
+          - generic [ref=e272]: R. HAND · EQUIPPED
+          - generic [ref=e273]: KATANA
+          - generic [ref=e274]: 4+ · 1d6 · 2
+      - generic [ref=e276]:
+        - generic [ref=e277]: PROGRESSION TRACK
+        - generic [ref=e278]:
+          - generic [ref=e279]:
+            - generic [ref=e281]:
+              - generic [ref=e282]: BLUE
+              - generic [ref=e283]: 0 XP
+            - generic "The Survivor may move 1 or 2 Zones with a single Move Action. Entering a Zone with Zombies still ends the Move." [ref=e285]: +1 Zone per Move
+          - generic [ref=e286]:
+            - generic [ref=e288]:
+              - generic [ref=e289]: YELLOW
+              - generic [ref=e290]: 7 XP
+            - generic "The Survivor has one extra Action per Turn." [ref=e292]: +1 Action
+          - generic [ref=e293]:
+            - generic [ref=e295]:
+              - generic [ref=e296]: ORANGE
+              - generic [ref=e297]: 19 XP
+            - generic [ref=e298]:
+              - generic "The Survivor does not spend extra Actions to move out of a Zone with Zombies." [ref=e299]: Slippery
+              - generic "The Survivor has one free Combat Action (Melee or Ranged) per turn." [ref=e300]: +1 Free Combat Action
+            - generic [ref=e301]: PICK 1 OF 2
+          - generic [ref=e302]:
+            - generic [ref=e304]:
+              - generic [ref=e305]: RED
+              - generic [ref=e306]: 43 XP
+            - generic [ref=e307]:
+              - generic "The Survivor gets a +1 Damage bonus with Melee Weapons." [ref=e308]: "+1 Damage: Melee"
+              - generic "The Survivor gets a +1 Damage bonus with Ranged Weapons." [ref=e309]: "+1 Damage: Ranged"
+              - generic "The Survivor can move up to 3 Zones for 1 Action." [ref=e310]: Sprint
+            - generic [ref=e311]: PICK 1 OF 3

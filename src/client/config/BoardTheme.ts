@@ -4,7 +4,15 @@
  * All hex color literals that were previously scattered through PixiBoardRenderer.ts
  * are consolidated here. To re-theme the board, edit this file only.
  *
- * Colors aligned with CSS design tokens (tokens.css) — "Scorched Earth" palette.
+ * Colors aligned with CSS design tokens (`src/styles/tokens.css`) — Field
+ * Manual palette. PIXI cannot read CSS variables, so this file is the
+ * canvas-side mirror; when a palette anchor in `tokens.css` moves, update
+ * the matching entry below. The "matches --foo" comments are the contract.
+ *
+ * Noise overlay coverage rules live in `tokens.css` and apply equally if a
+ * canvas-side grain layer is ever added: grain on background tiers (bg-0/1/2)
+ * at 4-6%; no grain on inputs, hazard tape, or button surfaces. See the
+ * comment block above `--grain-opacity` in tokens.css for the full list.
  */
 
 export const BOARD_THEME = {

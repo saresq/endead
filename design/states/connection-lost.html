@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lobby — Connection lost state · Endead design reference</title>
+
+  <!--
+    DESIGN ONLY — reference frame for follow-up #06.
+    Lives in /design/states/. Static; not wired into LobbyUI.
+    Live target: src/client/ui/LobbyUI.ts (Wave 4).
+  -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Stencil+Display:wght@400;700;900&family=Oswald:wght@400;500;700&family=Barlow+Condensed:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+  />
+
+  <link rel="stylesheet" href="../../src/styles/tokens.css" />
+  <link rel="stylesheet" href="../../src/styles/reset.css" />
+  <link rel="stylesheet" href="../../src/styles/base.css" />
+  <link rel="stylesheet" href="../../src/styles/utilities.css" />
+  <link rel="stylesheet" href="../../src/styles/components/buttons.css" />
+  <link rel="stylesheet" href="../../src/styles/components/forms.css" />
+  <link rel="stylesheet" href="../../src/styles/components/field-manual.css" />
+  <link rel="stylesheet" href="../../src/styles/components/menu.css" />
+  <link rel="stylesheet" href="../../src/styles/components/lobby.css" />
+
+  <style>
+    body { background: var(--bg-0); }
+
+    .frame {
+      position: relative;
+      min-height: 100vh;
+      display: block;
+    }
+
+    /* Faded lobby underneath — communicates that the surface is still
+       there, just unreachable. Uses bg tokens only; the scrim above
+       handles the hierarchy. */
+    .frame .lobby {
+      position: relative;
+      min-height: 100vh;
+      filter: grayscale(0.35) brightness(0.55);
+      pointer-events: none;
+      user-select: none;
+    }
+
+    /* Full-panel scrim — covers the entire viewport. Holds a single
+       bracketed dossier with the connection-lost message + reconnect
+       outline button. No screen-filling red modal — this is degraded
+       state, not a fatal error. */
+    .lobby-scrim {
+      position: fixed;
+      inset: 0;
+      z-index: var(--z-modal);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-4);
+      background: var(--modal-backdrop);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      animation: panel-fade-in 200ms var(--ease-out) both;
+    }
+
+    .lobby-scrim::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image: var(--grain-url);
+      background-size: 160px 160px;
+      opacity: 0.04;
+      pointer-events: none;
+      mix-blend-mode: overlay;
+    }
+
+    .lobby-scrim__card {
+      position: relative;
+      width: 100%;
+      max-width: 420px;
+      padding: 28px 28px 24px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .lobby-scrim__title {
+      font-family: var(--font-stencil);
+      font-size: 28px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--rust-300);
+      line-height: 1;
+      margin: 0;
+      text-shadow: 0 0 18px rgba(196, 90, 44, 0.35);
+    }
+
+    .lobby-scrim__sub {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--bone-300);
+      line-height: 1.5;
+      max-width: 30ch;
+    }
+
+    .lobby-scrim__meta {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      color: var(--bone-500);
+      text-transform: uppercase;
+    }
+
+    .lobby-scrim__meta::after {
+      content: '_';
+      animation: hud-blink-caret 1.1s step-end infinite;
+      color: var(--rust-400);
+      margin-left: 2px;
+    }
+
+    .lobby-scrim__actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 4px;
+    }
+
+    /* Reconnect outline button — secondary chrome, rust border to
+       signal corrective action without screaming "danger". */
+    .fm-btn--reconnect {
+      background: transparent;
+      color: var(--rust-300);
+      border: 1px solid var(--rust-500);
+      clip-path: polygon(
+        10px 0,
+        100% 0,
+        100% calc(100% - 10px),
+        calc(100% - 10px) 100%,
+        0 100%,
+        0 10px
+      );
+    }
+
+    .fm-btn--reconnect:hover:not(:disabled) {
+      border-color: var(--rust-400);
+      color: var(--rust-300);
+      background: rgba(196, 90, 44, 0.1);
+    }
+
+    .frame-caption {
+      position: fixed;
+      left: 12px;
+      bottom: 12px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--bone-500);
+      background: rgba(11, 13, 10, 0.85);
+      padding: 6px 10px;
+      border-left: 2px solid var(--rust-400);
+      pointer-events: none;
+      z-index: 9999;
+    }
+  </style>
+</head>
+<body>
+  <main class="frame">
+    <!-- Underlying lobby — visible, dimmed, non-interactive -->
+    <div class="lobby" aria-hidden="true">
+      <div class="lobby__stack">
+        <section class="fm-panel lobby-panel lobby-panel--briefing">
+          <span class="fm-panel-dot fm-panel-dot--tl"></span>
+          <span class="fm-panel-dot fm-panel-dot--br"></span>
+          <div class="fm-brackets fm-brackets--amber lobby-briefing__body">
+            <span class="fm-bracket-tr"></span>
+            <span class="fm-bracket-bl"></span>
+            <div class="fm-kicker">// MISSION BRIEFING</div>
+            <h1 class="fm-stencil lobby-briefing__title">LOBBY</h1>
+            <button type="button" class="lobby-room-chip">
+              <span class="lobby-room-chip__label">ROOM</span>
+              <span class="lobby-room-chip__id">7K4N-92QR</span>
+              <span class="lobby-room-chip__glyph">⎘</span>
+            </button>
+          </div>
+        </section>
+
+        <section class="fm-panel lobby-panel lobby-panel--squad">
+          <div class="lobby-squad__header">
+            <div class="fm-kicker fm-kicker--secondary">SQUAD</div>
+            <div class="lobby-squad__count fm-mono">3/6</div>
+          </div>
+          <ul class="lobby-squad">
+            <li class="lobby-squad__row">
+              <div class="lobby-squad__head">
+                <span class="fm-stencil lobby-squad__name">CALLSIGN-01</span>
+              </div>
+              <div class="lobby-squad__sub">
+                <span class="lobby-squad__class fm-mono">SCOUT</span>
+                <span class="lobby-squad__dot">·</span>
+                <span class="lobby-status lobby-status--ready">● READY</span>
+              </div>
+            </li>
+          </ul>
+        </section>
+      </div>
+    </div>
+
+    <!-- Full-panel scrim with bracketed dossier -->
+    <div class="lobby-scrim" role="alertdialog" aria-modal="true" aria-labelledby="scrim-title">
+      <div class="fm-panel fm-brackets fm-brackets--rust fm-brackets--lg lobby-scrim__card">
+        <span class="fm-panel-dot fm-panel-dot--tl" aria-hidden="true"></span>
+        <span class="fm-panel-dot fm-panel-dot--br" aria-hidden="true"></span>
+        <span class="fm-bracket-tr" aria-hidden="true"></span>
+        <span class="fm-bracket-bl" aria-hidden="true"></span>
+
+        <div class="fm-kicker">// SIGNAL DEGRADED</div>
+        <h2 id="scrim-title" class="lobby-scrim__title">// CONNECTION LOST</h2>
+        <p class="lobby-scrim__sub">
+          Server contact dropped at 02:14:08 ZULU. Mission state held locally.
+        </p>
+        <div class="lobby-scrim__meta">RETRYING HANDSHAKE</div>
+
+        <div class="lobby-scrim__actions">
+          <button type="button" class="fm-btn fm-btn--reconnect">
+            <span class="fm-btn__label">Reconnect</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div class="frame-caption">// design/states/connection-lost.html · target: src/client/ui/LobbyUI.ts</div>
+</body>
+</html>

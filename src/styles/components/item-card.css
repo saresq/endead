@@ -74,7 +74,7 @@
   justify-content: center;
   width: 32px;
   height: 32px;
-  background: var(--dl-surface-1, var(--surface-1));
+  background: var(--dl-surface-1, var(--bg-1));
   border-radius: var(--radius-sm);
   border: var(--border-thin) solid var(--dl-border);
   color: var(--text-muted);
@@ -116,7 +116,7 @@
   font-family: var(--font-display);
   font-size: var(--text-sm);
   font-weight: var(--font-bold);
-  color: var(--text-primary);
+  color: var(--bone-100);
   letter-spacing: var(--letter-spacing-wide);
   text-transform: uppercase;
   white-space: nowrap;
@@ -163,7 +163,7 @@
   color: var(--text-inverse);
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-wider);
-  background: var(--accent);
+  background: var(--amber-400);
   padding: 1px 6px 2px;
   border-radius: var(--radius-none);
   z-index: 3;
@@ -272,7 +272,7 @@
 }
 
 .item-card--featured::after {
-  background: var(--accent);
+  background: var(--amber-400);
   width: 3px;
 }
 
@@ -281,7 +281,7 @@
   height: 40px;
   background: var(--accent-muted);
   border-color: var(--accent-border);
-  color: var(--accent-bright);
+  color: var(--amber-200);
   border-radius: var(--radius-md);
   box-shadow:
     var(--shadow-cutout),
@@ -290,11 +290,11 @@
 
 .item-card--featured .item-card__name {
   font-size: var(--text-base);
-  color: var(--text-primary);
+  color: var(--bone-100);
 }
 
 .item-card--featured .item-card__stats {
-  color: var(--accent-bright);
+  color: var(--amber-200);
   font-weight: var(--font-medium);
 }
 
@@ -302,7 +302,7 @@
 
 .item-card--placed {
   border-style: dashed;
-  border-color: var(--surface-4);
+  border-color: var(--olive-700);
   opacity: 0.35;
   filter: grayscale(0.7) brightness(0.7);
   pointer-events: none;
@@ -333,7 +333,7 @@
 }
 
 .item-card--discarded .item-card__name {
-  color: var(--text-secondary);
+  color: var(--bone-300);
   text-decoration: line-through;
   text-decoration-color: rgba(168, 64, 48, 0.5);
 }
@@ -412,5 +412,5 @@
 }
 
 [data-danger="red"] .item-card__name {
-  color: var(--text-primary);
+  color: var(--bone-100);
 }

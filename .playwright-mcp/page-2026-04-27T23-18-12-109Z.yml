@@ -1,0 +1,24 @@
+- generic [ref=e3]:
+  - dialog "Endead" [ref=e4]:
+    - banner [ref=e6]:
+      - generic [ref=e7]: — SURVIVOR OPS // ENTRY
+      - heading "Endead" [level=1] [ref=e9]
+      - generic [ref=e10]: // FIELD MANUAL · TACTICAL SURVIVAL
+    - generic [ref=e12]:
+      - generic [ref=e13]: — CALL SIGN
+      - textbox "— CALL SIGN" [ref=e14]:
+        - /placeholder: designate operator
+        - text: Hunter
+  - button "Create Room" [ref=e17] [cursor=pointer]:
+    - img [ref=e19]
+    - generic [ref=e21]: Create Room
+  - separator "or join by room id" [ref=e22]:
+    - generic [ref=e24]: — // OR JOIN BY ROOM ID
+  - region "Join existing room" [ref=e26]:
+    - generic [ref=e28]:
+      - generic [ref=e29]: — ROOM ID
+      - generic [ref=e30]:
+        - textbox "— ROOM ID" [ref=e31]:
+          - /placeholder: XXXX-XXXX
+        - button "Join" [ref=e32] [cursor=pointer]:
+          - generic [ref=e33]: Join

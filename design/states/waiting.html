@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lobby — Waiting state · Endead design reference</title>
+
+  <!--
+    DESIGN ONLY — reference frame for follow-up #06.
+    Lives in /design/states/. Static; not wired into LobbyUI.
+    Live target: src/client/ui/LobbyUI.ts (Wave 4).
+    Imports the live tokens + component CSS so the frame renders at parity
+    with production. Do not duplicate styles here.
+  -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Stencil+Display:wght@400;700;900&family=Oswald:wght@400;500;700&family=Barlow+Condensed:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+  />
+
+  <link rel="stylesheet" href="../../src/styles/tokens.css" />
+  <link rel="stylesheet" href="../../src/styles/reset.css" />
+  <link rel="stylesheet" href="../../src/styles/base.css" />
+  <link rel="stylesheet" href="../../src/styles/utilities.css" />
+  <link rel="stylesheet" href="../../src/styles/components/buttons.css" />
+  <link rel="stylesheet" href="../../src/styles/components/forms.css" />
+  <link rel="stylesheet" href="../../src/styles/components/field-manual.css" />
+  <link rel="stylesheet" href="../../src/styles/components/menu.css" />
+  <link rel="stylesheet" href="../../src/styles/components/lobby.css" />
+
+  <style>
+    /* ----------------------------------------------------------------------
+       Mockup-only chrome. Anything that would belong in a live component
+       lives in lobby.css. Below is *only* the slow rust-pulse on the room
+       chip (frame-specific affordance under design review) plus a frame
+       wrapper so the panel sits in the viewport at the right size.
+       ----------------------------------------------------------------- */
+    body { background: var(--bg-0); }
+
+    .frame {
+      position: relative;
+      min-height: 100vh;
+      width: 100%;
+      display: block;
+    }
+
+    /* Pin the lobby surface to a desktop-ish frame (the live UI is
+       absolutely positioned via .lobby — keep that contract). */
+    .frame .lobby { position: relative; min-height: 100vh; }
+
+    /* Slow rust pulse on the room chip — uses canonical --rust-* tokens
+       only. Animates outline + box-shadow (compositor-friendly box-shadow
+       is fine here at this small size). */
+    .lobby-room-chip--pulse {
+      animation: rust-pulse 2.4s ease-in-out infinite;
+    }
+
+    @keyframes rust-pulse {
+      0%, 100% {
+        box-shadow:
+          0 0 0 1px rgba(196, 90, 44, 0.0),
+          0 0 0 0 rgba(196, 90, 44, 0.0);
+      }
+      50% {
+        box-shadow:
+          0 0 0 1px var(--rust-400),
+          0 0 14px rgba(196, 90, 44, 0.45);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .lobby-room-chip--pulse { animation: none; }
+    }
+
+    /* Caption strip at the bottom for the design reviewer */
+    .frame-caption {
+      position: fixed;
+      left: 12px;
+      bottom: 12px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--bone-500);
+      background: rgba(11, 13, 10, 0.85);
+      padding: 6px 10px;
+      border-left: 2px solid var(--amber-400);
+      pointer-events: none;
+      z-index: 9999;
+    }
+  </style>
+</head>
+<body>
+  <main class="frame">
+    <div class="lobby">
+      <div class="lobby__stack">
+        <!-- 1. Mission briefing — room ID chip pulses rust to read as
+             "share this code" while waiting -->
+        <section class="fm-panel lobby-panel lobby-panel--briefing">
+          <span class="fm-panel-dot fm-panel-dot--tl" aria-hidden="true"></span>
+          <span class="fm-panel-dot fm-panel-dot--br" aria-hidden="true"></span>
+          <div class="fm-brackets fm-brackets--amber lobby-briefing__body">
+            <span class="fm-bracket-tr" aria-hidden="true"></span>
+            <span class="fm-bracket-bl" aria-hidden="true"></span>
+            <div class="fm-kicker">// WAITING FOR OPERATIVES &middot; 1/6</div>
+            <h1 class="fm-stencil lobby-briefing__title">LOBBY</h1>
+            <button
+              type="button"
+              class="lobby-room-chip lobby-room-chip--pulse"
+              title="Copy room code"
+              aria-label="Copy room code to clipboard"
+            >
+              <span class="lobby-room-chip__label">ROOM</span>
+              <span class="lobby-room-chip__id">7K4N-92QR</span>
+              <span class="lobby-room-chip__glyph" aria-hidden="true">⎘</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- 2. Squad — only the local player so far -->
+        <section class="fm-panel lobby-panel lobby-panel--squad">
+          <div class="lobby-squad__header">
+            <div class="fm-kicker fm-kicker--secondary">SQUAD</div>
+            <div class="lobby-squad__count fm-mono">1/6</div>
+          </div>
+          <ul class="lobby-squad">
+            <li class="lobby-squad__row">
+              <div class="lobby-squad__head">
+                <span class="fm-stencil lobby-squad__name">CALLSIGN-01</span>
+                <span class="lobby-pill lobby-pill--amber">YOU</span>
+                <span class="lobby-pill lobby-pill--amber">HOST</span>
+              </div>
+              <div class="lobby-squad__sub">
+                <span class="lobby-squad__class fm-mono">SCOUT</span>
+                <span class="lobby-squad__dot" aria-hidden="true">·</span>
+                <span class="lobby-status lobby-status--ready">● READY</span>
+              </div>
+            </li>
+          </ul>
+
+          <!-- Inline waiting kicker — same monospace caret as the live
+               LobbyUI .lobby__waiting helper -->
+          <div class="lobby__waiting">SHARE ROOM CODE TO CONTINUE</div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <div class="frame-caption">// design/states/waiting.html · target: src/client/ui/LobbyUI.ts</div>
+</body>
+</html>

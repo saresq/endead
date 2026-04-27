@@ -9,9 +9,9 @@
   height: 44px;
   padding: var(--space-2) var(--space-3);
   background: var(--surface-inset, rgba(6, 6, 5, 0.04));
-  background-color: var(--dl-surface-1, var(--surface-1));
-  border: var(--border-thin) solid var(--dl-border, var(--surface-4));
-  border-bottom: var(--border-thick) solid var(--dl-panel-border, var(--surface-5));
+  background-color: var(--dl-surface-1, var(--bg-1));
+  border: var(--border-thin) solid var(--dl-border, var(--olive-700));
+  border-bottom: var(--border-thick) solid var(--dl-panel-border, var(--olive-500));
   border-radius: var(--radius-sm);
   color: var(--dl-text-readout, var(--text-hud));
   font-family: var(--font-mono);
@@ -53,9 +53,9 @@
 }
 
 .input:focus {
-  border-color: var(--dl-topbar-border, var(--accent));
-  border-bottom-color: var(--dl-topbar-border, var(--accent));
-  background-color: var(--dl-surface-2, var(--surface-2));
+  border-color: var(--dl-topbar-border, var(--amber-400));
+  border-bottom-color: var(--dl-topbar-border, var(--amber-400));
+  background-color: var(--dl-surface-2, var(--bg-2));
   box-shadow:
     inset 0 2px 6px rgba(0, 0, 0, 0.55),
     inset 0 0 0 1px rgba(0, 0, 0, 0.2),
@@ -63,7 +63,7 @@
     0 0 12px var(--dl-topbar-glow, var(--accent-glow)),
     0 0 32px var(--dl-glow, var(--accent-muted));
   outline: none;
-  color: var(--text-primary);
+  color: var(--bone-100);
 }
 
 .input:focus::placeholder {
@@ -73,9 +73,9 @@
 .input:disabled {
   opacity: 0.35;
   cursor: not-allowed;
-  background-color: var(--surface-1);
+  background-color: var(--bg-1);
   color: var(--text-disabled);
-  border-color: var(--surface-4);
+  border-color: var(--olive-700);
   filter: saturate(0.4);
 }
 
@@ -126,9 +126,9 @@
 
 .textarea {
   padding: var(--space-3);
-  background-color: var(--dl-surface-1, var(--surface-1));
-  border: var(--border-thin) solid var(--dl-border, var(--surface-4));
-  border-bottom: var(--border-thick) solid var(--dl-panel-border, var(--surface-5));
+  background-color: var(--dl-surface-1, var(--bg-1));
+  border: var(--border-thin) solid var(--dl-border, var(--olive-700));
+  border-bottom: var(--border-thick) solid var(--dl-panel-border, var(--olive-500));
   border-radius: var(--radius-sm);
   color: var(--dl-text-readout, var(--text-hud));
   font-family: var(--font-mono);
@@ -153,8 +153,8 @@
 }
 
 .textarea:focus {
-  border-color: var(--dl-topbar-border, var(--accent));
-  border-bottom-color: var(--dl-topbar-border, var(--accent));
+  border-color: var(--dl-topbar-border, var(--amber-400));
+  border-bottom-color: var(--dl-topbar-border, var(--amber-400));
   box-shadow:
     inset 0 2px 6px rgba(0, 0, 0, 0.55),
     0 0 0 1px var(--dl-topbar-border, var(--accent-border)),
@@ -167,9 +167,9 @@
 .select {
   height: 44px;
   padding: var(--space-2) var(--space-8) var(--space-2) var(--space-3);
-  background-color: var(--dl-surface-1, var(--surface-1));
-  border: var(--border-thin) solid var(--dl-border, var(--surface-4));
-  border-bottom: var(--border-thick) solid var(--dl-panel-border, var(--surface-5));
+  background-color: var(--dl-surface-1, var(--bg-1));
+  border: var(--border-thin) solid var(--dl-border, var(--olive-700));
+  border-bottom: var(--border-thick) solid var(--dl-panel-border, var(--olive-500));
   border-radius: var(--radius-sm);
   color: var(--dl-text-readout, var(--text-hud));
   font-family: var(--font-mono);
@@ -203,9 +203,9 @@
 }
 
 .select:focus {
-  border-color: var(--dl-topbar-border, var(--accent));
-  border-bottom-color: var(--dl-topbar-border, var(--accent));
-  background-color: var(--dl-surface-2, var(--surface-2));
+  border-color: var(--dl-topbar-border, var(--amber-400));
+  border-bottom-color: var(--dl-topbar-border, var(--amber-400));
+  background-color: var(--dl-surface-2, var(--bg-2));
   box-shadow:
     inset 0 2px 6px rgba(0, 0, 0, 0.55),
     0 0 0 1px var(--dl-topbar-border, var(--accent-border)),
@@ -216,8 +216,8 @@
 }
 
 .select:hover:not(:disabled):not(:focus) {
-  border-color: var(--surface-5);
-  background-color: var(--surface-2);
+  border-color: var(--olive-500);
+  background-color: var(--bg-2);
 }
 
 .select:disabled {
@@ -239,7 +239,7 @@
   font-family: var(--font-display);
   font-size: var(--text-xs);
   font-weight: var(--font-bold);
-  color: var(--text-secondary);
+  color: var(--bone-300);
   letter-spacing: var(--letter-spacing-widest);
   text-transform: uppercase;
   /* Left bracket — tactical field label */
@@ -274,7 +274,7 @@
   letter-spacing: var(--letter-spacing-wide);
   margin-top: var(--space-1);
   padding-left: var(--space-1);
-  border-left: 2px solid var(--surface-4);
+  border-left: 2px solid var(--olive-700);
   line-height: 1.5;
 }
 
@@ -322,8 +322,8 @@
 .toggle__track {
   width: 40px;
   height: 20px;
-  background: var(--surface-1);
-  border: var(--border-thin) solid var(--surface-4);
+  background: var(--bg-1);
+  border: var(--border-thin) solid var(--olive-700);
   border-radius: var(--radius-none);
   position: relative;
   flex-shrink: 0;
@@ -340,8 +340,8 @@
   left: 2px;
   width: 14px;
   height: 14px;
-  background: var(--surface-4);
-  border: var(--border-thin) solid var(--surface-5);
+  background: var(--olive-700);
+  border: var(--border-thin) solid var(--olive-500);
   border-radius: var(--radius-none);
   transition:
     transform var(--duration-normal) var(--ease-military),
@@ -351,8 +351,8 @@
 }
 
 .toggle--on .toggle__track {
-  background: var(--dl-surface-2, var(--surface-2));
-  border-color: var(--dl-topbar-border, var(--accent));
+  background: var(--dl-surface-2, var(--bg-2));
+  border-color: var(--dl-topbar-border, var(--amber-400));
   box-shadow:
     inset 0 2px 4px rgba(0, 0, 0, 0.5),
     0 0 8px var(--dl-topbar-glow, var(--accent-glow));
@@ -360,17 +360,17 @@
 
 .toggle--on .toggle__thumb {
   transform: translateX(20px);
-  background: var(--dl-topbar-border, var(--accent));
-  border-color: var(--dl-topbar-border, var(--accent));
+  background: var(--dl-topbar-border, var(--amber-400));
+  border-color: var(--dl-topbar-border, var(--amber-400));
   box-shadow: 0 0 8px var(--dl-topbar-glow, var(--accent-glow));
 }
 
 .toggle:hover .toggle__track {
-  border-color: var(--surface-5);
+  border-color: var(--olive-500);
 }
 
 .toggle--on:hover .toggle__track {
-  border-color: var(--accent-hover);
+  border-color: var(--amber-500);
 }
 
 .toggle__label {
@@ -379,7 +379,7 @@
   font-weight: var(--font-semibold);
   letter-spacing: var(--letter-spacing-wider);
   text-transform: uppercase;
-  color: var(--text-secondary);
+  color: var(--bone-300);
   transition: color var(--duration-fast) var(--ease-in-out);
 }
 
@@ -401,8 +401,8 @@
 .checkbox__box {
   width: 18px;
   height: 18px;
-  background: var(--surface-1);
-  border: var(--border-thin) solid var(--surface-5);
+  background: var(--bg-1);
+  border: var(--border-thin) solid var(--olive-500);
   border-radius: var(--radius-none);
   flex-shrink: 0;
   display: flex;
@@ -428,28 +428,28 @@
 }
 
 .checkbox--checked .checkbox__box {
-  background: var(--dl-surface-2, var(--surface-2));
-  border-color: var(--dl-topbar-border, var(--accent));
+  background: var(--dl-surface-2, var(--bg-2));
+  border-color: var(--dl-topbar-border, var(--amber-400));
   box-shadow:
     inset 0 1px 3px rgba(0, 0, 0, 0.4),
     0 0 8px var(--dl-topbar-glow, var(--accent-glow));
 }
 
 .checkbox--checked .checkbox__box::after {
-  border-right-color: var(--dl-topbar-border, var(--accent));
-  border-bottom-color: var(--dl-topbar-border, var(--accent));
+  border-right-color: var(--dl-topbar-border, var(--amber-400));
+  border-bottom-color: var(--dl-topbar-border, var(--amber-400));
 }
 
 .checkbox__label {
   font-family: var(--font-sans);
   font-size: var(--text-sm);
-  color: var(--text-secondary);
+  color: var(--bone-300);
   line-height: 1.4;
   transition: color var(--duration-fast) var(--ease-in-out);
 }
 
 .checkbox--checked .checkbox__label {
-  color: var(--text-primary);
+  color: var(--bone-100);
 }
 
 /* ---------- Radio ---------- */
@@ -466,8 +466,8 @@
 .radio__dot {
   width: 18px;
   height: 18px;
-  background: var(--surface-1);
-  border: var(--border-thin) solid var(--surface-5);
+  background: var(--bg-1);
+  border: var(--border-thin) solid var(--olive-500);
   /* Diamond/rhombus — tactical, not a circle */
   border-radius: var(--radius-none);
   transform: rotate(45deg);
@@ -495,26 +495,26 @@
 }
 
 .radio--selected .radio__dot {
-  border-color: var(--dl-topbar-border, var(--accent));
+  border-color: var(--dl-topbar-border, var(--amber-400));
   box-shadow:
     inset 0 1px 3px rgba(0, 0, 0, 0.4),
     0 0 8px var(--dl-topbar-glow, var(--accent-glow));
 }
 
 .radio--selected .radio__dot::after {
-  background: var(--dl-topbar-border, var(--accent));
+  background: var(--dl-topbar-border, var(--amber-400));
   box-shadow: 0 0 4px var(--dl-topbar-glow, var(--accent-glow));
 }
 
 .radio__label {
   font-family: var(--font-sans);
   font-size: var(--text-sm);
-  color: var(--text-secondary);
+  color: var(--bone-300);
   line-height: 1.4;
 }
 
 .radio--selected .radio__label {
-  color: var(--text-primary);
+  color: var(--bone-100);
 }
 
 /* ---------- Radio Group ---------- */
@@ -606,4 +606,23 @@
     flex-direction: column;
     gap: var(--space-1);
   }
+}
+
+/* ---------- fm-input--error — rust border + caret for failed input
+   submissions. Promoted from design/states/room-not-found.html. The
+   amber left-border accent is the system motif; the perimeter goes
+   rust to communicate failure without doubling the error state. ---------- */
+.fm-input--error {
+  border-color: var(--rust-400);
+  border-left-color: var(--rust-500);
+  caret-color: var(--rust-300);
+  color: var(--bone-100);
+}
+
+.fm-input--error:focus {
+  border-color: var(--rust-300);
+  border-left-color: var(--rust-400);
+  box-shadow:
+    inset 0 1px 0 rgba(0, 0, 0, 0.35),
+    0 0 0 2px rgba(196, 90, 44, 0.28);
 }

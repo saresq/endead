@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lobby — Host disconnected state · Endead design reference</title>
+
+  <!--
+    DESIGN ONLY — reference frame for follow-up #06.
+    Lives in /design/states/. Static; not wired into LobbyUI.
+    Live target: src/client/ui/LobbyUI.ts (Wave 4).
+  -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Stencil+Display:wght@400;700;900&family=Oswald:wght@400;500;700&family=Barlow+Condensed:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+  />
+
+  <link rel="stylesheet" href="../../src/styles/tokens.css" />
+  <link rel="stylesheet" href="../../src/styles/reset.css" />
+  <link rel="stylesheet" href="../../src/styles/base.css" />
+  <link rel="stylesheet" href="../../src/styles/utilities.css" />
+  <link rel="stylesheet" href="../../src/styles/components/buttons.css" />
+  <link rel="stylesheet" href="../../src/styles/components/forms.css" />
+  <link rel="stylesheet" href="../../src/styles/components/field-manual.css" />
+  <link rel="stylesheet" href="../../src/styles/components/menu.css" />
+  <link rel="stylesheet" href="../../src/styles/components/lobby.css" />
+
+  <style>
+    body { background: var(--bg-0); }
+    .frame { position: relative; min-height: 100vh; }
+    .frame .lobby { position: relative; min-height: 100vh; }
+
+    /* Rust banner — sits flush above the briefing panel inside the
+       lobby stack. Reuses corrosion ramp tokens, hazard-tape diagonal
+       stripes for the leading edge, no new colors. */
+    .lobby-banner {
+      position: relative;
+      display: grid;
+      grid-template-columns: 12px 1fr auto;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 16px;
+      background:
+        linear-gradient(180deg, rgba(196, 90, 44, 0.14), rgba(156, 63, 28, 0.08)),
+        linear-gradient(180deg, var(--bg-2), var(--bg-1));
+      border: 1px solid var(--rust-500);
+      border-left-width: 3px;
+      clip-path: polygon(
+        0 6px, 6px 0,
+        calc(100% - 6px) 0, 100% 6px,
+        100% calc(100% - 6px), calc(100% - 6px) 100%,
+        6px 100%, 0 calc(100% - 6px)
+      );
+      animation: panel-fade-in 200ms var(--ease-out) both;
+    }
+
+    .lobby-banner__icon {
+      width: 12px;
+      height: 12px;
+      align-self: center;
+      background: var(--rust-400);
+      border-radius: 1px;
+      box-shadow: 0 0 8px rgba(196, 90, 44, 0.55);
+      animation: rust-blink 1.6s ease-in-out infinite;
+    }
+
+    .lobby-banner__text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .lobby-banner__title {
+      font-family: var(--font-stencil);
+      font-size: 13px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--rust-300);
+      line-height: 1;
+    }
+
+    .lobby-banner__sub {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--bone-300);
+      line-height: 1.2;
+    }
+
+    .lobby-banner__countdown {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      letter-spacing: 0.18em;
+      color: var(--rust-300);
+      border: 1px solid var(--rust-500);
+      background: rgba(156, 63, 28, 0.16);
+      border-radius: 2px;
+      min-width: 56px;
+      justify-content: center;
+    }
+
+    .lobby-banner__countdown-num {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--rust-300);
+      font-family: var(--font-mono);
+      animation: countdown-pulse 1s steps(1, end) infinite;
+    }
+
+    @keyframes rust-blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.55; }
+    }
+
+    @keyframes countdown-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .lobby-banner__icon,
+      .lobby-banner__countdown-num { animation: none; }
+    }
+
+    .frame-caption {
+      position: fixed;
+      left: 12px;
+      bottom: 12px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--bone-500);
+      background: rgba(11, 13, 10, 0.85);
+      padding: 6px 10px;
+      border-left: 2px solid var(--rust-400);
+      pointer-events: none;
+      z-index: 9999;
+    }
+  </style>
+</head>
+<body>
+  <main class="frame">
+    <div class="lobby">
+      <div class="lobby__stack">
+        <!-- Rust banner sits at the top of the stack, above the
+             briefing panel, while host promotion happens. -->
+        <div class="lobby-banner" role="status" aria-live="polite">
+          <span class="lobby-banner__icon" aria-hidden="true"></span>
+          <div class="lobby-banner__text">
+            <span class="lobby-banner__title">HOST DISCONNECTED · PROMOTING…</span>
+            <span class="lobby-banner__sub">Selecting next operative as host.</span>
+          </div>
+          <span class="lobby-banner__countdown" aria-label="3 seconds remaining">
+            <span class="lobby-banner__countdown-num">3</span>
+            <span aria-hidden="true">s</span>
+          </span>
+        </div>
+
+        <!-- Briefing panel — same chrome, dimmed amber to avoid competing
+             with the rust banner above it. -->
+        <section class="fm-panel lobby-panel lobby-panel--briefing">
+          <span class="fm-panel-dot fm-panel-dot--tl" aria-hidden="true"></span>
+          <span class="fm-panel-dot fm-panel-dot--br" aria-hidden="true"></span>
+          <div class="fm-brackets fm-brackets--amber lobby-briefing__body">
+            <span class="fm-bracket-tr" aria-hidden="true"></span>
+            <span class="fm-bracket-bl" aria-hidden="true"></span>
+            <div class="fm-kicker">// MISSION BRIEFING · ON HOLD</div>
+            <h1 class="fm-stencil lobby-briefing__title">LOBBY</h1>
+            <button
+              type="button"
+              class="lobby-room-chip"
+              title="Copy room code"
+              aria-label="Copy room code to clipboard"
+            >
+              <span class="lobby-room-chip__label">ROOM</span>
+              <span class="lobby-room-chip__id">7K4N-92QR</span>
+              <span class="lobby-room-chip__glyph" aria-hidden="true">⎘</span>
+            </button>
+          </div>
+        </section>
+
+        <section class="fm-panel lobby-panel lobby-panel--squad">
+          <div class="lobby-squad__header">
+            <div class="fm-kicker fm-kicker--secondary">SQUAD</div>
+            <div class="lobby-squad__count fm-mono">3/6</div>
+          </div>
+          <ul class="lobby-squad">
+            <li class="lobby-squad__row">
+              <div class="lobby-squad__head">
+                <span class="fm-stencil lobby-squad__name">CALLSIGN-01</span>
+                <span class="lobby-pill lobby-pill--amber">YOU</span>
+              </div>
+              <div class="lobby-squad__sub">
+                <span class="lobby-squad__class fm-mono">SCOUT</span>
+                <span class="lobby-squad__dot" aria-hidden="true">·</span>
+                <span class="lobby-status lobby-status--ready">● READY</span>
+              </div>
+            </li>
+            <li class="lobby-squad__row">
+              <div class="lobby-squad__head">
+                <span class="fm-stencil lobby-squad__name">RIVERA</span>
+              </div>
+              <div class="lobby-squad__sub">
+                <span class="lobby-squad__class fm-mono">SOLDIER</span>
+                <span class="lobby-squad__dot" aria-hidden="true">·</span>
+                <span class="lobby-status lobby-status--ready">● READY</span>
+              </div>
+            </li>
+            <li class="lobby-squad__row">
+              <div class="lobby-squad__head">
+                <span class="fm-stencil lobby-squad__name">MORALES</span>
+              </div>
+              <div class="lobby-squad__sub">
+                <span class="lobby-squad__class fm-mono">NO CLASS</span>
+                <span class="lobby-squad__dot" aria-hidden="true">·</span>
+                <span class="lobby-status lobby-status--standby">● STANDBY</span>
+              </div>
+            </li>
+          </ul>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <div class="frame-caption">// design/states/host-left.html · target: src/client/ui/LobbyUI.ts</div>
+</body>
+</html>

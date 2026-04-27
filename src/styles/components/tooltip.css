@@ -10,14 +10,14 @@
   pointer-events: none;
   max-width: 260px;
   padding: var(--space-3) var(--space-4);
-  background: var(--dl-surface-1, var(--surface-1));
-  color: var(--text-primary);
+  background: var(--dl-surface-1, var(--bg-1));
+  color: var(--bone-100);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   line-height: 1.55;
   border-radius: var(--radius-sm);
-  border: var(--border-thin) solid var(--dl-border, var(--surface-4));
-  border-top: var(--border-thick) solid var(--dl-topbar-border, var(--surface-5));
+  border: var(--border-thin) solid var(--dl-border, var(--olive-700));
+  border-top: var(--border-thick) solid var(--dl-topbar-border, var(--olive-500));
   box-shadow:
     var(--shadow-lg),
     0 0 0 1px rgba(0, 0, 0, 0.6),
@@ -87,7 +87,7 @@
 }
 
 .board-tooltip .tooltip-title--group {
-  border-bottom: 1px solid var(--dl-border, var(--surface-4));
+  border-bottom: 1px solid var(--dl-border, var(--olive-700));
   padding-bottom: var(--space-2);
   /* Faint accent line under group titles */
   background-image: linear-gradient(
@@ -103,7 +103,7 @@
 .board-tooltip .tooltip-count {
   font-family: var(--font-mono);
   font-weight: var(--font-normal);
-  color: var(--text-secondary);
+  color: var(--bone-300);
   font-size: var(--text-xs);
   text-transform: none;
   letter-spacing: var(--letter-spacing-wide);
@@ -172,7 +172,7 @@
 .board-tooltip .tooltip-hp-track {
   flex: 1;
   height: 5px;
-  background: var(--dl-surface-2, var(--surface-3));
+  background: var(--dl-surface-2, var(--bg-3));
   border-radius: var(--radius-none);
   overflow: hidden;
   min-width: 60px;
@@ -209,7 +209,7 @@
 }
 
 .board-tooltip .tooltip-hp-text {
-  color: var(--text-secondary);
+  color: var(--bone-300);
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
   font-variant-numeric: tabular-nums;

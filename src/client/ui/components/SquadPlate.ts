@@ -1,9 +1,9 @@
 /**
  * SquadPlate — Compact squad roster card for HUD rails and lobby lists.
  *
- * Left stripe is tinted with the player's board-piece color. A small dot
- * next to the name encodes the survivor's danger rank (blue/yellow/orange/red).
- * No avatar, no callsign — the squad rail stays compact.
+ * Left stripe is tinted with the player's board-piece color. Rank is
+ * established in the dossier and progression track; the squad rail does
+ * not duplicate it inline (per follow-up #05).
  */
 
 import { icon } from './icons';
@@ -27,13 +27,6 @@ export interface SquadPlateOptions {
   /** Optional click target — emits `data-action="select-survivor"` with this id. */
   selectId?: string;
 }
-
-const RANK_LABEL: Record<SquadPlateRank, string> = {
-  blue: 'Rookie',
-  yellow: 'Veteran',
-  orange: 'Elite',
-  red: 'Hero',
-};
 
 function clamp(n: number, lo: number, hi: number): number {
   if (n < lo) return lo;
@@ -68,7 +61,6 @@ function renderPills(current: number, max: number, variant: 'hp' | 'actions'): s
 export function renderSquadPlate(opts: SquadPlateOptions): string {
   const hp = clamp(opts.hp, 0, opts.hpMax);
   const actions = clamp(opts.actions, 0, opts.actionsMax);
-  const rankTitle = RANK_LABEL[opts.rank];
 
   const rootClass = [
     'fm-squadplate',
@@ -106,9 +98,6 @@ export function renderSquadPlate(opts: SquadPlateOptions): string {
       <div class="fm-squadplate__stripe" style="${stripeStyle}"></div>
       <div class="fm-squadplate__body">
         <div class="fm-squadplate__head">
-          <span class="fm-squadplate__rank-dot fm-squadplate__rank-dot--${opts.rank}"
-                title="${escapeHtml(rankTitle)}"
-                aria-label="${escapeHtml(rankTitle)}"></span>
           <span class="fm-squadplate__name">${escapeHtml(opts.name)}</span>
           ${callsignTag}
           ${activeTag}

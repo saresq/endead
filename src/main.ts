@@ -8,7 +8,7 @@ import { networkManager } from './client/NetworkManager';
 import { AnimationController } from './client/AnimationController';
 import { GameHUD } from './client/ui/GameHUD';
 import { LobbyUI } from './client/ui/LobbyUI';
-import { MenuUI } from './client/ui/MenuUI';
+import { MenuUI, type MenuErrorState } from './client/ui/MenuUI';
 import { generateDiff } from './utils/StateDiff';
 import { GamePhase } from './types/GameState';
 import { MapEditor } from './client/editor/MapEditor';
@@ -55,7 +55,11 @@ function parseRoomFromPath(): string | null {
   return match ? match[1] : null;
 }
 
-function showMenu(infoMessage?: string, roomIdPrefill?: string): void {
+function showMenu(
+  infoMessage?: string,
+  roomIdPrefill?: string,
+  errorState?: MenuErrorState
+): void {
   cleanupRoomUi();
 
   menuUi?.destroy();
@@ -63,6 +67,7 @@ function showMenu(infoMessage?: string, roomIdPrefill?: string): void {
     nickname: getNickname(),
     roomIdPrefill,
     infoMessage,
+    errorState: errorState ?? null,
     onNicknameChange: (nickname) => setNickname(nickname),
     onCreateRoom: async (nickname) => {
       setNickname(nickname);
@@ -98,7 +103,7 @@ function showMenu(infoMessage?: string, roomIdPrefill?: string): void {
 }
 
 function cleanupRoomUi(): void {
-  lobbyUi?.hide();
+  lobbyUi?.destroy();
   lobbyUi = null;
 
   gameHud?.destroy();
@@ -297,7 +302,14 @@ async function startRoom(roomId: string): Promise<void> {
     if (error.code === 'ROOM_NOT_FOUND') {
       networkManager.disconnect();
       window.history.pushState({}, '', '/');
-      showMenu('Room not found', roomId);
+      showMenu(`Room ${roomId} could not be located. Confirm the code with your host and try again.`, roomId, 'not-found');
+      return;
+    }
+
+    if (error.code === 'SERVER_FULL' || error.code === 'ROOM_FULL') {
+      networkManager.disconnect();
+      window.history.pushState({}, '', '/');
+      showMenu(`Room ${roomId} is at capacity. Wait for a slot to open or coordinate with your host.`, roomId, 'full');
       return;
     }
 

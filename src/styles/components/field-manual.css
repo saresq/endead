@@ -195,20 +195,6 @@
   min-width: 0;
 }
 
-.fm-squadplate__rank-dot {
-  flex: 0 0 auto;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--bone-500);
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45);
-}
-
-.fm-squadplate__rank-dot--blue   { background: var(--rank-blue);   box-shadow: 0 0 6px rgba(74, 144, 217, 0.5),  0 0 0 1px rgba(0, 0, 0, 0.45); }
-.fm-squadplate__rank-dot--yellow { background: var(--rank-yellow); box-shadow: 0 0 6px rgba(217, 147, 54, 0.5),  0 0 0 1px rgba(0, 0, 0, 0.45); }
-.fm-squadplate__rank-dot--orange { background: var(--rank-orange); box-shadow: 0 0 6px rgba(196, 90, 44, 0.55),  0 0 0 1px rgba(0, 0, 0, 0.45); }
-.fm-squadplate__rank-dot--red    { background: var(--rank-red);    box-shadow: 0 0 6px rgba(156, 63, 28, 0.6),   0 0 0 1px rgba(0, 0, 0, 0.45); }
-
 .fm-squadplate__name {
   font-family: var(--font-stencil);
   font-size: 13px;

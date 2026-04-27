@@ -77,6 +77,10 @@ function characterImageUrl(charClass: string): string {
   return `/images/characters/${charClass.toLowerCase()}.webp`;
 }
 
+// Host-left banner countdown duration (ms). Drives the rust banner's
+// 3 → 2 → 1 chip while the next operative is promoted to host.
+const HOST_LEFT_COUNTDOWN_SECONDS = 3;
+
 export class LobbyUI {
   private container: HTMLElement;
   private localPlayerId: PlayerId;
@@ -96,6 +100,33 @@ export class LobbyUI {
     return initial;
   })();
 
+  // ─── Degraded-state plumbing ────────────────────────────────
+  // Host-left banner. Wired to STATE_UPDATE via update() — server
+  // stamps `lobby.hostLeftAt` when the host disconnects in lobby
+  // phase and survivors remain. We debounce on the timestamp so a
+  // re-render of the same state doesn't refire.
+  private hostLeftActive = false;
+  private hostLeftSecondsRemaining = HOST_LEFT_COUNTDOWN_SECONDS;
+  private hostLeftTimer: number | null = null;
+  private lastSeenHostLeftAt: number | null = null;
+
+  // Connection-lost scrim. Driven by NetworkManager's existing
+  // reconnect/drop callbacks (see installConnectionListeners).
+  private connectionLost = false;
+  private reconnectMeta: string | null = null;
+  private prevOnReconnecting:
+    | ((attempt: number, maxAttempts: number, nextRetryDelayMs?: number) => void)
+    | null = null;
+  private prevOnConnected: (() => void) | null = null;
+  private prevOnDisconnected: (() => void) | null = null;
+
+  // Live scrim meta state.
+  private disconnectedAt: number | null = null;
+  private nextRetryAt: number | null = null;
+  private currentAttempt: number = 0;
+  private maxAttempts: number = 0;
+  private connectionMetaTimer: number | null = null;
+
   constructor(playerId: PlayerId, roomId: string) {
     this.localPlayerId = playerId;
     this.roomId = roomId;
@@ -106,8 +137,175 @@ export class LobbyUI {
     document.body.appendChild(this.container);
 
     this.attachListeners();
+    this.installConnectionListeners();
     this.fetchMaps();
     this.render();
+  }
+
+  /**
+   * Tear-down hook. Clears the host-left timer and restores any
+   * NetworkManager callbacks we wrapped during construction.
+   */
+  public destroy(): void {
+    if (this.hostLeftTimer !== null) {
+      clearInterval(this.hostLeftTimer);
+      this.hostLeftTimer = null;
+    }
+    if (this.connectionMetaTimer !== null) {
+      clearInterval(this.connectionMetaTimer);
+      this.connectionMetaTimer = null;
+    }
+    if (this.nameDebounceTimer !== null) {
+      clearTimeout(this.nameDebounceTimer);
+      this.nameDebounceTimer = null;
+    }
+    document.removeEventListener('click', this.handleScrimClick);
+    networkManager.onReconnecting = this.prevOnReconnecting ?? undefined;
+    networkManager.onConnected = this.prevOnConnected ?? undefined;
+    networkManager.onDisconnected = this.prevOnDisconnected ?? undefined;
+    const scrimEl = document.body.querySelector(
+      ':scope > [data-scrim="connection-lost"]',
+    );
+    if (scrimEl) scrimEl.remove();
+    this.container.remove();
+  }
+
+  /**
+   * Production trigger AND debug hook. Wired to STATE_UPDATE via
+   * update() — fires when `lobby.hostLeftAt` changes from the last
+   * seen value. The leading `__` is preserved as an "internal" marker
+   * (and so `lobbyUi.__triggerHostLeftBanner()` still works from the
+   * devtools console for manual verification). Idempotent: a duplicate
+   * call while the banner is already active is a no-op.
+   */
+  public __triggerHostLeftBanner(): void {
+    if (this.hostLeftActive) return;
+    this.hostLeftActive = true;
+    this.hostLeftSecondsRemaining = HOST_LEFT_COUNTDOWN_SECONDS;
+    if (this.hostLeftTimer !== null) clearInterval(this.hostLeftTimer);
+    this.hostLeftTimer = window.setInterval(() => {
+      this.hostLeftSecondsRemaining -= 1;
+      if (this.hostLeftSecondsRemaining <= 0) {
+        if (this.hostLeftTimer !== null) {
+          clearInterval(this.hostLeftTimer);
+          this.hostLeftTimer = null;
+        }
+        this.hostLeftActive = false;
+      }
+      this.render();
+    }, 1000);
+    this.render();
+  }
+
+  /**
+   * Wraps NetworkManager's existing reconnect callbacks so the
+   * connection-lost scrim renders in-lobby instead of (or alongside)
+   * the toast. Original callbacks are still invoked.
+   */
+  private installConnectionListeners(): void {
+    this.prevOnReconnecting = networkManager.onReconnecting ?? null;
+    this.prevOnConnected = networkManager.onConnected ?? null;
+    this.prevOnDisconnected = networkManager.onDisconnected ?? null;
+
+    networkManager.onReconnecting = (attempt, maxAttempts, nextRetryDelayMs) => {
+      const wasConnected = !this.connectionLost;
+      this.connectionLost = true;
+      // Capture the disconnect-baseline on the first onReconnecting
+      // tick after a previously-connected state. NetworkManager calls
+      // this just before each setTimeout, so the very first call is
+      // the right anchor for our "DROPPED mm:ss" timer.
+      if (wasConnected || this.disconnectedAt === null) {
+        this.disconnectedAt = Date.now();
+      }
+      this.currentAttempt = attempt;
+      this.maxAttempts = maxAttempts;
+      this.nextRetryAt =
+        typeof nextRetryDelayMs === 'number' ? Date.now() + nextRetryDelayMs : null;
+      this.startConnectionMetaTimer();
+      this.refreshConnectionMeta();
+      this.render();
+      if (this.prevOnReconnecting) {
+        this.prevOnReconnecting(attempt, maxAttempts, nextRetryDelayMs);
+      }
+    };
+
+    networkManager.onConnected = () => {
+      this.connectionLost = false;
+      this.reconnectMeta = null;
+      this.disconnectedAt = null;
+      this.nextRetryAt = null;
+      this.currentAttempt = 0;
+      this.stopConnectionMetaTimer();
+      this.render();
+      if (this.prevOnConnected) this.prevOnConnected();
+    };
+
+    networkManager.onDisconnected = () => {
+      // Hard disconnect (max retries hit). Keep the scrim up so the
+      // RECONNECT button stays available.
+      this.connectionLost = true;
+      this.nextRetryAt = null;
+      if (this.disconnectedAt === null) this.disconnectedAt = Date.now();
+      this.startConnectionMetaTimer();
+      this.refreshConnectionMeta('CONNECTION DROPPED');
+      this.render();
+      if (this.prevOnDisconnected) this.prevOnDisconnected();
+    };
+  }
+
+  /** Start the 1Hz scrim-meta ticker. Idempotent. */
+  private startConnectionMetaTimer(): void {
+    if (this.connectionMetaTimer !== null) return;
+    this.connectionMetaTimer = window.setInterval(() => {
+      this.refreshConnectionMeta();
+    }, 1000);
+  }
+
+  private stopConnectionMetaTimer(): void {
+    if (this.connectionMetaTimer !== null) {
+      clearInterval(this.connectionMetaTimer);
+      this.connectionMetaTimer = null;
+    }
+  }
+
+  /**
+   * Compose the scrim meta line and patch it in place (no full
+   * re-render). Pieces: attempt count · time-since-disconnect mm:ss ·
+   * next-retry countdown. Falls back to a status-only line when
+   * `headlineOverride` is provided (e.g. hard-drop "CONNECTION DROPPED").
+   */
+  private refreshConnectionMeta(headlineOverride?: string): void {
+    const parts: string[] = [];
+
+    if (headlineOverride) {
+      parts.push(headlineOverride);
+    } else if (this.maxAttempts > 0) {
+      parts.push(`RETRYING HANDSHAKE · ${this.currentAttempt}/${this.maxAttempts}`);
+    } else {
+      parts.push('RETRYING HANDSHAKE');
+    }
+
+    if (this.disconnectedAt !== null) {
+      const elapsedSec = Math.max(0, Math.floor((Date.now() - this.disconnectedAt) / 1000));
+      const mm = Math.floor(elapsedSec / 60).toString().padStart(2, '0');
+      const ss = (elapsedSec % 60).toString().padStart(2, '0');
+      parts.push(`DROPPED ${mm}:${ss}`);
+    }
+
+    if (this.nextRetryAt !== null) {
+      const remaining = Math.max(0, Math.ceil((this.nextRetryAt - Date.now()) / 1000));
+      parts.push(remaining > 0 ? `NEXT ${remaining}s` : 'RECONNECTING…');
+    }
+
+    this.reconnectMeta = parts.join(' · ');
+
+    // Patch the scrim meta text in place so the entry animation
+    // doesn't replay every tick.
+    const scrimEl = document.body.querySelector(
+      ':scope > [data-scrim="connection-lost"]',
+    );
+    const metaEl = scrimEl?.querySelector('.lobby-scrim__meta') as HTMLElement | null;
+    if (metaEl) metaEl.textContent = this.reconnectMeta;
   }
 
   private async fetchMaps(): Promise<void> {
@@ -126,6 +324,21 @@ export class LobbyUI {
   }
 
   public update(state: GameState): void {
+    const isFirstUpdate = this.state === null;
+    const incomingHostLeftAt = state.lobby.hostLeftAt ?? null;
+
+    if (isFirstUpdate) {
+      // Seed from the very first state so a player joining a room
+      // post-event doesn't see a stale banner.
+      this.lastSeenHostLeftAt = incomingHostLeftAt;
+    } else if (
+      incomingHostLeftAt !== null &&
+      incomingHostLeftAt !== this.lastSeenHostLeftAt
+    ) {
+      this.lastSeenHostLeftAt = incomingHostLeftAt;
+      this.__triggerHostLeftBanner();
+    }
+
     this.state = state;
     this.render();
   }
@@ -172,6 +385,7 @@ export class LobbyUI {
     // HTML actually changed since the last render.
     const panels: Array<{ key: string; html: string }> = [];
     const hostId = this.state.lobby.players[0]?.id ?? null;
+    if (this.hostLeftActive) panels.push({ key: 'hostLeftBanner', html: this.renderHostLeftBanner() });
     panels.push({ key: 'briefing', html: this.renderBriefingPanel() });
     if (myPlayer) panels.push({ key: 'playerPlate', html: this.renderPlayerPlatePanel(myPlayer) });
     panels.push({ key: 'squad', html: this.renderSquadPanel(this.state.lobby.players, hostId) });
@@ -266,6 +480,35 @@ export class LobbyUI {
       const abomCheck = stack.querySelector('#lobby-abom-fest') as HTMLInputElement | null;
       if (abomCheck) abomCheck.checked = this.abominationFest;
     }
+
+    // ─── Connection-lost scrim + dimmed lobby ──────────────────
+    // The scrim is appended to document.body (sibling of #lobby-ui)
+    // so the .lobby--dimmed filter doesn't blur or grayscale it too.
+    this.container.classList.toggle('lobby--dimmed', this.connectionLost);
+    if (this.connectionLost) {
+      this.container.setAttribute('aria-hidden', 'true');
+    } else {
+      this.container.removeAttribute('aria-hidden');
+    }
+
+    let scrimEl = document.body.querySelector(
+      ':scope > [data-scrim="connection-lost"]',
+    ) as HTMLElement | null;
+    if (this.connectionLost) {
+      if (!scrimEl) {
+        const tmp = document.createElement('div');
+        tmp.innerHTML = this.renderConnectionLostScrim().trim();
+        scrimEl = tmp.firstElementChild as HTMLElement | null;
+        if (scrimEl) document.body.appendChild(scrimEl);
+      } else {
+        // Refresh the meta line in place so the scrim's entry
+        // animation doesn't replay every reconnect attempt.
+        const metaEl = scrimEl.querySelector('.lobby-scrim__meta') as HTMLElement | null;
+        if (metaEl) metaEl.textContent = this.reconnectMeta ?? 'RETRYING HANDSHAKE';
+      }
+    } else if (scrimEl) {
+      scrimEl.remove();
+    }
   }
 
   // ─── Panel renderers ─────────────────────────────────────────
@@ -275,6 +518,17 @@ export class LobbyUI {
     const copyGlyph = copied ? icon('Check', 'sm') : icon('Copy', 'sm');
     const copiedClass = copied ? ' lobby-room-chip--copied' : '';
     const label = copied ? '// COPIED' : 'ROOM';
+
+    // Solo-waiting state — single operative in the lobby. The room
+    // chip pulses rust to read as "share this code" and the kicker
+    // swaps to a count-aware WAITING line.
+    const squadSize = this.state?.lobby.players.length ?? 0;
+    const isSolo = squadSize === 1;
+    const pulseClass = isSolo ? ' lobby-room-chip--pulse' : '';
+    const kicker = isSolo
+      ? `// WAITING FOR OPERATIVES · ${squadSize}/${MAX_SQUAD}`
+      : '// MISSION BRIEFING';
+
     return `
       <section class="fm-panel lobby-panel lobby-panel--briefing">
         <span class="fm-panel-dot fm-panel-dot--tl"></span>
@@ -282,12 +536,12 @@ export class LobbyUI {
         <div class="fm-brackets fm-brackets--amber lobby-briefing__body">
           <span class="fm-bracket-tr"></span>
           <span class="fm-bracket-bl"></span>
-          <div class="fm-kicker">// MISSION BRIEFING</div>
+          <div class="fm-kicker">${kicker}</div>
           <h1 class="fm-stencil lobby-briefing__title">LOBBY</h1>
           <button
             type="button"
             id="room-pill"
-            class="lobby-room-chip${copiedClass}"
+            class="lobby-room-chip${copiedClass}${pulseClass}"
             title="Copy room code"
             aria-label="Copy room code to clipboard"
           >
@@ -297,6 +551,66 @@ export class LobbyUI {
           </button>
         </div>
       </section>
+    `;
+  }
+
+  /**
+   * Host-left banner. Sits at the very top of .lobby__stack while the
+   * server promotes a new host. role=status + aria-live=polite per
+   * design/states/host-left.html.
+   */
+  private renderHostLeftBanner(): string {
+    const seconds = Math.max(0, this.hostLeftSecondsRemaining);
+    return `
+      <div class="lobby-banner" role="status" aria-live="polite">
+        <span class="lobby-banner__icon" aria-hidden="true"></span>
+        <div class="lobby-banner__text">
+          <span class="lobby-banner__title">HOST DISCONNECTED · PROMOTING…</span>
+          <span class="lobby-banner__sub">Selecting next operative as host.</span>
+        </div>
+        <span class="lobby-banner__countdown" aria-label="${seconds} seconds remaining">
+          <span class="lobby-banner__countdown-num">${seconds}</span>
+          <span aria-hidden="true">s</span>
+        </span>
+      </div>
+    `;
+  }
+
+  /**
+   * Connection-lost scrim. Full-viewport alertdialog over the dimmed
+   * lobby; reuses the existing modal-backdrop + grain treatment. The
+   * reconnect button drives NetworkManager.connect().
+   */
+  private renderConnectionLostScrim(): string {
+    const meta = this.escHtml(this.reconnectMeta ?? 'RETRYING HANDSHAKE');
+    return `
+      <div
+        class="lobby-scrim"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="lobby-scrim-title"
+        data-scrim="connection-lost"
+      >
+        <div class="fm-panel fm-brackets fm-brackets--rust fm-brackets--lg lobby-scrim__card">
+          <span class="fm-panel-dot fm-panel-dot--tl" aria-hidden="true"></span>
+          <span class="fm-panel-dot fm-panel-dot--br" aria-hidden="true"></span>
+          <span class="fm-bracket-tr" aria-hidden="true"></span>
+          <span class="fm-bracket-bl" aria-hidden="true"></span>
+
+          <div class="fm-kicker">// SIGNAL DEGRADED</div>
+          <h2 id="lobby-scrim-title" class="lobby-scrim__title">// CONNECTION LOST</h2>
+          <p class="lobby-scrim__sub">
+            Server contact dropped. Mission state held locally.
+          </p>
+          <div class="lobby-scrim__meta">${meta}</div>
+
+          <div class="lobby-scrim__actions">
+            <button type="button" class="fm-btn fm-btn--reconnect" data-action="reconnect">
+              <span class="fm-btn__label">Reconnect</span>
+            </button>
+          </div>
+        </div>
+      </div>
     `;
   }
 
@@ -547,7 +861,18 @@ export class LobbyUI {
     });
   }
 
+  /** Document-level reconnect handler — the scrim lives outside
+   *  the lobby container so .lobby--dimmed doesn't blur it. */
+  private handleScrimClick = (e: Event): void => {
+    const target = e.target as HTMLElement;
+    const reconnectBtn = target.closest('[data-action="reconnect"]') as HTMLElement | null;
+    if (!reconnectBtn) return;
+    networkManager.connect();
+  };
+
   private attachListeners(): void {
+    document.addEventListener('click', this.handleScrimClick);
+
     // Click delegation.
     this.container.addEventListener('click', (e) => {
       const target = e.target as HTMLElement;

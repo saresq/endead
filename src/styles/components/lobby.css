@@ -171,6 +171,31 @@
   }
 }
 
+/* Solo waiting — slow rust pulse on the room chip while the squad
+   is at 1/N. Promoted from design/states/waiting.html. Uses canonical
+   --rust-* tokens only. Animates outline + box-shadow (compositor-
+   friendly box-shadow at this small size). */
+.lobby-room-chip--pulse {
+  animation: rust-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes rust-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1px rgba(196, 90, 44, 0),
+      0 0 0 0 rgba(196, 90, 44, 0);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px var(--rust-400),
+      0 0 14px rgba(196, 90, 44, 0.45);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lobby-room-chip--pulse { animation: none; }
+}
+
 /* ---------- 2. Squad roster ---------- */
 
 .lobby-panel--squad {
@@ -367,21 +392,64 @@
   color: inherit;
   font: inherit;
   text-align: left;
-  transition: transform 140ms ease, filter 140ms ease;
+  transition: transform 80ms ease, filter 140ms ease;
 }
 
-.lobby-roster__cell:hover:not(:disabled) {
-  transform: translateY(-1px);
-  filter: drop-shadow(0 0 6px rgba(240, 169, 74, 0.2));
+/* Resting affordance — present on every device (touch + desktop).
+   Layer onto the inner photo frame so the card reads as a pressable
+   surface, not a flat tile. Olive border at ~30% alpha + faint inset. */
+.lobby-roster__cell .fm-photoslot__frame {
+  border-color: rgba(138, 149, 96, 0.3);
+  box-shadow: inset 0 1px 0 rgba(232, 225, 204, 0.04),
+              inset 0 0 0 1px rgba(11, 13, 10, 0.35);
+  transition: border-color 80ms ease, box-shadow 80ms ease, transform 80ms ease;
 }
 
+/* Hover — only fires on devices with a real hover capability so touch
+   surfaces don't get a sticky hover state from the last tap. */
+@media (hover: hover) {
+  .lobby-roster__cell:hover:not(:disabled) {
+    transform: translateY(-1px);
+    filter: drop-shadow(0 0 6px var(--accent-glow));
+  }
+
+  .lobby-roster__cell:hover:not(:disabled) .fm-photoslot__frame {
+    border-color: var(--accent-border);
+    box-shadow: inset 0 1px 0 rgba(232, 225, 204, 0.06),
+                inset 0 0 0 1px var(--accent-muted);
+  }
+}
+
+/* Pressed — 1px inset shift mimics a physical button press. */
+.lobby-roster__cell:not(:disabled):active {
+  transform: translateY(0);
+}
+
+.lobby-roster__cell:not(:disabled):active .fm-photoslot__frame {
+  transform: translateY(1px);
+  box-shadow: inset 0 1px 2px rgba(11, 13, 10, 0.55);
+}
+
+/* Selected — must win over hover. Full amber border + inner glow +
+   4px shadow lift. The corner dot stays via fm-photoslot--selected. */
 .lobby-roster__cell--selected {
   transform: translateY(-3px);
   filter: drop-shadow(0 4px 14px rgba(240, 169, 74, 0.4));
 }
 
-.lobby-roster__cell--selected:hover:not(:disabled) {
-  transform: translateY(-3px);
+.lobby-roster__cell--selected .fm-photoslot__frame,
+.lobby-roster__cell--selected:hover:not(:disabled) .fm-photoslot__frame {
+  border-color: var(--amber-400);
+  box-shadow:
+    inset 0 0 0 1px var(--amber-400),
+    inset 0 0 12px var(--accent-muted),
+    0 4px 10px rgba(11, 13, 10, 0.5);
+}
+
+@media (hover: hover) {
+  .lobby-roster__cell--selected:hover:not(:disabled) {
+    transform: translateY(-3px);
+  }
 }
 
 .lobby-roster__cell:focus-visible {
@@ -393,6 +461,11 @@
   cursor: not-allowed;
   opacity: 0.45;
   filter: grayscale(0.4);
+}
+
+.lobby-roster__cell--taken .fm-photoslot__frame {
+  border-color: var(--olive-700);
+  box-shadow: none;
 }
 
 .lobby-roster__taken-label {
@@ -411,7 +484,7 @@
 
 /* ---------- 5. Operative (dossier + loadout + progression) ---------- */
 
-.lobby-panel--operative {
+.lobby-panel--area {
   padding: 16px 20px 18px;
 }
 
@@ -873,4 +946,249 @@
     font-size: 22px;
   }
 
+}
+
+/* ==========================================================================
+   Host-left banner — sits at the top of .lobby__stack while host
+   promotion happens. Promoted from design/states/host-left.html.
+   ========================================================================== */
+
+.lobby-banner {
+  position: relative;
+  display: grid;
+  grid-template-columns: 12px 1fr auto;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  background:
+    linear-gradient(180deg, rgba(196, 90, 44, 0.14), rgba(156, 63, 28, 0.08)),
+    linear-gradient(180deg, var(--bg-2), var(--bg-1));
+  border: 1px solid var(--rust-500);
+  border-left-width: 3px;
+  clip-path: polygon(
+    0 6px, 6px 0,
+    calc(100% - 6px) 0, 100% 6px,
+    100% calc(100% - 6px), calc(100% - 6px) 100%,
+    6px 100%, 0 calc(100% - 6px)
+  );
+  animation: panel-fade-in 200ms var(--ease-out) both;
+}
+
+.lobby-banner__icon {
+  width: 12px;
+  height: 12px;
+  align-self: center;
+  background: var(--rust-400);
+  border-radius: 1px;
+  box-shadow: 0 0 8px rgba(196, 90, 44, 0.55);
+  animation: rust-blink 1.6s ease-in-out infinite;
+}
+
+.lobby-banner__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.lobby-banner__title {
+  font-family: var(--font-stencil);
+  font-size: 13px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--rust-300);
+  line-height: 1;
+}
+
+.lobby-banner__sub {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--bone-300);
+  line-height: 1.2;
+}
+
+.lobby-banner__countdown {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  color: var(--rust-300);
+  border: 1px solid var(--rust-500);
+  background: rgba(156, 63, 28, 0.16);
+  border-radius: 2px;
+  min-width: 56px;
+  justify-content: center;
+}
+
+.lobby-banner__countdown-num {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--rust-300);
+  font-family: var(--font-mono);
+  animation: countdown-pulse 1s steps(1, end) infinite;
+}
+
+@keyframes rust-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+@keyframes countdown-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lobby-banner { animation: none; }
+  .lobby-banner__icon,
+  .lobby-banner__countdown-num { animation: none; }
+}
+
+/* ==========================================================================
+   Connection-lost scrim — full-viewport overlay with a single
+   bracketed dossier. Promoted from design/states/connection-lost.html.
+   The underlying lobby gets `.lobby--dimmed` to read as still-there
+   but unreachable.
+   ========================================================================== */
+
+.lobby--dimmed {
+  filter: grayscale(0.35) brightness(0.55);
+  pointer-events: none;
+  user-select: none;
+}
+
+.lobby-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: var(--modal-backdrop);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: panel-fade-in 200ms var(--ease-out) both;
+}
+
+.lobby-scrim::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--grain-url);
+  background-size: 160px 160px;
+  opacity: 0.04;
+  pointer-events: none;
+  mix-blend-mode: overlay;
+}
+
+.lobby-scrim__card {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  padding: 28px 28px 24px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.lobby-scrim__title {
+  font-family: var(--font-stencil);
+  font-size: 28px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--rust-300);
+  line-height: 1;
+  margin: 0;
+  text-shadow: 0 0 18px rgba(196, 90, 44, 0.35);
+}
+
+.lobby-scrim__sub {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--bone-300);
+  line-height: 1.5;
+  max-width: 30ch;
+  margin: 0;
+}
+
+.lobby-scrim__meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  color: var(--bone-500);
+  text-transform: uppercase;
+}
+
+.lobby-scrim__meta::after {
+  content: '_';
+  animation: hud-blink-caret 1.1s step-end infinite;
+  color: var(--rust-400);
+  margin-left: 2px;
+}
+
+.lobby-scrim__actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lobby-scrim { animation: none; }
+  .lobby-scrim__meta::after { animation: none; }
+}
+
+/* ==========================================================================
+   Tablet breakpoint (md: 768px – 1023px).
+   Promoted from design/breakpoints/lobby-tablet.html. The .lobby__stack
+   becomes a 2-column grid; columns are assigned by panel class so no
+   DOM restructure is required.
+   ========================================================================== */
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .lobby__stack {
+    max-width: 720px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 16px;
+    row-gap: 14px;
+  }
+
+  /* Column assignment — left rail handles the briefing + roster
+     (visual + selection), right rail handles dossier + loadout +
+     progression + roe + footer (the active operative dossier). */
+  .lobby-panel--briefing,
+  .lobby-panel--squad,
+  .lobby-panel--player,
+  .lobby-panel--roster {
+    grid-column: 1;
+  }
+
+  .lobby-panel--area,
+  .lobby-panel--roe,
+  .lobby-panel--footer {
+    grid-column: 2;
+  }
+
+  /* Roster goes 4-up at this width — 3-up wastes the column. */
+  .lobby-roster {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+  }
+
+  /* Sticky footer keeps the primary CTA visible while scrolling
+     the dossier column. */
+  .lobby-panel--footer {
+    position: sticky;
+    bottom: 12px;
+  }
 }

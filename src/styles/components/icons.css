@@ -58,11 +58,11 @@
 }
 
 .icon--secondary {
-  color: var(--text-secondary);
+  color: var(--bone-300);
 }
 
 .icon--accent {
-  color: var(--accent);
+  color: var(--amber-400);
   filter: drop-shadow(0 0 3px var(--accent-glow));
 }
 
@@ -155,7 +155,7 @@
 /* ---------- Weapon / item type icons (tactical markers) ---------- */
 
 .icon--weapon {
-  color: var(--text-secondary);
+  color: var(--bone-300);
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7));
 }
 
@@ -172,7 +172,7 @@
 }
 
 .icon--objective {
-  color: var(--accent);
+  color: var(--amber-400);
   filter: drop-shadow(0 0 4px var(--accent-glow));
 }
 

@@ -66,17 +66,18 @@ app.delete('/api/maps/:id', (req, res) => {
 
 // --- Tile Definitions ---
 
-// Seed hardcoded defaults into DB if table is empty
-if (persistenceService.tileDefinitionCount() === 0) {
-  for (const [id, def] of Object.entries(TILE_DEFINITIONS)) {
-    persistenceService.saveTileDefinition(id, def);
+// Seed hardcoded defaults into DB if table is empty. Skipped in vitest so
+// importing this module from a unit test never touches sqlite.
+if (process.env.VITEST !== 'true') {
+  if (persistenceService.tileDefinitionCount() === 0) {
+    for (const [id, def] of Object.entries(TILE_DEFINITIONS)) {
+      persistenceService.saveTileDefinition(id, def);
+    }
+    console.log(`Seeded ${Object.keys(TILE_DEFINITIONS).length} tile definitions into DB`);
   }
-  console.log(`Seeded ${Object.keys(TILE_DEFINITIONS).length} tile definitions into DB`);
-}
 
-// Load user-edited tile definitions from DB into the in-memory registry
-// so that compileScenario uses the correct data (not just hardcoded defaults)
-{
+  // Load user-edited tile definitions from DB into the in-memory registry
+  // so that compileScenario uses the correct data (not just hardcoded defaults)
   const dbDefs = persistenceService.loadAllTileDefinitions() as TileDefinition[];
   if (dbDefs.length > 0) {
     for (const def of dbDefs) {
@@ -474,6 +475,11 @@ function handleDisconnect(ws: WebSocket) {
     log(`Player ${playerId} disconnected from room ${roomId}.`);
 
     if (room.gameState.phase === GamePhase.Lobby) {
+      // Host = first player in array (matches existing convention; see
+      // KICK_PLAYER guard at line 543). Detect BEFORE filtering so we
+      // can stamp the promotion signal for the surviving operatives.
+      const wasHost = room.gameState.lobby.players[0]?.id === playerId;
+
       const newState = structuredClone(room.gameState) as GameState;
       newState.lobby.players = newState.lobby.players.filter((p: any) => p.id !== playerId);
       newState.history.push({
@@ -483,6 +489,14 @@ function handleDisconnect(ws: WebSocket) {
         timestamp: Date.now(),
         payload: { phase: 'lobby' }
       });
+
+      // Surface the host-promoted signal on lobby state. Next-in-array
+      // is the new host (longest-tenured surviving player) — no separate
+      // selection step. Client debounces on the timestamp value.
+      if (wasHost && newState.lobby.players.length > 0) {
+        newState.lobby.hostLeftAt = Date.now();
+      }
+
       room.gameState = newState;
       broadcastRoomState(room);
     }
@@ -610,9 +624,25 @@ function runStaleRoomCleanup() {
   }
 }
 
-runStaleRoomCleanup();
-setInterval(runStaleRoomCleanup, STALE_ROOM_CLEANUP_INTERVAL_MS);
+if (process.env.VITEST !== 'true') {
+  runStaleRoomCleanup();
+  setInterval(runStaleRoomCleanup, STALE_ROOM_CLEANUP_INTERVAL_MS);
+}
 
-server.listen(PORT, () => {
-  log(`Server started on port ${PORT}`);
-});
+// Guard the listen call so vitest can import this module without binding
+// a port. The test runner exposes process.env.VITEST === 'true'.
+if (process.env.VITEST !== 'true') {
+  server.listen(PORT, () => {
+    log(`Server started on port ${PORT}`);
+  });
+}
+
+// Test-only surface. Keeps the public module API clean while letting unit
+// tests reach into the internals that drive disconnect/cleanup logic.
+export const __test__ = {
+  handleDisconnect,
+  createRoom,
+  rooms,
+  socketSessions,
+  scheduleRoomCleanup,
+};

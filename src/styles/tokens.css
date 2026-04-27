@@ -5,12 +5,19 @@
    Stenciled type, hazard-tape accents, corner-bracketed panels.
    Olive + rust + amber on near-black with cool olive undertone.
 
-   Variable naming: legacy names (--accent, --surface-0, --text-primary, ...)
-   are preserved for component-CSS compatibility, but their values are now
-   the Field Manual equivalents. New-system tokens (--bg-0, --olive-*,
-   --rust-*, --amber-*, --bone-*, --hazard, --ready, --font-stencil,
-   --font-body) are additive.
-   ========================================================================== */
+   ──────────────────────────────────────────────────────────────────────
+   Naming convention (CANONICAL — use in new code):
+     --{role}-{step}     e.g. --bg-0, --bg-1, --olive-500, --rust-400,
+                              --amber-400, --bone-100
+     --{semantic}        e.g. --hazard, --ready, --success, --danger,
+                              --text-muted, --modal-bg, --hud-phosphor
+   The role/step palette names self-document their place in the system
+   (background tier, olive ramp step, etc). Semantic tokens are layered
+   on top — use them when the role is the meaning (modal background,
+   readiness indicator) rather than a raw color step.
+
+   See `src/styles/README.md` for the full design-system naming rules.
+   ────────────────────────────────────────────────────────────────────── */
 
 :root {
   /* ---------- Field Manual core palette (new) ---------- */
@@ -46,16 +53,47 @@
   --rank-orange: var(--rust-400);
   --rank-red: #b23025;
 
-  /* ---------- Legacy surface aliases (remapped to Field Manual values) ---------- */
+  /* ====================================================================
+     @deprecated — LEGACY ALIAS SHIM. Do not use in new code.
+     ────────────────────────────────────────────────────────────────────
+     These aliases predate the Field Manual palette and are kept only as
+     a migration shim for surfaces still pointing at the old names. New
+     CSS should reference the canonical names directly:
+
+         OLD                       →  NEW (canonical)
+         --surface-0 .. --surface-3 →  --bg-0 .. --bg-3
+         --surface-4                →  --olive-700
+         --surface-5                →  --olive-500
+         --accent                   →  --amber-400
+         --accent-bright            →  --amber-200
+         --accent-hover             →  --amber-500
+         --text-primary             →  --bone-100
+         --text-secondary           →  --bone-300
+
+     Component CSS under `src/styles/components/` and `src/styles/{base,
+     layout,utilities}.css` has been migrated. As of Wave 6 follow-up #03
+     these aliases have ZERO references in src/ and ZERO references in
+     node_modules CSS. They are kept only as a safety net for any
+     third-party-shaped overlay we may wire in. Target removal: next
+     palette milestone after Wave 6 ships. If you add new code, do not
+     reach for these names — use the canonical replacements above.
+
+     The rgba-tinted aliases (--accent-muted, --accent-glow,
+     --accent-border, --surface-inset) are intentionally kept as
+     SEMANTIC tokens — they encode an alpha tint, not a raw color step.
+     Treat those as canonical. They are not subject to the rename above.
+     ==================================================================== */
   --surface-0: var(--bg-0);
   --surface-1: var(--bg-1);
   --surface-2: var(--bg-2);
   --surface-3: var(--bg-3);
   --surface-4: var(--olive-700);
   --surface-5: var(--olive-500);
-  --surface-inset: rgba(11, 13, 10, 0.6);
+  --surface-inset: rgba(11, 13, 10, 0.6); /* semantic — alpha-tinted bg-0 */
 
   /* ---------- Text ---------- */
+  /* @deprecated --text-primary, --text-secondary — use --bone-100, --bone-300.
+     The rest below are canonical semantic tokens; keep using them. */
   --text-primary: var(--bone-100);
   --text-secondary: var(--bone-300);
   --text-muted: var(--bone-500);
@@ -67,6 +105,10 @@
   --text-hud-dim: rgba(247, 210, 138, 0.4);
 
   /* ---------- Accent / Brand (amber) ---------- */
+  /* @deprecated --accent, --accent-bright, --accent-hover —
+     use --amber-400, --amber-200, --amber-500 instead.
+     The -muted/-glow/-border variants remain canonical: they are
+     alpha-tinted amber and have no role/step equivalent. */
   --accent: var(--amber-400);
   --accent-bright: var(--amber-200);
   --accent-hover: var(--amber-500);
@@ -135,9 +177,13 @@
   --zombie-necromancer: #204860;
   --zombie-necromancer-muted: rgba(32, 72, 96, 0.22);
 
-  /* ---------- Typography ---------- */
-  --font-stencil: "Big Shoulders Stencil Display", "Stencil Std", "Impact", sans-serif;
+  /* ---------- Typography ----------
+     Three-family stack: one display (Oswald), one body (Barlow Condensed),
+     one mono (JetBrains Mono). --font-stencil is kept as an alias to
+     --font-display so legacy stencil callers fall through to Oswald — do
+     not introduce a fourth family. */
   --font-display: "Oswald", "Stencil Std", "Impact", sans-serif;
+  --font-stencil: var(--font-display);
   --font-body: "Barlow Condensed", "Roboto Condensed", system-ui, sans-serif;
   --font-sans: var(--font-body);
   --font-mono: "JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace;
@@ -279,7 +325,27 @@
   --trade-arrow-color: var(--text-muted);
   --trade-highlight: rgba(240, 169, 74, 0.08);
 
-  /* ---------- Texture / grain ---------- */
+  /* ---------- Texture / grain ----------
+     Noise overlay coverage rules — canonical list. The grain texture
+     keeps dark surfaces from reading flat; opacity stays within 4–6%
+     so it modulates luminance without fuzzing text.
+
+     Apply grain to (target opacity in parens):
+       --bg-0  body background           (4%)
+       --bg-1  panel base                (5%)
+       --bg-2  raised surface            (6%)
+       modal scrim                       (4%)
+       HUD topbar                        (5%)
+
+     Do NOT apply grain to:
+       --bg-3 input background    — would fight input text legibility
+       hazard-tape stripe         — already textured
+       button surfaces            — would muddy chamfer edges
+
+     Implementation hook: the `.noise` utility class will apply the
+     shared overlay (gated on tracker task #13). Components that need
+     to opt out individually can use `.noise--off`.
+   --------------------------------------------------------------------- */
   --grain-opacity: 0.06;
   --grain-url: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.9 0 0 0 0 0.85 0 0 0 0 0.6 0 0 0 0.5 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.35'/%3E%3C/svg%3E");
   --scratch-opacity: 0.04;

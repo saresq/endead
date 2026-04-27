@@ -30,21 +30,8 @@
   border: var(--border-thin) solid transparent;
   text-decoration: none;
   line-height: 1;
-  /* Subtle noise over all buttons */
+  /* Buttons intentionally skip grain (followup #08) — would muddy chamfer edges. */
   isolation: isolate;
-}
-
-/* Worn metal surface overlay */
-.btn::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background-image: var(--grain-url);
-  opacity: 0.035;
-  pointer-events: none;
-  z-index: 1;
-  mix-blend-mode: overlay;
 }
 
 /* Top-edge highlight — stamped metal bevel */
@@ -87,9 +74,9 @@
 
 .btn--primary {
   background:
-    linear-gradient(180deg, var(--accent-hover) 0%, var(--accent) 60%, color-mix(in srgb, var(--accent) 80%, black) 100%);
+    linear-gradient(180deg, var(--amber-500) 0%, var(--amber-400) 60%, color-mix(in srgb, var(--amber-400) 80%, black) 100%);
   color: var(--text-inverse);
-  border-color: color-mix(in srgb, var(--accent) 60%, black);
+  border-color: color-mix(in srgb, var(--amber-400) 60%, black);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.15),
     inset 0 -2px 0 rgba(0, 0, 0, 0.3),
@@ -100,7 +87,7 @@
 
 .btn--primary:hover:not(:disabled):not(.btn--loading) {
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--accent-hover) 90%, white 10%) 0%, var(--accent-hover) 60%, var(--accent) 100%);
+    linear-gradient(180deg, color-mix(in srgb, var(--amber-500) 90%, white 10%) 0%, var(--amber-500) 60%, var(--amber-400) 100%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.2),
     inset 0 -2px 0 rgba(0, 0, 0, 0.25),
@@ -112,7 +99,7 @@
 
 .btn--primary:active:not(:disabled):not(.btn--loading) {
   background:
-    linear-gradient(180deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 80%, black) 100%);
+    linear-gradient(180deg, var(--amber-400) 0%, color-mix(in srgb, var(--amber-400) 80%, black) 100%);
   box-shadow:
     inset 0 2px 4px rgba(0, 0, 0, 0.4),
     inset 0 1px 0 rgba(0, 0, 0, 0.2),
@@ -124,9 +111,9 @@
 
 .btn--secondary {
   background:
-    linear-gradient(180deg, var(--surface-3) 0%, var(--surface-2) 50%, color-mix(in srgb, var(--surface-2) 90%, black) 100%);
-  color: var(--text-primary);
-  border-color: var(--surface-4);
+    linear-gradient(180deg, var(--bg-3) 0%, var(--bg-2) 50%, color-mix(in srgb, var(--bg-2) 90%, black) 100%);
+  color: var(--bone-100);
+  border-color: var(--olive-700);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
     inset 0 -1px 0 rgba(0, 0, 0, 0.4),
@@ -136,9 +123,9 @@
 
 .btn--secondary:hover:not(:disabled):not(.btn--loading) {
   background:
-    linear-gradient(180deg, var(--surface-4) 0%, var(--surface-3) 50%, var(--surface-2) 100%);
-  border-color: var(--surface-5);
-  color: var(--text-primary);
+    linear-gradient(180deg, var(--olive-700) 0%, var(--bg-3) 50%, var(--bg-2) 100%);
+  border-color: var(--olive-500);
+  color: var(--bone-100);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.07),
     inset 0 -1px 0 rgba(0, 0, 0, 0.35),
@@ -148,7 +135,7 @@
 
 .btn--secondary:active:not(:disabled):not(.btn--loading) {
   background:
-    linear-gradient(180deg, var(--surface-2) 0%, var(--surface-3) 100%);
+    linear-gradient(180deg, var(--bg-2) 0%, var(--bg-3) 100%);
   box-shadow:
     inset 0 2px 5px rgba(0, 0, 0, 0.45),
     0 1px 3px rgba(0, 0, 0, 0.4);
@@ -194,7 +181,7 @@
 
 .btn--ghost {
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--bone-300);
   border-color: transparent;
   box-shadow: none;
 }
@@ -204,17 +191,17 @@
 }
 
 .btn--ghost:hover:not(:disabled):not(.btn--loading) {
-  background: var(--surface-3);
-  color: var(--text-primary);
-  border-color: var(--surface-4);
+  background: var(--bg-3);
+  color: var(--bone-100);
+  border-color: var(--olive-700);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.04),
     0 1px 4px rgba(0, 0, 0, 0.3);
 }
 
 .btn--ghost:active:not(:disabled):not(.btn--loading) {
-  background: var(--surface-4);
-  border-color: var(--surface-5);
+  background: var(--olive-700);
+  border-color: var(--olive-500);
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
@@ -222,7 +209,7 @@
 
 .btn--outline {
   background: transparent;
-  color: var(--accent);
+  color: var(--amber-400);
   border-color: var(--accent-border);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.04),
@@ -231,7 +218,7 @@
 
 .btn--outline:hover:not(:disabled):not(.btn--loading) {
   background: var(--accent-muted);
-  border-color: var(--accent);
+  border-color: var(--amber-400);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.06),
     0 0 12px var(--accent-glow),
@@ -249,7 +236,7 @@
 
 .btn--icon {
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--bone-300);
   padding: 0;
   width: 44px;
   height: 44px;
@@ -264,14 +251,14 @@
 }
 
 .btn--icon:hover:not(:disabled):not(.btn--loading) {
-  background: var(--surface-3);
-  color: var(--text-primary);
-  border-color: var(--surface-4);
+  background: var(--bg-3);
+  color: var(--bone-100);
+  border-color: var(--olive-700);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .btn--icon:active:not(:disabled):not(.btn--loading) {
-  background: var(--surface-4);
+  background: var(--olive-700);
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
   transform: scale(0.9);
 }
@@ -312,11 +299,11 @@
   background:
     linear-gradient(
       180deg,
-      color-mix(in srgb, var(--surface-3) 85%, black) 0%,
-      color-mix(in srgb, var(--surface-2) 85%, black) 100%
+      color-mix(in srgb, var(--bg-3) 85%, black) 0%,
+      color-mix(in srgb, var(--bg-2) 85%, black) 100%
     );
-  color: color-mix(in srgb, var(--accent) 55%, var(--text-secondary));
-  border-color: color-mix(in srgb, var(--accent) 25%, black);
+  color: color-mix(in srgb, var(--amber-400) 55%, var(--bone-300));
+  border-color: color-mix(in srgb, var(--amber-400) 25%, black);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.04),
     inset 0 -1px 0 rgba(0, 0, 0, 0.5),
@@ -361,7 +348,7 @@
 .btn[aria-pressed="true"] {
   background: var(--accent-muted);
   border-color: var(--accent-border);
-  color: var(--accent-bright);
+  color: var(--amber-200);
   box-shadow:
     inset 0 2px 4px rgba(0, 0, 0, 0.4),
     inset 0 0 0 1px var(--accent-border),
@@ -377,7 +364,7 @@
 /* ---------- Focus ---------- */
 
 .btn:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--amber-400);
   outline-offset: 3px;
 }
 
@@ -473,14 +460,14 @@
   cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
-  border: var(--border-thin) solid var(--surface-4);
+  border: var(--border-thin) solid var(--olive-700);
   background:
     linear-gradient(
       170deg,
       rgba(255, 255, 255, 0.03) 0%,
       transparent 40%
     ),
-    var(--surface-2);
+    var(--bg-2);
   transition:
     background var(--duration-fast) var(--ease-military),
     border-color var(--duration-fast) var(--ease-military),
@@ -494,21 +481,11 @@
   isolation: isolate;
   /* Left-edge accent indicator */
   border-left-width: var(--border-thick);
-  border-left-color: var(--surface-5);
+  border-left-color: var(--olive-500);
 }
 
-/* Grain texture over action button */
-.action-btn::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background-image: var(--grain-url);
-  opacity: var(--dl-grain-opacity, 0.045);
-  mix-blend-mode: overlay;
-  pointer-events: none;
-  z-index: 1;
-}
+/* Action buttons intentionally skip grain (followup #08) — chamfer edges
+   stay crisp without an overlay. */
 
 /* Corner-clip bevel effect (top-right) */
 .action-btn::after {
@@ -530,8 +507,8 @@
       rgba(255, 255, 255, 0.05) 0%,
       transparent 40%
     ),
-    var(--surface-3);
-  border-color: var(--surface-5);
+    var(--bg-3);
+  border-color: var(--olive-500);
   border-left-color: var(--accent-border);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
@@ -544,18 +521,18 @@
 
 .action-btn:active:not(.action-btn--disabled):not(.action-btn--unavailable) {
   background:
-    linear-gradient(180deg, var(--surface-1) 0%, var(--surface-2) 100%);
+    linear-gradient(180deg, var(--bg-1) 0%, var(--bg-2) 100%);
   box-shadow:
     inset 0 2px 5px rgba(0, 0, 0, 0.5),
     inset 0 1px 0 rgba(0, 0, 0, 0.3),
     0 1px 3px rgba(0, 0, 0, 0.5);
   transform: translateY(1px) scale(0.97);
-  border-left-color: var(--accent);
+  border-left-color: var(--amber-400);
 }
 
 /* Available state — glowing accent left edge + active indicator dot */
 .action-btn--available {
-  border-left-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  border-left-color: color-mix(in srgb, var(--amber-400) 60%, transparent);
   /* Active status indicator — riveted LED */
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.06),
@@ -566,7 +543,7 @@
 }
 
 .action-btn--available:hover:not(.action-btn--disabled) {
-  border-left-color: var(--accent);
+  border-left-color: var(--amber-400);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
     inset 0 -2px 0 rgba(0, 0, 0, 0.35),
@@ -580,9 +557,9 @@
 .action-btn[aria-pressed="true"] {
   background:
     linear-gradient(170deg, var(--accent-muted) 0%, rgba(0, 0, 0, 0.1) 100%),
-    var(--surface-2);
+    var(--bg-2);
   border-color: var(--accent-border);
-  border-left-color: var(--accent);
+  border-left-color: var(--amber-400);
   box-shadow:
     inset 0 2px 5px rgba(0, 0, 0, 0.4),
     inset 0 0 0 1px var(--accent-muted),
@@ -618,17 +595,17 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: var(--text-secondary);
+  color: var(--bone-300);
   transition: color var(--duration-fast) var(--ease-military);
 }
 
 .action-btn:hover:not(.action-btn--disabled):not(.action-btn--unavailable) .action-btn__icon {
-  color: var(--text-primary);
+  color: var(--bone-100);
 }
 
 .action-btn--available .action-btn__icon,
 .action-btn--selected .action-btn__icon {
-  color: var(--accent);
+  color: var(--amber-400);
 }
 
 /* Label — stencilled military stamp */
@@ -640,7 +617,7 @@
   font-size: var(--text-2xs);
   letter-spacing: var(--letter-spacing-widest);
   text-transform: uppercase;
-  color: var(--text-secondary);
+  color: var(--bone-300);
   text-align: left;
   line-height: 1.1;
   white-space: nowrap;
@@ -648,12 +625,12 @@
 }
 
 .action-btn:hover:not(.action-btn--disabled):not(.action-btn--unavailable) .action-btn__label {
-  color: var(--text-primary);
+  color: var(--bone-100);
 }
 
 .action-btn--available .action-btn__label,
 .action-btn--selected .action-btn__label {
-  color: var(--text-primary);
+  color: var(--bone-100);
 }
 
 /* Spacer pushes cost/kbd to the right */
@@ -687,7 +664,7 @@
   text-transform: uppercase;
   padding: 1px 4px;
   border-radius: var(--radius-sm);
-  border: var(--border-thin) solid var(--surface-5);
+  border: var(--border-thin) solid var(--olive-500);
   background: rgba(0, 0, 0, 0.45);
   color: var(--text-muted);
   line-height: 1.6;
@@ -708,7 +685,7 @@
 .action-btn__cost--ap {
   background: var(--accent-muted);
   border-color: var(--accent-border);
-  color: var(--accent-bright);
+  color: var(--amber-200);
 }
 
 /* Zero AP remaining — you can't afford this */
@@ -727,18 +704,18 @@
       rgba(184, 112, 48, 0.06) 0%,
       transparent 50%
     ),
-    var(--surface-2);
+    var(--bg-2);
   border-color: var(--accent-border);
-  border-left-color: var(--accent);
+  border-left-color: var(--amber-400);
   min-width: 80px;
 }
 
 .action-btn--end-turn .action-btn__icon {
-  color: var(--accent);
+  color: var(--amber-400);
 }
 
 .action-btn--end-turn .action-btn__label {
-  color: var(--accent);
+  color: var(--amber-400);
 }
 
 .action-btn--end-turn:hover:not(.action-btn--disabled) {
@@ -748,8 +725,8 @@
       var(--accent-muted) 0%,
       rgba(0, 0, 0, 0.1) 100%
     ),
-    var(--surface-2);
-  border-color: var(--accent);
+    var(--bg-2);
+  border-color: var(--amber-400);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
     inset 0 -2px 0 rgba(0, 0, 0, 0.3),
@@ -838,7 +815,7 @@
 }
 
 .btn--hud-control:hover {
-  background: var(--surface-3);
+  background: var(--bg-3);
   border-color: var(--dl-hud-border);
   color: var(--hud-phosphor);
   box-shadow:
@@ -848,7 +825,7 @@
 }
 
 .btn--hud-control:active {
-  background: var(--surface-1);
+  background: var(--bg-1);
   box-shadow:
     inset 0 2px 4px rgba(0, 0, 0, 0.45),
     0 0 4px var(--dl-glow);
@@ -1127,4 +1104,48 @@
 
 .fm-btn__label {
   display: inline-block;
+}
+
+/* ---------- fm-btn--shake — submit-failure shake (one-shot) ---------- */
+/* Promoted from design/states/room-not-found.html. Compositor-friendly:
+   transform-only. Apply once on JOIN failure; remove the class on
+   animationend so a second failure can replay it. */
+.fm-btn--shake {
+  animation: btn-shake 380ms cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@keyframes btn-shake {
+  0%, 100% { transform: translateX(0); }
+  15%      { transform: translateX(-4px); }
+  30%      { transform: translateX(4px); }
+  45%      { transform: translateX(-3px); }
+  60%      { transform: translateX(3px); }
+  80%      { transform: translateX(-1px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fm-btn--shake { animation: none; }
+}
+
+/* ---------- fm-btn--reconnect — outline rust button for the
+   connection-lost scrim. Promoted from
+   design/states/connection-lost.html. ---------- */
+.fm-btn--reconnect {
+  background: transparent;
+  color: var(--rust-300);
+  border: 1px solid var(--rust-500);
+  clip-path: polygon(
+    10px 0,
+    100% 0,
+    100% calc(100% - 10px),
+    calc(100% - 10px) 100%,
+    0 100%,
+    0 10px
+  );
+}
+
+.fm-btn--reconnect:hover:not(:disabled) {
+  border-color: var(--rust-400);
+  color: var(--rust-300);
+  background: rgba(196, 90, 44, 0.1);
 }

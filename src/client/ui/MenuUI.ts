@@ -1,6 +1,16 @@
 import { renderButton } from './components/Button';
 
 /**
+ * Inline failure state surfaced on the entry card after a rejected
+ * room-id submission. `null` is the nominal/non-error state.
+ *  - `not-found` → `// ROOM NOT FOUND`
+ *  - `full`      → `// ROOM AT CAPACITY · 6/6`
+ */
+export type MenuErrorState = 'not-found' | 'full' | null;
+
+const ROOM_CAPACITY = 6;
+
+/**
  * MenuUI — Field Manual entry screen (Phase C1).
  *
  * Single bracketed dossier panel on a dark gridded field. Hazard-tape stripes
@@ -26,6 +36,17 @@ export class MenuUI {
     onJoinRoom: (roomId: string, nickname: string) => void;
     onBack: () => void;
     infoMessage?: string;
+    /**
+     * Inline failure-state for the entry card after a rejected
+     * room-id submission. When non-null, the room-id field renders
+     * with the rust .fm-input--error border, the header kicker
+     * swaps to a state-specific tag, and the JOIN button plays a
+     * one-shot shake on mount. See design/states/room-not-found.html.
+     *
+     *  - `not-found` → bad/expired code
+     *  - `full`      → server returned SERVER_FULL / ROOM_FULL
+     */
+    errorState?: MenuErrorState;
   }) {
     this.onCreateRoom = options.onCreateRoom;
     this.onJoinRoom = options.onJoinRoom;
@@ -37,14 +58,31 @@ export class MenuUI {
       document.body.appendChild(this.container);
     }
 
+    const errorState: MenuErrorState = options.errorState ?? null;
+    const isError = errorState !== null;
     const infoBlock = options.infoMessage
       ? `
-        <div class="menu-message" role="status">
+        <div class="menu-message" role="${isError ? 'alert' : 'status'}">
           <span class="menu-message__marker" aria-hidden="true">!</span>
           <span class="menu-message__text">${escapeHtml(options.infoMessage)}</span>
         </div>
       `
       : '';
+
+    // Kicker swaps based on which inline failure state was raised.
+    // Default kicker remains `SURVIVOR OPS // ENTRY`.
+    const headerKicker =
+      errorState === 'not-found'
+        ? '// ROOM NOT FOUND'
+        : errorState === 'full'
+          ? `// ROOM AT CAPACITY · ${ROOM_CAPACITY}/${ROOM_CAPACITY}`
+          : 'SURVIVOR OPS // ENTRY';
+
+    // Rust error border on the room-id input + one-shot shake on the
+    // JOIN button. Both are scoped to the failed-submission case.
+    const roomInputErrorClass = isError ? ' fm-input--error' : '';
+    const roomInputAriaInvalid = isError ? 'aria-invalid="true"' : '';
+    const joinShakeClass = isError ? ' fm-btn--shake' : '';
 
     const backButton = options.infoMessage
       ? renderButton({
@@ -74,7 +112,7 @@ export class MenuUI {
           <div class="fm-hazard-tape menu-card__stripe menu-card__stripe--top" aria-hidden="true"></div>
 
           <header class="menu-header">
-            <div class="menu-header__kicker fm-kicker">SURVIVOR OPS // ENTRY</div>
+            <div class="menu-header__kicker fm-kicker">${headerKicker}</div>
 
             <div class="menu-wordmark fm-brackets fm-brackets--amber fm-brackets--lg">
               <span class="fm-bracket-tr" aria-hidden="true"></span>
@@ -103,7 +141,7 @@ export class MenuUI {
             </div>
           </div>
 
-          <div class="fm-hazard-tape menu-card__stripe menu-card__stripe--bottom" aria-hidden="true"></div>
+          <div class="menu-card__divider" aria-hidden="true"></div>
         </section>
 
         <div class="menu-action menu-action--standalone">
@@ -130,25 +168,25 @@ export class MenuUI {
           <span class="fm-panel-dot fm-panel-dot--tl" aria-hidden="true"></span>
           <span class="fm-panel-dot fm-panel-dot--br" aria-hidden="true"></span>
 
-          <div class="fm-hazard-tape menu-card__stripe menu-card__stripe--top" aria-hidden="true"></div>
-
           <div class="menu-form">
             <div class="menu-field-group">
               <label class="fm-input__label fm-kicker" for="menu-room-id">ROOM ID</label>
               <div class="menu-join-row">
                 <input
                   id="menu-room-id"
-                  class="fm-input menu-input"
+                  class="fm-input menu-input${roomInputErrorClass}"
                   type="text"
                   value="${escapeHtml(options.roomIdPrefill || '')}"
                   placeholder="XXXX-XXXX"
                   autocomplete="off"
                   spellcheck="false"
+                  ${roomInputAriaInvalid}
                 />
                 ${renderButton({
                   label: 'Join',
                   variant: 'secondary',
                   dataAction: 'join-room',
+                  className: joinShakeClass.trim(),
                 })}
               </div>
             </div>
@@ -156,7 +194,7 @@ export class MenuUI {
             ${backButton}
           </div>
 
-          <div class="fm-hazard-tape menu-card__stripe menu-card__stripe--bottom" aria-hidden="true"></div>
+          <div class="menu-card__divider" aria-hidden="true"></div>
         </section>
       </div>
     `;
@@ -194,6 +232,21 @@ export class MenuUI {
     roomInput?.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') submitJoin();
     });
+
+    // One-shot shake on the JOIN button. Strip the class on
+    // animationend so a *second* failure (re-mount with an errorState)
+    // re-applies it cleanly. Without this strip the browser would
+    // skip the animation on identical class membership.
+    if (isError) {
+      const joinBtn = this.container.querySelector('[data-action="join-room"]') as HTMLElement | null;
+      if (joinBtn) {
+        const stripShake = (): void => {
+          joinBtn.classList.remove('fm-btn--shake');
+          joinBtn.removeEventListener('animationend', stripShake);
+        };
+        joinBtn.addEventListener('animationend', stripShake);
+      }
+    }
   }
 
   public destroy(): void {

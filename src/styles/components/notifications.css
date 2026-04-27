@@ -39,9 +39,9 @@
   align-items: flex-start;
   gap: var(--space-3);
   padding: var(--space-3) calc(var(--space-4) + var(--card-corner-clip, 6px)) var(--space-3) var(--space-4);
-  background: var(--dl-surface-1, var(--surface-1));
+  background: var(--dl-surface-1, var(--bg-1));
   border-radius: var(--radius-sm);
-  border: var(--border-thin) solid var(--dl-border, var(--surface-4));
+  border: var(--border-thin) solid var(--dl-border, var(--olive-700));
   border-left: var(--border-heavy) solid var(--dl-hud-tint, var(--hud-phosphor));
   box-shadow:
     var(--shadow-md),
@@ -114,19 +114,19 @@
 }
 
 /* Variant border accents */
-.toast--info    { border-left-color: var(--accent); }
+.toast--info    { border-left-color: var(--amber-400); }
 .toast--success { border-left-color: var(--success); }
 .toast--warning { border-left-color: var(--warning); }
 .toast--danger  { border-left-color: var(--danger-bright); }
 
 /* Variant backgrounds — low-chroma tints */
-.toast--info    { background: color-mix(in srgb, var(--dl-surface-1, var(--surface-1)) 94%, var(--accent) 6%); }
-.toast--success { background: color-mix(in srgb, var(--dl-surface-1, var(--surface-1)) 93%, var(--success) 7%); }
-.toast--warning { background: color-mix(in srgb, var(--dl-surface-1, var(--surface-1)) 93%, var(--warning) 7%); }
-.toast--danger  { background: color-mix(in srgb, var(--dl-surface-1, var(--surface-1)) 91%, var(--danger) 9%); }
+.toast--info    { background: color-mix(in srgb, var(--dl-surface-1, var(--bg-1)) 94%, var(--amber-400) 6%); }
+.toast--success { background: color-mix(in srgb, var(--dl-surface-1, var(--bg-1)) 93%, var(--success) 7%); }
+.toast--warning { background: color-mix(in srgb, var(--dl-surface-1, var(--bg-1)) 93%, var(--warning) 7%); }
+.toast--danger  { background: color-mix(in srgb, var(--dl-surface-1, var(--bg-1)) 91%, var(--danger) 9%); }
 
 /* Icon color matches variant */
-.toast--info    .toast__icon { color: var(--accent); }
+.toast--info    .toast__icon { color: var(--amber-400); }
 .toast--success .toast__icon { color: var(--success-bright); }
 .toast--warning .toast__icon { color: var(--warning); }
 .toast--danger  .toast__icon { color: var(--danger-bright); }
@@ -160,7 +160,7 @@
 .toast__message {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
-  color: var(--text-secondary);
+  color: var(--bone-300);
   line-height: 1.4;
   letter-spacing: 0.02em;
 }
@@ -176,7 +176,7 @@
 }
 
 .toast__dismiss:hover {
-  color: var(--dl-text-readout, var(--text-primary));
+  color: var(--dl-text-readout, var(--bone-100));
 }
 
 /* Progress bar */
@@ -186,18 +186,18 @@
   left: 0;
   right: 0;
   height: 2px;
-  background: var(--surface-0);
+  background: var(--bg-0);
 }
 
 .toast__progress-bar {
   height: 100%;
-  background: var(--accent);
+  background: var(--amber-400);
   animation: toast-countdown linear forwards;
   transform-origin: left;
   box-shadow: 0 0 6px currentColor;
 }
 
-.toast--info    .toast__progress-bar { background: var(--accent); }
+.toast--info    .toast__progress-bar { background: var(--amber-400); }
 .toast--success .toast__progress-bar { background: var(--success-bright); }
 .toast--warning .toast__progress-bar { background: var(--warning); }
 .toast--danger  .toast__progress-bar { background: var(--danger-bright); }
@@ -218,7 +218,7 @@
     box-shadow: 0 0 0 1px rgba(184, 48, 40, 0.3), var(--shadow-md);
   }
   100% {
-    background-color: color-mix(in srgb, var(--dl-surface-1, var(--surface-1)) 91%, var(--danger) 9%);
+    background-color: color-mix(in srgb, var(--dl-surface-1, var(--bg-1)) 91%, var(--danger) 9%);
     box-shadow: var(--shadow-md);
   }
 }
@@ -234,9 +234,9 @@
   align-items: flex-start;
   gap: var(--space-3);
   padding: var(--space-4);
-  background: var(--dl-surface-1, var(--surface-1));
+  background: var(--dl-surface-1, var(--bg-1));
   border-radius: var(--radius-sm);
-  border: var(--border-thin) solid var(--dl-border, var(--surface-4));
+  border: var(--border-thin) solid var(--dl-border, var(--olive-700));
   border-top: var(--border-thick) solid var(--dl-hud-tint, var(--hud-phosphor));
   box-shadow:
     var(--shadow-lg),
@@ -312,23 +312,23 @@
 }
 
 /* Variant top borders */
-.alert-banner--info    { border-top-color: var(--accent); }
+.alert-banner--info    { border-top-color: var(--amber-400); }
 .alert-banner--success { border-top-color: var(--success-bright); }
 .alert-banner--warning { border-top-color: var(--warning); }
 .alert-banner--danger  { border-top-color: var(--danger-bright); }
 
 /* Variant backgrounds */
 .alert-banner--info {
-  background: color-mix(in srgb, var(--dl-surface-1, var(--surface-1)) 94%, var(--accent) 6%);
+  background: color-mix(in srgb, var(--dl-surface-1, var(--bg-1)) 94%, var(--amber-400) 6%);
 }
 .alert-banner--success {
-  background: color-mix(in srgb, var(--dl-surface-1, var(--surface-1)) 93%, var(--success) 7%);
+  background: color-mix(in srgb, var(--dl-surface-1, var(--bg-1)) 93%, var(--success) 7%);
 }
 .alert-banner--warning {
-  background: color-mix(in srgb, var(--dl-surface-1, var(--surface-1)) 93%, var(--warning) 7%);
+  background: color-mix(in srgb, var(--dl-surface-1, var(--bg-1)) 93%, var(--warning) 7%);
 }
 .alert-banner--danger {
-  background: color-mix(in srgb, var(--dl-surface-1, var(--surface-1)) 90%, var(--danger) 10%);
+  background: color-mix(in srgb, var(--dl-surface-1, var(--bg-1)) 90%, var(--danger) 10%);
   box-shadow:
     var(--shadow-lg),
     inset 0 1px 0 rgba(255, 255, 255, 0.03),
@@ -337,7 +337,7 @@
 }
 
 /* Icon colors */
-.alert-banner--info    .alert-banner__icon { color: var(--accent); }
+.alert-banner--info    .alert-banner__icon { color: var(--amber-400); }
 .alert-banner--success .alert-banner__icon { color: var(--success-bright); }
 .alert-banner--warning .alert-banner__icon { color: var(--warning); }
 .alert-banner--danger  .alert-banner__icon { color: var(--danger-bright); }
@@ -376,7 +376,7 @@
 .alert-banner__message {
   font-family: var(--font-mono);
   font-size: var(--text-sm);
-  color: var(--text-secondary);
+  color: var(--bone-300);
   line-height: 1.45;
   letter-spacing: 0.02em;
 }
@@ -392,7 +392,7 @@
 }
 
 .alert-banner__dismiss:hover {
-  color: var(--dl-text-readout, var(--text-primary));
+  color: var(--dl-text-readout, var(--bone-100));
 }
 
 /* ---------- Danger-level reactive glow intensity ---------- */

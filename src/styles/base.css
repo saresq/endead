@@ -27,8 +27,8 @@ html {
 body {
   font-family: var(--font-sans);
   font-weight: var(--font-normal);
-  color: var(--text-primary);
-  background-color: var(--dl-bg, var(--surface-0));
+  color: var(--bone-100);
+  background-color: var(--dl-bg, var(--bg-0));
   min-height: 100%;
   /* Industrial grid — reinforcement mesh barely visible in concrete */
   background-image:
@@ -143,12 +143,12 @@ body::after {
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--surface-0);
-  border-left: 1px solid var(--surface-4);
+  background: var(--bg-0);
+  border-left: 1px solid var(--olive-700);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--surface-5);
+  background: var(--olive-500);
   border-radius: var(--radius-none);
   border-left: 1px solid rgba(255, 255, 255, 0.04);
 }
@@ -158,20 +158,20 @@ body::after {
 }
 
 ::-webkit-scrollbar-corner {
-  background: var(--surface-0);
+  background: var(--bg-0);
 }
 
 /* ---------- Text selection ---------- */
 
 ::selection {
-  background: var(--accent);
+  background: var(--amber-400);
   color: var(--text-inverse);
 }
 
 /* ---------- Focus ring — accessible, tactical ---------- */
 
 :focus-visible {
-  outline: var(--border-thick) solid var(--accent);
+  outline: var(--border-thick) solid var(--amber-400);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
 }
@@ -193,12 +193,12 @@ kbd {
 kbd {
   display: inline-block;
   padding: 1px 5px;
-  background: var(--surface-2);
-  border: 1px solid var(--surface-5);
+  background: var(--bg-2);
+  border: 1px solid var(--olive-500);
   border-bottom-width: 2px;
   border-radius: var(--radius-sm);
   font-size: var(--text-2xs);
-  color: var(--text-secondary);
+  color: var(--bone-300);
   letter-spacing: var(--letter-spacing-wide);
   text-transform: uppercase;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
@@ -213,9 +213,9 @@ hr {
   background: linear-gradient(
     90deg,
     transparent,
-    var(--surface-4) 15%,
-    var(--surface-5) 50%,
-    var(--surface-4) 85%,
+    var(--olive-700) 15%,
+    var(--olive-500) 50%,
+    var(--olive-700) 85%,
     transparent
   );
   margin: var(--space-4) 0;
@@ -244,7 +244,7 @@ h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display);
   font-weight: var(--font-bold);
   letter-spacing: var(--letter-spacing-wide);
-  color: var(--text-primary);
+  color: var(--bone-100);
   line-height: 1.1;
   text-transform: uppercase;
   margin: 0;

@@ -222,6 +222,13 @@ export interface LobbyState {
     ready: boolean;
     characterClass: string; // Selected character
   }[];
+  /**
+   * Set when the host (lobby.players[0]) drops in lobby phase and at
+   * least one survivor remains. Epoch ms; client uses the value as a
+   * change-detection signal to fire the host-promoted banner.
+   * Optional so existing serialized states/tests don't break.
+   */
+  hostLeftAt?: number;
 }
 
 export interface TradeSession {

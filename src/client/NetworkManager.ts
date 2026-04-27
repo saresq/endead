@@ -29,7 +29,13 @@ export class NetworkManager {
   public onConnected?: () => void;
   public onDisconnected?: () => void;
   public onServerError?: (error: { code: string; message: string }) => void;
-  public onReconnecting?: (attempt: number, maxAttempts: number) => void;
+  /**
+   * Fired just BEFORE each reconnect attempt is scheduled. The
+   * optional third arg is the upcoming setTimeout delay in ms — used
+   * by the connection-lost scrim to render a "next retry in Xs"
+   * countdown. Existing 2-arg consumers continue to work.
+   */
+  public onReconnecting?: (attempt: number, maxAttempts: number, nextRetryDelayMs?: number) => void;
 
   public connect(): void {
     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) return;
@@ -126,9 +132,17 @@ export class NetworkManager {
     const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000)
       + Math.random() * 1000;
 
+    // Fire the callback with the UPCOMING attempt number and delay
+    // BEFORE the setTimeout so the UI can start a countdown to the
+    // retry. The first call (when reconnectAttempts=0) is the right
+    // moment for the scrim to capture disconnectedAt.
+    const nextAttempt = this.reconnectAttempts + 1;
+    if (this.onReconnecting) {
+      this.onReconnecting(nextAttempt, this.maxReconnectAttempts, delay);
+    }
+
     this.reconnectTimer = setTimeout(() => {
       this.reconnectAttempts++;
-      if (this.onReconnecting) this.onReconnecting(this.reconnectAttempts, this.maxReconnectAttempts);
       this.connect();
     }, delay);
   }

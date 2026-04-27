@@ -1,0 +1,151 @@
+- generic [ref=e1]:
+  - text: —
+  - dialog "OPERATIVE · WANDA" [ref=e242]:
+    - generic [ref=e243]:
+      - generic [ref=e244]:
+        - heading "// OPERATIVE · WANDA" [level=2] [ref=e245]
+        - generic [ref=e246]: POINT · SCOUT
+      - button "Close" [active] [ref=e247] [cursor=pointer]:
+        - img [ref=e248]
+    - generic [ref=e251]:
+      - generic [ref=e252]:
+        - generic [ref=e253]: DOSSIER
+        - generic [ref=e254]:
+          - generic [ref=e255]: WANDA
+          - generic [ref=e256]: POINT · SCOUT
+      - generic [ref=e259]:
+        - img [ref=e262]
+        - generic [ref=e271]:
+          - generic [ref=e272]: R. HAND · EQUIPPED
+          - generic [ref=e273]: KATANA
+          - generic [ref=e274]: 4+ · 1d6 · 2
+      - generic [ref=e276]:
+        - generic [ref=e277]: PROGRESSION TRACK
+        - generic [ref=e278]:
+          - generic [ref=e279]:
+            - generic [ref=e281]:
+              - generic [ref=e282]: BLUE
+              - generic [ref=e283]: 0 XP
+            - generic "The Survivor may move 1 or 2 Zones with a single Move Action. Entering a Zone with Zombies still ends the Move." [ref=e285]: +1 Zone per Move
+          - generic [ref=e286]:
+            - generic [ref=e288]:
+              - generic [ref=e289]: YELLOW
+              - generic [ref=e290]: 7 XP
+            - generic "The Survivor has one extra Action per Turn." [ref=e292]: +1 Action
+          - generic [ref=e293]:
+            - generic [ref=e295]:
+              - generic [ref=e296]: ORANGE
+              - generic [ref=e297]: 19 XP
+            - generic [ref=e298]:
+              - generic "The Survivor does not spend extra Actions to move out of a Zone with Zombies." [ref=e299]: Slippery
+              - generic "The Survivor has one free Combat Action (Melee or Ranged) per turn." [ref=e300]: +1 Free Combat Action
+            - generic [ref=e301]: PICK 1 OF 2
+          - generic [ref=e302]:
+            - generic [ref=e304]:
+              - generic [ref=e305]: RED
+              - generic [ref=e306]: 43 XP
+            - generic [ref=e307]:
+              - generic "The Survivor gets a +1 Damage bonus with Melee Weapons." [ref=e308]: "+1 Damage: Melee"
+              - generic "The Survivor gets a +1 Damage bonus with Ranged Weapons." [ref=e309]: "+1 Damage: Ranged"
+              - generic "The Survivor can move up to 3 Zones for 1 Action." [ref=e310]: Sprint
+            - generic [ref=e311]: PICK 1 OF 3
+  - generic:
+    - generic [ref=e313]:
+      - generic [ref=e314]:
+        - button "Turn 1 — click to view history" [ref=e315] [cursor=pointer]:
+          - generic [ref=e316]: TURN
+          - generic [ref=e317]: "01"
+        - 'status "Current phase: PLAYER · HUNTER" [ref=e318]':
+          - generic [ref=e319]: "["
+          - generic [ref=e320]: PLAYER · HUNTER
+          - generic [ref=e321]: "]"
+      - generic [ref=e326]:
+        - generic [ref=e327]: CH YFJTVM
+        - button "Menu" [ref=e328] [cursor=pointer]:
+          - img [ref=e329]
+    - complementary [ref=e330]:
+      - generic [ref=e331]: SQUAD · 1
+      - button "Hunter P-01 Active operative" [pressed] [ref=e333] [cursor=pointer]:
+        - generic [ref=e336]:
+          - generic [ref=e337]: Hunter
+          - generic [ref=e338]: P-01
+          - generic "Active operative" [ref=e339]:
+            - img [ref=e340]
+            - text: ACTIVE
+    - complementary [ref=e342]:
+      - generic [ref=e343]:
+        - generic [ref=e344]:
+          - generic [ref=e345]:
+            - generic [ref=e349]:
+              - generic [ref=e351]: Hunter
+              - generic "The Survivor may move 1 or 2 Zones with a single Move Action. Entering a Zone with Zombies still ends the Move." [ref=e354]:
+                - img [ref=e355]
+                - generic [ref=e358]: +1 Zone per Move
+            - generic [ref=e359]: POINT · P-01
+          - generic [ref=e360]:
+            - generic [ref=e361]:
+              - generic [ref=e362]:
+                - img [ref=e364]
+                - generic [ref=e366]: VITALS
+              - generic [ref=e367]:
+                - generic [ref=e368]: "3"
+                - generic [ref=e369]: /
+                - generic [ref=e370]: "3"
+            - generic [ref=e375]:
+              - generic [ref=e376]:
+                - img [ref=e378]
+                - generic [ref=e380]: ACTIONS
+              - generic [ref=e381]:
+                - generic [ref=e382]: "3"
+                - generic [ref=e383]: /
+                - generic [ref=e384]: "3"
+            - generic [ref=e389]:
+              - generic [ref=e390]:
+                - generic [ref=e391]: XP
+                - generic [ref=e392]: 0 → 7
+              - progressbar "Experience" [ref=e393]
+        - generic [ref=e394]:
+          - generic [ref=e395]: LOADOUT
+          - generic [ref=e396]:
+            - generic "R.HAND" [ref=e397]:
+              - button "Katana 4+ · 1d6 · 2 dmg" [ref=e398] [cursor=pointer]:
+                - generic [ref=e399]:
+                  - img [ref=e401]
+                  - generic [ref=e410]:
+                    - generic [ref=e411]: Katana
+                    - generic [ref=e412]: 4+ · 1d6 · 2 dmg
+            - generic "L.HAND empty" [ref=e413]:
+              - generic [ref=e414]: — EMPTY —
+            - button "Open backpack (0 items)" [ref=e416] [cursor=pointer]:
+              - img [ref=e418]
+              - generic [ref=e422]: BAG
+        - generic [ref=e423]:
+          - generic [ref=e424]: FIELD LOG
+          - generic [ref=e426]: // AWAITING CONTACT
+    - generic [ref=e428]:
+      - 'button "Search (1 AP) — key: S" [ref=e429] [cursor=pointer]':
+        - img [ref=e431]
+        - generic [ref=e434]: Search
+        - generic [ref=e435]: S
+      - 'button "Noise (1 AP) — key: N" [ref=e436] [cursor=pointer]':
+        - img [ref=e438]
+        - generic [ref=e442]: Noise
+        - generic [ref=e443]: "N"
+      - 'button "Door (1 AP) — key: D" [disabled]':
+        - generic:
+          - img
+        - generic: Door
+        - generic: D
+      - 'button "Objective (1 AP) — key: O" [disabled]':
+        - generic:
+          - img
+        - generic: Objective
+        - generic: O
+      - 'button "Trade (1 AP) — key: T" [ref=e444] [cursor=pointer]':
+        - img [ref=e446]
+        - generic [ref=e451]: Trade
+        - generic [ref=e452]: T
+      - 'button "End Turn — key: E" [ref=e453] [cursor=pointer]':
+        - img [ref=e455]
+        - generic [ref=e457]: End Turn
+        - generic [ref=e458]: E

@@ -120,6 +120,7 @@ export class GameHUD {
   private elRailRight: HTMLElement | null = null;
   private elFeed: HTMLDivElement | null = null;
   private elFab: HTMLDivElement | null = null;
+  private elActions: HTMLDivElement | null = null;
   private shellBuilt = false;
 
   constructor(inputController: InputController, playerId: PlayerId) {
@@ -424,11 +425,15 @@ export class GameHUD {
     this.elFab = document.createElement('div');
     this.elFab.className = 'hud-fab-slot';
 
+    this.elActions = document.createElement('div');
+    this.elActions.className = 'hud-actions';
+
     this.container.append(
       this.elTopBar,
       this.elRailLeft,
       center,
       this.elRailRight,
+      this.elActions,
       this.elFab,
     );
     this.shellBuilt = true;
@@ -456,9 +461,13 @@ export class GameHUD {
 
     this.elTopBar!.innerHTML = this.renderTopBar(isMyTurn);
     this.elRailLeft!.innerHTML = this.renderSquadRail();
-    this.elRailRight!.innerHTML = activeSurvivor && activeSurvivor.playerId === this.localPlayerId
+    const showActiveOp = activeSurvivor && activeSurvivor.playerId === this.localPlayerId;
+    this.elRailRight!.innerHTML = showActiveOp
       ? this.renderRightPanel(activeSurvivor, isMyTurn)
       : '<span class="fm-bracket-tr"></span><span class="fm-bracket-bl"></span>';
+    this.elActions!.innerHTML = showActiveOp
+      ? this.renderActionRow(activeSurvivor, isMyTurn)
+      : '';
 
     this.elFeed!.innerHTML = this.renderFeed();
     this.elFab!.innerHTML = '';
@@ -696,19 +705,17 @@ export class GameHUD {
       </div>`;
 
     return `
-      <div class="hud-actions">
-        <div class="hud-actions__grid">
-          ${renderActionButton({ id: 'btn-search', icon: 'Search', label: 'Search', kbd: 'S', cost: survivor.freeSearchesRemaining > 0 ? 'FREE' : '1 AP', disabled: !isMyTurn || survivor.hasSearched || (noAP && survivor.freeSearchesRemaining <= 0) })}
-          ${renderActionButton({ id: 'btn-noise', icon: 'Volume2', label: 'Noise', kbd: 'N', cost: '1 AP', disabled: !isMyTurn || noAP })}
-          ${renderActionButton({ id: 'btn-door', icon: 'DoorOpen', label: 'Door', kbd: 'D', cost: '1 AP', disabled: !isMyTurn || noAP || !canOpenDoor })}
-          ${objectiveBtn('')}
-          ${tradeBtn('')}
-          ${renderActionButton({ id: 'btn-end-turn', icon: 'SkipForward', label: 'End Turn', kbd: 'E', disabled: !isMyTurn })}
-        </div>
-        ${moreButton}
-        ${skillActions}
-        ${tray}
-      </div>`;
+      <div class="hud-actions__grid">
+        ${renderActionButton({ id: 'btn-search', icon: 'Search', label: 'Search', kbd: 'S', cost: survivor.freeSearchesRemaining > 0 ? 'FREE' : '1 AP', disabled: !isMyTurn || survivor.hasSearched || (noAP && survivor.freeSearchesRemaining <= 0) })}
+        ${renderActionButton({ id: 'btn-noise', icon: 'Volume2', label: 'Noise', kbd: 'N', cost: '1 AP', disabled: !isMyTurn || noAP })}
+        ${renderActionButton({ id: 'btn-door', icon: 'DoorOpen', label: 'Door', kbd: 'D', cost: '1 AP', disabled: !isMyTurn || noAP || !canOpenDoor })}
+        ${objectiveBtn('')}
+        ${tradeBtn('')}
+        ${renderActionButton({ id: 'btn-end-turn', icon: 'SkipForward', label: 'End Turn', kbd: 'E', disabled: !isMyTurn })}
+      </div>
+      ${moreButton}
+      ${skillActions}
+      ${tray}`;
   }
 
   // ─── Right panel — active op readout + loadout + field log ──
@@ -722,8 +729,7 @@ export class GameHUD {
     const noAP = survivor.actionsRemaining < 1;
     const weaponBoosts = this.getWeaponBoosts(survivor);
 
-    // Active Op card — photo slot + name + rank chip + callsign
-    const rankLabel = this.rankLabel(survivor.dangerLevel);
+    // Active Op card — photo slot + name + callsign (rank conveyed via avatar stripe)
     const avatarUrl = (identity as { avatarUrl?: string } | undefined)?.avatarUrl
       ?? (survivor.characterClass ? `/images/characters/${survivor.characterClass.toLowerCase()}.webp` : undefined);
     const photo = renderPhotoSlot({ size: 'sm', imageUrl: avatarUrl });
@@ -745,7 +751,6 @@ export class GameHUD {
             <div class="hud-op__ident">
               <div class="hud-op__nameline">
                 <span class="hud-op__name">${escapeHtml(survivor.name)}</span>
-                <span class="hud-op__rankchip hud-op__rankchip--${dangerToRank(survivor.dangerLevel)}">${rankLabel}</span>
               </div>
               ${tagRow}
             </div>
@@ -817,22 +822,14 @@ export class GameHUD {
 
     const fieldLog = this.renderFieldLog();
 
-    const actionRow = this.renderActionRow(survivor, isMyTurn);
-
     return `
       <span class="fm-bracket-tr"></span><span class="fm-bracket-bl"></span>
       <div class="hud-rail__body">
         ${opCard}
-        ${actionRow}
         ${loadout}
         ${woundAlert}
         ${fieldLog}
       </div>`;
-  }
-
-  private rankLabel(dangerLevel: string): string {
-    const rank = dangerToRank(dangerLevel);
-    return ({ blue: 'ROOKIE', yellow: 'VETERAN', orange: 'ELITE', red: 'HERO' } as const)[rank];
   }
 
   // ─── Field Log — condensed turn history for right panel ─────
