@@ -62,87 +62,103 @@ export class MenuUI {
         <div class="menu-field__vignette"></div>
       </div>
 
-      <section
-        class="menu-card fm-panel"
-        role="dialog"
-        aria-labelledby="menu-wordmark"
-      >
-        <span class="fm-panel-dot fm-panel-dot--tl" aria-hidden="true"></span>
-        <span class="fm-panel-dot fm-panel-dot--br" aria-hidden="true"></span>
+      <div class="menu-stack">
+        <section
+          class="menu-card menu-card--id fm-panel"
+          role="dialog"
+          aria-labelledby="menu-wordmark"
+        >
+          <span class="fm-panel-dot fm-panel-dot--tl" aria-hidden="true"></span>
+          <span class="fm-panel-dot fm-panel-dot--br" aria-hidden="true"></span>
 
-        <div class="fm-hazard-tape menu-card__stripe menu-card__stripe--top" aria-hidden="true"></div>
+          <div class="fm-hazard-tape menu-card__stripe menu-card__stripe--top" aria-hidden="true"></div>
 
-        <header class="menu-header">
-          <div class="menu-header__kicker fm-kicker">SURVIVOR OPS // ENTRY</div>
+          <header class="menu-header">
+            <div class="menu-header__kicker fm-kicker">SURVIVOR OPS // ENTRY</div>
 
-          <div class="menu-wordmark fm-brackets fm-brackets--amber fm-brackets--lg">
-            <span class="fm-bracket-tr" aria-hidden="true"></span>
-            <span class="fm-bracket-bl" aria-hidden="true"></span>
-            <h1 id="menu-wordmark" class="menu-wordmark__text fm-stencil">Endead</h1>
-          </div>
+            <div class="menu-wordmark fm-brackets fm-brackets--amber fm-brackets--lg">
+              <span class="fm-bracket-tr" aria-hidden="true"></span>
+              <span class="fm-bracket-bl" aria-hidden="true"></span>
+              <h1 id="menu-wordmark" class="menu-wordmark__text fm-stencil">Endead</h1>
+            </div>
 
-          <div class="menu-header__subline fm-mono">// FIELD MANUAL &middot; TACTICAL SURVIVAL</div>
-        </header>
+            <div class="menu-header__subline fm-mono">// FIELD MANUAL &middot; TACTICAL SURVIVAL</div>
+          </header>
 
-        ${infoBlock}
+          ${infoBlock}
 
-        <div class="menu-form">
-          <div class="menu-field-group">
-            <label class="fm-input__label fm-kicker" for="menu-nickname">CALL SIGN</label>
-            <input
-              id="menu-nickname"
-              class="fm-input menu-input"
-              type="text"
-              maxlength="24"
-              value="${escapeHtml(options.nickname)}"
-              placeholder="designate operator"
-              autocomplete="off"
-              spellcheck="false"
-            />
-          </div>
-
-          <div class="menu-action">
-            ${renderButton({
-              label: 'Create Room',
-              icon: 'Play',
-              variant: 'primary',
-              size: 'lg',
-              fullWidth: true,
-              dataAction: 'create-room',
-            })}
-          </div>
-
-          <div class="menu-divider" role="separator" aria-label="or join by room id">
-            <span class="menu-divider__line" aria-hidden="true"></span>
-            <span class="menu-divider__label fm-kicker">// OR JOIN BY ROOM ID</span>
-            <span class="menu-divider__line" aria-hidden="true"></span>
-          </div>
-
-          <div class="menu-field-group">
-            <label class="fm-input__label fm-kicker" for="menu-room-id">ROOM ID</label>
-            <div class="menu-join-row">
+          <div class="menu-form">
+            <div class="menu-field-group">
+              <label class="fm-input__label fm-kicker" for="menu-nickname">CALL SIGN</label>
               <input
-                id="menu-room-id"
+                id="menu-nickname"
                 class="fm-input menu-input"
                 type="text"
-                value="${escapeHtml(options.roomIdPrefill || '')}"
-                placeholder="XXXX-XXXX"
+                maxlength="24"
+                value="${escapeHtml(options.nickname)}"
+                placeholder="designate operator"
                 autocomplete="off"
                 spellcheck="false"
               />
-              ${renderButton({
-                label: 'Join',
-                variant: 'secondary',
-                dataAction: 'join-room',
-              })}
             </div>
           </div>
 
-          ${backButton}
+          <div class="fm-hazard-tape menu-card__stripe menu-card__stripe--bottom" aria-hidden="true"></div>
+        </section>
+
+        <div class="menu-action menu-action--standalone">
+          ${renderButton({
+            label: 'Create Room',
+            icon: 'Play',
+            variant: 'primary',
+            size: 'lg',
+            fullWidth: true,
+            dataAction: 'create-room',
+          })}
         </div>
 
-        <div class="fm-hazard-tape menu-card__stripe menu-card__stripe--bottom" aria-hidden="true"></div>
-      </section>
+        <div class="menu-divider menu-divider--standalone" role="separator" aria-label="or join by room id">
+          <span class="menu-divider__line" aria-hidden="true"></span>
+          <span class="menu-divider__label fm-kicker">// OR JOIN BY ROOM ID</span>
+          <span class="menu-divider__line" aria-hidden="true"></span>
+        </div>
+
+        <section
+          class="menu-card menu-card--join fm-panel"
+          aria-label="Join existing room"
+        >
+          <span class="fm-panel-dot fm-panel-dot--tl" aria-hidden="true"></span>
+          <span class="fm-panel-dot fm-panel-dot--br" aria-hidden="true"></span>
+
+          <div class="fm-hazard-tape menu-card__stripe menu-card__stripe--top" aria-hidden="true"></div>
+
+          <div class="menu-form">
+            <div class="menu-field-group">
+              <label class="fm-input__label fm-kicker" for="menu-room-id">ROOM ID</label>
+              <div class="menu-join-row">
+                <input
+                  id="menu-room-id"
+                  class="fm-input menu-input"
+                  type="text"
+                  value="${escapeHtml(options.roomIdPrefill || '')}"
+                  placeholder="XXXX-XXXX"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+                ${renderButton({
+                  label: 'Join',
+                  variant: 'secondary',
+                  dataAction: 'join-room',
+                })}
+              </div>
+            </div>
+
+            ${backButton}
+          </div>
+
+          <div class="fm-hazard-tape menu-card__stripe menu-card__stripe--bottom" aria-hidden="true"></div>
+        </section>
+      </div>
     `;
 
     const nicknameInput = this.container.querySelector('#menu-nickname') as HTMLInputElement;

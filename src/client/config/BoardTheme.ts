@@ -133,4 +133,44 @@ export const BOARD_THEME = {
     lineAlpha: 0.5,
     lineWidth: 2,
   },
+
+  // ─── Empty-state placeholder (HUD-D1) ────────────
+  // Stylized blueprint shown when no real map is loaded.
+  placeholder: {
+    backdrop: 0x0c0b09,         // matches --surface-0
+    backdropAlpha: 0.55,
+    tileFill: 0x1a1812,         // greyed tile fill
+    tileFillAlpha: 0.85,
+    tileBuilding: 0x231f17,     // slightly warmer for "building"
+    tileStroke: 0x3a342a,       // subtle warm outline
+    tileStrokeAlpha: 0.9,
+    tileStrokeWidth: 1,
+    gridLine: 0xd4a84b,         // amber gridlines
+    gridLineAlpha: 0.08,
+    gridStep: 24,
+    operativeBlue: 0x4a82c8,    // BLUE rank (matches PlayerIdentities[1])
+    operativeYellow: 0xc8a830,  // YELLOW rank (matches PlayerIdentities[3])
+    operativeStroke: 0x0c0b09,
+    operativeStrokeWidth: 2,
+    hostile: 0xb84a3c,          // matches --danger
+    hostileStrokeWidth: 1,
+    label: 0xd4a84b,            // amber mono label
+    labelAlpha: 0.85,
+    compass: 0xd4a84b,
+    compassAlpha: 0.45,
+  },
+} as const;
+
+/**
+ * Kicker tiers — typographic hierarchy for section labels (SYS-02).
+ *
+ * Reference for HTML/CSS surfaces. The actual styling lives in
+ * `src/styles/utilities.css` under `.fm-kicker` (primary) and
+ * `.fm-kicker--secondary`. Use primary sparingly: at most 1–2
+ * screen-level section headers per screen. Use secondary for
+ * sub-panel labels (rosters, dossier sections, loadout, field log).
+ */
+export const KICKER = {
+  primary:   { fontSize: 10, tracking: 0.24, prefix: '// ', dot: true,  rule: true  },
+  secondary: { fontSize: 9,  tracking: 0.18, prefix: '',    dot: false, rule: false },
 } as const;

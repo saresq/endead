@@ -66,6 +66,12 @@ export class PixiBoardRenderer {
   private layerEntities: PIXI.Container;
   private layerBadges: PIXI.Container;
 
+  // Empty-state blueprint placeholder (HUD-D1) — shown when no real map is
+  // loaded. Lives on the stage (outside the camera-transformed container) so
+  // it stays pinned to the viewport.
+  private placeholderLayer: PIXI.Container;
+  private placeholderVisible = false;
+
   constructor(app: PIXI.Application) {
     this.app = app;
     this.container = new PIXI.Container();
@@ -87,6 +93,12 @@ export class PixiBoardRenderer {
     this.container.addChild(this.layerBoard);
     this.container.addChild(this.layerEntities);
     this.container.addChild(this.layerBadges);
+
+    // Placeholder layer sits directly on the stage so it ignores camera pan/zoom.
+    this.placeholderLayer = new PIXI.Container();
+    this.placeholderLayer.visible = false;
+    this.placeholderLayer.eventMode = 'none';
+    this.app.stage.addChild(this.placeholderLayer);
 
     // Load tiles, then re-render if state arrived before tiles were ready
     tileService.loadAssets().then(() => {
@@ -118,6 +130,13 @@ export class PixiBoardRenderer {
 
     // Spacebar pan mode
     const signal = this._abortController.signal;
+
+    // Re-flow the empty-state placeholder when the viewport resizes so the
+    // mobile/desktop variants swap at the right breakpoints.
+    window.addEventListener('resize', () => {
+      if (this.placeholderVisible) this.renderPlaceholder();
+    }, { signal });
+
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Space') {
         e.preventDefault();
@@ -453,6 +472,17 @@ export class PixiBoardRenderer {
   public render(state: GameState, options: RenderOptions = {}): void {
     // 0. Update zone geometry for layout resolver
     setZoneGeometry(state.zoneGeometry ?? null);
+
+    // Empty-state blueprint: show a stylized placeholder when there is no
+    // real map data to render (initial state, between operations, dev review).
+    // Triggers when the editor has no tiles AND no zone geometry.
+    const hasTiles = !!state.tiles && state.tiles.length > 0;
+    const hasZoneGeometry = !!state.zoneGeometry;
+    if (!hasTiles && !hasZoneGeometry && !options.editorMode) {
+      this.renderPlaceholder();
+    } else if (this.placeholderVisible) {
+      this.clearPlaceholder();
+    }
 
     // 1. Tiles
     if (state.tiles) {
@@ -1517,6 +1547,198 @@ export class PixiBoardRenderer {
     return groups;
   }
 
+  /**
+   * Render the empty-state blueprint placeholder. Called when no real map is
+   * loaded. Output: greyed tile rectangles, two operative dots in BLUE/YELLOW
+   * rank colors, one hostile cluster, faint coordinate gridlines, compass mark,
+   * and a `// PREVIEW · NO ACTIVE MAP` mono label.
+   */
+  private renderPlaceholder(): void {
+    const layer = this.placeholderLayer;
+    layer.removeChildren();
+    layer.visible = true;
+    this.placeholderVisible = true;
+
+    const w = this.app.screen.width;
+    const h = this.app.screen.height;
+    const t = BOARD_THEME.placeholder;
+
+    // Backdrop wash so the placeholder reads as a designed surface, not a void.
+    const backdrop = new PIXI.Graphics();
+    backdrop.rect(0, 0, w, h);
+    backdrop.fill({ color: t.backdrop, alpha: t.backdropAlpha });
+    layer.addChild(backdrop);
+
+    // Faint orthogonal coordinate gridlines across the whole viewport.
+    const grid = new PIXI.Graphics();
+    for (let x = 0; x <= w; x += t.gridStep) {
+      grid.moveTo(x, 0);
+      grid.lineTo(x, h);
+    }
+    for (let y = 0; y <= h; y += t.gridStep) {
+      grid.moveTo(0, y);
+      grid.lineTo(w, y);
+    }
+    grid.stroke({ width: 1, color: t.gridLine, alpha: t.gridLineAlpha });
+    layer.addChild(grid);
+
+    // Tile grid — denser at desktop, sparser at mobile.
+    const isSmall = w < 720;
+    const isMedium = w >= 720 && w < 1100;
+    const cols = isSmall ? 4 : isMedium ? 5 : 6;
+    const rows = isSmall ? 3 : 4;
+
+    const maxByWidth = (w * 0.7) / cols;
+    const maxByHeight = (h * 0.6) / rows;
+    const cell = Math.max(56, Math.min(140, Math.min(maxByWidth, maxByHeight)));
+    const gap = Math.round(cell * 0.14);
+
+    const totalW = cols * cell + (cols - 1) * gap;
+    const totalH = rows * cell + (rows - 1) * gap;
+    const startX = Math.round((w - totalW) / 2);
+    const startY = Math.round((h - totalH) / 2);
+
+    // Deterministic irregularity: vary tile widths a bit so the layout reads
+    // as a stylized blueprint, not a uniform grid. Pattern repeats predictably.
+    const widthVariants = [1, 1, 1.35, 0.85, 1.15, 1, 0.9, 1.25];
+    const buildingPattern = [false, true, false, true, true, false, true, false, false, true, false, true];
+
+    const tiles = new PIXI.Graphics();
+    let pIdx = 0;
+    type TileRect = { x: number; y: number; w: number; h: number; col: number; row: number };
+    const tileRects: TileRect[] = [];
+    for (let row = 0; row < rows; row++) {
+      let cursorX = startX;
+      for (let col = 0; col < cols; col++) {
+        const variant = widthVariants[(row * cols + col) % widthVariants.length];
+        const tw = Math.round(cell * variant);
+        const th = cell;
+        // Keep the row aligned even with width variance — clamp the last tile.
+        const remaining = (startX + totalW) - cursorX;
+        const finalW = col === cols - 1 ? remaining : tw;
+        if (finalW <= 0) continue;
+
+        const isBuilding = buildingPattern[(row + col) % buildingPattern.length];
+        tiles.rect(cursorX, startY + row * (cell + gap), finalW, th);
+        tiles.fill({
+          color: isBuilding ? t.tileBuilding : t.tileFill,
+          alpha: t.tileFillAlpha,
+        });
+        tiles.rect(cursorX, startY + row * (cell + gap), finalW, th);
+        tiles.stroke({
+          width: t.tileStrokeWidth,
+          color: t.tileStroke,
+          alpha: t.tileStrokeAlpha,
+        });
+
+        tileRects.push({
+          x: cursorX,
+          y: startY + row * (cell + gap),
+          w: finalW,
+          h: th,
+          col,
+          row,
+        });
+        cursorX += finalW + gap;
+        pIdx++;
+      }
+    }
+    layer.addChild(tiles);
+
+    // Pick stable tile slots for the rank dots and hostile cluster. Indices
+    // chosen so they land on different tiles at every viewport tier.
+    const tileCount = tileRects.length;
+    if (tileCount > 0) {
+      const blueTile = tileRects[Math.min(1, tileCount - 1)];
+      const yellowTile = tileRects[Math.min(Math.max(0, Math.floor(tileCount * 0.55)), tileCount - 1)];
+      const hostileTile = tileRects[Math.min(Math.max(0, tileCount - 2), tileCount - 1)];
+
+      const dotR = Math.max(7, Math.round(cell * 0.16));
+
+      const dots = new PIXI.Graphics();
+      // Operative dots — concentric: dark stroke ring + colored core.
+      const drawOperative = (rect: TileRect, color: number) => {
+        const cx = rect.x + rect.w / 2;
+        const cy = rect.y + rect.h / 2;
+        dots.circle(cx, cy, dotR);
+        dots.fill({ color });
+        dots.circle(cx, cy, dotR);
+        dots.stroke({ width: t.operativeStrokeWidth, color: t.operativeStroke });
+      };
+      drawOperative(blueTile, t.operativeBlue);
+      drawOperative(yellowTile, t.operativeYellow);
+
+      // Hostile cluster — three small dots in a triangular formation.
+      const hostileR = Math.max(4, Math.round(cell * 0.09));
+      const hcx = hostileTile.x + hostileTile.w / 2;
+      const hcy = hostileTile.y + hostileTile.h / 2;
+      const spread = hostileR * 2.4;
+      const offsets: Array<[number, number]> = [
+        [0, -spread * 0.6],
+        [-spread * 0.7, spread * 0.5],
+        [spread * 0.7, spread * 0.5],
+      ];
+      for (const [dx, dy] of offsets) {
+        dots.circle(hcx + dx, hcy + dy, hostileR);
+        dots.fill({ color: t.hostile });
+        dots.circle(hcx + dx, hcy + dy, hostileR);
+        dots.stroke({ width: t.hostileStrokeWidth, color: t.operativeStroke, alpha: 0.7 });
+      }
+      layer.addChild(dots);
+    }
+
+    // Compass mark — small "N" in the top-right corner of the placeholder.
+    const compass = new PIXI.Graphics();
+    const compassX = startX + totalW - 18;
+    const compassY = startY - 22;
+    compass.moveTo(compassX, compassY + 12);
+    compass.lineTo(compassX, compassY - 4);
+    compass.lineTo(compassX - 4, compassY);
+    compass.moveTo(compassX, compassY - 4);
+    compass.lineTo(compassX + 4, compassY);
+    compass.stroke({ width: 1.5, color: t.compass, alpha: t.compassAlpha });
+    layer.addChild(compass);
+
+    const compassLabel = new PIXI.Text({
+      text: 'N',
+      style: {
+        fontFamily: 'JetBrains Mono, monospace',
+        fontSize: 9,
+        fontWeight: '600',
+        fill: t.compass,
+        letterSpacing: 1,
+      },
+    });
+    compassLabel.alpha = t.compassAlpha;
+    compassLabel.anchor.set(0.5, 0);
+    compassLabel.position.set(compassX, compassY + 14);
+    layer.addChild(compassLabel);
+
+    // Mono preview label — top-center of the tile region so reviewers can't
+    // mistake the blueprint for live game state.
+    const label = new PIXI.Text({
+      text: '// PREVIEW · NO ACTIVE MAP',
+      style: {
+        fontFamily: 'JetBrains Mono, monospace',
+        fontSize: isSmall ? 11 : 12,
+        fontWeight: '600',
+        fill: t.label,
+        letterSpacing: 2,
+      },
+    });
+    label.alpha = t.labelAlpha;
+    label.anchor.set(0.5, 1);
+    label.position.set(w / 2, startY - 12);
+    layer.addChild(label);
+  }
+
+  /** Hide and clear the empty-state placeholder. */
+  private clearPlaceholder(): void {
+    this.placeholderLayer.visible = false;
+    this.placeholderLayer.removeChildren();
+    this.placeholderVisible = false;
+  }
+
   /** Tear down renderer, removing all event listeners and PIXI resources. */
   public destroy(): void {
     // Remove window/DOM event listeners via AbortController
@@ -1540,6 +1762,13 @@ export class PixiBoardRenderer {
     }
     this.groupBadges.clear();
     this.tileSprites = [];
+
+    // Placeholder layer lives on the stage (not the camera container) so
+    // tear it down explicitly.
+    if (this.placeholderLayer) {
+      this.app.stage.removeChild(this.placeholderLayer);
+      this.placeholderLayer.destroy({ children: true });
+    }
 
     // Destroy the container tree (recursively destroys children)
     this.container.destroy({ children: true });

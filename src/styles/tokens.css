@@ -136,7 +136,7 @@
   --zombie-necromancer-muted: rgba(32, 72, 96, 0.22);
 
   /* ---------- Typography ---------- */
-  --font-stencil: "Black Ops One", "Stencil Std", "Impact", sans-serif;
+  --font-stencil: "Big Shoulders Stencil Display", "Stencil Std", "Impact", sans-serif;
   --font-display: "Oswald", "Stencil Std", "Impact", sans-serif;
   --font-body: "Barlow Condensed", "Roboto Condensed", system-ui, sans-serif;
   --font-sans: var(--font-body);

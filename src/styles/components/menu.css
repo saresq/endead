@@ -21,6 +21,23 @@
   font-family: var(--font-body);
 }
 
+/* ---------- Stack — identification panel, CTA, divider, join panel ---------- */
+.menu-stack {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 18px;
+  width: 420px;
+  max-width: 92vw;
+}
+
+.menu-stack > .menu-card {
+  width: 100%;
+  max-width: 100%;
+}
+
 /* ---------- Background field: grid + vignette ---------- */
 .menu-field {
   position: absolute;
@@ -106,16 +123,16 @@
 .menu-wordmark__text {
   margin: 0;
   font-family: var(--font-stencil);
-  font-size: 56px;
-  font-weight: 400;
+  font-size: 62px;
+  font-weight: 900;
   line-height: 1;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--amber-400);
   text-shadow:
-    0 0 18px rgba(240, 169, 74, 0.35),
-    0 0 44px rgba(240, 169, 74, 0.18),
-    0 2px 0 rgba(0, 0, 0, 0.85);
+    0 0 20px rgba(240, 169, 74, 0.4),
+    0 0 48px rgba(240, 169, 74, 0.2),
+    0 2px 0 rgba(0, 0, 0, 0.9);
 }
 
 .menu-header__subline {
@@ -220,6 +237,11 @@
 
 /* ---------- Mobile adjustments ---------- */
 @media (max-width: 480px) {
+  .menu-stack {
+    width: 100%;
+    gap: 14px;
+  }
+
   .menu-card {
     width: 100%;
   }
@@ -238,7 +260,7 @@
   }
 
   .menu-wordmark__text {
-    font-size: 44px;
+    font-size: 48px;
     letter-spacing: 0.12em;
   }
 

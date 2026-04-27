@@ -6,6 +6,8 @@
  * No avatar, no callsign — the squad rail stays compact.
  */
 
+import { icon } from './icons';
+
 export type SquadPlateRank = 'blue' | 'yellow' | 'orange' | 'red';
 
 export interface SquadPlateOptions {
@@ -18,6 +20,12 @@ export interface SquadPlateOptions {
   actions: number;
   actionsMax: number;
   active?: boolean;
+  /** Compact rail variant — omits the HP/Actions pills row. */
+  compact?: boolean;
+  /** Optional callsign (e.g. "P-01") rendered as a small mono tag. */
+  callsign?: string;
+  /** Optional click target — emits `data-action="select-survivor"` with this id. */
+  selectId?: string;
 }
 
 const RANK_LABEL: Record<SquadPlateRank, string> = {
@@ -66,20 +74,21 @@ export function renderSquadPlate(opts: SquadPlateOptions): string {
     'fm-squadplate',
     `fm-squadplate--rank-${opts.rank}`,
     opts.active ? 'fm-squadplate--active' : '',
+    opts.compact ? 'fm-squadplate--compact' : '',
+    opts.selectId ? 'fm-squadplate--clickable' : '',
   ].filter(Boolean).join(' ');
 
   const stripeStyle = `background:${escapeHtml(opts.playerColor)};`;
 
-  return `
-    <div class="${rootClass}">
-      <div class="fm-squadplate__stripe" style="${stripeStyle}"></div>
-      <div class="fm-squadplate__body">
-        <div class="fm-squadplate__head">
-          <span class="fm-squadplate__rank-dot fm-squadplate__rank-dot--${opts.rank}"
-                title="${escapeHtml(rankTitle)}"
-                aria-label="${escapeHtml(rankTitle)}"></span>
-          <span class="fm-squadplate__name">${escapeHtml(opts.name)}</span>
-        </div>
+  const callsignTag = opts.callsign
+    ? `<span class="fm-squadplate__callsign">${escapeHtml(opts.callsign)}</span>`
+    : '';
+
+  const activeTag = opts.active
+    ? `<span class="fm-squadplate__activetag" aria-label="Active operative">${icon('Play', 'xs')} ACTIVE</span>`
+    : '';
+
+  const stats = opts.compact ? '' : `
         <div class="fm-squadplate__stats">
           <div class="fm-squadplate__stat fm-squadplate__stat--hp" role="progressbar"
                aria-label="HP" aria-valuenow="${hp}" aria-valuemin="0" aria-valuemax="${opts.hpMax}">
@@ -91,8 +100,35 @@ export function renderSquadPlate(opts: SquadPlateOptions): string {
             <div class="fm-squadplate__pills">${renderPills(actions, opts.actionsMax, 'actions')}</div>
             <span class="fm-squadplate__qty">${actions}/${opts.actionsMax}</span>
           </div>
-        </div>
-      </div>
+        </div>`;
+
+  const body = `
+      <div class="fm-squadplate__stripe" style="${stripeStyle}"></div>
+      <div class="fm-squadplate__body">
+        <div class="fm-squadplate__head">
+          <span class="fm-squadplate__rank-dot fm-squadplate__rank-dot--${opts.rank}"
+                title="${escapeHtml(rankTitle)}"
+                aria-label="${escapeHtml(rankTitle)}"></span>
+          <span class="fm-squadplate__name">${escapeHtml(opts.name)}</span>
+          ${callsignTag}
+          ${activeTag}
+        </div>${stats}
+      </div>`;
+
+  if (opts.selectId) {
+    return `
+      <button type="button" class="${rootClass}"
+              data-action="select-survivor"
+              data-survivor-id="${escapeHtml(opts.selectId)}"
+              aria-pressed="${opts.active ? 'true' : 'false'}">
+        ${body}
+      </button>
+    `;
+  }
+
+  return `
+    <div class="${rootClass}">
+      ${body}
     </div>
   `;
 }

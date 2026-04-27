@@ -49,7 +49,7 @@ export function renderPhotoSlot(opts: PhotoSlotOptions): string {
   `;
 
   const selectedDotHtml = selected
-    ? `<span class="fm-photoslot__dot" aria-hidden="true"></span>`
+    ? `<span class="fm-photoslot__tag" aria-hidden="true">■ SELECTED</span>`
     : '';
 
   const hasCaption = !!(opts.name || opts.role);

@@ -156,41 +156,57 @@
   color: var(--amber-200);
 }
 
-.hud-phasecells {
-  display: flex;
-  align-items: stretch;
-  gap: 2px;
+.hud-phaseindicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   min-width: 0;
+  padding: 2px 4px;
+  background: transparent;
+  border: none;
+  cursor: default;
+  user-select: none;
 }
 
-.hud-phasecell {
-  position: relative;
-  padding: 4px 10px;
+.hud-phaseindicator__bracket {
   font-family: var(--font-stencil);
-  font-size: 10px;
-  letter-spacing: 0.14em;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--amber-400);
+  opacity: 0.75;
+}
+
+.hud-phaseindicator__label {
+  font-family: var(--font-stencil);
+  font-size: 11px;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--bone-500);
-  background: transparent;
-  border: 1px solid transparent;
+  color: var(--amber-200);
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
   max-width: 32ch;
 }
 
-.hud-phasecell--active {
-  color: var(--bg-0);
-  background: var(--amber-400);
-  border-color: var(--amber-500);
+.hud-phaseindicator__ticks {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 4px;
 }
 
-.hud-phasecell--active::after {
-  content: '';
-  position: absolute;
-  left: 0; right: 0; bottom: -1px;
+.hud-phasetick {
+  display: inline-block;
+  width: 10px;
   height: 2px;
-  background: var(--amber-500);
+  background: var(--bone-500);
+  opacity: 0.35;
+  border-radius: 1px;
+}
+
+.hud-phasetick--current {
+  background: var(--amber-400);
+  opacity: 1;
 }
 
 .hud-channel {
@@ -433,29 +449,118 @@
 }
 
 /* ==========================================================================
-   Center action row — six actions (+ skill buttons wrap)
+   Action row — six actions (+ skill buttons wrap)
    ========================================================================== */
 
-.hud-center__actions {
-  flex-shrink: 0;
-  pointer-events: auto;
+.hud-actions {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
 }
 
-.hud-actions {
+.hud-actions__grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.hud-actions > .action-btn,
+.hud-actions__grid > .action-btn { min-height: 38px; }
+
+/* Slimmer action buttons on the bar — tighter padding, gap, label spacing. */
+.hud-actions .action-btn {
+  padding: 6px 8px;
   gap: 6px;
 }
+.hud-actions .action-btn__label {
+  letter-spacing: 0.12em;
+}
+.hud-actions .action-btn__kbd {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  margin-right: 2px;
+  font-size: 10px;
+  line-height: 1;
+  opacity: 0.55;
+  flex-shrink: 0;
+}
 
-.hud-actions > .action-btn { min-height: 44px; }
+
+/* Skill buttons (Sprint, Charge, etc.) — packed grid below End Turn. */
+.hud-actions__skills {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+
+/* Desktop / laptop: hide mobile-only "More" trigger and tray. */
+.hud-actions__more,
+.hud-actions__tray {
+  display: none;
+}
 
 @media (max-width: 767px) {
-  .hud-actions { gap: 4px; }
+  .hud-actions__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+  }
+  /* On mobile, Objective/Trade migrate into the More tray. */
+  .hud-actions__grid > #btn-objective,
+  .hud-actions__grid > #btn-trade { display: none; }
+
   .action-btn__kbd { display: none; }
-  .action-btn { min-height: 44px; padding: 6px; }
+  .hud-actions .action-btn { min-height: 44px; padding: 6px; }
   .action-btn__label { font-size: 11px; }
   .action-btn__cost { font-size: 9px; padding: 0 3px; }
   .action-btn__spacer { display: none; }
+
+  .hud-actions__grid > #btn-end-turn {
+    grid-column: 1 / -1;
+  }
+
+  .hud-actions__more {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+  }
+
+  .hud-actions__more--open {
+    background: var(--olive-700, #3a3a26);
+    color: var(--bone-100, #f5efe1);
+  }
+
+  .hud-actions__skills { gap: 4px; }
+
+  .hud-actions__tray {
+    display: grid;
+    position: absolute;
+    bottom: calc(100% + 6px);
+    right: 0;
+    grid-template-columns: repeat(2, minmax(120px, 1fr));
+    gap: 4px;
+    padding: 6px;
+    background: linear-gradient(180deg, var(--bg-2), var(--bg-1));
+    border: 1px solid var(--olive-700, #3a3a26);
+    border-radius: 2px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+    z-index: 4;
+    min-width: min(260px, calc(100% - 16px));
+    transform-origin: bottom right;
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+    pointer-events: none;
+    transition: opacity 120ms ease, transform 120ms ease;
+  }
+
+  .hud-actions__tray[data-open="true"] {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+  }
 }
 
 /* ==========================================================================
@@ -622,9 +727,21 @@
 
 .hud-loadout__grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
+  grid-template-columns: 1fr;
+  gap: 8px;
   align-items: stretch;
+}
+
+/* On desktop/laptop the bag becomes a slim full-width row button.
+   The wrapping slot tile is stripped of chrome so the button itself
+   is the only visible surface — icon left, BAG label right. */
+.hud-loadout__grid .hud-slot--bag {
+  justify-self: stretch;
+  width: auto;
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .hud-slot {
@@ -667,10 +784,12 @@
   position: relative;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   flex: 1 1 auto;
-  min-height: 60px;
-  padding: 8px;
+  width: 100%;
+  gap: 10px;
+  min-height: 36px;
+  padding: 6px 12px;
   background: var(--bg-0);
   border: 1px solid var(--amber-500);
   border-radius: 2px;
@@ -678,6 +797,24 @@
   cursor: pointer;
   pointer-events: auto;
   transition: transform 120ms ease, background 120ms ease, box-shadow 120ms ease;
+}
+
+.hud-bag-button__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  color: var(--amber-200);
+}
+
+.hud-bag-button__label {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--amber-200);
 }
 
 .hud-bag-button:hover {
@@ -724,19 +861,22 @@
   overflow-y: auto;
   font-family: var(--font-mono);
   font-size: 10px;
-  line-height: 1.5;
+  line-height: 1.35;
   color: var(--bone-300);
   scrollbar-width: thin;
-  scrollbar-color: var(--olive-700) transparent;
+  scrollbar-color: var(--amber-500) transparent;
 }
 .hud-log__body::-webkit-scrollbar { width: 4px; }
-.hud-log__body::-webkit-scrollbar-thumb { background: var(--olive-700); }
+.hud-log__body::-webkit-scrollbar-thumb {
+  background: var(--amber-500);
+  border-radius: 2px;
+}
 
 .hud-log__line {
   display: grid;
   grid-template-columns: auto auto 1fr;
   column-gap: 6px;
-  padding: 2px 0;
+  padding: 1px 0;
   border-bottom: 1px dashed rgba(62, 67, 44, 0.4);
 }
 
@@ -784,12 +924,65 @@
     padding: 10px;
   }
 
-  .hud-rail--right .hud-rail__body { gap: 10px; }
+  .hud-rail--right .hud-rail__body { gap: 8px; }
 
   .hud-center { padding: 8px; }
-  .hud-map-window { min-height: 180px; }
+  .hud-map-window { min-height: 380px; flex: 1 1 auto; }
 
   .hud-log { display: none; }
+
+  /* Mobile loadout: weapons share a single horizontal band with the bag tile
+     pinned to the right. Hand labels are dropped (the player knows which thumb
+     they tapped) so the cells can show full weapon stats inline. */
+  .hud-loadout { gap: 4px; }
+  .hud-loadout__kicker { display: none; }
+  .hud-loadout__grid {
+    grid-template-columns: 1fr 1fr 56px;
+    gap: 4px;
+  }
+
+  .hud-loadout__grid .hud-slot--bag {
+    justify-self: stretch;
+    width: auto;
+    padding: 4px 6px;
+    background: var(--bg-1);
+    border: 1px solid var(--amber-500);
+    box-shadow: inset 0 0 0 1px rgba(240, 169, 74, 0.18);
+  }
+
+  .hud-loadout .hud-slot {
+    padding: 4px 6px;
+  }
+
+  .hud-loadout .hud-slot__label { display: none; }
+
+  .hud-loadout .hud-slot--empty {
+    justify-content: center;
+  }
+
+  .hud-loadout .hud-slot--empty .hud-slot__empty {
+    padding: 6px 0;
+    font-size: 10px;
+    text-align: center;
+  }
+
+  .hud-loadout .hud-weapon-btn {
+    min-width: 0;
+  }
+
+  .hud-loadout .hud-weapon-btn .item-card__icon {
+    width: 28px;
+    height: 28px;
+  }
+
+  .hud-loadout .hud-bag-button {
+    min-height: 48px;
+    padding: 4px;
+    justify-content: center;
+    gap: 0;
+  }
+
+  .hud-loadout .hud-bag-button__label { display: none; }
 }
 
 /* ==========================================================================
@@ -816,18 +1009,18 @@
   transition: transform 120ms var(--ease-military, ease-out);
 }
 
-.hud-weapon-btn:disabled {
-  opacity: 0.45; cursor: not-allowed; pointer-events: none;
+.hud-weapon-btn--locked {
+  opacity: 0.45; cursor: not-allowed;
 }
 
-.hud-weapon-btn:hover:not(:disabled) { transform: translateY(-1px); }
+.hud-weapon-btn:hover:not(.hud-weapon-btn--locked) { transform: translateY(-1px); }
 
-.hud-weapon-btn:hover:not(:disabled) .item-card {
+.hud-weapon-btn:hover:not(.hud-weapon-btn--locked) .item-card {
   background: var(--bg-3);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
 }
 
-.hud-weapon-btn:active:not(:disabled) { transform: translateY(0); }
+.hud-weapon-btn:active:not(.hud-weapon-btn--locked) { transform: translateY(0); }
 
 .hud-weapon-btn--active .item-card {
   background: color-mix(in srgb, var(--rust-500) 22%, var(--bg-2));

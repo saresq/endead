@@ -12,7 +12,7 @@ import { renderAvatar } from './components/PlayerAvatar';
 import { renderActionButton } from './components/ActionButton';
 import { renderLastActionEntry, renderSpawnEntry, type SpawnCardData } from './components/EventEntry';
 import { renderButton } from './components/Button';
-import { renderItemCard } from './components/ItemCard';
+import { renderItemCard, renderEmptySlotsCounter } from './components/ItemCard';
 import { renderStatCell } from './components/StatCell';
 import { renderSquadPlate, type SquadPlateRank } from './components/SquadPlate';
 import { renderPhotoSlot } from './components/PhotoSlot';
@@ -28,6 +28,16 @@ function dangerToRank(level: string): SquadPlateRank {
     case 'orange': return 'orange';
     case 'red':    return 'red';
     default:       return 'blue';
+  }
+}
+
+/** Color of the rank a survivor is progressing toward; max-rank survivors stay on their current color. */
+function nextRankColor(level: string): SquadPlateRank {
+  switch ((level || '').toLowerCase()) {
+    case 'yellow': return 'orange';
+    case 'orange': return 'red';
+    case 'red':    return 'red';
+    default:       return 'yellow';
   }
 }
 
@@ -103,11 +113,11 @@ export class GameHUD {
   private feedAutoDismissTimer: ReturnType<typeof setTimeout> | null = null;
   private feedAutoDismissScheduledFor: number | null = null;
   private boundDelegateHandler: (e: Event) => void;
+  private mobileActionsTrayOpen = false;
   // Stable shell elements — created once, updated per-section
   private elTopBar: HTMLDivElement | null = null;
   private elRailLeft: HTMLElement | null = null;
   private elRailRight: HTMLElement | null = null;
-  private elCenterActions: HTMLDivElement | null = null;
   private elFeed: HTMLDivElement | null = null;
   private elFab: HTMLDivElement | null = null;
   private shellBuilt = false;
@@ -198,12 +208,29 @@ export class GameHUD {
 
     const btn = target.closest('[data-action]') as HTMLElement | null;
     const closestButton = target.closest('button') as HTMLElement | null;
-    const id = target.id || closestButton?.id || '';
+    const rawId = target.id || closestButton?.id || '';
+    const id = rawId.replace(/-mobile$/, '');
     const action = btn?.dataset.action;
 
     const activeSurvivor = this.selectedSurvivorId && this.state ? this.state.survivors[this.selectedSurvivorId] : null;
     const isMyTurn = this.state ? this.state.players[this.state.activePlayerIndex] === this.localPlayerId : false;
     const isOwner = activeSurvivor ? activeSurvivor.playerId === this.localPlayerId : false;
+
+    // --- Mobile actions tray toggle / dismiss ---
+    if (action === 'toggle-actions-tray') {
+      this.setMobileActionsTrayOpen(!this.mobileActionsTrayOpen);
+      return;
+    }
+    if (this.mobileActionsTrayOpen) {
+      const insideTray = !!target.closest('.hud-actions__tray');
+      const onMore = !!target.closest('.hud-actions__more');
+      if (!onMore) {
+        // Close after any other click — selection inside the tray closes it,
+        // taps outside also close it. Action handlers below still run.
+        this.setMobileActionsTrayOpen(false);
+        if (!insideTray && !closestButton) return;
+      }
+    }
 
     // --- Top bar ---
     if (id === 'btn-mute' || action === 'toggle-mute') {
@@ -241,6 +268,18 @@ export class GameHUD {
       return;
     }
 
+    // --- Squad rail: focus another local-controlled survivor ---
+    if (action === 'select-survivor') {
+      const sid = btn?.dataset.survivorId;
+      if (sid && this.state) {
+        const target = this.state.survivors[sid];
+        if (target && target.playerId === this.localPlayerId) {
+          this.inputController.selectMySurvivorById(sid);
+        }
+      }
+      return;
+    }
+
     // --- Backpack ---
     if (action === 'open-backpack') {
       this.openBackpack();
@@ -260,6 +299,35 @@ export class GameHUD {
     // --- Wound picker (not turn-gated — can resolve during any phase) ---
     if (action === 'resolve-wounds' && activeSurvivor) {
       this.openWoundPicker(activeSurvivor);
+      return;
+    }
+
+    // --- Weapon buttons (not turn-gated — off-turn taps show a toast) ---
+    const weaponBtn = target.closest('.hud-weapon-btn') as HTMLElement | null;
+    if (weaponBtn) {
+      const weaponId = weaponBtn.dataset.id;
+      if (!weaponId || !activeSurvivor || !isOwner) return;
+      const isCurrentlyArmed =
+        this.inputController.mode === 'ATTACK' && this.inputController.weaponId === weaponId;
+      if (isCurrentlyArmed) {
+        this.inputController.setMode('DEFAULT');
+        return;
+      }
+      const noAPNow = activeSurvivor.actionsRemaining < 1;
+      const freeCombatAvailNow =
+        activeSurvivor.freeCombatsRemaining > 0
+        || activeSurvivor.freeMeleeRemaining > 0
+        || activeSurvivor.freeRangedRemaining > 0;
+      if (!isMyTurn) {
+        notificationManager.show({ variant: 'warning', message: 'Not your turn.', duration: 2500 });
+        return;
+      }
+      if (noAPNow && !freeCombatAvailNow) {
+        notificationManager.show({ variant: 'warning', message: 'No actions remaining.', duration: 2500 });
+        return;
+      }
+      this.inputController.setMode('ATTACK', weaponId);
+      notificationManager.show({ variant: 'info', message: 'Select a Zone to Attack!', duration: 5000 });
       return;
     }
 
@@ -322,16 +390,6 @@ export class GameHUD {
       return;
     }
 
-    // --- Weapon buttons ---
-    const weaponBtn = target.closest('.hud-weapon-btn') as HTMLElement;
-    if (weaponBtn && !weaponBtn.hasAttribute('disabled')) {
-      const weaponId = weaponBtn.dataset.id;
-      if (weaponId) {
-        this.inputController.setMode('ATTACK', weaponId);
-        notificationManager.show({ variant: 'info', message: 'Select a Zone to Attack!', duration: 5000 });
-      }
-      return;
-    }
   }
 
   // ─── Rendering shell — Field Manual three-column grid ───────
@@ -358,10 +416,7 @@ export class GameHUD {
     mapWindow.className = 'hud-map-window fm-brackets';
     mapWindow.innerHTML = '<span class="fm-bracket-tr"></span><span class="fm-bracket-bl"></span>';
 
-    this.elCenterActions = document.createElement('div');
-    this.elCenterActions.className = 'hud-center__actions';
-
-    center.append(this.elFeed, mapWindow, this.elCenterActions);
+    center.append(this.elFeed, mapWindow);
 
     this.elRailRight = document.createElement('aside');
     this.elRailRight.className = 'hud-rail hud-rail--right fm-brackets fm-brackets--amber';
@@ -405,7 +460,6 @@ export class GameHUD {
       ? this.renderRightPanel(activeSurvivor, isMyTurn)
       : '<span class="fm-bracket-tr"></span><span class="fm-bracket-bl"></span>';
 
-    this.elCenterActions!.innerHTML = '';
     this.elFeed!.innerHTML = this.renderFeed();
     this.elFab!.innerHTML = '';
 
@@ -443,8 +497,14 @@ export class GameHUD {
     const myTurnClass = isMyTurn ? ' hud-topbar--my-turn' : '';
     const dangerClass = ` hud-topbar--danger-${state.currentDangerLevel.toLowerCase()}`;
 
-    const phaseCell = (label: string, active: boolean) =>
-      `<span class="hud-phasecell${active ? ' hud-phasecell--active' : ''}">${label}</span>`;
+    const currentPhaseLabel = isZombiePhase
+      ? 'ZOMBIE'
+      : isEndPhase
+        ? 'END'
+        : `PLAYER${activeName ? ' · ' + escapeHtml(activeName.toUpperCase()) : ''}`;
+
+    const tick = (active: boolean) =>
+      `<span class="hud-phasetick${active ? ' hud-phasetick--current' : ''}" aria-hidden="true"></span>`;
 
     return `
       <div class="hud-topbar__inner${myTurnClass}${dangerClass}">
@@ -453,10 +513,15 @@ export class GameHUD {
             <span class="hud-turnchip__label">TURN</span>
             <span class="hud-turnchip__value">${String(state.turn).padStart(2, '0')}</span>
           </button>
-          <div class="hud-phasecells">
-            ${phaseCell(`PLAYER${activeName ? ' · ' + escapeHtml(activeName.toUpperCase()) : ''}`, isPlayerPhase)}
-            ${phaseCell('ZOMBIE', isZombiePhase)}
-            ${phaseCell('END', isEndPhase)}
+          <div class="hud-phaseindicator" role="status" aria-live="polite" aria-label="Current phase: ${currentPhaseLabel}">
+            <span class="hud-phaseindicator__bracket hud-phaseindicator__bracket--left" aria-hidden="true">[</span>
+            <span class="hud-phaseindicator__label">${currentPhaseLabel}</span>
+            <span class="hud-phaseindicator__bracket hud-phaseindicator__bracket--right" aria-hidden="true">]</span>
+            <span class="hud-phaseindicator__ticks" aria-hidden="true">
+              ${tick(isPlayerPhase)}
+              ${tick(isZombiePhase)}
+              ${tick(isEndPhase)}
+            </span>
           </div>
         </div>
         <div class="hud-topbar__right">
@@ -488,16 +553,17 @@ export class GameHUD {
   private renderSquadRail(): string {
     if (!this.state) return '';
     const players = this.state.players;
-    const activePid = players[this.state.activePlayerIndex];
     const survivorsByPlayer: Survivor[] = [];
     for (const pid of players) {
       const s = Object.values(this.state.survivors).find(sv => sv.playerId === pid);
       if (s) survivorsByPlayer.push(s);
     }
 
-    const plates = survivorsByPlayer.map((s) => {
-      const active = s.playerId === activePid;
+    const focusedId = this.selectedSurvivorId;
+    const plates = survivorsByPlayer.map((s, idx) => {
+      const active = s.id === focusedId;
       const playerColor = getPlayerIdentity(this.state!, s.playerId).primary;
+      const isLocal = s.playerId === this.localPlayerId;
       return renderSquadPlate({
         name: s.name,
         rank: dangerToRank(s.dangerLevel),
@@ -507,10 +573,13 @@ export class GameHUD {
         actions: s.actionsRemaining,
         actionsMax: s.actionsPerTurn,
         active,
+        compact: true,
+        callsign: callsignFor(s, idx),
+        selectId: isLocal ? s.id : undefined,
       });
     }).join('');
 
-    const kicker = `<div class="fm-kicker hud-rail__kicker">SQUAD · ${survivorsByPlayer.length}</div>`;
+    const kicker = `<div class="fm-kicker fm-kicker--secondary hud-rail__kicker">SQUAD · ${survivorsByPlayer.length}</div>`;
     return `${kicker}<div class="hud-rail__list">${plates}</div>`;
   }
 
@@ -577,6 +646,17 @@ export class GameHUD {
 
   // ─── Center action row ──────────────────────────────────────
 
+  private setMobileActionsTrayOpen(open: boolean): void {
+    this.mobileActionsTrayOpen = open;
+    const tray = this.container.querySelector('.hud-actions__tray') as HTMLElement | null;
+    const moreBtn = this.container.querySelector('.hud-actions__more') as HTMLElement | null;
+    if (tray) tray.dataset.open = open ? 'true' : 'false';
+    if (moreBtn) {
+      moreBtn.classList.toggle('hud-actions__more--open', open);
+      moreBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+  }
+
   private renderActionRow(survivor: Survivor, isMyTurn: boolean): string {
     const canOpenDoor = survivor.inventory.some(c => c.inHand && c.canOpenDoor);
     const currentZone = this.state?.zones[survivor.position.zoneId];
@@ -584,15 +664,50 @@ export class GameHUD {
     const noAP = survivor.actionsRemaining < 1;
     const skillActions = this.renderSkillActionButtons(survivor, isMyTurn, noAP);
 
+    const objectiveBtn = (idSuffix: string) => renderActionButton({
+      id: `btn-objective${idSuffix}`,
+      icon: 'Target', label: 'Objective', kbd: 'O', cost: '1 AP',
+      disabled: !isMyTurn || noAP || !canTakeObjective,
+      highlight: canTakeObjective && isMyTurn && !noAP,
+    });
+    const tradeBtn = (idSuffix: string) => renderActionButton({
+      id: `btn-trade${idSuffix}`,
+      icon: 'Handshake', label: 'Trade', kbd: 'T', cost: '1 AP',
+      disabled: !isMyTurn || noAP,
+    });
+
+    const trayOpen = this.mobileActionsTrayOpen;
+
+    const moreButton = `
+      <button class="action-btn hud-actions__more${trayOpen ? ' hud-actions__more--open' : ''}"
+        data-action="toggle-actions-tray"
+        aria-haspopup="menu"
+        aria-expanded="${trayOpen ? 'true' : 'false'}"
+        aria-label="More actions">
+        <span class="action-btn__icon">${icon('MoreHorizontal', 'sm')}</span>
+        <span class="action-btn__label">More</span>
+        <span class="action-btn__spacer"></span>
+      </button>`;
+
+    const tray = `
+      <div class="hud-actions__tray" data-open="${trayOpen ? 'true' : 'false'}" role="menu" aria-label="More actions">
+        ${objectiveBtn('-mobile')}
+        ${tradeBtn('-mobile')}
+      </div>`;
+
     return `
       <div class="hud-actions">
-        ${renderActionButton({ id: 'btn-search', icon: 'Search', label: 'Search', kbd: 'S', cost: survivor.freeSearchesRemaining > 0 ? 'FREE' : '1 AP', disabled: !isMyTurn || survivor.hasSearched || (noAP && survivor.freeSearchesRemaining <= 0) })}
-        ${renderActionButton({ id: 'btn-noise', icon: 'Volume2', label: 'Noise', kbd: 'N', cost: '1 AP', disabled: !isMyTurn || noAP })}
-        ${renderActionButton({ id: 'btn-door', icon: 'DoorOpen', label: 'Door', kbd: 'D', cost: '1 AP', disabled: !isMyTurn || noAP || !canOpenDoor })}
-        ${renderActionButton({ id: 'btn-objective', icon: 'Target', label: 'Objective', kbd: 'O', cost: '1 AP', disabled: !isMyTurn || noAP || !canTakeObjective, highlight: canTakeObjective && isMyTurn && !noAP })}
-        ${renderActionButton({ id: 'btn-trade', icon: 'Handshake', label: 'Trade', kbd: 'T', cost: '1 AP', disabled: !isMyTurn || noAP })}
-        ${renderActionButton({ id: 'btn-end-turn', icon: 'SkipForward', label: 'End Turn', kbd: 'E', disabled: !isMyTurn })}
+        <div class="hud-actions__grid">
+          ${renderActionButton({ id: 'btn-search', icon: 'Search', label: 'Search', kbd: 'S', cost: survivor.freeSearchesRemaining > 0 ? 'FREE' : '1 AP', disabled: !isMyTurn || survivor.hasSearched || (noAP && survivor.freeSearchesRemaining <= 0) })}
+          ${renderActionButton({ id: 'btn-noise', icon: 'Volume2', label: 'Noise', kbd: 'N', cost: '1 AP', disabled: !isMyTurn || noAP })}
+          ${renderActionButton({ id: 'btn-door', icon: 'DoorOpen', label: 'Door', kbd: 'D', cost: '1 AP', disabled: !isMyTurn || noAP || !canOpenDoor })}
+          ${objectiveBtn('')}
+          ${tradeBtn('')}
+          ${renderActionButton({ id: 'btn-end-turn', icon: 'SkipForward', label: 'End Turn', kbd: 'E', disabled: !isMyTurn })}
+        </div>
+        ${moreButton}
         ${skillActions}
+        ${tray}
       </div>`;
   }
 
@@ -654,16 +769,19 @@ export class GameHUD {
 
     const weaponSlot = (w: typeof rHand, slotLabel: string) => {
       if (!w) {
-        return `<div class="hud-slot hud-slot--empty">
-          <div class="hud-slot__label">${slotLabel}</div>
+        return `<div class="hud-slot hud-slot--empty" aria-label="${slotLabel} empty">
           <div class="hud-slot__empty">— EMPTY —</div>
         </div>`;
       }
       const boosts = weaponBoosts.get(w.id) || { dice: 0, damage: 0 };
       const isActive = this.inputController.mode === 'ATTACK' && this.inputController.weaponId === w.id;
-      return `<div class="hud-slot hud-slot--weapon">
-        <div class="hud-slot__label">${slotLabel}</div>
-        <button class="hud-weapon-btn${isActive ? ' hud-weapon-btn--active' : ''}" data-id="${escapeHtml(w.id)}" ${attackDisabled ? 'disabled' : ''}>
+      const classes = [
+        'hud-weapon-btn',
+        isActive ? 'hud-weapon-btn--active' : '',
+        attackDisabled ? 'hud-weapon-btn--locked' : '',
+      ].filter(Boolean).join(' ');
+      return `<div class="hud-slot hud-slot--weapon" aria-label="${slotLabel}">
+        <button class="${classes}" data-id="${escapeHtml(w.id)}"${attackDisabled ? ' aria-disabled="true"' : ''}>
           ${renderItemCard(w, { variant: 'weapon', showSlot: false, bonusDice: boosts.dice, bonusDamage: boosts.damage })}
         </button>
       </div>`;
@@ -672,16 +790,16 @@ export class GameHUD {
     const bagItems = survivor.inventory.filter(c => !c.inHand);
     const bagSlot = `
       <div class="hud-slot hud-slot--bag">
-        <div class="hud-slot__label">BAG</div>
         <button class="hud-bag-button" data-action="open-backpack" title="Open backpack" aria-label="Open backpack (${bagItems.length} item${bagItems.length === 1 ? '' : 's'})">
-          ${icon('Backpack', 'lg')}
+          <span class="hud-bag-button__icon">${icon('Backpack', 'md')}</span>
+          <span class="hud-bag-button__label">BAG</span>
           ${bagItems.length > 0 ? `<span class="hud-bag-button__badge">${bagItems.length}</span>` : ''}
         </button>
       </div>`;
 
     const loadout = `
       <section class="hud-loadout">
-        <div class="fm-kicker hud-loadout__kicker">// LOADOUT</div>
+        <div class="fm-kicker fm-kicker--secondary hud-loadout__kicker">LOADOUT</div>
         <div class="hud-loadout__grid">
           ${weaponSlot(rHand, 'R.HAND')}
           ${weaponSlot(lHand, 'L.HAND')}
@@ -725,9 +843,9 @@ export class GameHUD {
       .filter(e =>
         e.actionType !== 'JOIN_LOBBY' && e.actionType !== 'START_GAME'
         && e.actionType !== 'RESOLVE_SEARCH' && e.actionType !== 'CHOOSE_SKILL'
-        && e.actionType !== 'KICK_PLAYER'
+        && e.actionType !== 'KICK_PLAYER' && e.actionType !== 'DISCONNECT'
       )
-      .slice(-8)
+      .slice(-14)
       .reverse();
 
     const lines = entries.map(e => {
@@ -750,7 +868,7 @@ export class GameHUD {
 
     return `
       <section class="hud-log">
-        <div class="fm-kicker hud-log__kicker">// FIELD LOG</div>
+        <div class="fm-kicker fm-kicker--secondary hud-log__kicker">FIELD LOG</div>
         <div class="hud-log__body">${body}</div>
       </section>`;
   }
@@ -794,6 +912,7 @@ export class GameHUD {
   private renderXpBar(survivor: Survivor): string {
     const level = String(survivor.dangerLevel).toUpperCase();
     const rank = dangerToRank(level);
+    const fillRank = nextRankColor(level);
     const xp = Math.max(0, survivor.experience || 0);
     const next = XP_NEXT_THRESHOLD[level];
     const current = XP_CURRENT_THRESHOLD[level] ?? 0;
@@ -802,11 +921,11 @@ export class GameHUD {
       return `
         <div class="hud-op__xp hud-op__xp--rank-${rank} hud-op__xp--max">
           <div class="hud-op__xp-head">
-            <span class="hud-op__xp-label">Experience</span>
-            <span class="hud-op__xp-value">${xp} XP · MAX</span>
+            <span class="hud-op__xp-label">XP</span>
+            <span class="hud-op__xp-value">${xp} · MAX</span>
           </div>
           <div class="hud-op__xp-track" role="progressbar" aria-valuenow="${xp}" aria-valuemin="0" aria-valuemax="${xp}">
-            <div class="hud-op__xp-fill hud-op__xp-fill--${rank}" style="width:100%"></div>
+            <div class="hud-op__xp-fill hud-op__xp-fill--${fillRank}" style="width:100%"></div>
           </div>
         </div>`;
     }
@@ -818,11 +937,11 @@ export class GameHUD {
     return `
       <div class="hud-op__xp hud-op__xp--rank-${rank}">
         <div class="hud-op__xp-head">
-          <span class="hud-op__xp-label">Experience</span>
-          <span class="hud-op__xp-value">${xp} / ${next}</span>
+          <span class="hud-op__xp-label">XP</span>
+          <span class="hud-op__xp-value">${xp} → ${next}</span>
         </div>
         <div class="hud-op__xp-track" role="progressbar" aria-label="Experience" aria-valuenow="${xp}" aria-valuemin="${current}" aria-valuemax="${next}">
-          <div class="hud-op__xp-fill hud-op__xp-fill--${rank}" style="width:${pct}%"></div>
+          <div class="hud-op__xp-fill hud-op__xp-fill--${fillRank}" style="width:${pct}%"></div>
         </div>
       </div>`;
   }
@@ -884,7 +1003,8 @@ export class GameHUD {
       }));
     }
 
-    return buttons.join('');
+    if (buttons.length === 0) return '';
+    return `<div class="hud-actions__skills">${buttons.join('')}</div>`;
   }
 
   private getWeaponBoosts(survivor: Survivor): Map<string, { dice: number; damage: number }> {
@@ -1196,16 +1316,18 @@ export class GameHUD {
       return;
     }
 
+    const BAG_CAPACITY = 3;
+
     this.backpackModalId = modalManager.open({
-      title: `Backpack (${survivor.inventory.length})`,
+      title: `Backpack (${survivor.inventory.filter(c => !c.inHand).length}/${BAG_CAPACITY})`,
       size: 'md',
       renderBody: () => {
-        if (survivor.inventory.length === 0) {
-          return '<div class="text-center-muted">Empty</div>';
-        }
+        const bagItems = survivor.inventory.filter(c => !c.inHand);
+        const emptyCount = Math.max(0, BAG_CAPACITY - bagItems.length);
 
         return `<div class="grid grid--2 gap-2">
-          ${survivor.inventory.map(item => renderItemCard(item)).join('')}
+          ${bagItems.map(item => renderItemCard(item)).join('')}
+          ${renderEmptySlotsCounter(emptyCount)}
         </div>`;
       },
       renderFooter: () => renderButton({ label: 'Close', variant: 'secondary', dataAction: 'modal-close' }),
@@ -1298,7 +1420,7 @@ export class GameHUD {
         const displayEntries = entries.filter(e =>
           e.actionType !== 'JOIN_LOBBY' && e.actionType !== 'START_GAME'
           && e.actionType !== 'RESOLVE_SEARCH' && e.actionType !== 'CHOOSE_SKILL'
-          && e.actionType !== 'KICK_PLAYER'
+          && e.actionType !== 'KICK_PLAYER' && e.actionType !== 'DISCONNECT'
         );
 
         const turnGroups: { turn: number; actions: typeof displayEntries }[] = [];

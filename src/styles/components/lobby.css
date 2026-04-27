@@ -124,7 +124,7 @@
 
 .lobby-room-chip:hover {
   background: rgba(240, 169, 74, 0.14);
-  box-shadow: 0 0 10px rgba(240, 169, 74, 0.25);
+  box-shadow: 0 0 0 1px var(--amber-400), 0 0 10px rgba(240, 169, 74, 0.25);
 }
 
 .lobby-room-chip:focus-visible {
@@ -148,13 +148,27 @@
 }
 
 .lobby-room-chip--copied {
-  border-color: var(--ready);
-  color: var(--ready);
-  background: rgba(122, 166, 74, 0.12);
+  border-color: var(--amber-200);
+  color: var(--amber-200);
+  background: rgba(240, 169, 74, 0.28);
+  box-shadow: 0 0 0 1px var(--amber-200), 0 0 14px rgba(240, 169, 74, 0.45);
+  animation: lobby-room-chip-flash 320ms ease-out;
 }
 
+.lobby-room-chip--copied .lobby-room-chip__label,
 .lobby-room-chip--copied .lobby-room-chip__id {
-  color: var(--ready);
+  color: var(--amber-200);
+}
+
+@keyframes lobby-room-chip-flash {
+  0% {
+    background: rgba(240, 169, 74, 0.55);
+    box-shadow: 0 0 0 1px var(--amber-200), 0 0 22px rgba(240, 169, 74, 0.7);
+  }
+  100% {
+    background: rgba(240, 169, 74, 0.28);
+    box-shadow: 0 0 0 1px var(--amber-200), 0 0 14px rgba(240, 169, 74, 0.45);
+  }
 }
 
 /* ---------- 2. Squad roster ---------- */
@@ -261,15 +275,66 @@
 .lobby-status--ready { color: var(--ready); }
 .lobby-status--standby { color: var(--bone-300); }
 
-/* ---------- 3. Call sign input ---------- */
+/* ---------- 3. Player plate (thin top strip) ---------- */
 
-.lobby-panel--callsign {
-  padding: 16px 20px;
+.lobby-panel--player {
+  padding: 8px 14px;
 }
 
-.lobby-callsign-input {
+.lobby-player {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  max-height: 48px;
+}
+
+.lobby-player__avatar {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, var(--bg-3), var(--bg-2));
+  border: 1px solid var(--olive-700);
+  overflow: hidden;
+  clip-path: polygon(
+    0 4px, 4px 0,
+    calc(100% - 4px) 0, 100% 4px,
+    100% calc(100% - 4px), calc(100% - 4px) 100%,
+    4px 100%, 0 calc(100% - 4px)
+  );
+}
+
+.lobby-player__img {
   width: 100%;
-  margin-top: 4px;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.lobby-player__img--empty {
+  background:
+    repeating-linear-gradient(
+      45deg,
+      transparent 0,
+      transparent 5px,
+      rgba(240, 169, 74, 0.18) 5px,
+      rgba(240, 169, 74, 0.18) 6px
+    );
+}
+
+.lobby-player__name {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  padding: 0 10px;
+}
+
+.lobby-player__status {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 /* ---------- 4. Operative roster ---------- */
@@ -308,6 +373,15 @@
 .lobby-roster__cell:hover:not(:disabled) {
   transform: translateY(-1px);
   filter: drop-shadow(0 0 6px rgba(240, 169, 74, 0.2));
+}
+
+.lobby-roster__cell--selected {
+  transform: translateY(-3px);
+  filter: drop-shadow(0 4px 14px rgba(240, 169, 74, 0.4));
+}
+
+.lobby-roster__cell--selected:hover:not(:disabled) {
+  transform: translateY(-3px);
 }
 
 .lobby-roster__cell:focus-visible {
@@ -480,15 +554,15 @@
 
 .lobby-rank-row {
   display: grid;
-  grid-template-columns: 10px 1fr;
-  grid-template-rows: auto auto;
+  grid-template-columns: 10px minmax(0, 1fr);
   column-gap: 12px;
-  row-gap: 4px;
+  row-gap: 6px;
   align-items: center;
 }
 
 .lobby-rank-chip {
-  grid-row: 1 / span 2;
+  grid-column: 1;
+  grid-row: 1 / -1;
   width: 10px;
   height: 24px;
   background: var(--rank-color, var(--olive-500));
@@ -498,9 +572,12 @@
 }
 
 .lobby-rank-head {
+  grid-column: 2;
+  grid-row: 1;
   display: flex;
   align-items: baseline;
   gap: 10px;
+  min-width: 0;
 }
 
 .lobby-rank-label {
@@ -521,6 +598,8 @@
   flex-wrap: wrap;
   gap: 5px;
   grid-column: 2;
+  grid-row: 2;
+  min-width: 0;
 }
 
 .lobby-rank-pill {
@@ -534,6 +613,18 @@
   border-radius: 2px;
   border: 1px solid currentColor;
   background: rgba(11, 13, 10, 0.35);
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.lobby-rank-hint {
+  grid-column: 2;
+  grid-row: 3;
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--bone-500);
+  opacity: 0.7;
 }
 
 .lobby-rank-pill--blue   { color: var(--rank-blue); }
@@ -651,11 +742,22 @@
     linear-gradient(180deg, var(--bg-1), var(--bg-2));
 }
 
+.lobby-roe-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.lobby-roe-list > .lobby-roe + .lobby-roe {
+  border-top: 1px dashed rgba(138, 149, 96, 0.18);
+  padding-top: 10px;
+}
+
 .lobby-roe {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-top: 8px;
   cursor: pointer;
 }
 
@@ -706,12 +808,35 @@
 
 .lobby-panel--footer {
   padding: 16px 20px 18px;
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  margin-top: auto;
+  background:
+    linear-gradient(180deg, transparent 0, var(--bg-1) 24%, var(--bg-1) 100%);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
 
 .lobby-footer {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+/* ---------- Dossier drawer (modal-as-bottom-sheet on mobile) ---------- */
+
+.lobby-dossier-modal__body {
+  padding: 16px 20px 20px;
+}
+
+@media (max-width: 480px) {
+  .modal.lobby-dossier-modal {
+    align-self: flex-end;
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 0;
+  }
 }
 
 /* ---------- Waiting state ---------- */

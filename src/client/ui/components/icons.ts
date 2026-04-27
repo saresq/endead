@@ -56,10 +56,11 @@ import {
   Footprints,
   Sparkles,
   ShieldCheck,
+  MoreHorizontal,
   type IconNode,
 } from 'lucide';
 
-type IconSize = 'sm' | 'md' | 'lg' | 'xl';
+type IconSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
 // Lucide IconNode is an array of [tag, attrs] tuples
 const ICON_REGISTRY: Record<string, IconNode> = {
@@ -112,6 +113,7 @@ const ICON_REGISTRY: Record<string, IconNode> = {
   Footprints,
   Sparkles,
   ShieldCheck,
+  MoreHorizontal,
 };
 
 export function icon(name: string, size: IconSize = 'md'): string {

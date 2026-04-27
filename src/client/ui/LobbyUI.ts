@@ -1,12 +1,11 @@
 
-import { GameState, PlayerId, DangerLevel } from '../../types/GameState';
+import { GameState, PlayerId } from '../../types/GameState';
 import { ActionType } from '../../types/Action';
 import { networkManager } from '../NetworkManager';
 import { CHARACTER_DEFINITIONS } from '../../config/CharacterRegistry';
-import { SURVIVOR_CLASSES, SKILL_DEFINITIONS } from '../../config/SkillRegistry';
-import { EQUIPMENT_CARDS } from '../../config/EquipmentRegistry';
 import { renderButton } from './components/Button';
 import { renderPhotoSlot } from './components/PhotoSlot';
+import { renderLobbyDossier } from './components/LobbyDossier';
 import { icon } from './components/icons';
 import { notificationManager } from './NotificationManager';
 import { modalManager } from './overlays/ModalManager';
@@ -27,25 +26,56 @@ const CHARACTER_ROLES: Record<string, string> = {
 // Max operatives per squad — mirrors `MAX_PLAYERS` in server.ts.
 const MAX_SQUAD = 6;
 
+// ROE rules shown in the Rules of Engagement panel. Only
+// `endless-horde` is wired to actual game config (abominationFest);
+// the rest are presentation-only toggles per task 11 (LOB-05).
+type RoeRule = {
+  id: string;
+  title: string;
+  description: string;
+  defaultOn: boolean;
+  riskLabel: string;
+  riskVariant: 'rust' | 'olive';
+};
+
+const ROE_RULES: RoeRule[] = [
+  {
+    id: 'endless-horde',
+    title: 'ENDLESS HORDE MODE',
+    description: 'UNLIMITED ABOMINATIONS MAY SPAWN. EXPECT CASUALTIES.',
+    defaultOn: false,
+    riskLabel: 'HIGH RISK',
+    riskVariant: 'rust',
+  },
+  {
+    id: 'friendly-fire',
+    title: 'FRIENDLY FIRE',
+    description: 'RANGED ATTACKS CAN STRIKE OPERATIVES IN THE TARGET ZONE.',
+    defaultOn: false,
+    riskLabel: 'HAZARD',
+    riskVariant: 'rust',
+  },
+  {
+    id: 'shared-vitals',
+    title: 'SHARED VITALS',
+    description: 'WOUNDS DISTRIBUTE ACROSS THE SQUAD. NO OPERATIVE FALLS ALONE.',
+    defaultOn: false,
+    riskLabel: 'TACTICAL',
+    riskVariant: 'olive',
+  },
+  {
+    id: 'perma-death',
+    title: 'PERMA-DEATH',
+    description: 'DOWNED OPERATIVES ARE LOST. NO REVIVES PERMITTED.',
+    defaultOn: false,
+    riskLabel: 'HIGH RISK',
+    riskVariant: 'rust',
+  },
+];
+
 function characterImageUrl(charClass: string): string {
   return `/images/characters/${charClass.toLowerCase()}.webp`;
 }
-
-// Rank labels + XP thresholds for the progression track.
-interface RankRow {
-  level: DangerLevel;
-  label: string;
-  xp: string;
-  colorVar: string;
-  pillClass: string;
-}
-
-const RANK_ROWS: RankRow[] = [
-  { level: DangerLevel.Blue,   label: 'BLUE',   xp: '0 XP',  colorVar: '--rank-blue',   pillClass: 'lobby-rank-pill--blue' },
-  { level: DangerLevel.Yellow, label: 'YELLOW', xp: '7 XP',  colorVar: '--rank-yellow', pillClass: 'lobby-rank-pill--yellow' },
-  { level: DangerLevel.Orange, label: 'ORANGE', xp: '19 XP', colorVar: '--rank-orange', pillClass: 'lobby-rank-pill--orange' },
-  { level: DangerLevel.Red,    label: 'RED',    xp: '43 XP', colorVar: '--rank-red',    pillClass: 'lobby-rank-pill--red' },
-];
 
 export class LobbyUI {
   private container: HTMLElement;
@@ -58,6 +88,13 @@ export class LobbyUI {
   private nameDebounceTimer: number | null = null;
   private roomPillCopied = false;
   private panelCache: Record<string, string> = {};
+  private selectedSurvivorId: string | null = null;
+  private dossierModalId: string | null = null;
+  private roeRuleStates: Record<string, boolean> = (() => {
+    const initial: Record<string, boolean> = {};
+    for (const rule of ROE_RULES) initial[rule.id] = rule.defaultOn;
+    return initial;
+  })();
 
   constructor(playerId: PlayerId, roomId: string) {
     this.localPlayerId = playerId;
@@ -136,10 +173,9 @@ export class LobbyUI {
     const panels: Array<{ key: string; html: string }> = [];
     const hostId = this.state.lobby.players[0]?.id ?? null;
     panels.push({ key: 'briefing', html: this.renderBriefingPanel() });
+    if (myPlayer) panels.push({ key: 'playerPlate', html: this.renderPlayerPlatePanel(myPlayer) });
     panels.push({ key: 'squad', html: this.renderSquadPanel(this.state.lobby.players, hostId) });
-    if (myPlayer) panels.push({ key: 'callsign', html: this.renderCallsignPanel(myPlayer) });
     panels.push({ key: 'roster', html: this.renderRosterPanel(myChar, takenClasses) });
-    if (myChar) panels.push({ key: 'operative', html: this.renderOperativePanel(myChar) });
     panels.push({ key: 'area', html: this.renderAreaPanel(selectedMap, isHost) });
     panels.push({ key: 'roe', html: this.renderRoePanel(abomFest, isHost) });
     panels.push({ key: 'footer', html: this.renderFooterPanel(isHost, allReady) });
@@ -214,7 +250,7 @@ export class LobbyUI {
       prevEl = existing;
     }
 
-    if (hadFocus && rerendered.has('callsign')) {
+    if (hadFocus && rerendered.has('playerPlate')) {
       const nextInput = stack.querySelector('#lobby-nickname') as HTMLInputElement | null;
       if (nextInput) {
         nextInput.focus();
@@ -235,8 +271,10 @@ export class LobbyUI {
   // ─── Panel renderers ─────────────────────────────────────────
 
   private renderBriefingPanel(): string {
-    const copyGlyph = this.roomPillCopied ? icon('Check', 'sm') : icon('Copy', 'sm');
-    const copiedClass = this.roomPillCopied ? ' lobby-room-chip--copied' : '';
+    const copied = this.roomPillCopied;
+    const copyGlyph = copied ? icon('Check', 'sm') : icon('Copy', 'sm');
+    const copiedClass = copied ? ' lobby-room-chip--copied' : '';
+    const label = copied ? '// COPIED' : 'ROOM';
     return `
       <section class="fm-panel lobby-panel lobby-panel--briefing">
         <span class="fm-panel-dot fm-panel-dot--tl"></span>
@@ -250,10 +288,10 @@ export class LobbyUI {
             type="button"
             id="room-pill"
             class="lobby-room-chip${copiedClass}"
-            title="Copy room URL"
-            aria-label="Copy room URL to clipboard"
+            title="Copy room code"
+            aria-label="Copy room code to clipboard"
           >
-            <span class="lobby-room-chip__label">ROOM</span>
+            <span class="lobby-room-chip__label">${label}</span>
             <span class="lobby-room-chip__id">${this.escHtml(this.roomId)}</span>
             <span class="lobby-room-chip__glyph">${copyGlyph}</span>
           </button>
@@ -293,7 +331,7 @@ export class LobbyUI {
     return `
       <section class="fm-panel lobby-panel lobby-panel--squad">
         <div class="lobby-squad__header">
-          <div class="fm-kicker">// SQUAD</div>
+          <div class="fm-kicker fm-kicker--secondary">SQUAD</div>
           <div class="lobby-squad__count fm-mono">${players.length}/${MAX_SQUAD}</div>
         </div>
         <ul class="lobby-squad">${rows}</ul>
@@ -301,22 +339,32 @@ export class LobbyUI {
     `;
   }
 
-  private renderCallsignPanel(
+  private renderPlayerPlatePanel(
     myPlayer: { id: PlayerId; name: string; ready: boolean; characterClass: string },
   ): string {
+    const ready = !!myPlayer.characterClass;
+    const statusClass = ready ? 'lobby-status--ready' : 'lobby-status--standby';
+    const statusLabel = ready ? '● READY' : '● STANDBY';
+    const avatarInner = myPlayer.characterClass
+      ? `<img class="lobby-player__img" src="${this.escHtml(characterImageUrl(myPlayer.characterClass))}" alt="${this.escHtml(myPlayer.characterClass)}" />`
+      : `<span class="lobby-player__img lobby-player__img--empty" aria-hidden="true"></span>`;
+
     return `
-      <section class="fm-panel lobby-panel lobby-panel--callsign">
-        <label class="fm-input__label" for="lobby-nickname">CALL SIGN</label>
-        <input
-          id="lobby-nickname"
-          class="fm-input lobby-callsign-input"
-          type="text"
-          value="${this.escHtml(myPlayer.name)}"
-          placeholder="ENTER CALL SIGN"
-          maxlength="24"
-          aria-label="Your call sign"
-          autocomplete="off"
-        />
+      <section class="fm-panel lobby-panel lobby-panel--player">
+        <div class="lobby-player">
+          <div class="lobby-player__avatar">${avatarInner}</div>
+          <input
+            id="lobby-nickname"
+            class="fm-input lobby-player__name"
+            type="text"
+            value="${this.escHtml(myPlayer.name)}"
+            placeholder="ENTER CALL SIGN"
+            maxlength="24"
+            aria-label="Your call sign"
+            autocomplete="off"
+          />
+          <span class="lobby-status ${statusClass} lobby-player__status">${statusLabel}</span>
+        </div>
       </section>
     `;
   }
@@ -365,101 +413,11 @@ export class LobbyUI {
 
     return `
       <section class="fm-panel lobby-panel lobby-panel--roster">
-        <div class="fm-kicker">// OPERATIVE ROSTER</div>
+        <div class="fm-kicker fm-kicker--secondary">OPERATIVE ROSTER</div>
         <div class="lobby-roster" role="radiogroup" aria-label="Select operative">
           ${cells}
         </div>
       </section>
-    `;
-  }
-
-  private renderOperativePanel(charClass: string): string {
-    const dossier = this.renderDossierSection(charClass);
-    const loadout = this.renderLoadoutSection(charClass);
-    const progression = this.renderProgressionSection(charClass);
-
-    const parts = [dossier, loadout, progression].filter(Boolean);
-    const body = parts.join('<div class="lobby-operative__divider" aria-hidden="true"></div>');
-
-    return `
-      <section class="fm-panel lobby-panel lobby-panel--operative">
-        ${body}
-      </section>
-    `;
-  }
-
-  private renderDossierSection(charClass: string): string {
-    const charDef = CHARACTER_DEFINITIONS[charClass];
-    if (!charDef) return '';
-    const role = CHARACTER_ROLES[charClass] ?? 'OPERATIVE';
-
-    return `
-      <div class="lobby-operative__section">
-        <div class="fm-kicker">// DOSSIER</div>
-        <div class="lobby-dossier__body">
-          <div class="fm-stencil lobby-dossier__name">${this.escHtml(charClass.toUpperCase())}</div>
-          <div class="lobby-dossier__sub fm-mono">${role}</div>
-        </div>
-      </div>
-    `;
-  }
-
-  private renderLoadoutSection(charClass: string): string {
-    const charDef = CHARACTER_DEFINITIONS[charClass];
-    if (!charDef) return '';
-    const template = EQUIPMENT_CARDS[charDef.startingEquipmentKey];
-    if (!template) return '';
-
-    const stats = template.stats;
-    const statLine = stats
-      ? `${stats.accuracy}+ · ${stats.dice}d6 · ${stats.damage}`
-      : '—';
-    const weaponName = template.name.toUpperCase();
-
-    return `
-      <div class="lobby-operative__section">
-        <div class="lobby-loadout">
-          <div class="lobby-loadout__icon-slot">
-            <span class="lobby-loadout__icon">${icon('Swords', 'md')}</span>
-          </div>
-          <div class="lobby-loadout__text">
-            <div class="fm-kicker">R. HAND · EQUIPPED</div>
-            <div class="fm-stencil lobby-loadout__name">${this.escHtml(weaponName)}</div>
-            <div class="lobby-loadout__stats fm-mono">${statLine}</div>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  private renderProgressionSection(charClass: string): string {
-    const progression = SURVIVOR_CLASSES[charClass];
-    if (!progression) return '';
-
-    const rows = RANK_ROWS.map(row => {
-      const skillIds = progression[row.level] || [];
-      const skills = skillIds.map(id => SKILL_DEFINITIONS[id]).filter(Boolean);
-      const pills = skills.map(s =>
-        `<span class="lobby-rank-pill ${row.pillClass}" title="${this.escHtml(s.description)}">${this.escHtml(s.name)}</span>`
-      ).join('');
-
-      return `
-        <div class="lobby-rank-row">
-          <span class="lobby-rank-chip" style="--rank-color: var(${row.colorVar});"></span>
-          <div class="lobby-rank-head">
-            <span class="fm-stencil lobby-rank-label">${row.label}</span>
-            <span class="lobby-rank-xp fm-mono">${row.xp}</span>
-          </div>
-          <div class="lobby-rank-pills">${pills || '<span class="lobby-rank-empty fm-mono">—</span>'}</div>
-        </div>
-      `;
-    }).join('');
-
-    return `
-      <div class="lobby-operative__section">
-        <div class="fm-kicker">// PROGRESSION TRACK</div>
-        <div class="lobby-progression">${rows}</div>
-      </div>
     `;
   }
 
@@ -485,13 +443,13 @@ export class LobbyUI {
         <div class="lobby-area">
           <div class="lobby-area__bar" aria-hidden="true"></div>
           <div class="lobby-area__text">
-            <div class="fm-kicker">// AREA OF OPERATION</div>
+            <div class="fm-kicker fm-kicker--secondary">AREA OF OPERATION</div>
             <div class="fm-stencil lobby-area__name">${this.escHtml(name.toUpperCase())} · ${size}</div>
             <div class="lobby-area__sub fm-mono">HOSTILE DENSITY: MEDIUM</div>
           </div>
           <div class="lobby-area__select-wrap">
             ${selectHtml}
-            <span class="lobby-area__caret" aria-hidden="true">▾</span>
+            <span class="lobby-area__caret" aria-hidden="true">${icon('ChevronDown', 'xs')}</span>
           </div>
         </div>
       </section>
@@ -501,33 +459,53 @@ export class LobbyUI {
   private renderRoePanel(abomFest: boolean, isHost: boolean): string {
     const disabledAttr = isHost ? '' : 'disabled';
     const readonlyClass = isHost ? '' : ' lobby-roe--readonly';
-    return `
-      <section class="fm-panel lobby-panel lobby-panel--roe${readonlyClass}">
-        <div class="fm-kicker">// RULES OF ENGAGEMENT</div>
+
+    // Keep `endless-horde` synced to the canonical abominationFest flag
+    // before rendering so the row reflects host-driven config.
+    this.roeRuleStates['endless-horde'] = abomFest;
+
+    const rows = ROE_RULES.map(rule => {
+      const on = !!this.roeRuleStates[rule.id];
+      const checkboxId = `lobby-roe-${rule.id}`;
+      const ariaInputId = rule.id === 'endless-horde' ? 'lobby-abom-fest' : checkboxId;
+      const chipVariant = rule.riskVariant === 'rust' ? 'lobby-chip lobby-chip--rust' : 'lobby-chip';
+      return `
         <label class="lobby-roe">
           <input
             type="checkbox"
-            id="lobby-abom-fest"
+            id="${ariaInputId}"
             class="lobby-roe__check"
-            ${abomFest ? 'checked' : ''}
+            data-roe-id="${rule.id}"
+            ${on ? 'checked' : ''}
             ${disabledAttr}
           />
           <div class="lobby-roe__text">
-            <div class="fm-stencil lobby-roe__title">ENDLESS HORDE MODE</div>
-            <div class="lobby-roe__desc fm-mono">UNLIMITED ABOMINATIONS MAY SPAWN. EXPECT CASUALTIES.</div>
+            <div class="fm-stencil lobby-roe__title">${this.escHtml(rule.title)}</div>
+            <div class="lobby-roe__desc fm-mono">${this.escHtml(rule.description)}</div>
           </div>
-          <span class="lobby-chip lobby-chip--rust lobby-roe__tag">HIGH RISK</span>
+          <span class="${chipVariant} lobby-roe__tag">${this.escHtml(rule.riskLabel)}</span>
         </label>
+      `;
+    }).join('');
+
+    return `
+      <section class="fm-panel lobby-panel lobby-panel--roe${readonlyClass}">
+        <div class="fm-kicker fm-kicker--secondary">RULES OF ENGAGEMENT</div>
+        <div class="lobby-roe-list" role="group" aria-label="Rules of engagement">
+          ${rows}
+        </div>
       </section>
     `;
   }
 
   private renderFooterPanel(isHost: boolean, allReady: boolean): string {
-    const playerCount = this.state?.lobby.players.length ?? 0;
+    const players = this.state?.lobby.players ?? [];
+    const totalCount = players.length;
+    const readyCount = players.filter(p => !!p.characterClass).length;
 
     const primaryBtn = isHost
       ? renderButton({
-          label: `BEGIN OPERATION (${playerCount})`,
+          label: `BEGIN OPERATION · ${readyCount}/${totalCount} READY`,
           icon: 'Play',
           variant: 'primary',
           size: 'lg',
@@ -593,6 +571,7 @@ export class LobbyUI {
             type: ActionType.SELECT_CHARACTER,
             payload: { characterClass: charClass, name: nameInput?.value },
           });
+          this.openDossier(charClass);
         }
         return;
       }
@@ -667,26 +646,92 @@ export class LobbyUI {
       if (target.id === 'lobby-map-select') {
         this.selectedMapId = (target as HTMLSelectElement).value;
         this.render();
-      } else if (target.id === 'lobby-abom-fest') {
-        this.abominationFest = (target as HTMLInputElement).checked;
+        return;
+      }
+      if (target instanceof HTMLInputElement && target.classList.contains('lobby-roe__check')) {
+        const ruleId = target.dataset.roeId ?? (target.id === 'lobby-abom-fest' ? 'endless-horde' : null);
+        if (!ruleId) return;
+        const next = target.checked;
+        this.roeRuleStates[ruleId] = next;
+        if (ruleId === 'endless-horde') this.abominationFest = next;
       }
     });
   }
 
   private async handleRoomPillCopy(): Promise<void> {
-    const roomUrl = `${window.location.origin}/room/${this.roomId}`;
-    try {
-      await navigator.clipboard.writeText(roomUrl);
+    const setCopied = () => {
       this.roomPillCopied = true;
       this.render();
-      notificationManager.show({ variant: 'success', message: 'Room URL copied!', priority: 'low' });
       setTimeout(() => {
         this.roomPillCopied = false;
         this.render();
-      }, 2000);
-    } catch {
-      notificationManager.show({ variant: 'warning', message: 'Could not copy URL. Room code: ' + this.roomId });
+      }, 1200);
+    };
+
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(this.roomId);
+        setCopied();
+        return;
+      } catch {
+        // fall through to legacy path
+      }
     }
+
+    // Legacy fallback for non-secure contexts / older browsers.
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = this.roomId;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      if (ok) {
+        setCopied();
+        return;
+      }
+    } catch {
+      // fall through to notification
+    }
+
+    notificationManager.show({ variant: 'warning', message: 'Could not copy. Room code: ' + this.roomId });
+  }
+
+  // ─── Dossier drawer ──────────────────────────────────────────
+
+  private openDossier(charClass: string): void {
+    if (!CHARACTER_DEFINITIONS[charClass]) return;
+    const role = CHARACTER_ROLES[charClass] ?? 'OPERATIVE';
+    const body = renderLobbyDossier(charClass, role);
+
+    if (this.dossierModalId && modalManager.isOpen(this.dossierModalId)) {
+      this.selectedSurvivorId = charClass;
+      modalManager.updateBody(this.dossierModalId, body);
+      const el = modalManager.getElement(this.dossierModalId);
+      const titleEl = el?.querySelector('.modal__title') as HTMLElement | null;
+      if (titleEl) titleEl.textContent = `OPERATIVE · ${charClass.toUpperCase()}`;
+      const subEl = el?.querySelector('.modal__subtitle') as HTMLElement | null;
+      if (subEl) subEl.textContent = role;
+      else if (this.dossierModalId) modalManager.updateSubtitle(this.dossierModalId, role);
+      return;
+    }
+
+    this.selectedSurvivorId = charClass;
+    this.dossierModalId = modalManager.open({
+      title: `OPERATIVE · ${charClass.toUpperCase()}`,
+      subtitle: role,
+      size: 'sm',
+      className: 'lobby-dossier-modal',
+      bodyClassName: 'lobby-dossier-modal__body',
+      renderBody: () => body,
+      onClose: () => {
+        this.selectedSurvivorId = null;
+        this.dossierModalId = null;
+      },
+    });
   }
 
   // ─── Helpers ─────────────────────────────────────────────────

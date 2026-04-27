@@ -198,6 +198,42 @@
   content: ' —';
 }
 
+/* ---------- Variant: slots-counter (collapsed empty bag slots) ---------- */
+
+.item-card--slots-counter {
+  border-style: dashed;
+  border-color: var(--dl-panel-border, var(--dl-border));
+  background: transparent;
+  box-shadow: none;
+  opacity: 0.7;
+}
+
+.item-card--slots-counter::after {
+  display: none;
+}
+
+.item-card--slots-counter .item-card__name {
+  font-family: var(--font-mono);
+  font-weight: var(--font-bold);
+  color: var(--text-muted);
+  letter-spacing: var(--letter-spacing-wider);
+}
+
+.item-card__icon--plus {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: var(--font-black);
+  color: var(--text-muted);
+  line-height: 1;
+  background: transparent;
+  border-style: dashed;
+  box-shadow: none;
+}
+
+.item-card__icon--plus::after {
+  display: none;
+}
+
 /* ---------- Variant: ghost (incoming item) ---------- */
 
 .item-card--ghost {

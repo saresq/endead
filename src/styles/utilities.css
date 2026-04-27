@@ -138,6 +138,18 @@
   letter-spacing: 0;
 }
 
+/* Secondary tier — used on sub-panel labels so screen headers stay dominant. */
+.fm-kicker--secondary {
+  font-size: 9px;
+  letter-spacing: var(--letter-spacing-wider);
+  color: var(--text-muted, var(--bone-500));
+  opacity: 0.78;
+}
+
+.fm-kicker--secondary::before {
+  content: none;
+}
+
 /* ==========================================================================
    Field Manual — hazard tape stripe
    ========================================================================== */
@@ -167,6 +179,21 @@
   box-shadow: var(--shadow-inset), var(--shadow-hard);
   padding: var(--space-4);
   animation: panel-fade-in 200ms var(--ease-out) both;
+}
+
+/* Printed-paper grain overlay — keeps dark panel surfaces from reading flat.
+   Held to 4–6% via the existing grain-opacity token; overlay blend mode means
+   the noise modulates the surface luminance without fuzzing text. Clipped by
+   the parent's polygon clip-path automatically. */
+.fm-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--grain-url);
+  background-size: 160px 160px;
+  opacity: 0.05;
+  pointer-events: none;
+  mix-blend-mode: overlay;
 }
 
 .fm-panel::after {

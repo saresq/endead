@@ -95,3 +95,19 @@ export function renderItemCard(card: EquipmentCard | null | undefined, opts?: It
 export function renderEmptySlot(): string {
   return '<span class="item-card__empty">Empty</span>';
 }
+
+/**
+ * Renders a single capacity counter for empty bag slots.
+ * Replaces N identical "EMPTY" rows with one "+ N SLOTS FREE" affordance.
+ */
+export function renderEmptySlotsCounter(count: number): string {
+  if (count <= 0) return '';
+  const label = count === 1 ? '1 SLOT FREE' : `${count} SLOTS FREE`;
+  return `
+    <div class="item-card item-card--slots-counter" aria-label="${label.toLowerCase()}">
+      <span class="item-card__icon item-card__icon--plus" aria-hidden="true">+</span>
+      <div class="item-card__body">
+        <span class="item-card__name">${label}</span>
+      </div>
+    </div>`;
+}
