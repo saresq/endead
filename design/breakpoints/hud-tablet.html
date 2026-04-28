@@ -1,456 +1,274 @@
-<!DOCTYPE html>
-<html lang="en" data-danger="orange">
+<!doctype html>
+<html lang="en" class="in-game" data-danger="blue">
 <head>
   <meta charset="utf-8" />
-  <title>HUD — Tablet (md: 768px) Mockup</title>
-  <meta name="viewport" content="width=768" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HUD — Tablet (md: 768) · Endead live snapshot</title>
 
   <!--
-    DESIGN-ONLY MOCKUP — DO NOT WIRE INTO LIVE CSS.
-    Live wire-in targets:
-      - src/styles/components/hud.css       (md grid override on #game-hud,
-                                              top-bar squad pill list,
-                                              actions grid 6-up)
-      - src/styles/components/game-layout.css (no change required —
-                                              .game-layout already stacks
-                                              top/canvas/bottom; the map
-                                              flex split moves to hud.css)
+    Regenerated from live at 2026-04-27.
+    Target state: in-game HUD at md tablet width. Captured immediately
+                  after BEGIN OPERATION started a game with WANDA as the
+                  active operative, dossier modal closed via Escape.
+    Target viewport: 768 x 1024.
+    Source: src/client/ui/GameHUD.ts rendered by Vite dev server.
 
-    Tablet behavior (md: 768px ≤ width < 1024px):
-      - Squad rail collapses to a HORIZONTAL pill list under the topbar
-        (row 2). Each squad plate becomes a compact pill: callsign +
-        HP/AP pip rail, overflow-x scroll if more than 4 operatives.
-      - Body splits 60/40 — map column ~60%, right panel (feed +
-        actions) ~40%. No left rail at this width.
-      - Actions grid renders 6 across in one row instead of 3×2.
-      - Mobile (<768) stack and laptop (≥1024) 3-column grid are
-        unchanged at their respective widths.
+    The live PIXI canvas backs the .hud-map-window slot; the captured
+    DOM keeps the canvas-less .hud-map-window placeholder so the file
+    renders without PIXI. Live <html> attributes preserved:
+    class="in-game" and data-danger="blue".
+
+    The live md tablet rules live in src/styles/components/hud.css
+    inside the @media (min-width: 768px) and (max-width: 1023px) block.
   -->
 
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Barlow+Condensed:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" />
+
   <link rel="stylesheet" href="../../src/styles/tokens.css" />
+  <link rel="stylesheet" href="../../src/styles/reset.css" />
   <link rel="stylesheet" href="../../src/styles/base.css" />
   <link rel="stylesheet" href="../../src/styles/utilities.css" />
   <link rel="stylesheet" href="../../src/styles/layout.css" />
-  <link rel="stylesheet" href="../../src/styles/components/field-manual.css" />
+  <link rel="stylesheet" href="../../src/styles/components/icons.css" />
   <link rel="stylesheet" href="../../src/styles/components/buttons.css" />
+  <link rel="stylesheet" href="../../src/styles/components/forms.css" />
+  <link rel="stylesheet" href="../../src/styles/components/field-manual.css" />
+  <link rel="stylesheet" href="../../src/styles/components/item-card.css" />
+  <link rel="stylesheet" href="../../src/styles/components/player-avatar.css" />
   <link rel="stylesheet" href="../../src/styles/components/hud.css" />
-
-  <style>
-    /* =============================================================
-       MOCKUP-LOCAL CSS — tablet breakpoint preview only.
-       ============================================================= */
-    html, body { background: var(--bg-0); margin: 0; }
-    body {
-      width: 768px;
-      min-height: 100vh;
-      font-family: var(--font-body);
-      color: var(--bone-100);
-    }
-
-    .mockup-frame {
-      position: relative;
-      width: 768px;
-      height: 1024px;
-      background:
-        radial-gradient(ellipse at 30% 35%, rgba(80, 70, 40, 0.25) 0%, transparent 55%),
-        linear-gradient(180deg, #1a1408 0%, #0b0d0a 100%);
-      overflow: hidden;
-    }
-
-    .mockup-caption {
-      position: fixed;
-      top: 8px;
-      right: 8px;
-      z-index: 9999;
-      padding: 4px 10px;
-      background: var(--bg-1);
-      border: 1px solid var(--olive-700);
-      color: var(--amber-200);
-      font-family: var(--font-mono);
-      font-size: 10px;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-    }
-
-    /* Faux PIXI canvas — same role as the real renderer mount. */
-    .mockup-canvas {
-      position: absolute;
-      inset: 0;
-      background:
-        repeating-linear-gradient(0deg, rgba(138, 149, 96, 0.06) 0 1px, transparent 1px 48px),
-        repeating-linear-gradient(90deg, rgba(138, 149, 96, 0.06) 0 1px, transparent 1px 48px),
-        radial-gradient(ellipse at 40% 50%, rgba(196, 90, 44, 0.22) 0%, transparent 45%),
-        linear-gradient(180deg, #1c1208 0%, #0d0a06 100%);
-    }
-
-    .mockup-canvas::after {
-      content: 'PIXI MAP';
-      position: absolute;
-      top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      color: rgba(232, 225, 204, 0.18);
-      font-family: var(--font-mono);
-      font-size: 24px;
-      letter-spacing: 0.4em;
-    }
-
-    /* ---------- md: 768px tablet override (mockup-local) ---------- */
-    @media (min-width: 768px) and (max-width: 1023px) {
-      #game-hud {
-        position: absolute;
-        inset: 0;
-        grid-template-rows:
-          var(--hud-topbar-height, 44px)
-          auto       /* squad rail as horizontal strip */
-          minmax(0, 1fr)
-          auto;      /* actions row */
-        grid-template-columns: minmax(0, 60fr) minmax(0, 40fr);
-        grid-template-areas:
-          "topbar  topbar"
-          "rail-l  rail-l"
-          "center  rail-r"
-          "actions actions";
-      }
-
-      /* Left rail becomes the top squad-pill strip. */
-      #game-hud > .hud-rail--left {
-        grid-area: rail-l;
-        border-right: 0;
-        border-bottom: 1px solid var(--olive-700);
-        background: linear-gradient(180deg, var(--bg-1), var(--bg-0));
-        padding: 6px 10px;
-        overflow-x: auto;
-        overflow-y: hidden;
-      }
-
-      .hud-rail--left .hud-rail__kicker {
-        display: none;
-      }
-
-      .hud-rail--left .hud-rail__list {
-        display: flex;
-        flex-direction: row;
-        gap: 8px;
-        padding: 0;
-        overflow: visible;
-      }
-
-      .hud-rail--left .fm-squadplate {
-        flex: 0 0 auto;
-        width: 168px;
-      }
-
-      /* Right rail = feed; sits in 40% column. */
-      #game-hud > .hud-rail--right {
-        grid-area: rail-r;
-        border-left: 1px solid var(--olive-700);
-      }
-
-      /* Center column = map window only at this breakpoint. */
-      #game-hud > .hud-center {
-        grid-area: center;
-      }
-
-      /* Actions grid spans full width — 6-up row. */
-      .hud-actions {
-        grid-area: actions;
-        pointer-events: auto;
-        padding: 8px 12px;
-        background: linear-gradient(0deg, var(--bg-1), var(--bg-0));
-        border-top: 1px solid var(--olive-700);
-      }
-
-      .hud-actions__grid {
-        display: grid;
-        grid-template-columns: repeat(6, 1fr);
-        gap: 8px;
-      }
-    }
-
-    /* Inline structural fallbacks for primitives the mockup uses but
-       that the live HUD would normally hydrate from React state. */
-    .mockup-pill {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 6px 10px;
-      background: var(--bg-2);
-      border: 1px solid var(--olive-700);
-      border-left-width: 3px;
-      flex: 0 0 auto;
-      width: 168px;
-      min-height: 44px;
-    }
-    .mockup-pill--active { border-left-color: var(--amber-400); background: linear-gradient(180deg, var(--bg-2), var(--bg-1)); }
-    .mockup-pill--blue   { border-left-color: var(--rank-blue); }
-    .mockup-pill--yellow { border-left-color: var(--rank-yellow); }
-    .mockup-pill--orange { border-left-color: var(--rank-orange); }
-    .mockup-pill__name {
-      font-family: var(--font-stencil);
-      font-size: 13px;
-      letter-spacing: 0.16em;
-      color: var(--bone-100);
-      flex: 1;
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .mockup-pill__pips {
-      display: flex;
-      gap: 2px;
-    }
-    .mockup-pill__pip {
-      width: 6px; height: 10px;
-      background: var(--olive-700);
-    }
-    .mockup-pill__pip--on { background: var(--ready); }
-    .mockup-pill__pip--ap { background: var(--amber-400); }
-
-    .mockup-action {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 2px;
-      min-height: 56px;
-      padding: 6px 4px;
-      background: linear-gradient(180deg, var(--bg-2), var(--bg-1));
-      border: 1px solid var(--olive-700);
-      border-bottom-width: 2px;
-      color: var(--bone-100);
-      font-family: var(--font-stencil);
-      font-size: 11px;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-      cursor: pointer;
-    }
-    .mockup-action__kbd {
-      font-family: var(--font-mono);
-      font-size: 9px;
-      color: var(--amber-400);
-      letter-spacing: 0.12em;
-    }
-    .mockup-action--primary {
-      border-color: var(--amber-400);
-      box-shadow: 0 0 0 1px var(--accent-muted), inset 0 0 12px var(--accent-muted);
-      color: var(--amber-200);
-    }
-
-    .mockup-feed {
-      padding: 10px 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      height: 100%;
-      overflow-y: auto;
-      background: linear-gradient(180deg, var(--bg-1), var(--bg-0));
-    }
-    .mockup-feed__title {
-      font-family: var(--font-stencil);
-      font-size: 10px;
-      letter-spacing: 0.22em;
-      color: var(--bone-500);
-      text-transform: uppercase;
-      border-bottom: 1px dashed rgba(138, 149, 96, 0.3);
-      padding-bottom: 4px;
-    }
-    .mockup-feed__entry {
-      border-left: 2px solid var(--olive-700);
-      padding: 4px 8px;
-      font-size: 11px;
-      color: var(--bone-100);
-      letter-spacing: 0.04em;
-    }
-    .mockup-feed__entry--action { border-left-color: var(--amber-400); }
-    .mockup-feed__entry--spawn  { border-left-color: var(--rust-400); }
-    .mockup-feed__entry small {
-      display: block;
-      color: var(--bone-500);
-      font-family: var(--font-mono);
-      font-size: 9px;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-    }
-
-    .mockup-topbar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      height: 100%;
-      padding: 0 12px;
-      gap: 12px;
-    }
-    .mockup-topbar__group { display: flex; align-items: center; gap: 10px; min-width: 0; }
-    .mockup-topbar__phase {
-      font-family: var(--font-stencil);
-      font-size: 14px;
-      letter-spacing: 0.2em;
-      color: var(--amber-200);
-    }
-    .mockup-topbar__round {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      letter-spacing: 0.16em;
-      color: var(--bone-500);
-    }
-    .mockup-topbar__danger {
-      padding: 4px 10px;
-      background: var(--rust-700);
-      color: var(--bone-100);
-      font-family: var(--font-stencil);
-      font-size: 11px;
-      letter-spacing: 0.22em;
-      text-transform: uppercase;
-      border: 1px solid var(--rust-400);
-    }
-  </style>
+  <link rel="stylesheet" href="../../src/styles/components/game-layout.css" />
+  <link rel="stylesheet" href="../../src/styles/components/tooltip.css" />
 </head>
 <body>
-  <div class="mockup-caption">HUD · MD 768 · TABLET</div>
-
-  <div class="mockup-frame">
-    <div class="mockup-canvas"></div>
-
-    <div id="game-hud">
-      <!-- Topbar -->
-      <div class="hud-topbar hud-topbar--my-turn">
-        <div class="hud-topbar__inner">
-          <div class="mockup-topbar" style="flex:1;">
-            <div class="mockup-topbar__group">
-              <span class="mockup-topbar__phase">PLAYERS · TURN 4</span>
-              <span class="mockup-topbar__round">PHASE 2 / 3</span>
+<div id="game-hud"><div class="hud-topbar">
+      <div class="hud-topbar__inner hud-topbar--my-turn hud-topbar--danger-blue">
+        <div class="hud-topbar__left">
+          <button class="hud-turnchip" data-action="open-history" title="View turn history" aria-label="Turn 1 — click to view history">
+            <span class="hud-turnchip__label">TURN</span>
+            <span class="hud-turnchip__value">01</span>
+          </button>
+          <div class="hud-phaseindicator" role="status" aria-live="polite" aria-label="Current phase: PLAYER · OPS-04">
+            <span class="hud-phaseindicator__bracket hud-phaseindicator__bracket--left" aria-hidden="true">[</span>
+            <span class="hud-phaseindicator__label">PLAYER · OPS-04</span>
+            <span class="hud-phaseindicator__bracket hud-phaseindicator__bracket--right" aria-hidden="true">]</span>
+            <span class="hud-phaseindicator__ticks" aria-hidden="true">
+              <span class="hud-phasetick hud-phasetick--current" aria-hidden="true"></span>
+              <span class="hud-phasetick" aria-hidden="true"></span>
+              <span class="hud-phasetick" aria-hidden="true"></span>
+            </span>
+          </div>
+        </div>
+        <div class="hud-topbar__right">
+          <span class="hud-channel">CH YFJTVM</span>
+          <button id="btn-menu" class="hud-iconbtn" data-action="open-menu" title="Menu" aria-label="Menu"><svg class="icon icon--sm" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16"></path><path d="M4 12h16"></path><path d="M4 19h16"></path></svg></button>
+        </div>
+        <div class="hud-topbar__bar"></div>
+      </div></div><aside class="hud-rail hud-rail--left"><div class="fm-kicker fm-kicker--secondary hud-rail__kicker">SQUAD · 1</div><div class="hud-rail__list">
+      <button type="button" class="fm-squadplate fm-squadplate--rank-blue fm-squadplate--active fm-squadplate--compact fm-squadplate--clickable" data-action="select-survivor" data-survivor-id="survivor-player-408756" aria-pressed="true">
+        
+      <div class="fm-squadplate__stripe" style="background:#d94444;"></div>
+      <div class="fm-squadplate__body">
+        <div class="fm-squadplate__head">
+          <span class="fm-squadplate__name">OPS-04</span>
+          <span class="fm-squadplate__callsign">P-01</span>
+          <span class="fm-squadplate__activetag" aria-label="Active operative"><svg class="icon icon--xs" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"></path></svg> ACTIVE</span>
+        </div>
+      </div>
+      </button>
+    </div></aside><div class="hud-center"><div class="hud-feed-slot"></div><div class="hud-map-window fm-brackets"><span class="fm-bracket-tr"></span><span class="fm-bracket-bl"></span></div></div><aside class="hud-rail hud-rail--right fm-brackets fm-brackets--amber">
+      <span class="fm-bracket-tr"></span><span class="fm-bracket-bl"></span>
+      <div class="hud-rail__body">
+        
+      <div class="hud-op">
+        <div class="hud-op__head">
+          <div class="hud-op__head-left">
+            
+    <div class="fm-photoslot fm-photoslot--sm">
+      <div class="fm-photoslot__frame">
+        <img class="fm-photoslot__img" src="../../public/images/characters/wanda.webp" alt="">
+        
+    <span class="fm-photoslot__corner fm-photoslot__corner--tl" aria-hidden="true"></span>
+    <span class="fm-photoslot__corner fm-photoslot__corner--tr" aria-hidden="true"></span>
+    <span class="fm-photoslot__corner fm-photoslot__corner--bl" aria-hidden="true"></span>
+    <span class="fm-photoslot__corner fm-photoslot__corner--br" aria-hidden="true"></span>
+  
+        
+      </div>
+      
+    </div>
+  
+            <div class="hud-op__ident">
+              <div class="hud-op__nameline">
+                <span class="hud-op__name">OPS-04</span>
+              </div>
+              <div class="hud-op__tags"><div class="hud-skills"><span class="skill-badge skill-badge--passive" title="The Survivor may move 1 or 2 Zones with a single Move Action. Entering a Zone with Zombies still ends the Move."><svg class="icon icon--sm" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z"></path><path d="M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z"></path><path d="M16 17h4"></path><path d="M4 13h4"></path></svg><span>+1 Zone per Move</span></span></div></div>
             </div>
-            <div class="mockup-topbar__group">
-              <span class="mockup-topbar__danger">DL · ORANGE</span>
-            </div>
           </div>
+          <div class="hud-op__head-right">
+            <span class="hud-op__sub">POINT · P-01</span>
+          </div>
+        </div>
+        <div class="hud-op__stats">
+          
+    <div class="fm-statcell fm-statcell--danger fm-statcell--sm">
+      <div class="fm-statcell__head">
+        <span class="fm-statcell__icon"><svg class="icon icon--sm" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5"></path></svg></span>
+        <span class="fm-statcell__label">VITALS</span>
+      </div>
+      
+    <div class="fm-statcell__value">
+      <span class="fm-statcell__num">3</span>
+      <span class="fm-statcell__sep">/</span>
+      <span class="fm-statcell__max">3</span>
+    </div>
+  
+      <div class="fm-statcell__pips"><span class="fm-statcell__pip fm-statcell__pip--filled"></span><span class="fm-statcell__pip fm-statcell__pip--filled"></span><span class="fm-statcell__pip fm-statcell__pip--filled"></span></div>
+    </div>
+  
+          
+    <div class="fm-statcell fm-statcell--amber fm-statcell--sm">
+      <div class="fm-statcell__head">
+        <span class="fm-statcell__icon"><svg class="icon icon--sm" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"></path></svg></span>
+        <span class="fm-statcell__label">ACTIONS</span>
+      </div>
+      
+    <div class="fm-statcell__value">
+      <span class="fm-statcell__num">3</span>
+      <span class="fm-statcell__sep">/</span>
+      <span class="fm-statcell__max">3</span>
+    </div>
+  
+      <div class="fm-statcell__pips"><span class="fm-statcell__pip fm-statcell__pip--filled"></span><span class="fm-statcell__pip fm-statcell__pip--filled"></span><span class="fm-statcell__pip fm-statcell__pip--filled"></span></div>
+    </div>
+  
+          
+      <div class="hud-op__xp hud-op__xp--rank-blue">
+        <div class="hud-op__xp-head">
+          <span class="hud-op__xp-label">XP</span>
+          <span class="hud-op__xp-value">0 → 7</span>
+        </div>
+        <div class="hud-op__xp-track" role="progressbar" aria-label="Experience" aria-valuenow="0" aria-valuemin="0" aria-valuemax="7">
+          <div class="hud-op__xp-fill hud-op__xp-fill--yellow" style="width:0%"></div>
         </div>
       </div>
-
-      <!-- Squad rail collapsed to horizontal pill strip -->
-      <div class="hud-rail hud-rail--left">
-        <div class="hud-rail__kicker">SQUAD</div>
-        <div class="hud-rail__list">
-          <div class="mockup-pill mockup-pill--active mockup-pill--blue">
-            <span class="mockup-pill__name">PHIL</span>
-            <span class="mockup-pill__pips">
-              <span class="mockup-pill__pip mockup-pill__pip--on"></span>
-              <span class="mockup-pill__pip mockup-pill__pip--on"></span>
-              <span class="mockup-pill__pip mockup-pill__pip--on"></span>
-              <span class="mockup-pill__pip"></span>
-            </span>
-            <span class="mockup-pill__pips">
-              <span class="mockup-pill__pip mockup-pill__pip--ap"></span>
-              <span class="mockup-pill__pip mockup-pill__pip--ap"></span>
-              <span class="mockup-pill__pip"></span>
-            </span>
-          </div>
-          <div class="mockup-pill mockup-pill--blue">
-            <span class="mockup-pill__name">JOSH</span>
-            <span class="mockup-pill__pips">
-              <span class="mockup-pill__pip mockup-pill__pip--on"></span>
-              <span class="mockup-pill__pip mockup-pill__pip--on"></span>
-              <span class="mockup-pill__pip"></span>
-              <span class="mockup-pill__pip"></span>
-            </span>
-            <span class="mockup-pill__pips">
-              <span class="mockup-pill__pip"></span>
-              <span class="mockup-pill__pip"></span>
-              <span class="mockup-pill__pip"></span>
-            </span>
-          </div>
-          <div class="mockup-pill mockup-pill--yellow">
-            <span class="mockup-pill__name">NED</span>
-            <span class="mockup-pill__pips">
-              <span class="mockup-pill__pip mockup-pill__pip--on"></span>
-              <span class="mockup-pill__pip mockup-pill__pip--on"></span>
-              <span class="mockup-pill__pip mockup-pill__pip--on"></span>
-              <span class="mockup-pill__pip mockup-pill__pip--on"></span>
-            </span>
-            <span class="mockup-pill__pips">
-              <span class="mockup-pill__pip mockup-pill__pip--ap"></span>
-              <span class="mockup-pill__pip mockup-pill__pip--ap"></span>
-              <span class="mockup-pill__pip mockup-pill__pip--ap"></span>
-            </span>
-          </div>
-          <div class="mockup-pill mockup-pill--orange">
-            <span class="mockup-pill__name">AMY</span>
-            <span class="mockup-pill__pips">
-              <span class="mockup-pill__pip mockup-pill__pip--on"></span>
-              <span class="mockup-pill__pip"></span>
-              <span class="mockup-pill__pip"></span>
-              <span class="mockup-pill__pip"></span>
-            </span>
-            <span class="mockup-pill__pips">
-              <span class="mockup-pill__pip mockup-pill__pip--ap"></span>
-              <span class="mockup-pill__pip"></span>
-              <span class="mockup-pill__pip"></span>
-            </span>
-          </div>
         </div>
       </div>
-
-      <!-- Center map slot — transparent so canvas shows through -->
-      <div class="hud-center"></div>
-
-      <!-- Right rail — combat / event feed -->
-      <div class="hud-rail hud-rail--right">
-        <div class="mockup-feed">
-          <div class="mockup-feed__title">EVENT FEED</div>
-          <div class="mockup-feed__entry mockup-feed__entry--action">
-            PHIL · MELEE · WALKER · 2 HITS
-            <small>ROUND 4 · 12:03</small>
-          </div>
-          <div class="mockup-feed__entry mockup-feed__entry--spawn">
-            SPAWN · 3× WALKER · ZONE 7
-            <small>ROUND 4 · 12:02</small>
-          </div>
-          <div class="mockup-feed__entry">
-            JOSH · MOVE · ZONE 4 → 5
-            <small>ROUND 4 · 12:01</small>
-          </div>
-          <div class="mockup-feed__entry mockup-feed__entry--action">
-            NED · SEARCH · PIPE WRENCH
-            <small>ROUND 4 · 12:00</small>
-          </div>
-          <div class="mockup-feed__entry">
-            DL · BLUE → YELLOW
-            <small>ROUND 3 · 11:55</small>
-          </div>
-        </div>
-      </div>
-
-      <!-- Action grid — 6-up row at md -->
-      <div class="hud-actions">
-        <div class="hud-actions__grid">
-          <button class="mockup-action mockup-action--primary">
-            <span>MOVE</span>
-            <span class="mockup-action__kbd">[1]</span>
-          </button>
-          <button class="mockup-action">
-            <span>MELEE</span>
-            <span class="mockup-action__kbd">[2]</span>
-          </button>
-          <button class="mockup-action">
-            <span>RANGED</span>
-            <span class="mockup-action__kbd">[3]</span>
-          </button>
-          <button class="mockup-action">
-            <span>SEARCH</span>
-            <span class="mockup-action__kbd">[4]</span>
-          </button>
-          <button class="mockup-action">
-            <span>OBJ</span>
-            <span class="mockup-action__kbd">[5]</span>
-          </button>
-          <button class="mockup-action">
-            <span>END</span>
-            <span class="mockup-action__kbd">[E]</span>
-          </button>
-        </div>
+        
+      <section class="hud-loadout">
+        <div class="fm-kicker fm-kicker--secondary hud-loadout__kicker">LOADOUT</div>
+        <div class="hud-loadout__grid">
+          <div class="hud-slot hud-slot--weapon" aria-label="R.HAND">
+        <button class="hud-weapon-btn" data-id="card-start-katana-0">
+          
+    <div class="item-card item-card--weapon" data-id="card-start-katana-0" data-ghost="false">
+      
+      <span class="item-card__icon"><svg class="icon icon--sm" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"></polyline><line x1="13" x2="19" y1="19" y2="13"></line><line x1="16" x2="20" y1="16" y2="20"></line><line x1="19" x2="21" y1="21" y2="19"></line><polyline points="14.5 6.5 18 3 21 3 21 6 17.5 9.5"></polyline><line x1="5" x2="9" y1="14" y2="18"></line><line x1="7" x2="4" y1="17" y2="20"></line><line x1="3" x2="5" y1="19" y2="21"></line></svg></span>
+      <div class="item-card__body">
+        <span class="item-card__name">Katana</span>
+        <span class="item-card__stats">4+ · 1d6 · 2 dmg</span>
+        
       </div>
     </div>
-  </div>
+        </button>
+      </div>
+          <div class="hud-slot hud-slot--empty" aria-label="L.HAND empty">
+          <div class="hud-slot__empty">— EMPTY —</div>
+        </div>
+          
+      <div class="hud-slot hud-slot--bag">
+        <button class="hud-bag-button" data-action="open-backpack" title="Open backpack" aria-label="Open backpack (0 items)">
+          <span class="hud-bag-button__icon"><svg class="icon icon--md" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"></path><path d="M8 10h8"></path><path d="M8 18h8"></path><path d="M8 22v-6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v6"></path><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"></path></svg></span>
+          <span class="hud-bag-button__label">BAG</span>
+          
+        </button>
+      </div>
+        </div>
+      </section>
+        
+        
+      <section class="hud-log">
+        <div class="fm-kicker fm-kicker--secondary hud-log__kicker">FIELD LOG</div>
+        <div class="hud-log__body"><div class="hud-log__empty">// AWAITING CONTACT</div></div>
+      </section>
+      </div></aside><div class="hud-actions">
+      <div class="hud-actions__grid">
+        
+    <button id="btn-search" class="action-btn" role="button" aria-label="Search (1 AP) — key: S">
+      <span class="action-btn__icon"><svg class="icon icon--sm" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21 21-4.34-4.34"></path><circle cx="11" cy="11" r="8"></circle></svg></span>
+      <span class="action-btn__label">Search</span>
+      <span class="action-btn__spacer"></span>
+      
+      <span class="action-btn__kbd">S</span>
+    </button>
+        
+    <button id="btn-noise" class="action-btn" role="button" aria-label="Noise (1 AP) — key: N">
+      <span class="action-btn__icon"><svg class="icon icon--sm" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"></path><path d="M16 9a5 5 0 0 1 0 6"></path><path d="M19.364 18.364a9 9 0 0 0 0-12.728"></path></svg></span>
+      <span class="action-btn__label">Noise</span>
+      <span class="action-btn__spacer"></span>
+      
+      <span class="action-btn__kbd">N</span>
+    </button>
+        
+    <button id="btn-door" class="action-btn action-btn--disabled" disabled="" role="button" aria-label="Door (1 AP) — key: D">
+      <span class="action-btn__icon"><svg class="icon icon--sm" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 20H2"></path><path d="M11 4.562v16.157a1 1 0 0 0 1.242.97L19 20V5.562a2 2 0 0 0-1.515-1.94l-4-1A2 2 0 0 0 11 4.561z"></path><path d="M11 4H8a2 2 0 0 0-2 2v14"></path><path d="M14 12h.01"></path><path d="M22 20h-3"></path></svg></span>
+      <span class="action-btn__label">Door</span>
+      <span class="action-btn__spacer"></span>
+      
+      <span class="action-btn__kbd">D</span>
+    </button>
+        
+    <button id="btn-objective" class="action-btn action-btn--disabled" disabled="" role="button" aria-label="Objective (1 AP) — key: O">
+      <span class="action-btn__icon"><svg class="icon icon--sm" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg></span>
+      <span class="action-btn__label">Objective</span>
+      <span class="action-btn__spacer"></span>
+      
+      <span class="action-btn__kbd">O</span>
+    </button>
+        
+    <button id="btn-trade" class="action-btn" role="button" aria-label="Trade (1 AP) — key: T">
+      <span class="action-btn__icon"><svg class="icon icon--sm" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m11 17 2 2a1 1 0 1 0 3-3"></path><path d="m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4"></path><path d="m21 3 1 11h-2"></path><path d="M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3"></path><path d="M3 4h8"></path></svg></span>
+      <span class="action-btn__label">Trade</span>
+      <span class="action-btn__spacer"></span>
+      
+      <span class="action-btn__kbd">T</span>
+    </button>
+        
+    <button id="btn-end-turn" class="action-btn" role="button" aria-label="End Turn — key: E">
+      <span class="action-btn__icon"><svg class="icon icon--sm" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 4v16"></path><path d="M6.029 4.285A2 2 0 0 0 3 6v12a2 2 0 0 0 3.029 1.715l9.997-5.998a2 2 0 0 0 .003-3.432z"></path></svg></span>
+      <span class="action-btn__label">End Turn</span>
+      <span class="action-btn__spacer"></span>
+      
+      <span class="action-btn__kbd">E</span>
+    </button>
+      </div>
+      
+      <button class="action-btn hud-actions__more" data-action="toggle-actions-tray" aria-haspopup="menu" aria-expanded="false" aria-label="More actions">
+        <span class="action-btn__icon"><svg class="icon icon--sm" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg></span>
+        <span class="action-btn__label">More</span>
+        <span class="action-btn__spacer"></span>
+      </button>
+      
+      
+      <div class="hud-actions__tray" data-open="false" role="menu" aria-label="More actions">
+        
+    <button id="btn-objective-mobile" class="action-btn action-btn--disabled" disabled="" role="button" aria-label="Objective (1 AP) — key: O">
+      <span class="action-btn__icon"><svg class="icon icon--sm" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg></span>
+      <span class="action-btn__label">Objective</span>
+      <span class="action-btn__spacer"></span>
+      
+      <span class="action-btn__kbd">O</span>
+    </button>
+        
+    <button id="btn-trade-mobile" class="action-btn" role="button" aria-label="Trade (1 AP) — key: T">
+      <span class="action-btn__icon"><svg class="icon icon--sm" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m11 17 2 2a1 1 0 1 0 3-3"></path><path d="m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4"></path><path d="m21 3 1 11h-2"></path><path d="M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3"></path><path d="M3 4h8"></path></svg></span>
+      <span class="action-btn__label">Trade</span>
+      <span class="action-btn__spacer"></span>
+      
+      <span class="action-btn__kbd">T</span>
+    </button>
+      </div></div><div class="hud-fab-slot"></div></div>
 </body>
 </html>

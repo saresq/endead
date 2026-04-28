@@ -1,82 +1,73 @@
-# Breakpoint reference mockups — md: 768px tablet coverage
+# Breakpoint snapshots — md: 768 tablet coverage
 
-Frozen design references for the gap between mobile (≤480px) and laptop
-(≥1024px). These files are **DESIGN ONLY** — they preview the tablet layout
-and are not loaded by the live app.
+Static snapshots of the live UI at 2026-04-27 at the md tablet width,
+regenerated from the running app. To refresh, run `npm run dev` and
+re-snapshot through Playwright at 768 x 1024, then overwrite the
+matching file with the captured DOM.
 
-The follow-up that owns this work is
-`handoff/review-followups/07-mid-breakpoint-coverage.md` (severity MAJ,
-~3 hr). The mockups here cover the design portion. The live wire-in is
-Wave 4 work and intentionally not included in `src/styles/`.
+Each file is a standalone HTML page that imports the live `src/styles/`
+CSS via relative `<link>` tags so the snapshot renders at parity with
+production. No styles are inlined, no DOM is invented.
 
 ## Frames
 
-| File                   | Surface | Viewport | Behavior at md (768 ≤ w < 1024) |
-|------------------------|---------|----------|---------------------------------|
-| `lobby-tablet.html`    | Lobby   | 768 × ≥1024 | Two-column grid: briefing + roster + squad list (left) and dossier + loadout + progression + RoE + footer (right). Operative roster expands from 3-up to 4-up. Mobile (<768) and laptop (≥960 inner cap) stay unchanged. |
-| `hud-tablet.html`      | HUD     | 768 × 1024  | Squad rail collapses to a horizontal pill strip directly below the topbar (overflow-x scroll). Body splits 60/40 between map and event feed. Action grid renders 6-up in a single row. |
+| File | Surface | Viewport | State at capture |
+|------|---------|----------|------------------|
+| [`lobby-tablet.html`](./lobby-tablet.html) | Lobby | 768 x 1024 | Fresh lobby, host has selected WANDA so the player plate avatar, READY status, the selected roster cell, and the `BEGIN OPERATION · 1/1 READY` primary CTA all populate. |
+| [`hud-tablet.html`](./hud-tablet.html) | In-game HUD | 768 x 1024 | Game just started with WANDA active. Turn 01 PLAYER phase, dossier modal closed via Escape. The PIXI canvas in `.hud-map-window` is captured as an empty placeholder so the file renders without PIXI. |
 
-The breakpoints stay aligned with the existing scale:
+## Live md tablet rules
 
-- `<480px` — mobile stack (no change)
-- `≥480px` — mobile-large polish only (no layout change)
-- `≥768px` — tablet layout introduced (NEW)
-- `≥1024px` — laptop three-column / lobby single-column-wider (no change)
-- `≥1280px` — desktop wide (no change)
+The md tablet rules captured in these snapshots are owned by the live
+component CSS. They are not duplicated into the snapshot files.
 
-## Wave 4 wire-in targets (live)
+### `lobby-tablet.html` ↔ `src/styles/components/lobby.css`
 
-When promoting these frames to live CSS, the canonical files are:
+The `@media (min-width: 768px) and (max-width: 1023px)` block (line 1157+)
+implements the column-by-class layout the snapshot renders:
 
-### `lobby-tablet.html` →
+- `.lobby-panel--briefing`, `--player`, `--squad`, `--roster` → column 1
+- `.lobby-panel--area`, `--roe`, `--footer` → column 2
+- `.lobby-roster` becomes `repeat(4, 1fr)` at md
+- `.lobby-panel--footer` is `position: sticky; bottom: 12px`
 
-- `src/styles/components/lobby.css`
-  - Add `@media (min-width: 768px) and (max-width: 1023px)` block near
-    the existing `@media (min-width: 960px)` rule.
-  - Promote `.lobby__stack` to a 2-column CSS grid. Either introduce a
-    `.lobby__columns` wrapper around the panels OR keep `.lobby__stack`
-    and assign panels to columns by class (`.lobby-panel--briefing`,
-    `--squad`, `--player`, `--roster` → column 1; `--operative`, `--roe`,
-    `--footer` → column 2).
-  - Promote `.lobby-roster` to `repeat(4, 1fr)` at md.
-  - Optionally make `.lobby-panel--footer` `position: sticky; bottom: 12px;`
-    so the primary CTA stays visible while the dossier column scrolls.
-- No change required in `LobbyUI.ts` if the column-by-class approach is
-  taken.
+### `hud-tablet.html` ↔ `src/styles/components/hud.css`
 
-### `hud-tablet.html` →
+The `@media (min-width: 768px) and (max-width: 1023px)` block (line 1018+)
+implements:
 
-- `src/styles/components/hud.css`
-  - Add `@media (min-width: 768px) and (max-width: 1023px)` block. The
-    existing mobile `@media (max-width: 767px)` rule continues to handle
-    sub-768 layouts.
-  - Override `#game-hud` `grid-template-rows`, `grid-template-columns`,
-    and `grid-template-areas` to the 4-row / 2-column shape used in the
-    mockup (topbar, rail-l strip, center+rail-r split, actions row).
-  - Override `.hud-rail--left` to render a horizontal pill list with
-    `display: flex; flex-direction: row;` and `overflow-x: auto`.
-  - Override `.hud-actions__grid` to `grid-template-columns: repeat(6, 1fr);`
-    at md.
-- `src/styles/components/game-layout.css`
-  - No structural change required — the `.game-layout` shell already
-    stacks topbar/canvas/bottom and the canvas remains the full backdrop.
-    Only `hud.css` needs the md override.
-- `src/client/ui/GameHUD.ts` and `src/client/ui/components/SquadPlate.ts`
-  - May want to opt the squad plate into a `--compact` variant when the
-    md media query matches, since the horizontal strip benefits from the
-    smaller plate variant that already exists in
-    `field-manual.css` (`.fm-squadplate--compact`).
-  - No structural rendering change is strictly required — the live HTML
-    is reused as-is.
+- `#game-hud` grid: 4 rows / 2 cols with areas
+  `topbar topbar / rail-l rail-l / center rail-r / actions actions`
+- `.hud-rail--left` collapses to a horizontal pill strip under the topbar
+- `.hud-actions__grid` becomes `repeat(6, 1fr)`
+- `.hud-actions` is a direct child of `#game-hud` (sibling of the rails),
+  matching `GameHUD.buildShell()`
 
-## Constraints honored
+## Conventions
 
 - Canonical tokens only (`--bg-*`, `--olive-*`, `--rust-*`, `--amber-*`,
   `--bone-*`, `--rank-*`, `--ready`, `--accent-muted`, `--hazard-*`).
-- No new colors introduced.
-- No edits to `design-review.html` (frozen artifact).
-- No edits to live `src/styles/` — the `md: 768px` rules are inline in
-  each mockup so Wave 4 can promote them deliberately.
-- Reuses live primitives by linking `src/styles/tokens.css`,
-  `base.css`, `utilities.css`, `layout.css`, and the relevant component
-  CSS via relative paths.
+- Reuses live primitives by linking `src/styles/tokens.css`, `base.css`,
+  `utilities.css`, `layout.css`, and the relevant component CSS via
+  relative paths. No styles are duplicated in the snapshot files.
+- The captured `<html>` attributes (e.g. `class="in-game"`,
+  `data-danger="blue"` for the HUD) are preserved.
+
+## Viewing locally
+
+```bash
+npm run dev
+# then visit
+#   http://localhost:5173/design/breakpoints/lobby-tablet.html
+#   http://localhost:5173/design/breakpoints/hud-tablet.html
+```
+
+## Refresh procedure
+
+1. Start `npm run dev`.
+2. Resize the browser to 768 x 1024.
+3. Drive the live app to the target state (see the per-file comment at
+   the top of each HTML file).
+4. Capture the live DOM (`#lobby-ui` for the lobby; `#game-hud` for the
+   HUD) and replace the body of the matching HTML file with it. Keep the
+   existing `<head>` scaffold (imports + comment block).

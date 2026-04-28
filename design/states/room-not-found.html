@@ -3,108 +3,42 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Login — Room not found state · Endead design reference</title>
+  <title>Menu — Room not found · Endead live snapshot</title>
 
   <!--
-    DESIGN ONLY — reference frame for follow-up #06.
-    Lives in /design/states/. Static; not wired into MenuUI.
-    Live target: src/client/ui/MenuUI.ts (Wave 4).
+    Regenerated from live at 2026-04-27.
+    Target state: main menu after attempting to JOIN a non-existent room
+                  ID (`9X4Z-77LL`). Error state with rust-error input
+                  border + "// ROOM NOT FOUND" kicker + alert banner.
+    Target viewport: 1280 × 900.
+    Source: src/client/ui/MenuUI.ts rendered by Vite dev server.
   -->
+
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
     rel="stylesheet"
-    href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Stencil+Display:wght@400;700;900&family=Oswald:wght@400;500;700&family=Barlow+Condensed:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Barlow+Condensed:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap"
   />
 
   <link rel="stylesheet" href="../../src/styles/tokens.css" />
   <link rel="stylesheet" href="../../src/styles/reset.css" />
   <link rel="stylesheet" href="../../src/styles/base.css" />
   <link rel="stylesheet" href="../../src/styles/utilities.css" />
+  <link rel="stylesheet" href="../../src/styles/layout.css" />
+  <link rel="stylesheet" href="../../src/styles/components/icons.css" />
   <link rel="stylesheet" href="../../src/styles/components/buttons.css" />
   <link rel="stylesheet" href="../../src/styles/components/forms.css" />
-  <link rel="stylesheet" href="../../src/styles/components/field-manual.css" />
   <link rel="stylesheet" href="../../src/styles/components/menu.css" />
-
-  <style>
-    /* Mockup-only chrome. Frame wrapper + the rust-error variants for the
-       room-id input + JOIN shake. All colors come from canonical tokens. */
-    body { background: var(--bg-0); }
-
-    .frame {
-      position: relative;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: var(--space-4);
-    }
-
-    /* Render at parity with the live #menu-ui surface */
-    .frame::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      background-image:
-        linear-gradient(to right, rgba(240, 169, 74, 0.03) 1px, transparent 1px),
-        linear-gradient(to bottom, rgba(240, 169, 74, 0.03) 1px, transparent 1px);
-      background-size: 40px 40px;
-      mask-image: radial-gradient(ellipse 80% 70% at 50% 50%, #000 30%, transparent 95%);
-    }
-
-    /* Error variant — input border + caret turn rust. The :left-border
-       amber accent is preserved as the system motif; the perimeter goes
-       rust to communicate the failure without doubling the error state. */
-    .fm-input--error {
-      border-color: var(--rust-400);
-      border-left-color: var(--rust-500);
-      caret-color: var(--rust-300);
-      color: var(--bone-100);
-    }
-    .fm-input--error:focus {
-      border-color: var(--rust-300);
-      border-left-color: var(--rust-400);
-      box-shadow:
-        inset 0 1px 0 rgba(0, 0, 0, 0.35),
-        0 0 0 2px rgba(196, 90, 44, 0.28);
-    }
-
-    /* Submit-failure shake — fires once on attempted JOIN with a bad code.
-       Compositor-friendly: transform only. */
-    .fm-btn--shake { animation: btn-shake 380ms cubic-bezier(.36,.07,.19,.97) both; }
-    @keyframes btn-shake {
-      0%, 100% { transform: translateX(0); }
-      15%      { transform: translateX(-4px); }
-      30%      { transform: translateX(4px); }
-      45%      { transform: translateX(-3px); }
-      60%      { transform: translateX(3px); }
-      80%      { transform: translateX(-1px); }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      .fm-btn--shake { animation: none; }
-    }
-
-    .frame-caption {
-      position: fixed;
-      left: 12px;
-      bottom: 12px;
-      font-family: var(--font-mono);
-      font-size: 10px;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      color: var(--bone-500);
-      background: rgba(11, 13, 10, 0.85);
-      padding: 6px 10px;
-      border-left: 2px solid var(--amber-400);
-      pointer-events: none;
-      z-index: 9999;
-    }
-  </style>
+  <link rel="stylesheet" href="../../src/styles/components/field-manual.css" />
 </head>
 <body>
-  <main class="frame">
+  <div id="menu-ui">
+    <div class="menu-field" aria-hidden="true">
+      <div class="menu-field__grid"></div>
+      <div class="menu-field__vignette"></div>
+    </div>
+
     <div class="menu-stack">
       <section class="menu-card menu-card--id fm-panel" role="dialog" aria-labelledby="menu-wordmark">
         <span class="fm-panel-dot fm-panel-dot--tl" aria-hidden="true"></span>
@@ -114,45 +48,38 @@
 
         <header class="menu-header">
           <div class="menu-header__kicker fm-kicker">// ROOM NOT FOUND</div>
-          <div class="menu-wordmark fm-brackets fm-brackets--rust fm-brackets--lg">
+
+          <div class="menu-wordmark fm-brackets fm-brackets--amber fm-brackets--lg">
             <span class="fm-bracket-tr" aria-hidden="true"></span>
             <span class="fm-bracket-bl" aria-hidden="true"></span>
             <h1 id="menu-wordmark" class="menu-wordmark__text fm-stencil">Endead</h1>
           </div>
-          <div class="menu-header__subline fm-mono">// FIELD MANUAL &middot; TACTICAL SURVIVAL</div>
+
+          <div class="menu-header__subline fm-mono">// FIELD MANUAL · TACTICAL SURVIVAL</div>
         </header>
 
-        <!-- Persistent inline error strip — same .menu-message rust strip
-             the live UI already ships -->
         <div class="menu-message" role="alert">
           <span class="menu-message__marker" aria-hidden="true">!</span>
-          <span class="menu-message__text">
-            Room <strong>9X4Z-77LL</strong> could not be located. Confirm the code with your host and try again.
-          </span>
+          <span class="menu-message__text">Room 9X4Z-77LL could not be located. Confirm the code with your host and try again.</span>
         </div>
 
         <div class="menu-form">
           <div class="menu-field-group">
             <label class="fm-input__label fm-kicker" for="menu-nickname">CALL SIGN</label>
-            <input
-              id="menu-nickname"
-              class="fm-input menu-input"
-              type="text"
-              maxlength="24"
-              value="OPS-04"
-              placeholder="designate operator"
-              autocomplete="off"
-              spellcheck="false"
-            />
+            <input id="menu-nickname" class="fm-input menu-input" type="text" maxlength="24" value="Hunter" placeholder="designate operator" autocomplete="off" spellcheck="false">
           </div>
         </div>
 
         <div class="menu-card__divider" aria-hidden="true"></div>
       </section>
 
-      <div class="menu-divider menu-divider--standalone" role="separator" aria-label="join by room id">
+      <div class="menu-action menu-action--standalone">
+        <button class="fm-btn fm-btn--primary fm-btn--full btn btn--primary btn--lg btn--full" data-action="create-room"><span class="btn__icon fm-btn__icon"><svg class="icon icon--md" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"></path></svg></span><span class="btn__label fm-btn__label">Create Room</span></button>
+      </div>
+
+      <div class="menu-divider menu-divider--standalone" role="separator" aria-label="or join by room id">
         <span class="menu-divider__line" aria-hidden="true"></span>
-        <span class="menu-divider__label fm-kicker">// JOIN BY ROOM ID</span>
+        <span class="menu-divider__label fm-kicker">// OR JOIN BY ROOM ID</span>
         <span class="menu-divider__line" aria-hidden="true"></span>
       </div>
 
@@ -164,28 +91,17 @@
           <div class="menu-field-group">
             <label class="fm-input__label fm-kicker" for="menu-room-id">ROOM ID</label>
             <div class="menu-join-row">
-              <input
-                id="menu-room-id"
-                class="fm-input menu-input fm-input--error"
-                type="text"
-                value="9X4Z-77LL"
-                placeholder="XXXX-XXXX"
-                autocomplete="off"
-                spellcheck="false"
-                aria-invalid="true"
-              />
-              <button type="button" class="fm-btn fm-btn--secondary fm-btn--shake" data-action="join-room">
-                <span class="fm-btn__label">Join</span>
-              </button>
+              <input id="menu-room-id" class="fm-input menu-input fm-input--error" type="text" value="9X4Z-77LL" placeholder="XXXX-XXXX" autocomplete="off" spellcheck="false" aria-invalid="true">
+              <button class="fm-btn fm-btn--secondary btn btn--secondary btn--md" data-action="join-room"><span class="btn__label fm-btn__label">Join</span></button>
             </div>
           </div>
+
+          <button class="fm-btn fm-btn--ghost fm-btn--full btn btn--ghost btn--md btn--full" data-action="go-back"><span class="btn__icon fm-btn__icon"><svg class="icon icon--md" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg></span><span class="btn__label fm-btn__label">Go Back</span></button>
         </div>
 
         <div class="menu-card__divider" aria-hidden="true"></div>
       </section>
     </div>
-  </main>
-
-  <div class="frame-caption">// design/states/room-not-found.html · target: src/client/ui/MenuUI.ts</div>
+  </div>
 </body>
 </html>

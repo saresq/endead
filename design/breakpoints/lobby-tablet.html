@@ -1,322 +1,291 @@
-<!DOCTYPE html>
-<html lang="en" data-danger="blue">
+<!doctype html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Lobby — Tablet (md: 768px) Mockup</title>
-  <meta name="viewport" content="width=768" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lobby — Tablet (md: 768) · Endead live snapshot</title>
 
   <!--
-    DESIGN-ONLY MOCKUP — DO NOT WIRE INTO LIVE CSS.
-    Live wire-in target: src/styles/components/lobby.css
-                          (add @media (min-width: 768px) block;
-                           introduce .lobby__columns wrapper or treat
-                           .lobby__stack as a CSS grid at md+).
+    Regenerated from live at 2026-04-27.
+    Target state: lobby at md tablet width with WANDA selected so the
+                  player plate avatar + READY status, the
+                  selected roster cell, and the BEGIN OPERATION primary
+                  CTA all populate.
+    Target viewport: 768 x 1024.
+    Source: src/client/ui/LobbyUI.ts rendered by Vite dev server.
 
-    Tablet behavior (md: 768px ≤ width < 1024px):
-      - .lobby__stack widens to 2 columns (briefing + roster on left,
-        dossier + loadout + progression + roe + footer on right)
-      - max-width grows to 720px so columns can breathe
-      - operative roster expands to 4 cells across (vs. 3 mobile, 6 laptop)
-      - mobile (<768) and laptop (≥1024) layouts are unchanged
+    The live md tablet rules live in src/styles/components/lobby.css
+    inside the @media (min-width: 768px) and (max-width: 1023px) block
+    that turns .lobby__stack into a 2-column grid.
   -->
 
-  <!-- Live tokens + lobby + field-manual CSS imported verbatim. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Barlow+Condensed:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" />
+
   <link rel="stylesheet" href="../../src/styles/tokens.css" />
+  <link rel="stylesheet" href="../../src/styles/reset.css" />
   <link rel="stylesheet" href="../../src/styles/base.css" />
   <link rel="stylesheet" href="../../src/styles/utilities.css" />
   <link rel="stylesheet" href="../../src/styles/layout.css" />
-  <link rel="stylesheet" href="../../src/styles/components/field-manual.css" />
-  <link rel="stylesheet" href="../../src/styles/components/lobby.css" />
+  <link rel="stylesheet" href="../../src/styles/components/icons.css" />
   <link rel="stylesheet" href="../../src/styles/components/buttons.css" />
   <link rel="stylesheet" href="../../src/styles/components/forms.css" />
-
-  <style>
-    /* =============================================================
-       MOCKUP-LOCAL CSS — tablet breakpoint preview only.
-       This block belongs in src/styles/components/lobby.css when
-       Wave 4 promotes it. Do not duplicate elsewhere.
-       ============================================================= */
-
-    /* Force the mockup body to render as a 768px viewport so the
-       breakpoint rules below kick in regardless of the host window. */
-    html, body { background: var(--bg-0); }
-    body {
-      margin: 0;
-      width: 768px;
-      min-height: 100vh;
-      font-family: var(--font-body);
-      color: var(--bone-100);
-    }
-
-    .mockup-frame {
-      position: relative;
-      width: 768px;
-      min-height: 1024px;
-    }
-
-    .mockup-caption {
-      position: fixed;
-      top: 8px;
-      right: 8px;
-      z-index: 9999;
-      padding: 4px 10px;
-      background: var(--bg-1);
-      border: 1px solid var(--olive-700);
-      color: var(--amber-200);
-      font-family: var(--font-mono);
-      font-size: 10px;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-    }
-
-    /* The .lobby element is absolute/inset:0 in the live CSS — pin it
-       to the mockup frame instead so it renders inline. */
-    .mockup-frame .lobby {
-      position: relative;
-      inset: auto;
-    }
-
-    /* ---------- md: 768px tablet rules (mockup-local) ---------- */
-    @media (min-width: 768px) and (max-width: 1023px) {
-      .lobby__stack {
-        max-width: 720px;
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-        column-gap: 16px;
-        row-gap: 14px;
-      }
-
-      /* Column assignment — left rail handles the briefing + roster
-         (visual + selection), right rail handles dossier + loadout
-         + progression + roe + footer (the active operative dossier). */
-      .lobby-panel--briefing,
-      .lobby-panel--squad,
-      .lobby-panel--player,
-      .lobby-panel--roster {
-        grid-column: 1;
-      }
-
-      .lobby-panel--operative,
-      .lobby-panel--roe,
-      .lobby-panel--footer {
-        grid-column: 2;
-      }
-
-      /* Roster goes 4-up at this width — 3-up wastes the column. */
-      .lobby-roster {
-        grid-template-columns: repeat(4, 1fr);
-        gap: 10px;
-      }
-
-      /* Sticky footer keeps the primary CTA visible while scrolling
-         the dossier column. */
-      .lobby-panel--footer {
-        position: sticky;
-        bottom: 12px;
-      }
-    }
-  </style>
+  <link rel="stylesheet" href="../../src/styles/components/field-manual.css" />
+  <link rel="stylesheet" href="../../src/styles/components/lobby.css" />
 </head>
 <body>
-  <div class="mockup-caption">LOBBY · MD 768 · TABLET</div>
-
-  <div class="mockup-frame">
-    <div class="lobby">
-      <div class="lobby__stack">
-
-        <!-- 1. Briefing -->
-        <section class="fm-panel lobby-panel lobby-panel--briefing">
-          <div class="fm-panel__label">MISSION BRIEFING</div>
-          <div class="lobby-briefing__body">
-            <h1 class="fm-stencil lobby-briefing__title">FIELD STATION 7</h1>
-            <button type="button" class="lobby-room-chip">
-              <span class="lobby-room-chip__label">ROOM</span>
-              <span class="lobby-room-chip__id">FX-9421</span>
-              <span class="lobby-room-chip__glyph">⧉</span>
-            </button>
+<div id="lobby-ui" class="lobby" style="display: flex;">
+        <div class="lobby__stack"><section class="fm-panel lobby-panel lobby-panel--briefing" data-panel="briefing">
+        <span class="fm-panel-dot fm-panel-dot--tl"></span>
+        <span class="fm-panel-dot fm-panel-dot--br"></span>
+        <div class="fm-brackets fm-brackets--amber lobby-briefing__body">
+          <span class="fm-bracket-tr"></span>
+          <span class="fm-bracket-bl"></span>
+          <div class="fm-kicker">// WAITING FOR OPERATIVES · 1/6</div>
+          <h1 class="fm-stencil lobby-briefing__title">LOBBY</h1>
+          <button type="button" id="room-pill" class="lobby-room-chip lobby-room-chip--pulse" title="Copy room code" aria-label="Copy room code to clipboard">
+            <span class="lobby-room-chip__label">ROOM</span>
+            <span class="lobby-room-chip__id">qxevvw</span>
+            <span class="lobby-room-chip__glyph"><svg class="icon icon--sm" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></span>
+          </button>
+        </div>
+      </section><section class="fm-panel lobby-panel lobby-panel--player" data-panel="playerPlate">
+        <div class="lobby-player">
+          <div class="lobby-player__avatar"><img class="lobby-player__img" src="../../public/images/characters/wanda.webp" alt="Wanda"></div>
+          <input id="lobby-nickname" class="fm-input lobby-player__name" type="text" value="OPS-04" placeholder="ENTER CALL SIGN" maxlength="24" aria-label="Your call sign" autocomplete="off">
+          <span class="lobby-status lobby-status--ready lobby-player__status">● READY</span>
+        </div>
+      </section><section class="fm-panel lobby-panel lobby-panel--squad" data-panel="squad">
+        <div class="lobby-squad__header">
+          <div class="fm-kicker fm-kicker--secondary">SQUAD</div>
+          <div class="lobby-squad__count fm-mono">1/6</div>
+        </div>
+        <ul class="lobby-squad">
+        <li class="lobby-squad__row">
+          <div class="lobby-squad__head">
+            <span class="fm-stencil lobby-squad__name">OPS-04</span>
+            <span class="lobby-pill lobby-pill--amber">YOU</span>
+            <span class="lobby-pill lobby-pill--amber">HOST</span>
           </div>
-        </section>
-
-        <!-- 2. Squad roster (waiting list) -->
-        <section class="fm-panel lobby-panel lobby-panel--squad">
-          <div class="fm-panel__label">
-            <span>SQUAD</span>
-            <span class="lobby-squad__count">3 / 4</span>
+          <div class="lobby-squad__sub">
+            <span class="lobby-squad__class fm-mono">WANDA</span>
+            <span class="lobby-squad__dot" aria-hidden="true">·</span>
+            <span class="lobby-status lobby-status--ready">● READY</span>
           </div>
-          <ul class="lobby-squad">
-            <li class="lobby-squad__row">
-              <div class="lobby-squad__head">
-                <span class="lobby-squad__name">SARESQ</span>
-                <span class="lobby-pill lobby-pill--amber">HOST</span>
-              </div>
-              <div class="lobby-squad__sub">
-                <span class="lobby-squad__class">PHIL · SCAVENGER</span>
-                <span class="lobby-squad__dot">·</span>
-                <span class="lobby-status lobby-status--ready">READY</span>
-              </div>
-            </li>
-            <li class="lobby-squad__row">
-              <div class="lobby-squad__head">
-                <span class="lobby-squad__name">VEKK</span>
-              </div>
-              <div class="lobby-squad__sub">
-                <span class="lobby-squad__class">JOSH · MEDIC</span>
-                <span class="lobby-squad__dot">·</span>
-                <span class="lobby-status lobby-status--ready">READY</span>
-              </div>
-            </li>
-            <li class="lobby-squad__row">
-              <div class="lobby-squad__head">
-                <span class="lobby-squad__name">DOC</span>
-              </div>
-              <div class="lobby-squad__sub">
-                <span class="lobby-squad__class">NED · BRAWLER</span>
-                <span class="lobby-squad__dot">·</span>
-                <span class="lobby-status lobby-status--standby">STANDBY</span>
-              </div>
-            </li>
-          </ul>
-        </section>
-
-        <!-- 3. Operative roster (4-up at md) -->
-        <section class="fm-panel lobby-panel lobby-panel--roster">
-          <div class="fm-panel__label">SELECT OPERATIVE</div>
-          <div class="lobby-roster">
-            <button type="button" class="lobby-roster__cell lobby-roster__cell--selected">
-              <div class="fm-photoslot fm-photoslot--md">
-                <div class="fm-photoslot__frame">
-                  <div class="fm-photoslot__name">PHIL</div>
-                </div>
-              </div>
-            </button>
-            <button type="button" class="lobby-roster__cell">
-              <div class="fm-photoslot fm-photoslot--md">
-                <div class="fm-photoslot__frame">
-                  <div class="fm-photoslot__name">JOSH</div>
-                </div>
-              </div>
-            </button>
-            <button type="button" class="lobby-roster__cell lobby-roster__cell--taken">
-              <div class="fm-photoslot fm-photoslot--md">
-                <div class="fm-photoslot__frame">
-                  <div class="fm-photoslot__name">NED</div>
-                </div>
-              </div>
-              <div class="lobby-roster__taken-label">TAKEN</div>
-            </button>
-            <button type="button" class="lobby-roster__cell">
-              <div class="fm-photoslot fm-photoslot--md">
-                <div class="fm-photoslot__frame">
-                  <div class="fm-photoslot__name">AMY</div>
-                </div>
-              </div>
-            </button>
-            <button type="button" class="lobby-roster__cell">
-              <div class="fm-photoslot fm-photoslot--md">
-                <div class="fm-photoslot__frame">
-                  <div class="fm-photoslot__name">WANDA</div>
-                </div>
-              </div>
-            </button>
-            <button type="button" class="lobby-roster__cell">
-              <div class="fm-photoslot fm-photoslot--md">
-                <div class="fm-photoslot__frame">
-                  <div class="fm-photoslot__name">DOUG</div>
-                </div>
-              </div>
-            </button>
-          </div>
-        </section>
-
-        <!-- 4. Operative dossier + loadout + progression -->
-        <section class="fm-panel lobby-panel lobby-panel--operative">
-          <div class="fm-panel__label">OPERATIVE</div>
-          <div class="lobby-operative__section">
-            <div class="lobby-dossier__body">
-              <span class="lobby-dossier__name">PHIL</span>
-              <span class="lobby-dossier__sub">SCAVENGER · LV 1</span>
-            </div>
-            <div class="lobby-dossier__chips">
-              <span class="lobby-chip">+1 SEARCH</span>
-              <span class="lobby-chip lobby-chip--rust">SLOW</span>
-              <span class="lobby-chip">+1 INV</span>
-            </div>
-            <p class="lobby-dossier__quote">"I'll find a way out. I always do."</p>
-          </div>
-          <div class="lobby-operative__divider"></div>
-
-          <div class="lobby-operative__section">
-            <div class="fm-panel__label" style="border:0;background:transparent;padding:0 0 6px;">STARTING LOADOUT</div>
-            <div class="lobby-loadout">
-              <div class="lobby-loadout__icon-slot">
-                <span class="lobby-loadout__icon">⚒</span>
-              </div>
-              <div class="lobby-loadout__text">
-                <span class="lobby-loadout__name">PIPE WRENCH</span>
-                <span class="lobby-loadout__stats">MELEE · 1 DICE · 4+</span>
-              </div>
-            </div>
-          </div>
-          <div class="lobby-operative__divider"></div>
-
-          <div class="lobby-operative__section">
-            <div class="fm-panel__label" style="border:0;background:transparent;padding:0 0 6px;">PROGRESSION</div>
-            <div class="lobby-progression">
-              <div class="lobby-rank-row" style="--rank-color: var(--rank-blue);">
-                <div class="lobby-rank-chip"></div>
-                <div class="lobby-rank-head">
-                  <span class="lobby-rank-label">BLUE</span>
-                  <span class="lobby-rank-xp">0 / 7 XP</span>
-                </div>
-                <div class="lobby-rank-pills">
-                  <span class="lobby-rank-pill lobby-rank-pill--blue">+1 ACTION</span>
-                </div>
-              </div>
-              <div class="lobby-rank-row" style="--rank-color: var(--rank-yellow);">
-                <div class="lobby-rank-chip"></div>
-                <div class="lobby-rank-head">
-                  <span class="lobby-rank-label">YELLOW</span>
-                  <span class="lobby-rank-xp">— LOCKED</span>
-                </div>
-                <div class="lobby-rank-pills">
-                  <span class="lobby-rank-pill lobby-rank-pill--yellow">+1 DAMAGE</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- 5. Rules of engagement -->
-        <section class="fm-panel lobby-panel lobby-panel--roe">
-          <div class="fm-panel__label">RULES OF ENGAGEMENT</div>
-          <div class="lobby-roe-list">
-            <label class="lobby-roe">
-              <input class="lobby-roe__check" type="checkbox" checked />
-              <div class="lobby-roe__text">
-                <span class="lobby-roe__title">FRIENDLY FIRE</span>
-                <span class="lobby-roe__desc">Allies inside the kill arc still take hits.</span>
-              </div>
-            </label>
-            <label class="lobby-roe">
-              <input class="lobby-roe__check" type="checkbox" />
-              <div class="lobby-roe__text">
-                <span class="lobby-roe__title">PERMA-DEATH</span>
-                <span class="lobby-roe__desc">No revives. Bodies stay down.</span>
-              </div>
-            </label>
-          </div>
-        </section>
-
-        <!-- 6. Footer / primary CTA -->
-        <section class="fm-panel lobby-panel lobby-panel--footer">
-          <div class="lobby-footer">
-            <button type="button" class="btn btn--primary btn--lg">CONFIRM &amp; READY UP</button>
-            <button type="button" class="btn btn--ghost btn--sm">LEAVE ROOM</button>
-          </div>
-        </section>
-
+        </li>
+      </ul>
+      </section><section class="fm-panel lobby-panel lobby-panel--roster" data-panel="roster">
+        <div class="fm-kicker fm-kicker--secondary">OPERATIVE ROSTER</div>
+        <div class="lobby-roster" role="radiogroup" aria-label="Select operative">
+          
+        <button type="button" class="lobby-roster__cell lobby-roster__cell--selected" data-action="select-class" data-id="Wanda" role="radio" aria-checked="true" aria-label="Select Wanda">
+          
+    <div class="fm-photoslot fm-photoslot--md fm-photoslot--selected">
+      <div class="fm-photoslot__frame">
+        <img class="fm-photoslot__img" src="../../public/images/characters/wanda.webp" alt="WANDA">
+        
+    <span class="fm-photoslot__corner fm-photoslot__corner--tl" aria-hidden="true"></span>
+    <span class="fm-photoslot__corner fm-photoslot__corner--tr" aria-hidden="true"></span>
+    <span class="fm-photoslot__corner fm-photoslot__corner--bl" aria-hidden="true"></span>
+    <span class="fm-photoslot__corner fm-photoslot__corner--br" aria-hidden="true"></span>
+  
+        <span class="fm-photoslot__tag" aria-hidden="true">■ SELECTED</span>
       </div>
+      
+      <div class="fm-photoslot__caption">
+        <div class="fm-photoslot__name">WANDA</div>
+        <div class="fm-photoslot__role">POINT · SCOUT</div>
+      </div>
+    
     </div>
-  </div>
+  
+          
+        </button>
+      
+        <button type="button" class="lobby-roster__cell" data-action="select-class" data-id="Doug" role="radio" aria-checked="false" aria-label="Select Doug">
+          
+    <div class="fm-photoslot fm-photoslot--md">
+      <div class="fm-photoslot__frame">
+        <img class="fm-photoslot__img" src="../../public/images/characters/doug.webp" alt="DOUG">
+        
+    <span class="fm-photoslot__corner fm-photoslot__corner--tl" aria-hidden="true"></span>
+    <span class="fm-photoslot__corner fm-photoslot__corner--tr" aria-hidden="true"></span>
+    <span class="fm-photoslot__corner fm-photoslot__corner--bl" aria-hidden="true"></span>
+    <span class="fm-photoslot__corner fm-photoslot__corner--br" aria-hidden="true"></span>
+  
+        
+      </div>
+      
+      <div class="fm-photoslot__caption">
+        <div class="fm-photoslot__name">DOUG</div>
+        <div class="fm-photoslot__role">SUPPORT · LEADER</div>
+      </div>
+    
+    </div>
+  
+          
+        </button>
+      
+        <button type="button" class="lobby-roster__cell" data-action="select-class" data-id="Amy" role="radio" aria-checked="false" aria-label="Select Amy">
+          
+    <div class="fm-photoslot fm-photoslot--md">
+      <div class="fm-photoslot__frame">
+        <img class="fm-photoslot__img" src="../../public/images/characters/amy.webp" alt="AMY">
+        
+    <span class="fm-photoslot__corner fm-photoslot__corner--tl" aria-hidden="true"></span>
+    <span class="fm-photoslot__corner fm-photoslot__corner--tr" aria-hidden="true"></span>
+    <span class="fm-photoslot__corner fm-photoslot__corner--bl" aria-hidden="true"></span>
+    <span class="fm-photoslot__corner fm-photoslot__corner--br" aria-hidden="true"></span>
+  
+        
+      </div>
+      
+      <div class="fm-photoslot__caption">
+        <div class="fm-photoslot__name">AMY</div>
+        <div class="fm-photoslot__role">MEDIC · SLIPPERY</div>
+      </div>
+    
+    </div>
+  
+          
+        </button>
+      
+        <button type="button" class="lobby-roster__cell" data-action="select-class" data-id="Ned" role="radio" aria-checked="false" aria-label="Select Ned">
+          
+    <div class="fm-photoslot fm-photoslot--md">
+      <div class="fm-photoslot__frame">
+        <img class="fm-photoslot__img" src="../../public/images/characters/ned.webp" alt="NED">
+        
+    <span class="fm-photoslot__corner fm-photoslot__corner--tl" aria-hidden="true"></span>
+    <span class="fm-photoslot__corner fm-photoslot__corner--tr" aria-hidden="true"></span>
+    <span class="fm-photoslot__corner fm-photoslot__corner--bl" aria-hidden="true"></span>
+    <span class="fm-photoslot__corner fm-photoslot__corner--br" aria-hidden="true"></span>
+  
+        
+      </div>
+      
+      <div class="fm-photoslot__caption">
+        <div class="fm-photoslot__name">NED</div>
+        <div class="fm-photoslot__role">RECON · SEARCHER</div>
+      </div>
+    
+    </div>
+  
+          
+        </button>
+      
+        <button type="button" class="lobby-roster__cell" data-action="select-class" data-id="Elle" role="radio" aria-checked="false" aria-label="Select Elle">
+          
+    <div class="fm-photoslot fm-photoslot--md">
+      <div class="fm-photoslot__frame">
+        <img class="fm-photoslot__img" src="../../public/images/characters/elle.webp" alt="ELLE">
+        
+    <span class="fm-photoslot__corner fm-photoslot__corner--tl" aria-hidden="true"></span>
+    <span class="fm-photoslot__corner fm-photoslot__corner--tr" aria-hidden="true"></span>
+    <span class="fm-photoslot__corner fm-photoslot__corner--bl" aria-hidden="true"></span>
+    <span class="fm-photoslot__corner fm-photoslot__corner--br" aria-hidden="true"></span>
+  
+        
+      </div>
+      
+      <div class="fm-photoslot__caption">
+        <div class="fm-photoslot__name">ELLE</div>
+        <div class="fm-photoslot__role">MARKSMAN · SNIPER</div>
+      </div>
+    
+    </div>
+  
+          
+        </button>
+      
+        <button type="button" class="lobby-roster__cell" data-action="select-class" data-id="Josh" role="radio" aria-checked="false" aria-label="Select Josh">
+          
+    <div class="fm-photoslot fm-photoslot--md">
+      <div class="fm-photoslot__frame">
+        <img class="fm-photoslot__img" src="../../public/images/characters/josh.webp" alt="JOSH">
+        
+    <span class="fm-photoslot__corner fm-photoslot__corner--tl" aria-hidden="true"></span>
+    <span class="fm-photoslot__corner fm-photoslot__corner--tr" aria-hidden="true"></span>
+    <span class="fm-photoslot__corner fm-photoslot__corner--bl" aria-hidden="true"></span>
+    <span class="fm-photoslot__corner fm-photoslot__corner--br" aria-hidden="true"></span>
+  
+        
+      </div>
+      
+      <div class="fm-photoslot__caption">
+        <div class="fm-photoslot__name">JOSH</div>
+        <div class="fm-photoslot__role">HEAVY · BRAWLER</div>
+      </div>
+    
+    </div>
+  
+          
+        </button>
+      
+        </div>
+      </section><section class="fm-panel lobby-panel lobby-panel--area" data-panel="area">
+        <div class="lobby-area">
+          <div class="lobby-area__bar" aria-hidden="true"></div>
+          <div class="lobby-area__text">
+            <div class="fm-kicker fm-kicker--secondary">AREA OF OPERATION</div>
+            <div class="fm-stencil lobby-area__name">ENDEAD · 4×3</div>
+            <div class="lobby-area__sub fm-mono">HOSTILE DENSITY: MEDIUM</div>
+          </div>
+          <div class="lobby-area__select-wrap">
+            <select class="lobby-area__select fm-mono" id="lobby-map-select" aria-label="Select map"><option value="map-1776396353842" selected="">ENDEAD</option></select>
+            <span class="lobby-area__caret" aria-hidden="true"><svg class="icon icon--xs" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></span>
+          </div>
+        </div>
+      </section><section class="fm-panel lobby-panel lobby-panel--roe" data-panel="roe">
+        <div class="fm-kicker fm-kicker--secondary">RULES OF ENGAGEMENT</div>
+        <div class="lobby-roe-list" role="group" aria-label="Rules of engagement">
+          
+        <label class="lobby-roe">
+          <input type="checkbox" id="lobby-abom-fest" class="lobby-roe__check" data-roe-id="endless-horde">
+          <div class="lobby-roe__text">
+            <div class="fm-stencil lobby-roe__title">ENDLESS HORDE MODE</div>
+            <div class="lobby-roe__desc fm-mono">UNLIMITED ABOMINATIONS MAY SPAWN. EXPECT CASUALTIES.</div>
+          </div>
+          <span class="lobby-chip lobby-chip--rust lobby-roe__tag">HIGH RISK</span>
+        </label>
+      
+        <label class="lobby-roe">
+          <input type="checkbox" id="lobby-roe-friendly-fire" class="lobby-roe__check" data-roe-id="friendly-fire">
+          <div class="lobby-roe__text">
+            <div class="fm-stencil lobby-roe__title">FRIENDLY FIRE</div>
+            <div class="lobby-roe__desc fm-mono">RANGED ATTACKS CAN STRIKE OPERATIVES IN THE TARGET ZONE.</div>
+          </div>
+          <span class="lobby-chip lobby-chip--rust lobby-roe__tag">HAZARD</span>
+        </label>
+      
+        <label class="lobby-roe">
+          <input type="checkbox" id="lobby-roe-shared-vitals" class="lobby-roe__check" data-roe-id="shared-vitals">
+          <div class="lobby-roe__text">
+            <div class="fm-stencil lobby-roe__title">SHARED VITALS</div>
+            <div class="lobby-roe__desc fm-mono">WOUNDS DISTRIBUTE ACROSS THE SQUAD. NO OPERATIVE FALLS ALONE.</div>
+          </div>
+          <span class="lobby-chip lobby-roe__tag">TACTICAL</span>
+        </label>
+      
+        <label class="lobby-roe">
+          <input type="checkbox" id="lobby-roe-perma-death" class="lobby-roe__check" data-roe-id="perma-death">
+          <div class="lobby-roe__text">
+            <div class="fm-stencil lobby-roe__title">PERMA-DEATH</div>
+            <div class="lobby-roe__desc fm-mono">DOWNED OPERATIVES ARE LOST. NO REVIVES PERMITTED.</div>
+          </div>
+          <span class="lobby-chip lobby-chip--rust lobby-roe__tag">HIGH RISK</span>
+        </label>
+      
+        </div>
+      </section><section class="fm-panel lobby-panel lobby-panel--footer" data-panel="footer">
+        <div class="lobby-footer">
+          <button class="fm-btn fm-btn--primary fm-btn--full btn btn--primary btn--lg btn--full" data-action="start-game"><span class="btn__icon fm-btn__icon"><svg class="icon icon--md" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"></path></svg></span><span class="btn__label fm-btn__label">BEGIN OPERATION · 1/1 READY</span></button>
+          <button class="fm-btn fm-btn--ghost fm-btn--full btn btn--ghost btn--md btn--full" data-action="leave-room"><span class="btn__icon fm-btn__icon"><svg class="icon icon--md" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg></span><span class="btn__label fm-btn__label">LEAVE ROOM</span></button>
+        </div>
+      </section>
+          
+        </div></div>
 </body>
 </html>
