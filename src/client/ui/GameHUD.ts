@@ -1,5 +1,5 @@
 
-import { GameState, PlayerId, EntityId, Survivor, GameResult } from '../../types/GameState';
+import { GameState, PlayerId, EntityId, Survivor, GameResult, EquipmentCard } from '../../types/GameState';
 import { ActionType } from '../../types/Action';
 import { networkManager } from '../NetworkManager';
 import { InputController } from '../InputController';
@@ -725,7 +725,6 @@ export class GameHUD {
     const idx = Math.max(0, this.state!.players.indexOf(survivor.playerId));
 
     const hp = Math.max(0, survivor.maxHealth - survivor.wounds);
-    const weapons = survivor.inventory.filter(c => c.type === 'WEAPON' && c.inHand);
     const noAP = survivor.actionsRemaining < 1;
     const weaponBoosts = this.getWeaponBoosts(survivor);
 
@@ -752,13 +751,13 @@ export class GameHUD {
               <div class="hud-op__nameline">
                 <span class="hud-op__name">${escapeHtml(survivor.name)}</span>
               </div>
-              ${tagRow}
             </div>
           </div>
           <div class="hud-op__head-right">
             <span class="hud-op__sub">POINT · ${escapeHtml(callsignFor(survivor, idx))}</span>
           </div>
         </div>
+        ${tagRow}
         <div class="hud-op__stats">
           ${renderStatCell({ icon: icon('Heart', 'sm'), label: 'VITALS', value: hp, max: survivor.maxHealth, color: 'danger', size: 'sm' })}
           ${renderStatCell({ icon: icon('Zap', 'sm'), label: 'ACTIONS', value: survivor.actionsRemaining, max: survivor.actionsPerTurn, color: 'amber', size: 'sm' })}
@@ -766,28 +765,33 @@ export class GameHUD {
         </div>
       </div>`;
 
-    // Loadout — weapons + backpack
-    const rHand = weapons[0];
-    const lHand = weapons[1];
+    // Loadout — render by actual slot occupancy so non-weapons in hand are visible.
+    const rHand = survivor.inventory.find(c => c.slot === 'HAND_1');
+    const lHand = survivor.inventory.find(c => c.slot === 'HAND_2');
     const freeCombatAvail = survivor.freeCombatsRemaining > 0 || survivor.freeMeleeRemaining > 0 || survivor.freeRangedRemaining > 0;
     const attackDisabled = !isMyTurn || (noAP && !freeCombatAvail);
 
-    const weaponSlot = (w: typeof rHand, slotLabel: string) => {
-      if (!w) {
+    const handSlot = (item: EquipmentCard | undefined, slotLabel: string) => {
+      if (!item) {
         return `<div class="hud-slot hud-slot--empty" aria-label="${slotLabel} empty">
           <div class="hud-slot__empty">— EMPTY —</div>
         </div>`;
       }
-      const boosts = weaponBoosts.get(w.id) || { dice: 0, damage: 0 };
-      const isActive = this.inputController.mode === 'ATTACK' && this.inputController.weaponId === w.id;
+      if (item.type !== 'WEAPON') {
+        return `<div class="hud-slot hud-slot--item" aria-label="${slotLabel}">
+          ${renderItemCard(item, { variant: 'default', showSlot: false })}
+        </div>`;
+      }
+      const boosts = weaponBoosts.get(item.id) || { dice: 0, damage: 0 };
+      const isActive = this.inputController.mode === 'ATTACK' && this.inputController.weaponId === item.id;
       const classes = [
         'hud-weapon-btn',
         isActive ? 'hud-weapon-btn--active' : '',
         attackDisabled ? 'hud-weapon-btn--locked' : '',
       ].filter(Boolean).join(' ');
       return `<div class="hud-slot hud-slot--weapon" aria-label="${slotLabel}">
-        <button class="${classes}" data-id="${escapeHtml(w.id)}"${attackDisabled ? ' aria-disabled="true"' : ''}>
-          ${renderItemCard(w, { variant: 'weapon', showSlot: false, bonusDice: boosts.dice, bonusDamage: boosts.damage })}
+        <button class="${classes}" data-id="${escapeHtml(item.id)}"${attackDisabled ? ' aria-disabled="true"' : ''}>
+          ${renderItemCard(item, { variant: 'weapon', showSlot: false, bonusDice: boosts.dice, bonusDamage: boosts.damage })}
         </button>
       </div>`;
     };
@@ -806,8 +810,8 @@ export class GameHUD {
       <section class="hud-loadout">
         <div class="fm-kicker fm-kicker--secondary hud-loadout__kicker">LOADOUT</div>
         <div class="hud-loadout__grid">
-          ${weaponSlot(rHand, 'R.HAND')}
-          ${weaponSlot(lHand, 'L.HAND')}
+          ${handSlot(rHand, 'R.HAND')}
+          ${handSlot(lHand, 'L.HAND')}
           ${bagSlot}
         </div>
       </section>`;

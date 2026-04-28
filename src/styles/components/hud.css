@@ -605,7 +605,7 @@
 
 .hud-op__head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 10px;
   min-width: 0;
@@ -613,7 +613,7 @@
 
 .hud-op__head-left {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 10px;
   min-width: 0;
   flex: 1 1 auto;
@@ -623,7 +623,6 @@
   flex: 0 0 auto;
   text-align: right;
   white-space: nowrap;
-  padding-top: 2px;
 }
 
 .hud-op__ident { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }

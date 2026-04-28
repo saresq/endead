@@ -1,6 +1,6 @@
 // src/services/EquipmentManager.ts
 
-import { GameState, Survivor, EquipmentCard, EntityId } from '../types/GameState';
+import { GameState, Survivor, EquipmentCard, EntityId, EquipmentType } from '../types/GameState';
 
 const BACKPACK_SLOTS = ['BACKPACK_0', 'BACKPACK_1', 'BACKPACK_2'] as const;
 
@@ -26,26 +26,34 @@ export class EquipmentManager {
 
   /**
    * Adds a card to the first available slot.
-   * If full, it does NOT add, requiring a resolution action.
+   * Weapons prefer hands; non-weapons prefer backpack so they don't block
+   * weapon slots. Falls back to the other region when the preferred is full.
    */
   public static addCard(survivor: Survivor, card: EquipmentCard): Survivor {
     const newSurvivor = { ...survivor, inventory: [...survivor.inventory] };
 
-    // Auto-assign slot
-    // 1. Hands
-    // 2. Backpack
     const handCount = newSurvivor.inventory.filter(c => c.slot === 'HAND_1' || c.slot === 'HAND_2').length;
+    const openBackpack = this.firstOpenBackpackSlot(newSurvivor);
+    const isWeapon = card.type === EquipmentType.Weapon;
 
-    if (handCount < this.MAX_HANDS) {
-      // Find empty hand slot
+    const placeInHand = () => {
       const hand1 = newSurvivor.inventory.find(c => c.slot === 'HAND_1');
-      const hand2 = newSurvivor.inventory.find(c => c.slot === 'HAND_2');
-
       card.slot = !hand1 ? 'HAND_1' : 'HAND_2';
       card.inHand = true;
-    } else {
-      card.slot = this.firstOpenBackpackSlot(newSurvivor) ?? 'BACKPACK_0';
+    };
+    const placeInBackpack = () => {
+      card.slot = openBackpack ?? 'BACKPACK_0';
       card.inHand = false;
+    };
+
+    if (isWeapon) {
+      if (handCount < this.MAX_HANDS) placeInHand();
+      else if (openBackpack) placeInBackpack();
+      else placeInHand(); // both full — fall through; gating in caller should have caught it
+    } else {
+      if (openBackpack) placeInBackpack();
+      else if (handCount < this.MAX_HANDS) placeInHand();
+      else placeInBackpack();
     }
 
     newSurvivor.inventory.push(card);

@@ -26,9 +26,9 @@ const CHARACTER_ROLES: Record<string, string> = {
 // Max operatives per squad — mirrors `MAX_PLAYERS` in server.ts.
 const MAX_SQUAD = 6;
 
-// ROE rules shown in the Rules of Engagement panel. Only
-// `endless-horde` is wired to actual game config (abominationFest);
-// the rest are presentation-only toggles per task 11 (LOB-05).
+// ROE rules shown in the Rules of Engagement panel. Each entry
+// must be wired to actual game config — presentation-only mocks
+// were removed once they started misleading hosts.
 type RoeRule = {
   id: string;
   title: string;
@@ -41,32 +41,8 @@ type RoeRule = {
 const ROE_RULES: RoeRule[] = [
   {
     id: 'endless-horde',
-    title: 'ENDLESS HORDE MODE',
-    description: 'UNLIMITED ABOMINATIONS MAY SPAWN. EXPECT CASUALTIES.',
-    defaultOn: false,
-    riskLabel: 'HIGH RISK',
-    riskVariant: 'rust',
-  },
-  {
-    id: 'friendly-fire',
-    title: 'FRIENDLY FIRE',
-    description: 'RANGED ATTACKS CAN STRIKE OPERATIVES IN THE TARGET ZONE.',
-    defaultOn: false,
-    riskLabel: 'HAZARD',
-    riskVariant: 'rust',
-  },
-  {
-    id: 'shared-vitals',
-    title: 'SHARED VITALS',
-    description: 'WOUNDS DISTRIBUTE ACROSS THE SQUAD. NO OPERATIVE FALLS ALONE.',
-    defaultOn: false,
-    riskLabel: 'TACTICAL',
-    riskVariant: 'olive',
-  },
-  {
-    id: 'perma-death',
-    title: 'PERMA-DEATH',
-    description: 'DOWNED OPERATIVES ARE LOST. NO REVIVES PERMITTED.',
+    title: 'ABOMINATION SURGE',
+    description: 'POOL CAP LIFTED. ABOMINATIONS KEEP SPAWNING. EXPECT CASUALTIES.',
     defaultOn: false,
     riskLabel: 'HIGH RISK',
     riskVariant: 'rust',

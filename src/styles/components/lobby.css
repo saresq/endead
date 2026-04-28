@@ -1147,48 +1147,5 @@
   .lobby-scrim__meta::after { animation: none; }
 }
 
-/* ==========================================================================
-   Tablet breakpoint (md: 768px – 1023px).
-   Promoted from design/breakpoints/lobby-tablet.html. The .lobby__stack
-   becomes a 2-column grid; columns are assigned by panel class so no
-   DOM restructure is required.
-   ========================================================================== */
-
-@media (min-width: 768px) and (max-width: 1023px) {
-  .lobby__stack {
-    max-width: 720px;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    column-gap: 16px;
-    row-gap: 14px;
-  }
-
-  /* Column assignment — left rail handles the briefing + roster
-     (visual + selection), right rail handles dossier + loadout +
-     progression + roe + footer (the active operative dossier). */
-  .lobby-panel--briefing,
-  .lobby-panel--squad,
-  .lobby-panel--player,
-  .lobby-panel--roster {
-    grid-column: 1;
-  }
-
-  .lobby-panel--area,
-  .lobby-panel--roe,
-  .lobby-panel--footer {
-    grid-column: 2;
-  }
-
-  /* Roster goes 4-up at this width — 3-up wastes the column. */
-  .lobby-roster {
-    grid-template-columns: repeat(4, 1fr);
-    gap: 10px;
-  }
-
-  /* Sticky footer keeps the primary CTA visible while scrolling
-     the dossier column. */
-  .lobby-panel--footer {
-    position: sticky;
-    bottom: 12px;
-  }
-}
+/* Lobby stays a single column at every resolution — multi-column splits
+   leave large empty regions when one rail is shorter. */
