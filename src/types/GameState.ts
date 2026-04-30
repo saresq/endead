@@ -44,6 +44,12 @@ export interface WeaponStats {
 
 export interface EquipmentCard {
   id: EntityId;
+  /**
+   * Stable registry key (e.g. 'pistol', 'aaahh_epic'). Survives reshuffles
+   * and is the matching key for `CollectItems` win conditions. Stamped at
+   * card creation in `DeckService` from the `EquipmentRegistry` key.
+   */
+  equipmentId: string;
   name: string;
   type: EquipmentType;
   stats?: WeaponStats; // Only for weapons
@@ -139,6 +145,9 @@ export interface Survivor extends Entity {
 
   // Pending wounds for "Is That All You've Got?" resolution
   pendingWounds?: number;
+
+  // Cheat mode — survivor takes unlimited actions per turn (cosmetic + gameplay).
+  cheatMode?: boolean;
 }
 
 export interface Zombie extends Entity {
@@ -168,6 +177,12 @@ export interface Zone {
   exitPoint?: boolean;
   isExit?: boolean;
   hasObjective?: boolean;
+  /** Color of the Objective token (yellow/blue/green) — present iff `hasObjective` is true. */
+  objectiveColor?: ObjectiveColor;
+  /** Present iff this zone is a colored Spawn Zone (dormant until matching Objective is taken). */
+  spawnColor?: ObjectiveColor.Blue | ObjectiveColor.Green;
+  /** Present iff a red Epic Weapon Crate token sits in this zone. */
+  hasEpicCrate?: boolean;
   searchable: boolean;
   isDark: boolean;
   hasBeenSpawned: boolean;
@@ -197,22 +212,44 @@ export enum GameResult {
 }
 
 export enum ObjectiveType {
-  ReachExit = 'REACH_EXIT', // All survivors must reach this zone (no zombies allowed)
-  TakeObjective = 'TAKE_OBJECTIVE', // Take X objectives
-  KillZombie = 'KILL_ZOMBIE', // Kill X zombies of a specific type (or any)
-  CollectItem = 'COLLECT_ITEM', // Have X specific items in inventory
+  ReachExit = 'REACH_EXIT',                     // All living survivors must occupy the exit zone (no zombies)
+  TakeObjective = 'TAKE_OBJECTIVE',             // Count of yellow Objective tokens taken
+  TakeColorObjective = 'TAKE_COLOR_OBJECTIVE',  // Count of blue OR green Objective tokens taken
+  TakeEpicCrate = 'TAKE_EPIC_CRATE',            // Count of red Epic Weapon Crates taken
+  KillZombie = 'KILL_ZOMBIE',                   // Kill X zombies of a specific type (or any)
+  CollectItems = 'COLLECT_ITEMS',               // Inventory contains the listed equipment IDs in the listed quantities
+  ReachDangerLevel = 'REACH_DANGER_LEVEL',      // Team max survivor danger level reaches threshold
 }
 
-export interface Objective {
-  id: string;
-  type: ObjectiveType;
-  description: string;
-  targetId?: string; // ZoneId (for ReachExit), ZombieType (for Kill), ItemName (for Collect)
-  amountRequired: number;
-  amountCurrent: number;
-  completed: boolean;
-  xpValue?: number; // XP given when this objective is completed/taken (usually 5)
+export enum ObjectiveColor {
+  Yellow = 'YELLOW', // common Objective token
+  Red    = 'RED',    // Epic Weapon Crate token
+  Blue   = 'BLUE',   // dormant blue spawns / blue Objective token
+  Green  = 'GREEN',  // dormant green spawns / green Objective token
 }
+
+export interface ItemRequirement {
+  /** Stable key from EQUIPMENT_CARDS / EPIC_EQUIPMENT_CARDS — matched against `EquipmentCard.equipmentId`. */
+  equipmentId: string;
+  quantity: number;
+}
+
+interface ObjectiveBase {
+  id: string;
+  description: string;
+  completed: boolean;
+  /** XP given when this objective is completed/taken (usually 5 for non-Epic). */
+  xpValue?: number;
+}
+
+export type Objective =
+  | (ObjectiveBase & { type: ObjectiveType.ReachExit; exitZoneId: string })
+  | (ObjectiveBase & { type: ObjectiveType.TakeObjective; amountRequired: number; amountCurrent: number })
+  | (ObjectiveBase & { type: ObjectiveType.TakeColorObjective; objectiveColor: ObjectiveColor.Blue | ObjectiveColor.Green; amountRequired: number; amountCurrent: number })
+  | (ObjectiveBase & { type: ObjectiveType.TakeEpicCrate; amountRequired: number; amountCurrent: number })
+  | (ObjectiveBase & { type: ObjectiveType.KillZombie; zombieType: ZombieType | 'ANY'; amountRequired: number; amountCurrent: number })
+  | (ObjectiveBase & { type: ObjectiveType.CollectItems; itemRequirements: ItemRequirement[] })
+  | (ObjectiveBase & { type: ObjectiveType.ReachDangerLevel; dangerThreshold: DangerLevel });
 
 // New Interface for Lobby Data
 export interface LobbyState {
@@ -304,10 +341,33 @@ export interface GameState {
 
   // Objectives
   objectives: Objective[]; // Dynamic Objectives List
+
+  /**
+   * Per-color dormant-spawn activation state. Zones with `spawnColor` are
+   * dormant while `activated === false`. After the matching colored
+   * Objective is taken, activation flips to true and `activatedOnTurn`
+   * stamps the turn number.
+   *
+   * Spawn gate (per RULEBOOK §9): a colored zone spawns on a Zombie Phase
+   * iff `activation.activated && currentTurn > activation.activatedOnTurn`.
+   * `state.turn` increments in `endRound()` AFTER spawning, so during
+   * turn N's Zombie Phase `state.turn === N`, which `>` correctly skips —
+   * the first dormant spawn happens on turn N+1's Zombie Phase.
+   *
+   * Yellow and Red are intentionally NOT represented here — they don't
+   * drive dormancy. Narrowed key type prevents accidental writes.
+   */
+  spawnColorActivation: Record<
+    ObjectiveColor.Blue | ObjectiveColor.Green,
+    { activated: boolean; activatedOnTurn: number }
+  >;
   
   // Decks
   equipmentDeck: EquipmentCard[];
   equipmentDiscard: EquipmentCard[];
+  /** Epic Weapons deck — drawn from when a survivor takes a red Epic Crate token. */
+  epicDeck: EquipmentCard[];
+  epicDiscard: EquipmentCard[];
   spawnDeck: SpawnCard[];
   spawnDiscard: SpawnCard[];
   
@@ -362,6 +422,10 @@ export interface GameState {
     damagePerHit?: number;           // Effective damage per hit
     usedFreeAction?: boolean;        // Whether a free action was consumed
     freeActionType?: string;         // Which free action type was used
+    /** Set when a colored Objective was taken — flips dormant spawns of that color. */
+    colorActivated?: ObjectiveColor;
+    /** Set when an Epic Weapon Crate was taken — equipmentId of the drawn epic weapon. */
+    epicWeaponDrawn?: string;
     // Captured on ATTACK when the actor has Lucky unspent — enables rollback-and-reroll.
     rollbackSnapshot?: {
       /** RNG state AFTER the dice were rolled but BEFORE any side effects consumed seed.
@@ -433,10 +497,16 @@ export const initialGameState: GameState = {
   zones: {}, // Populated by handleStartGame via ScenarioCompiler
   
   objectives: [], // Populated on Start Game
+  spawnColorActivation: {
+    [ObjectiveColor.Blue]: { activated: false, activatedOnTurn: 0 },
+    [ObjectiveColor.Green]: { activated: false, activatedOnTurn: 0 },
+  },
   tiles: [], // Populated later
 
   equipmentDeck: [], // Populated with card objects
   equipmentDiscard: [],
+  epicDeck: [], // Populated by handleStartGame via DeckService.initializeEpicDeck
+  epicDiscard: [],
   spawnDeck: [], // Populated with spawn cards
   spawnDiscard: [],
   

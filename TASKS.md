@@ -1,7 +1,5 @@
 # Tasks
 
-## Open
-
 ### Add Kid Survivors (Tiger Sam, Bunny G)
 
 Zombicide 2E core box includes two Kid survivors missing from `CharacterRegistry.ts`:

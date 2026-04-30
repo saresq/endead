@@ -414,3 +414,79 @@
 [data-danger="red"] .item-card__name {
   color: var(--bone-100);
 }
+
+/* ==========================================================================
+   Food slot — wraps an item-card with a tactical "consume" affordance.
+   The item-card stays informational; the eat action lives as a compact
+   inset chip on the card's right edge so the slot reads at a glance.
+   ========================================================================== */
+
+.food-slot {
+  position: relative;
+  display: block;
+}
+
+.food-slot .item-card {
+  /* Reserve room on the right for the eat chip without truncating name. */
+  padding-right: 92px;
+}
+
+.food-slot__eat {
+  position: absolute;
+  top: 50%;
+  right: var(--space-2);
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: linear-gradient(180deg, var(--amber-400) 0%, #d4892a 100%);
+  color: #1a1208;
+  border: 1px solid rgba(0, 0, 0, 0.45);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: var(--font-bold);
+  letter-spacing: var(--letter-spacing-wider);
+  text-transform: uppercase;
+  cursor: pointer;
+  z-index: 2;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
+    0 2px 6px rgba(0, 0, 0, 0.55);
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    filter var(--duration-fast) var(--ease-out);
+}
+
+.food-slot__eat .icon {
+  width: 14px;
+  height: 14px;
+}
+
+.food-slot__eat-label {
+  line-height: 1;
+}
+
+.food-slot__eat:hover {
+  filter: brightness(1.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
+    0 4px 10px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(240, 169, 74, 0.45);
+}
+
+.food-slot__eat:active {
+  transform: translateY(calc(-50% + 1px));
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.5),
+    0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.food-slot__eat:focus-visible {
+  outline: 2px solid var(--amber-200, var(--amber-400));
+  outline-offset: 2px;
+}

@@ -229,7 +229,17 @@ export class ZombiePhaseManager {
       ?? Object.values(newState.zones).filter(z => z.spawnPoint).map(z => z.id).sort();
     const spawnZones = orderedSpawnIds
       .map(id => newState.zones[id])
-      .filter(z => z && z.spawnPoint);
+      .filter(z => z && z.spawnPoint)
+      // Per RULEBOOK §9: dormant colored Spawn Zones receive no spawn until the
+      // turn AFTER their matching colored Objective is taken. The strict-greater
+      // gate skips turn N (when activation happened) and lets turn N+1 spawn.
+      // `state.turn` increments in `endRound()` AFTER processSpawns, so during
+      // turn N's Zombie Phase `state.turn === N`.
+      .filter(z => {
+        if (!z.spawnColor) return true;
+        const act = newState.spawnColorActivation?.[z.spawnColor];
+        return !!act && act.activated && newState.turn > act.activatedOnTurn;
+      });
 
     for (const zone of spawnZones) {
        // Self-healing: Initialize Spawn Deck if empty

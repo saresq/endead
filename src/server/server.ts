@@ -9,6 +9,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { HeartbeatManager } from './HeartbeatManager';
 import { persistenceService } from '../services/PersistenceService';
+import { validateInFlightGameStateSchema } from '../services/GameStateSchema';
 import { TILE_DEFINITIONS, registerTileDefinitions } from '../config/TileDefinitions';
 import { repairExternalEdges } from '../services/TileDefinitionService';
 import { TileDefinition } from '../types/TileDefinition';
@@ -214,13 +215,30 @@ function createRoom(roomId: string): RoomContext {
   };
 }
 
-function ensureRoom(roomId: string): RoomContext | null {
+type EnsureRoomResult =
+  | { kind: 'ROOM'; room: RoomContext }
+  | { kind: 'NOT_FOUND' }
+  | { kind: 'SCHEMA_INCOMPATIBLE' };
+
+function ensureRoom(roomId: string): EnsureRoomResult {
   const existing = rooms.get(roomId);
-  if (existing) return existing;
+  if (existing) return { kind: 'ROOM', room: existing };
 
   // Try to restore from DB
   const savedState = persistenceService.loadRoom(roomId);
   if (savedState) {
+    const schemaCheck = validateInFlightGameStateSchema(savedState);
+    if (!schemaCheck.ok) {
+      // Pre-Phase-F in-flight save — not resumable. Drop the row so the
+      // room id frees up for a fresh game and the user gets a clear error.
+      log(`Rejecting room ${roomId} — schema incompatible: ${schemaCheck.reason}`);
+      try {
+        persistenceService.deleteRoom(roomId);
+      } catch (e) {
+        console.error(`Failed to delete incompatible room ${roomId}:`, e);
+      }
+      return { kind: 'SCHEMA_INCOMPATIBLE' };
+    }
     log(`Restoring room ${roomId} from database.`);
     const room: RoomContext = {
       id: roomId,
@@ -231,10 +249,10 @@ function ensureRoom(roomId: string): RoomContext | null {
       cleanupTimer: null,
     };
     rooms.set(roomId, room);
-    return room;
+    return { kind: 'ROOM', room };
   }
 
-  return null;
+  return { kind: 'NOT_FOUND' };
 }
 
 function clearRoomCleanup(room: RoomContext): void {
@@ -379,11 +397,19 @@ function handleJoin(ws: WebSocket, payload: { roomId: string; playerId: PlayerId
     return;
   }
 
-  const room = ensureRoom(roomId);
-  if (!room) {
+  const ensured = ensureRoom(roomId);
+  if (ensured.kind === 'SCHEMA_INCOMPATIBLE') {
+    sendError(ws, {
+      code: 'SAVE_INCOMPATIBLE',
+      message: 'This room was saved with an older format and cannot be resumed. Please start a new game.',
+    });
+    return;
+  }
+  if (ensured.kind === 'NOT_FOUND') {
     sendError(ws, { code: 'ROOM_NOT_FOUND', message: 'Room not found.' });
     return;
   }
+  const room = ensured.room;
 
   clearRoomCleanup(room);
 

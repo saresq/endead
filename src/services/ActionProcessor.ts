@@ -1,5 +1,5 @@
 
-import { GameState, GamePhase, GameResult, ObjectiveType, Objective, Survivor, ZombieType } from '../types/GameState';
+import { GameState, GamePhase, GameResult, ObjectiveType, Objective, Survivor, ZombieType, DangerLevel } from '../types/GameState';
 import { ActionRequest, ActionResponse, ActionType, ActionError } from '../types/Action';
 import { validateTurn, advanceTurnState, checkEndTurn } from './TurnManager';
 import { ZombiePhaseManager } from './ZombiePhaseManager';
@@ -14,7 +14,9 @@ import { handleUseItem, handleSearch, handleResolveSearch, handleOrganize } from
 import { handleOpenDoor, handleMakeNoise } from './handlers/DoorHandlers';
 import { handleTradeStart, handleTradeOffer, handleTradeAccept, handleTradeCancel } from './handlers/TradeHandlers';
 import { handleTakeObjective } from './handlers/ObjectiveHandlers';
+import { handleTakeEpicCrate } from './handlers/EpicCrateHandlers';
 import { handleNothing, handleEndTurn } from './handlers/TurnHandlers';
+import { handleActivateCheat } from './handlers/CheatHandlers';
 
 const handlers: Partial<Record<ActionType, ActionHandler>> = {
   [ActionType.JOIN_LOBBY]: handleJoinLobby,
@@ -31,6 +33,7 @@ const handlers: Partial<Record<ActionType, ActionHandler>> = {
   [ActionType.ORGANIZE]: handleOrganize,
   [ActionType.OPEN_DOOR]: handleOpenDoor,
   [ActionType.TAKE_OBJECTIVE]: handleTakeObjective,
+  [ActionType.TAKE_EPIC_CRATE]: handleTakeEpicCrate,
   [ActionType.TRADE_START]: handleTradeStart,
   [ActionType.TRADE_OFFER]: handleTradeOffer,
   [ActionType.TRADE_ACCEPT]: handleTradeAccept,
@@ -46,11 +49,19 @@ const handlers: Partial<Record<ActionType, ActionHandler>> = {
   [ActionType.RESOLVE_WOUNDS]: handleResolveWounds,
   [ActionType.DISTRIBUTE_ZOMBIE_WOUNDS]: handleDistributeZombieWounds,
   [ActionType.REROLL_LUCKY]: handleRerollLucky,
+  [ActionType.ACTIVATE_CHEAT]: handleActivateCheat,
 };
 
 // --- Game End Logic ---
 
-function checkGameEndConditions(state: GameState): GameResult | undefined {
+const DANGER_VALUES: Record<DangerLevel, number> = {
+  [DangerLevel.Blue]: 0,
+  [DangerLevel.Yellow]: 1,
+  [DangerLevel.Orange]: 2,
+  [DangerLevel.Red]: 3,
+};
+
+export function checkGameEndConditions(state: GameState): GameResult | undefined {
   const survivors = Object.values(state.survivors);
   const zombies = Object.values(state.zombies);
 
@@ -64,39 +75,53 @@ function checkGameEndConditions(state: GameState): GameResult | undefined {
 
   const livingSurvivors = survivors.filter(s => s.wounds < s.maxHealth);
 
-  // Check if ALL objectives are met
   const allObjectivesMet = state.objectives.every(obj => {
       if (obj.completed) return true;
 
-      if (obj.type === ObjectiveType.ReachExit) {
-          if (!obj.targetId) return false;
+      switch (obj.type) {
+          case ObjectiveType.ReachExit: {
+              const exitZoneId = obj.exitZoneId;
+              if (!exitZoneId) return false;
 
-          const exitZoneId = obj.targetId;
-          const allInExit = livingSurvivors.every(s => s.position.zoneId === exitZoneId);
-          if (!allInExit) return false;
+              const allInExit = livingSurvivors.every(s => s.position.zoneId === exitZoneId);
+              if (!allInExit) return false;
 
-          const zombiesInExit = zombies.some(z => z.position.zoneId === exitZoneId);
-          if (zombiesInExit) return false;
+              const zombiesInExit = zombies.some(z => z.position.zoneId === exitZoneId);
+              if (zombiesInExit) return false;
 
-          return true;
+              return true;
+          }
+          case ObjectiveType.TakeObjective:
+          case ObjectiveType.TakeColorObjective:
+          case ObjectiveType.TakeEpicCrate:
+          case ObjectiveType.KillZombie:
+              return obj.amountCurrent >= obj.amountRequired;
+          case ObjectiveType.CollectItems: {
+              // Sum committed inventory only (drawnCard is transient mid-search
+              // staging). Match by equipmentId — exact, not name substring.
+              return obj.itemRequirements.every(req => {
+                  let total = 0;
+                  for (const s of livingSurvivors) {
+                      for (const card of s.inventory) {
+                          if (card.equipmentId === req.equipmentId) total += 1;
+                      }
+                  }
+                  return total >= req.quantity;
+              });
+          }
+          case ObjectiveType.ReachDangerLevel: {
+              // Team-shared: highest XP-derived danger among living survivors.
+              const teamMax = livingSurvivors.reduce(
+                  (acc, s) => Math.max(acc, DANGER_VALUES[s.dangerLevel]),
+                  0,
+              );
+              return teamMax >= DANGER_VALUES[obj.dangerThreshold];
+          }
+          default: {
+              const _exhaustive: never = obj;
+              return _exhaustive;
+          }
       }
-
-      if (obj.type === ObjectiveType.CollectItem) {
-        const requiredAmount = obj.amountRequired;
-        let foundAmount = 0;
-
-        livingSurvivors.forEach(s => {
-          s.inventory.forEach(card => {
-            if (obj.targetId && card.name.includes(obj.targetId)) {
-               foundAmount++;
-            }
-          });
-        });
-
-        return foundAmount >= requiredAmount;
-      }
-
-      return obj.amountCurrent >= obj.amountRequired;
   });
 
   if (allObjectivesMet) {
@@ -113,7 +138,8 @@ export function processAction(state: GameState, intent: ActionRequest): ActionRe
     intent.type === ActionType.SELECT_CHARACTER ||
     intent.type === ActionType.START_GAME ||
     intent.type === ActionType.END_GAME ||
-    intent.type === ActionType.DISTRIBUTE_ZOMBIE_WOUNDS
+    intent.type === ActionType.DISTRIBUTE_ZOMBIE_WOUNDS ||
+    intent.type === ActionType.ACTIVATE_CHEAT
   ) {
       // Allow through (lobby actions + cooperative wound distribution)
   } else {
@@ -150,10 +176,16 @@ export function processAction(state: GameState, intent: ActionRequest): ActionRe
     const gameActions = [
         ActionType.MOVE, ActionType.ATTACK, ActionType.SEARCH, ActionType.SPRINT, ActionType.USE_ITEM,
         ActionType.OPEN_DOOR, ActionType.MAKE_NOISE, ActionType.ORGANIZE,
-        ActionType.TAKE_OBJECTIVE,
+        ActionType.TAKE_OBJECTIVE, ActionType.TAKE_EPIC_CRATE,
         ActionType.TRADE_START, ActionType.TRADE_OFFER,
         ActionType.TRADE_ACCEPT, ActionType.TRADE_CANCEL, ActionType.END_TURN,
         ActionType.CHARGE, ActionType.BORN_LEADER, ActionType.BLOODLUST_MELEE, ActionType.LIFESAVER
+    ];
+
+    // Food consumption is free per Zombicide 2E (cards can be discarded any
+    // time). Currently the only USE_ITEM case is food.
+    const freeActions = [
+        ActionType.CHARGE, ActionType.BORN_LEADER, ActionType.LIFESAVER, ActionType.USE_ITEM,
     ];
 
     if (gameActions.includes(intent.type)) {
@@ -175,8 +207,17 @@ export function processAction(state: GameState, intent: ActionRequest): ActionRe
        else if (intent.type === ActionType.ORGANIZE && newState.survivors[intent.survivorId!]?.drawnCard) {
            // Free Organize during Pickup/Search Resolution
        }
-       else if (intent.type === ActionType.CHARGE || intent.type === ActionType.BORN_LEADER || intent.type === ActionType.LIFESAVER) {
-           // Charge, Born Leader, and Lifesaver are free actions — no AP cost
+       else if (freeActions.includes(intent.type)) {
+           // Charge, Born Leader, Lifesaver, and food consumption — no AP cost
+           newState = checkEndTurn(newState);
+       }
+       else if (intent.type === ActionType.END_TURN) {
+           // END_TURN is unconditional: handleEndTurn already cleared every blocker
+           // (actions, free counters, drawn cards, active trade) for the active
+           // player, so go straight to checkEndTurn without AP deduction or
+           // cheat-mode replenishment.
+           delete (newState as any)._extraAPCost;
+           delete (newState as any)._attackIsMelee;
            newState = checkEndTurn(newState);
        }
        else {

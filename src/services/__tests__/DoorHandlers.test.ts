@@ -20,6 +20,7 @@ function makeZone(overrides: Partial<Zone> & { id: string }): Zone {
 function makeOpener(): EquipmentCard {
   return {
     id: 'crowbar-1',
+    equipmentId: 'crowbar',
     name: 'Crowbar',
     type: EquipmentType.Weapon,
     canOpenDoor: true,

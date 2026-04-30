@@ -26,7 +26,7 @@ export function handleCharge(state: GameState, intent: ActionRequest): GameState
   if (!survivor.skills.includes('charge')) {
     throw new Error('Survivor does not have Charge skill');
   }
-  if (survivor.chargeUsedThisTurn) {
+  if (survivor.chargeUsedThisTurn && !survivor.cheatMode) {
     throw new Error('Charge already used this turn');
   }
 
@@ -71,7 +71,7 @@ export function handleBornLeader(state: GameState, intent: ActionRequest): GameS
   if (!survivor.skills.includes('born_leader')) {
     throw new Error('Survivor does not have Born Leader skill');
   }
-  if (survivor.bornLeaderUsedThisTurn) {
+  if (survivor.bornLeaderUsedThisTurn && !survivor.cheatMode) {
     throw new Error('Born Leader already used this turn');
   }
   if (!targetSurvivorId) throw new Error('Target survivor required');
@@ -99,7 +99,7 @@ export function handleBloodlustMelee(state: GameState, intent: ActionRequest): G
   if (!survivor.skills.includes('bloodlust_melee')) {
     throw new Error('Survivor does not have Bloodlust: Melee skill');
   }
-  if (survivor.bloodlustUsedThisTurn) {
+  if (survivor.bloodlustUsedThisTurn && !survivor.cheatMode) {
     throw new Error('Bloodlust: Melee already used this turn');
   }
 
@@ -145,7 +145,7 @@ export function handleLifesaver(state: GameState, intent: ActionRequest): GameSt
   if (!survivor.skills.includes('lifesaver')) {
     throw new Error('Survivor does not have Lifesaver skill');
   }
-  if (survivor.lifesaverUsedThisTurn) {
+  if (survivor.lifesaverUsedThisTurn && !survivor.cheatMode) {
     throw new Error('Lifesaver already used this turn');
   }
 

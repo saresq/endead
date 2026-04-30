@@ -8,11 +8,16 @@ import { notificationManager } from './ui/NotificationManager';
 import { modalManager } from './ui/overlays/ModalManager';
 import { renderButton } from './ui/components/Button';
 
+const CHEAT_SEQUENCE = 'iddqd';
+
 export class KeyboardManager {
   private localPlayerId: string;
   private inputController: InputController;
   private gameHud: () => GameHUD | null;
   private boundHandler: (e: KeyboardEvent) => void;
+  private boundKeyUp: (e: KeyboardEvent) => void;
+  private backspaceHeld: boolean = false;
+  private cheatBuffer: string = '';
 
   constructor(
     playerId: string,
@@ -24,17 +29,63 @@ export class KeyboardManager {
     this.gameHud = getGameHud;
 
     this.boundHandler = (e: KeyboardEvent) => this.handleKeyDown(e);
+    this.boundKeyUp = (e: KeyboardEvent) => this.handleKeyUp(e);
     window.addEventListener('keydown', this.boundHandler);
+    window.addEventListener('keyup', this.boundKeyUp);
   }
 
   public destroy(): void {
     window.removeEventListener('keydown', this.boundHandler);
+    window.removeEventListener('keyup', this.boundKeyUp);
+  }
+
+  private handleKeyUp(e: KeyboardEvent): void {
+    if (e.key === 'Backspace') {
+      this.backspaceHeld = false;
+      this.cheatBuffer = '';
+    }
+  }
+
+  private tryCheatCode(e: KeyboardEvent): boolean {
+    // Lobby phase has no survivor; cheat only meaningful in-game.
+    const state = gameStore.state;
+    if (!state || state.phase === GamePhase.Lobby || state.gameResult) return false;
+
+    if (e.key === 'Backspace') {
+      // Don't preventDefault — let normal Backspace behavior continue (but no input is focused, see top of handleKeyDown).
+      this.backspaceHeld = true;
+      this.cheatBuffer = '';
+      return false;
+    }
+
+    if (!this.backspaceHeld) return false;
+
+    const ch = e.key.toLowerCase();
+    if (ch.length !== 1 || !/^[a-z0-9]$/.test(ch)) return false;
+
+    this.cheatBuffer = (this.cheatBuffer + ch).slice(-CHEAT_SEQUENCE.length);
+    e.preventDefault();
+    if (this.cheatBuffer === CHEAT_SEQUENCE) {
+      this.cheatBuffer = '';
+      this.backspaceHeld = false;
+      networkManager.sendAction({
+        playerId: this.localPlayerId,
+        type: ActionType.ACTIVATE_CHEAT,
+      });
+    }
+    // Always swallow alphanumeric keys while Backspace is held so they
+    // don't trigger normal shortcuts (e.g. "d" = Open Door).
+    return true;
   }
 
   private handleKeyDown(e: KeyboardEvent): void {
     // Don't intercept when typing in an input/textarea
     const tag = (e.target as HTMLElement)?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+    // Cheat code — runs before any other key handling so Backspace and the
+    // iddqd letters don't trigger normal shortcuts (e.g. 'd' = Open Door).
+    if (this.tryCheatCode(e)) return;
 
     const state = gameStore.state;
     if (!state || state.phase === GamePhase.Lobby) return;
@@ -96,7 +147,7 @@ export class KeyboardManager {
     const key = e.key.toLowerCase();
 
     if (key === 's') {
-      if (!survivor.hasSearched) {
+      if (!survivor.hasSearched || survivor.cheatMode) {
         networkManager.sendAction({
           playerId: this.localPlayerId,
           survivorId: survivor.id,

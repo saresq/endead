@@ -1,7 +1,7 @@
 // src/client/PixiBoardRenderer.ts
 
 import * as PIXI from 'pixi.js';
-import { GameState, ZoneId, EntityId, Survivor, Zombie, ZombieType, DangerLevel } from '../types/GameState';
+import { GameState, ZoneId, EntityId, Survivor, Zombie, ZombieType, DangerLevel, ObjectiveColor } from '../types/GameState';
 import { TILE_SIZE, TILE_CELLS_PER_SIDE, TILE_PIXEL_SIZE, ENTITY_RADIUS, ENTITY_SPACING, MIN_ENTITY_RADIUS, GROUP_BADGE_RADIUS } from '../config/Layout';
 import { tileService } from '../services/TileService';
 import { TileInstance } from '../types/Map';
@@ -930,10 +930,29 @@ export class PixiBoardRenderer {
         const halfW = sp.bgWidth / 2;
         const halfH = sp.bgHeight / 2;
 
-        // Dark red rectangle background
+        // Dormancy: a colored Spawn Zone stays dormant until its color is
+        // activated (Blue/Green Objective taken). We render dormant zones with
+        // a desaturated overlay tint so the mapper / players can see them at
+        // game start without confusing them for active spawns.
+        const isDormantColored = zone.spawnColor !== undefined && (
+          !state.spawnColorActivation ||
+          !state.spawnColorActivation[zone.spawnColor]?.activated
+        );
+
+        // Background — color shifts for blue/green spawns
+        let bgColor: number = sp.bgColor;
+        let strokeColor: number = sp.strokeColor;
+        if (zone.spawnColor === ObjectiveColor.Blue) {
+          bgColor = 0x1A3A6B;
+          strokeColor = 0x3D8BFD;
+        } else if (zone.spawnColor === ObjectiveColor.Green) {
+          bgColor = 0x1A4A2E;
+          strokeColor = 0x33C16C;
+        }
+
         g.roundRect(cx - halfW, cy - halfH, sp.bgWidth, sp.bgHeight, sp.bgRadius);
-        g.fill({ color: sp.bgColor, alpha: sp.bgAlpha });
-        g.stroke({ width: sp.strokeWidth, color: sp.strokeColor });
+        g.fill({ color: bgColor, alpha: isDormantColored ? sp.bgAlpha * 0.55 : sp.bgAlpha });
+        g.stroke({ width: sp.strokeWidth, color: strokeColor });
 
         // Larger skull icon inside the rectangle
         const skullOff = sp.skullSize / 2;
@@ -950,6 +969,12 @@ export class PixiBoardRenderer {
           numText.position.set(cx + halfW - 8, cy);
           this.iconContainer.addChild(numText);
         }
+
+        // Dormant marker: small "Z" hatch under the spawn rect
+        if (isDormantColored) {
+          g.rect(cx - halfW, cy + halfH + 1, sp.bgWidth, 3);
+          g.fill({ color: strokeColor, alpha: 0.7 });
+        }
       }
 
       if (zone.isExit) {
@@ -964,11 +989,38 @@ export class PixiBoardRenderer {
       if (zone.hasObjective) {
         const ox = cx - TILE_SIZE / 2 + 25;
         const oy = cy + TILE_SIZE / 2 - 25;
+        // Color the objective token according to the marker variant; default
+        // to yellow (the existing common Objective color).
+        let fillColor: number = BOARD_THEME.objective.fillColor;
+        let dotColor: number = BOARD_THEME.objective.dotColor;
+        if (zone.objectiveColor === ObjectiveColor.Blue) {
+          fillColor = 0x3D8BFD;
+          dotColor = 0xFFFFFF;
+        } else if (zone.objectiveColor === ObjectiveColor.Green) {
+          fillColor = 0x33C16C;
+          dotColor = 0xFFFFFF;
+        }
         g.circle(ox, oy, 10);
-        g.fill({ color: BOARD_THEME.objective.fillColor });
+        g.fill({ color: fillColor });
         g.stroke({ width: BOARD_THEME.objective.strokeWidth, color: BOARD_THEME.objective.strokeColor });
         g.circle(ox, oy, 3);
-        g.fill({ color: BOARD_THEME.objective.dotColor });
+        g.fill({ color: dotColor });
+      }
+
+      if (zone.hasEpicCrate) {
+        // Red Epic Weapon Crate token in the opposite corner from yellow
+        // Objectives so both can coexist visually if the mapper allows it.
+        const ox = cx + TILE_SIZE / 2 - 25;
+        const oy = cy + TILE_SIZE / 2 - 25;
+        g.rect(ox - 10, oy - 10, 20, 20);
+        g.fill({ color: 0xCC2222, alpha: 0.9 });
+        g.stroke({ width: 2, color: 0xFFCC00 });
+        // Yellow "E" glyph
+        g.rect(ox - 5, oy - 6, 2, 12);
+        g.rect(ox - 5, oy - 6, 8, 2);
+        g.rect(ox - 5, oy - 1, 6, 2);
+        g.rect(ox - 5, oy + 4, 8, 2);
+        g.fill({ color: 0xFFCC00 });
       }
     }
   }

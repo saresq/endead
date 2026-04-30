@@ -78,7 +78,7 @@ export function validateTurn(state: GameState, request: ActionRequest): ActionEr
         (request.type === 'ATTACK' && (survivor.freeCombatsRemaining > 0 || survivor.freeMeleeRemaining > 0 || survivor.freeRangedRemaining > 0))
       );
 
-      if (survivor.actionsRemaining <= 0 && !isTradeException && !isPickupException && !hasFreeAction) {
+      if (survivor.actionsRemaining <= 0 && !isTradeException && !isPickupException && !hasFreeAction && !survivor.cheatMode) {
         return {
           code: 'NO_ACTIONS',
           message: `Survivor ${survivor.name} has no actions remaining.`,
@@ -87,7 +87,7 @@ export function validateTurn(state: GameState, request: ActionRequest): ActionEr
 
       // Zombie zone control: moving out of a zone with zombies costs +1 AP penalty
       // Slippery skill waives the penalty entirely
-      if (request.type === 'MOVE' && !survivor.skills.includes('slippery')) {
+      if (request.type === 'MOVE' && !survivor.skills.includes('slippery') && !survivor.cheatMode) {
         const currentZone = state.zones[survivor.position.zoneId];
         const hasZombies = currentZone && Object.values(state.zombies).some(
           (z: any) => z.position.zoneId === currentZone.id
@@ -118,15 +118,18 @@ export function checkEndTurn(state: GameState): GameState {
   // Create shallow copy
   const newState = { ...state };
 
-  // CRITICAL: Do NOT auto-pass if ANY survivor has a pending drawn card 
-  // or if a Trade is active.
-  const anyDrawnCard = Object.values(newState.survivors).some(s => s.drawnCard);
-  
-  if (anyDrawnCard || newState.activeTrade) {
+  const activePlayerId = newState.players[newState.activePlayerIndex];
+
+  // Do NOT auto-pass if the active player has a pending drawn card to resolve
+  // or if a Trade is active. A drawn card on a non-active player's survivor is
+  // not the active player's responsibility and must not block their turn end.
+  const activeDrawnCard = Object.values(newState.survivors).some(
+    (s) => s.playerId === activePlayerId && s.drawnCard
+  );
+
+  if (activeDrawnCard || newState.activeTrade) {
       return newState;
   }
-
-  const activePlayerId = newState.players[newState.activePlayerIndex];
   
   // Find all living survivors belonging to the active player
   const playerSurvivors = Object.values(newState.survivors).filter(
@@ -176,9 +179,13 @@ export function advanceTurnState(state: GameState, survivorId: string): GameStat
   const newSurvivors = { ...newState.survivors };
   const survivor = { ...newSurvivors[survivorId] };
   
-  // Ensure we don't go below 0, though validation should prevent this
-  const newActionsRemaining = Math.max(0, survivor.actionsRemaining - 1);
-  survivor.actionsRemaining = newActionsRemaining;
+  // Cheat mode — never decrement; keep actions topped up.
+  if (survivor.cheatMode) {
+    survivor.actionsRemaining = Math.max(survivor.actionsRemaining, survivor.actionsPerTurn);
+  } else {
+    // Ensure we don't go below 0, though validation should prevent this
+    survivor.actionsRemaining = Math.max(0, survivor.actionsRemaining - 1);
+  }
   newSurvivors[survivorId] = survivor;
   newState.survivors = newSurvivors;
 

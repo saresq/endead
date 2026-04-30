@@ -1,5 +1,5 @@
 
-import { GameState, GamePhase, DangerLevel, EquipmentCard, Survivor, initialGameState } from '../../types/GameState';
+import { GameState, GamePhase, DangerLevel, EquipmentCard, Survivor, initialGameState, ObjectiveColor } from '../../types/GameState';
 import { ActionRequest } from '../../types/Action';
 import { DeckService } from '../DeckService';
 import { compileScenario } from '../ScenarioCompiler';
@@ -77,6 +77,11 @@ export function handleStartGame(state: GameState, intent: ActionRequest): GameSt
     newState.equipmentDeck = deckResult.deck;
     newState.seed = deckResult.newSeed;
 
+    const epicResult = DeckService.initializeEpicDeck(newState.seed);
+    newState.epicDeck = epicResult.deck;
+    newState.epicDiscard = [];
+    newState.seed = epicResult.newSeed;
+
     const spawnResult = DeckService.initializeSpawnDeck(newState.seed);
     newState.spawnDeck = spawnResult.deck;
     newState.seed = spawnResult.newSeed;
@@ -91,6 +96,10 @@ export function handleStartGame(state: GameState, intent: ActionRequest): GameSt
 
     newState.zones = compiled.zones;
     newState.objectives = compiled.objectives;
+    newState.spawnColorActivation = {
+      [ObjectiveColor.Blue]: { activated: false, activatedOnTurn: 0 },
+      [ObjectiveColor.Green]: { activated: false, activatedOnTurn: 0 },
+    };
     newState.zoneGeometry = compiled.zoneGeometry;
     newState.edgeClassMap = compiled.edgeClassMap;
     newState.doorPositions = compiled.doorPositions;

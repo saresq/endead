@@ -25,6 +25,7 @@ export enum ActionType {
   CHOOSE_SKILL = 'CHOOSE_SKILL',
   RESOLVE_SEARCH = 'RESOLVE_SEARCH',
   TAKE_OBJECTIVE = 'TAKE_OBJECTIVE',
+  TAKE_EPIC_CRATE = 'TAKE_EPIC_CRATE',
   SPRINT = 'SPRINT',
   USE_ITEM = 'USE_ITEM',
   NOTHING = 'NOTHING',
@@ -37,6 +38,7 @@ export enum ActionType {
   DISTRIBUTE_ZOMBIE_WOUNDS = 'DISTRIBUTE_ZOMBIE_WOUNDS',
   KICK_PLAYER = 'KICK_PLAYER',
   REROLL_LUCKY = 'REROLL_LUCKY',
+  ACTIVATE_CHEAT = 'ACTIVATE_CHEAT',
 }
 
 // --- Action Payload Types ---
@@ -141,6 +143,7 @@ export interface ActionPayloadMap {
   [ActionType.CHOOSE_SKILL]: ChooseSkillPayload;
   [ActionType.RESOLVE_SEARCH]: ResolveSearchPayload;
   [ActionType.TAKE_OBJECTIVE]: undefined;
+  [ActionType.TAKE_EPIC_CRATE]: undefined;
   [ActionType.SPRINT]: SprintPayload;
   [ActionType.USE_ITEM]: UseItemPayload;
   [ActionType.NOTHING]: undefined;
@@ -153,6 +156,7 @@ export interface ActionPayloadMap {
   [ActionType.DISTRIBUTE_ZOMBIE_WOUNDS]: DistributeZombieWoundsPayload;
   [ActionType.KICK_PLAYER]: KickPlayerPayload;
   [ActionType.REROLL_LUCKY]: undefined;
+  [ActionType.ACTIVATE_CHEAT]: undefined;
 }
 
 export type ActionPayload = ActionPayloadMap[ActionType];

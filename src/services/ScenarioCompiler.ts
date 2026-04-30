@@ -7,8 +7,8 @@
 // Uses TileDefinitions for auto-classification of cells, and
 // Union-Find for merging street cells into multi-cell street zones.
 
-import { ScenarioMap, MapMarker, MarkerType, TileInstance, CrosswalkOverride } from '../types/Map';
-import { Zone, ZoneConnection, ZoneId, Objective, ObjectiveType } from '../types/GameState';
+import { ScenarioMap, MapMarker, MarkerType, TileInstance, CrosswalkOverride, WinConditionConfig } from '../types/Map';
+import { Zone, ZoneConnection, ZoneId, Objective, ObjectiveType, ObjectiveColor, DangerLevel, ZombieType } from '../types/GameState';
 import { TileDefinition, TileCellDef, TileEdgeDef, EdgeSide } from '../types/TileDefinition';
 import { getRotatedTileDefinition, getCellAt, getEdgeAt, getInternalEdge } from './TileDefinitionService';
 import { TILE_CELLS_PER_SIDE } from '../config/Layout';
@@ -360,6 +360,31 @@ export function compileScenario(map: ScenarioMap): CompiledScenario {
       }
     }
 
+    // Determine objective color from marker variant. Yellow/Blue/Green Objective
+    // tokens all set hasObjective; the color narrows downstream behavior
+    // (color counters and dormant-spawn activation).
+    let objectiveColor: ObjectiveColor | undefined;
+    if (allMarkers.some(m => m.type === MarkerType.Objective)) {
+      objectiveColor = ObjectiveColor.Yellow;
+    } else if (allMarkers.some(m => m.type === MarkerType.ObjectiveBlue)) {
+      objectiveColor = ObjectiveColor.Blue;
+    } else if (allMarkers.some(m => m.type === MarkerType.ObjectiveGreen)) {
+      objectiveColor = ObjectiveColor.Green;
+    }
+
+    let spawnColor: ObjectiveColor.Blue | ObjectiveColor.Green | undefined;
+    if (allMarkers.some(m => m.type === MarkerType.ZombieSpawnBlue)) {
+      spawnColor = ObjectiveColor.Blue;
+    } else if (allMarkers.some(m => m.type === MarkerType.ZombieSpawnGreen)) {
+      spawnColor = ObjectiveColor.Green;
+    }
+
+    const isSpawn =
+      allMarkers.some(m => m.type === MarkerType.ZombieSpawn) ||
+      spawnColor !== undefined;
+
+    const hasEpicCrate = allMarkers.some(m => m.type === MarkerType.EpicCrate);
+
     zones[zoneId] = {
       id: zoneId,
       connections: [],
@@ -369,9 +394,12 @@ export function compileScenario(map: ScenarioMap): CompiledScenario {
       searchable: isBuilding,
       isDark,
       hasBeenSpawned: false,
-      spawnPoint: allMarkers.some(m => m.type === MarkerType.ZombieSpawn),
+      spawnPoint: isSpawn,
+      ...(spawnColor ? { spawnColor } : {}),
       isExit: allMarkers.some(m => m.type === MarkerType.Exit),
-      hasObjective: allMarkers.some(m => m.type === MarkerType.Objective),
+      hasObjective: objectiveColor !== undefined,
+      ...(objectiveColor !== undefined ? { objectiveColor } : {}),
+      ...(hasEpicCrate ? { hasEpicCrate: true } : {}),
     };
   }
 
@@ -443,7 +471,12 @@ export function compileScenario(map: ScenarioMap): CompiledScenario {
   let playerStartZoneId = '';
   const spawnZoneIds: string[] = [];
   const exitZoneIds: string[] = [];
-  const objectiveZoneIds: string[] = [];
+  // Yellow Objective zones (count drives the legacy/default TakeObjective fallback)
+  const yellowObjectiveZoneIds: string[] = [];
+  // Per-color counts feed the win-condition default fallback
+  let blueObjectiveCount = 0;
+  let greenObjectiveCount = 0;
+  let epicCrateCount = 0;
 
   for (const marker of (map.markers || [])) {
     const ck = cellKey(marker.x, marker.y);
@@ -455,17 +488,27 @@ export function compileScenario(map: ScenarioMap): CompiledScenario {
         playerStartZoneId = zid;
         break;
       case MarkerType.ZombieSpawn:
+      case MarkerType.ZombieSpawnBlue:
+      case MarkerType.ZombieSpawnGreen:
+        // All spawn variants share placement order; dormancy is enforced at
+        // ZombiePhaseManager spawn-step iteration time via Zone.spawnColor +
+        // GameState.spawnColorActivation.
         if (!spawnZoneIds.includes(zid)) spawnZoneIds.push(zid);
         break;
       case MarkerType.Exit:
         if (!exitZoneIds.includes(zid)) exitZoneIds.push(zid);
         break;
       case MarkerType.Objective:
-        if (!objectiveZoneIds.includes(zid)) objectiveZoneIds.push(zid);
+        if (!yellowObjectiveZoneIds.includes(zid)) yellowObjectiveZoneIds.push(zid);
+        break;
+      case MarkerType.ObjectiveBlue:
+        blueObjectiveCount += 1;
+        break;
+      case MarkerType.ObjectiveGreen:
+        greenObjectiveCount += 1;
         break;
       case MarkerType.EpicCrate:
-        // Editor-authored Epic Weapon Crate positions. Not yet wired into
-        // gameplay (draw-from-epic-deck on take) — preserved in map data only.
+        epicCrateCount += 1;
         break;
     }
   }
@@ -475,31 +518,19 @@ export function compileScenario(map: ScenarioMap): CompiledScenario {
     playerStartZoneId = sorted[0] || 'z_0_0';
   }
 
-  // 12. Build objectives
-  const objectives: Objective[] = [];
+  // 12. Build objectives from authored winConditions (or fall back to legacy
+  // marker-derived defaults for v1 maps that don't carry a winConditions block).
+  const authored = map.winConditions ?? [];
+  const objectives: Objective[] = authored.length > 0
+    ? compileWinConditions(authored, exitZoneIds)
+    : compileLegacyObjectives(exitZoneIds, yellowObjectiveZoneIds);
 
-  if (exitZoneIds.length > 0) {
-    objectives.push({
-      id: 'obj-reach-exit',
-      type: ObjectiveType.ReachExit,
-      description: `All Survivors must reach the Exit`,
-      targetId: exitZoneIds[0],
-      amountRequired: 1,
-      amountCurrent: 0,
-      completed: false,
-    });
-  }
-
-  if (objectiveZoneIds.length > 0) {
-    objectives.push({
-      id: 'obj-take-objectives',
-      type: ObjectiveType.TakeObjective,
-      description: `Collect all objective tokens (${objectiveZoneIds.length})`,
-      amountRequired: objectiveZoneIds.length,
-      amountCurrent: 0,
-      completed: false,
-    });
-  }
+  // Used by editor + tests; surfaced via the return value for telemetry.
+  void blueObjectiveCount; void greenObjectiveCount; void epicCrateCount;
+  // The full objectiveZoneIds list (for compatibility with existing consumers)
+  // is the union of yellow Objective zones — blue/green are not aggregated here
+  // because their counts live on `Zone.objectiveColor`.
+  const objectiveZoneIds = yellowObjectiveZoneIds;
 
   // Convert Maps to plain objects for serialization
   const zoneCellsRecord: Record<ZoneId, { x: number; y: number }[]> = {};
@@ -539,6 +570,136 @@ export function compileScenario(map: ScenarioMap): CompiledScenario {
     doorPositions: doorPosRecord,
     cellTypes: cellTypeRecord,
   };
+}
+
+// --- Win-condition compilation helpers ---
+
+const DANGER_FROM_THRESHOLD: Record<'YELLOW' | 'ORANGE' | 'RED', DangerLevel> = {
+  YELLOW: DangerLevel.Yellow,
+  ORANGE: DangerLevel.Orange,
+  RED: DangerLevel.Red,
+};
+
+function describeWinCondition(c: WinConditionConfig): string {
+  switch (c.type) {
+    case 'REACH_EXIT': return 'All Survivors must reach the Exit';
+    case 'TAKE_OBJECTIVE': return `Take ${c.amount} Objective token${c.amount === 1 ? '' : 's'}`;
+    case 'TAKE_COLOR_OBJECTIVE': return `Take ${c.amount} ${c.color.toLowerCase()} Objective token${c.amount === 1 ? '' : 's'}`;
+    case 'TAKE_EPIC_CRATE': return `Take ${c.amount} Epic Weapon Crate${c.amount === 1 ? '' : 's'}`;
+    case 'KILL_ZOMBIE': {
+      const label = c.zombieType === 'ANY' ? 'zombie' : c.zombieType.toLowerCase();
+      return `Kill ${c.amount} ${label}${c.amount === 1 ? '' : 's'}`;
+    }
+    case 'COLLECT_ITEMS': {
+      const parts = c.items.map(i => `${i.quantity}× ${i.equipmentId}`);
+      return `Collect items: ${parts.join(', ')}`;
+    }
+    case 'REACH_DANGER_LEVEL':
+      return `Reach ${c.threshold} danger level`;
+  }
+}
+
+function compileWinConditions(authored: WinConditionConfig[], exitZoneIds: string[]): Objective[] {
+  return authored.map((c, i): Objective => {
+    const id = `obj-${i}-${c.type.toLowerCase()}`;
+    const description = describeWinCondition(c);
+    switch (c.type) {
+      case 'REACH_EXIT':
+        return {
+          id,
+          type: ObjectiveType.ReachExit,
+          description,
+          // exitZoneId is the first declared exit zone; multiple exits are
+          // treated as equivalent destinations downstream.
+          exitZoneId: exitZoneIds[0] ?? '',
+          completed: false,
+        };
+      case 'TAKE_OBJECTIVE':
+        return {
+          id,
+          type: ObjectiveType.TakeObjective,
+          description,
+          amountRequired: c.amount,
+          amountCurrent: 0,
+          completed: false,
+        };
+      case 'TAKE_COLOR_OBJECTIVE':
+        return {
+          id,
+          type: ObjectiveType.TakeColorObjective,
+          description,
+          objectiveColor: c.color === 'BLUE' ? ObjectiveColor.Blue : ObjectiveColor.Green,
+          amountRequired: c.amount,
+          amountCurrent: 0,
+          completed: false,
+        };
+      case 'TAKE_EPIC_CRATE':
+        return {
+          id,
+          type: ObjectiveType.TakeEpicCrate,
+          description,
+          amountRequired: c.amount,
+          amountCurrent: 0,
+          completed: false,
+        };
+      case 'KILL_ZOMBIE':
+        return {
+          id,
+          type: ObjectiveType.KillZombie,
+          description,
+          zombieType: c.zombieType === 'ANY' ? 'ANY' : c.zombieType as ZombieType,
+          amountRequired: c.amount,
+          amountCurrent: 0,
+          completed: false,
+        };
+      case 'COLLECT_ITEMS':
+        return {
+          id,
+          type: ObjectiveType.CollectItems,
+          description,
+          itemRequirements: c.items.map(i => ({ equipmentId: i.equipmentId, quantity: i.quantity })),
+          completed: false,
+        };
+      case 'REACH_DANGER_LEVEL':
+        return {
+          id,
+          type: ObjectiveType.ReachDangerLevel,
+          description,
+          dangerThreshold: DANGER_FROM_THRESHOLD[c.threshold],
+          completed: false,
+        };
+    }
+  });
+}
+
+function compileLegacyObjectives(exitZoneIds: string[], yellowObjectiveZoneIds: string[]): Objective[] {
+  // Back-compat for v1 maps without an authored winConditions block: emit
+  // ReachExit + TakeObjective inferred from markers (matches pre-Phase-B
+  // behavior). Phase F replaces this fallback with the importer migration UX.
+  const objectives: Objective[] = [];
+
+  if (exitZoneIds.length > 0) {
+    objectives.push({
+      id: 'obj-reach-exit',
+      type: ObjectiveType.ReachExit,
+      description: 'All Survivors must reach the Exit',
+      exitZoneId: exitZoneIds[0],
+      completed: false,
+    });
+  }
+
+  if (yellowObjectiveZoneIds.length > 0) {
+    objectives.push({
+      id: 'obj-take-objectives',
+      type: ObjectiveType.TakeObjective,
+      description: `Collect all objective tokens (${yellowObjectiveZoneIds.length})`,
+      amountRequired: yellowObjectiveZoneIds.length,
+      amountCurrent: 0,
+      completed: false,
+    });
+  }
+
+  return objectives;
 }
 
 // --- Edge classification helpers ---

@@ -64,6 +64,7 @@ export function buildStartingEquipment(characterClass: string, index: number): E
 
   return {
     id: `card-start-${charDef.startingEquipmentKey}-${index}`,
+    equipmentId: charDef.startingEquipmentKey,
     ...template,
     inHand: true,
     slot: 'HAND_1',

@@ -57,6 +57,7 @@ import {
   Sparkles,
   ShieldCheck,
   MoreHorizontal,
+  Utensils,
   type IconNode,
 } from 'lucide';
 
@@ -114,6 +115,7 @@ const ICON_REGISTRY: Record<string, IconNode> = {
   Sparkles,
   ShieldCheck,
   MoreHorizontal,
+  Utensils,
 };
 
 export function icon(name: string, size: IconSize = 'md'): string {

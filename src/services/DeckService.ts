@@ -1,7 +1,12 @@
 // src/services/DeckService.ts
 
 import { GameState, EquipmentCard, SpawnCard } from '../types/GameState';
-import { EQUIPMENT_CARDS, INITIAL_DECK_CONFIG } from '../config/EquipmentRegistry';
+import {
+  EQUIPMENT_CARDS,
+  EPIC_EQUIPMENT_CARDS,
+  INITIAL_DECK_CONFIG,
+  INITIAL_EPIC_DECK_CONFIG,
+} from '../config/EquipmentRegistry';
 import { SPAWN_CARDS } from '../config/SpawnRegistry';
 import { Rng, RngState } from './Rng';
 
@@ -19,6 +24,34 @@ export class DeckService {
       if (template) {
         deck.push({
           id: `card-${cardKey}-${cardCounter++}`,
+          equipmentId: cardKey,
+          ...template,
+          inHand: false,
+          slot: 'BACKPACK'
+        });
+      }
+    }
+
+    const rng = Rng.from(seed);
+    const shuffled = this.shuffle(deck, rng);
+    return { deck: shuffled, newSeed: rng.snapshot() };
+  }
+
+  /**
+   * Initializes the Epic Equipment Deck (red-back, drawn on Epic Crate take).
+   * Stamps `equipmentId` from the registry key — same convention as the
+   * standard deck so `CollectItems` win conditions can reference Epic IDs.
+   */
+  public static initializeEpicDeck(seed: RngState): { deck: EquipmentCard[], newSeed: RngState } {
+    const deck: EquipmentCard[] = [];
+
+    let cardCounter = 0;
+    for (const cardKey of INITIAL_EPIC_DECK_CONFIG) {
+      const template = EPIC_EQUIPMENT_CARDS[cardKey];
+      if (template) {
+        deck.push({
+          id: `epic-${cardKey}-${cardCounter++}`,
+          equipmentId: cardKey,
           ...template,
           inHand: false,
           slot: 'BACKPACK'

@@ -95,7 +95,7 @@ export function handleSprint(state: GameState, intent: ActionRequest): GameState
   if (!survivor.skills.includes('sprint')) {
     throw new Error('Survivor does not have Sprint skill');
   }
-  if (survivor.sprintUsedThisTurn) {
+  if (survivor.sprintUsedThisTurn && !survivor.cheatMode) {
     throw new Error('Sprint already used this turn');
   }
 

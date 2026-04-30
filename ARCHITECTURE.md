@@ -206,3 +206,26 @@ Largest files (most logic):
 - **UI Redesign**: See `tasks/00-implementation-plan.md`. Phased migration from inline styles to CSS design tokens (`src/styles/`). New component library in `src/client/ui/components/`. Currently in progress.
 - **Persistence**: Migrated from JSON files to SQLite via better-sqlite3 (`PersistenceService.ts`).
 - **Review**: See `REVIEW.md` for comprehensive rules accuracy audit and code quality findings.
+
+---
+
+## Schema & Compatibility Risks
+
+### `equipmentId` is load-bearing across maps
+
+`EquipmentCard.equipmentId` is the stable join key between a saved map's `CollectItems` win condition and the runtime equipment registry. Renaming a registry key in `src/config/EquipmentRegistry.ts` silently breaks any saved scenario JSON that references the old ID — the win condition will simply never resolve, and the map will appear unwinnable with no error surfaced.
+
+**Rule**: any future rename of an `EQUIPMENT_CARDS` key requires a migration table in `src/services/ScenarioCompiler.ts` mapping old → new IDs at load time. Do not rename in place. The `rifle → sniper_rifle` rename in Phase G was done before `equipmentId` was introduced and so did not need a migration table; future renames will.
+
+### Save-game schema break (in-flight games)
+
+The win-conditions / colored-objective work added these fields to `GameState` and its sub-types:
+
+- `Zone.objectiveColor`, `Zone.spawnColor`, `Zone.hasEpicCrate`
+- `GameState.spawnColorActivation`
+- `GameState.epicDeck`, `GameState.epicDiscard`
+- `Objective` discriminated union (replaces the previous flat shape)
+
+These are not backward-compatible with any pre-change save. Per project policy (`feedback_no_backward_compat`), in-flight games saved before this change are intentionally not resumable.
+
+**Enforcement**: `src/services/GameStateSchema.ts:validateInFlightGameStateSchema` rejects incompatible saves at load time. The server returns `SAVE_INCOMPATIBLE` and deletes the corrupt row so the room id frees up for reuse, rather than crashing in `ZombiePhaseManager` when the new fields are accessed.

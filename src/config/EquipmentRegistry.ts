@@ -1,8 +1,18 @@
 // src/config/EquipmentRegistry.ts
+//
+// WARNING — equipmentId stability:
+// Keys in EQUIPMENT_CARDS and EPIC_EQUIPMENT_CARDS are stable identifiers
+// referenced by saved maps' CollectItems win conditions (matched against
+// `EquipmentCard.equipmentId` stamped at deck creation). Renaming a key or
+// changing its meaning will silently break existing maps authored against
+// the old ID. If a rename is unavoidable, ship a migration in
+// ScenarioCompiler / map import that rewrites old IDs to new ones.
 
 import { EquipmentCard, EquipmentType } from '../types/GameState';
 
-export const EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'inHand' | 'slot'>> = {
+// Registry templates omit `equipmentId` — DeckService stamps it from the
+// registry key at card creation, keeping the registry shape declarative.
+export const EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'inHand' | 'slot' | 'equipmentId'>> = {
   'fire_axe': {
     name: 'Fire Axe',
     type: EquipmentType.Weapon,
@@ -57,8 +67,8 @@ export const EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'inHand'
       ammo: 'shells',
     }
   },
-  'rifle': {
-    name: 'Rifle',
+  'sniper_rifle': {
+    name: 'Sniper Rifle',
     type: EquipmentType.Weapon,
     keywords: ['sniper'],
     stats: {
@@ -164,7 +174,7 @@ export const EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'inHand'
     }
   },
   'sub_mg': {
-    name: 'Sub MG',
+    name: 'Sub-MG',
     type: EquipmentType.Weapon,
     stats: {
       range: [0, 1],
@@ -203,6 +213,9 @@ export const EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'inHand'
     type: EquipmentType.Item,
     stats: undefined
   },
+  // Standard-deck Aaahh!! (×4). Distinct registry entry from `aaahh_epic`
+  // by design: per RULEBOOK §14, the Standard and Epic decks each carry
+  // their own Aaahh!! cards. The duplication is intentional, not a bug.
   'aaahh': {
     name: 'Aaahh!!',
     type: EquipmentType.Item,
@@ -213,7 +226,9 @@ export const EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'inHand'
 
 // Zombicide 2nd Edition — Epic Weapons deck (11 cards, red backs, RULEBOOK §14).
 // Drawn only when a Survivor takes an Epic Weapon Crate token.
-export const EPIC_EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'inHand' | 'slot'>> = {
+export const EPIC_EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'inHand' | 'slot' | 'equipmentId'>> = {
+  // Epic-deck Aaahh!! (×2). Mirror of `aaahh` in EQUIPMENT_CARDS — the two
+  // decks each carry their own Aaahh!! per RULEBOOK §14. Intentional.
   'aaahh_epic': {
     name: 'Aaahh!!',
     type: EquipmentType.Item,
@@ -373,7 +388,7 @@ export const INITIAL_DECK_CONFIG = [
   'sawed_off', 'sawed_off', 'sawed_off', 'sawed_off',
   'shotgun', 'shotgun',
   'sub_mg', 'sub_mg',
-  'rifle', 'rifle',
+  'sniper_rifle', 'sniper_rifle',
 
   // Throwables
   'molotov', 'molotov', 'molotov', 'molotov',

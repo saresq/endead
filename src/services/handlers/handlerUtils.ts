@@ -58,6 +58,16 @@ export function deductAPWithFreeCheck(state: GameState, survivorId: string, acti
   const newSurvivors = { ...newState.survivors };
   const survivor = { ...newSurvivors[survivorId] };
 
+  // Cheat mode — skip AP deduction entirely and replenish to keep actions positive.
+  if (survivor.cheatMode) {
+    survivor.actionsRemaining = Math.max(survivor.actionsRemaining, survivor.actionsPerTurn);
+    delete (newState as any)._extraAPCost;
+    delete (newState as any)._attackIsMelee;
+    newSurvivors[survivorId] = survivor;
+    newState.survivors = newSurvivors;
+    return checkEndTurn(newState);
+  }
+
   let usedFree = false;
   let freeType = '';
 

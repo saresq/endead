@@ -18,6 +18,7 @@ export const DEFAULT_MAP: ScenarioMap = {
   width: 2,
   height: 2,
   gridSize: TILE_CELLS_PER_SIDE,
+  schemaVersion: 2,
   tiles: [
     { id: 'tile-0-0', tileId: '1V', x: 0, y: 0, rotation: 0 },
     { id: 'tile-1-0', tileId: '2V', x: 1, y: 0, rotation: 0 },
@@ -30,5 +31,10 @@ export const DEFAULT_MAP: ScenarioMap = {
     { type: MarkerType.ZombieSpawn, x: 20, y: 30 },
     { type: MarkerType.Exit, x: 20, y: 40 },
     { type: MarkerType.Objective, x: 0, y: 0 },
+  ],
+  winConditions: [
+    { type: 'REACH_EXIT' },
+    // 1 yellow Objective marker exists at (0,0) above; editor enforces amount ≤ #yellow markers.
+    { type: 'TAKE_OBJECTIVE', amount: 1 },
   ],
 };

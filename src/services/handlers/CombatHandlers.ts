@@ -108,7 +108,7 @@ export function handleAttack(state: GameState, intent: ActionRequest): GameState
           if (newState.objectives) {
               newState.objectives.forEach((obj: Objective) => {
                   if (obj.type === ObjectiveType.KillZombie && !obj.completed) {
-                      if (!obj.targetId || obj.targetId === zombie.type) {
+                      if (obj.zombieType === 'ANY' || obj.zombieType === zombie.type) {
                           obj.amountCurrent += 1;
                           if (obj.amountCurrent >= obj.amountRequired) {
                               obj.completed = true;
@@ -216,7 +216,7 @@ export function handleAttack(state: GameState, intent: ActionRequest): GameState
   const diceBonus = (isRangedWeapon && survivor.skills.includes('plus_1_to_dice_roll_ranged')) ? 1 : 0;
 
   // Capture pre-attack entity state if this survivor could Lucky-reroll the result.
-  const luckyAvailable = survivor.skills.includes('lucky') && !survivor.luckyUsedThisTurn;
+  const luckyAvailable = survivor.skills.includes('lucky') && (!survivor.luckyUsedThisTurn || !!survivor.cheatMode);
   const attackEntitySnapshot = luckyAvailable ? captureAttackState(newState) : undefined;
 
   // Perform attack(s) — dual wield = two separate attacks
@@ -375,7 +375,7 @@ export function handleAttack(state: GameState, intent: ActionRequest): GameState
           if (newState.objectives) {
               newState.objectives.forEach((obj: Objective) => {
                   if (obj.type === ObjectiveType.KillZombie && !obj.completed) {
-                      if (!obj.targetId || obj.targetId === zombie.type) {
+                      if (obj.zombieType === 'ANY' || obj.zombieType === zombie.type) {
                           obj.amountCurrent += 1;
                           if (obj.amountCurrent >= obj.amountRequired) {
                               obj.completed = true;
@@ -406,7 +406,7 @@ export function handleAttack(state: GameState, intent: ActionRequest): GameState
       if (newState.objectives) {
         newState.objectives.forEach((obj: Objective) => {
           if (obj.type === ObjectiveType.KillZombie && !obj.completed) {
-            if (!obj.targetId || obj.targetId === sameTypeZombie.type) {
+            if (obj.zombieType === 'ANY' || obj.zombieType === sameTypeZombie.type) {
               obj.amountCurrent += 1;
               if (obj.amountCurrent >= obj.amountRequired) obj.completed = true;
             }
@@ -581,7 +581,7 @@ export function handleRerollLucky(state: GameState, intent: ActionRequest): Game
   const survivor = state.survivors[intent.survivorId!];
   if (!survivor) throw new Error('Survivor not found');
   if (!survivor.skills.includes('lucky')) throw new Error('Survivor does not have Lucky');
-  if (survivor.luckyUsedThisTurn) throw new Error('Lucky already used this turn');
+  if (survivor.luckyUsedThisTurn && !survivor.cheatMode) throw new Error('Lucky already used this turn');
 
   const last = state.lastAction;
   if (!last || last.type !== ActionType.ATTACK || last.survivorId !== intent.survivorId) {

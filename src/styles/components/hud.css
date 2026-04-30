@@ -1,7 +1,7 @@
 /* ==========================================================================
    HUD — Field Manual in-game overlay
    Three-column command console over the PIXI map.
-   Grid layout at laptop+ (≥1024px), stacked at mobile (<768px).
+   Grid layout at laptop+ (≥1024px), stacked single-column below.
    The PIXI canvas is mounted in #app BEHIND this overlay; the center column
    is mostly transparent so the map shows through.
    ========================================================================== */
@@ -14,31 +14,29 @@
   pointer-events: none;
   z-index: var(--z-sticky);
   display: grid;
-  grid-template-rows: var(--hud-topbar-height, 44px) minmax(0, 1fr) auto;
+  grid-template-rows:
+    var(--hud-topbar-height, 44px)
+    auto
+    minmax(0, 1fr)
+    auto;
   grid-template-columns:
-    var(--hud-squad-rail-width, 220px)
     minmax(0, 1fr)
     var(--hud-right-panel-width, 260px);
   grid-template-areas:
-    "topbar topbar  topbar"
-    "rail-l center  rail-r"
-    "rail-l center  actions";
+    "topbar  topbar"
+    "rail-l  rail-l"
+    "center  rail-r"
+    "center  actions";
   gap: 0;
   color: var(--bone-100);
   font-family: var(--font-body);
 }
 
-@media (min-width: 1440px) {
-  #game-hud {
-    grid-template-columns:
-      var(--hud-desktop-squad-rail-width, 260px)
-      minmax(0, 1fr)
-      var(--hud-desktop-right-panel-width, 300px);
-  }
-}
-
-/* Stacked single-column at mobile. */
-@media (max-width: 767px) {
+/* Stacked single-column at mobile and tablet (<1024px). Tablet adopts
+   mobile's vertical stack so the right rail surfaces only the dossier and
+   the actions bar pins to the bottom — same as a phone. The HUD no longer
+   has a dedicated tablet layout. */
+@media (max-width: 1023.98px) {
   #game-hud {
     grid-template-rows: var(--hud-topbar-height, 44px) auto 1fr auto auto;
     /* `minmax(0, 1fr)` (not bare `1fr`, which resolves to min-content) so
@@ -53,12 +51,6 @@
       "rail-r"
       "actions";
   }
-
-  /* Belt-and-braces: ensure the squad rail and its scroll list can shrink
-     below their min-content. Without these, a single 180px plate sets the
-     min-content of the column and propagates up through #game-hud. */
-  #game-hud > .hud-rail--left { min-width: 0; }
-  .hud-rail--left .hud-rail__list { min-width: 0; }
 }
 
 #game-hud > .hud-topbar     { grid-area: topbar; pointer-events: auto; }
@@ -67,11 +59,10 @@
 #game-hud > .hud-rail--right{ grid-area: rail-r; pointer-events: auto; }
 #game-hud > .hud-fab-slot   { pointer-events: none; }
 
-/* Laptop default — `.hud-actions` sits at the bottom of the right column.
-   Continue the right rail's frame (border-left, background, horizontal
-   padding) so the action bar reads as the lower compartment of the same
-   panel rather than a detached block. The 1px olive separator above the
-   buttons keeps the dossier vs. command-bar boundary legible. */
+/* Laptop default — `.hud-actions` is rendered inline at the tail of the
+   right rail (see `.hud-rail__actions`), so the dedicated bottom-right
+   grid slot collapses. Mobile/tablet still mount the standalone bar in
+   the `actions` grid area below. */
 #game-hud > .hud-actions {
   grid-area: actions;
   pointer-events: auto;
@@ -79,6 +70,20 @@
   background: var(--bg-0);
   border-left: 1px solid var(--olive-700);
   border-top: 1px solid var(--olive-700);
+}
+
+#game-hud > .hud-actions:empty { display: none; }
+
+/* Action row when mounted inside the right rail body (laptop/desktop).
+   Pushes itself to the bottom of the rail so actions align with the
+   panel's lower edge — same visual anchor the field log used to hold. */
+.hud-rail__actions {
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid var(--olive-700);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
 }
 
 /* ==========================================================================
@@ -280,7 +285,36 @@
   overflow: hidden;
 }
 
-.hud-rail--left { border-right: 1px solid var(--olive-700); }
+/* Left squad rail — always a horizontal pill strip beneath the topbar.
+   The list scrolls horizontally when squad plates exceed the viewport
+   width so the rail never forces #game-hud to grow past 100vw. */
+.hud-rail--left {
+  flex-direction: row;
+  align-items: stretch;
+  border-bottom: 1px solid var(--olive-700);
+  padding: 6px 10px;
+  gap: 0;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.hud-rail--left .hud-rail__kicker { display: none; }
+
+.hud-rail--left .hud-rail__list {
+  flex-direction: row;
+  align-items: stretch;
+  gap: 6px;
+  overflow: visible;
+  min-width: 0;
+}
+
+.hud-rail--left .hud-rail__list > .fm-squadplate {
+  flex: 0 0 auto;
+  min-width: 180px;
+  max-width: 220px;
+}
+
 .hud-rail--right {
   border-left: 1px solid var(--olive-700);
   padding: var(--space-4, 16px) var(--space-3, 12px);
@@ -404,7 +438,7 @@
   .hud-feed__timer-bar { animation-duration: 0ms !important; }
 }
 
-@media (max-width: 767px) {
+@media (max-width: 1023.98px) {
   .hud-feed { max-height: 28vh; }
 }
 
@@ -528,7 +562,7 @@
   display: none;
 }
 
-@media (max-width: 767px) {
+@media (max-width: 1023.98px) {
   .hud-actions__grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 4px;
@@ -905,32 +939,10 @@
 }
 
 /* ==========================================================================
-   Mobile overrides — stacked layout
+   Mobile + tablet overrides — stacked single-column layout (<1024px)
    ========================================================================== */
 
-@media (max-width: 767px) {
-  .hud-rail { padding: 8px 10px; }
-
-  .hud-rail--left {
-    border-right: none;
-    border-bottom: 1px solid var(--olive-700);
-    max-height: none;
-    flex: 0 0 auto;
-  }
-
-  .hud-rail--left .hud-rail__list {
-    flex-direction: row;
-    overflow-x: auto;
-    overflow-y: hidden;
-    gap: 6px;
-  }
-
-  .hud-rail--left .hud-rail__list > .fm-squadplate {
-    flex: 0 0 auto;
-    min-width: 180px;
-    max-width: 220px;
-  }
-
+@media (max-width: 1023.98px) {
   .hud-rail--right {
     border-left: none;
     border-top: 1px solid var(--olive-700);
@@ -1004,96 +1016,6 @@
   }
 
   .hud-loadout .hud-bag-button__label { display: none; }
-}
-
-/* ==========================================================================
-   Tablet overrides — md: 768px–1023px
-   Squad rail collapses to a horizontal pill strip beneath the topbar,
-   body splits 60/40 between map (center) and event feed (right rail),
-   action grid renders 6-up in one row.
-   See design/breakpoints/hud-tablet.html for the source-of-truth mockup.
-   ========================================================================== */
-
-@media (min-width: 768px) and (max-width: 1023px) {
-  #game-hud {
-    grid-template-rows:
-      var(--hud-topbar-height, 44px)
-      auto
-      minmax(0, 1fr)
-      auto;
-    grid-template-columns: minmax(0, 60fr) minmax(0, 40fr);
-    grid-template-areas:
-      "topbar  topbar"
-      "rail-l  rail-l"
-      "center  rail-r"
-      "actions actions";
-  }
-
-  /* Left rail becomes the top squad-pill strip. */
-  #game-hud > .hud-rail--left {
-    grid-area: rail-l;
-    border-right: 0;
-    border-bottom: 1px solid var(--olive-700);
-    background: linear-gradient(180deg, var(--bg-1), var(--bg-0));
-    padding: 6px 10px;
-    overflow-x: auto;
-    overflow-y: hidden;
-  }
-
-  .hud-rail--left .hud-rail__kicker {
-    display: none;
-  }
-
-  .hud-rail--left .hud-rail__list {
-    flex-direction: row;
-    gap: 8px;
-    padding: 0;
-    overflow: visible;
-  }
-
-  .hud-rail--left .hud-rail__list > .fm-squadplate {
-    flex: 0 0 auto;
-    width: 168px;
-    min-width: 0;
-    max-width: none;
-  }
-
-  /* Right rail = event feed, sits in the 40% column. */
-  #game-hud > .hud-rail--right {
-    grid-area: rail-r;
-    border-left: 1px solid var(--olive-700);
-  }
-
-  /* Center column = map window only at this breakpoint. */
-  #game-hud > .hud-center {
-    grid-area: center;
-  }
-
-  /* Actions grid spans full width — 6-up row. Drop the laptop's
-     border-left since the bar now spans both columns; keep the
-     border-top divider above the bar. */
-  #game-hud > .hud-actions {
-    padding: 8px 12px;
-    background: linear-gradient(0deg, var(--bg-1), var(--bg-0));
-    border-left: 0;
-    border-top: 1px solid var(--olive-700);
-  }
-
-  .hud-actions__grid {
-    grid-template-columns: repeat(6, 1fr);
-    gap: 8px;
-  }
-}
-
-/* ==========================================================================
-   Desktop overrides (≥1440px)
-   ========================================================================== */
-
-@media (min-width: 1440px) {
-  .hud-rail--left { padding: var(--space-4, 16px); }
-  .hud-rail--right { padding: var(--space-5, 20px) var(--space-4, 16px); }
-  .hud-op__name { font-size: 16px; }
-  .hud-slot__label { font-size: 10px; }
 }
 
 /* ==========================================================================

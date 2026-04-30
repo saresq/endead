@@ -331,7 +331,8 @@ export class InputController {
     if (!this.selectedSurvivorId) return [];
 
     const survivor = state.survivors[this.selectedSurvivorId];
-    if (!survivor || !survivor.skills.includes('sprint') || survivor.sprintUsedThisTurn) return [];
+    if (!survivor || !survivor.skills.includes('sprint')) return [];
+    if (survivor.sprintUsedThisTurn && !survivor.cheatMode) return [];
     if (survivor.actionsRemaining < 1) return [];
 
     const startZoneId = survivor.position.zoneId;

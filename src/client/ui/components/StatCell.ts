@@ -19,6 +19,7 @@ export interface StatCellOptions {
   color?: StatCellColor;     // default 'amber'
   showPips?: boolean;        // default true
   size?: StatCellSize;       // default 'md'
+  infinite?: boolean;        // when true, render ∞ instead of value/max and skip pips
 }
 
 function clamp(n: number, lo: number, hi: number): number {
@@ -46,7 +47,13 @@ export function renderStatCell(opts: StatCellOptions): string {
 
   const labelHtml = `<span class="fm-statcell__label">${opts.label}</span>`;
 
-  const valueHtml = `
+  const valueHtml = opts.infinite
+    ? `
+    <div class="fm-statcell__value fm-statcell__value--infinite" aria-label="Unlimited">
+      <span class="fm-statcell__num">&infin;</span>
+    </div>
+  `
+    : `
     <div class="fm-statcell__value">
       <span class="fm-statcell__num">${safeValue}</span>
       <span class="fm-statcell__sep">/</span>
@@ -55,7 +62,7 @@ export function renderStatCell(opts: StatCellOptions): string {
   `;
 
   let pipsHtml = '';
-  if (showPips && safeMax > 0) {
+  if (!opts.infinite && showPips && safeMax > 0) {
     const pips: string[] = [];
     for (let i = 0; i < safeMax; i += 1) {
       const filled = i < safeValue ? ' fm-statcell__pip--filled' : '';

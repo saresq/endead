@@ -245,6 +245,21 @@ async function startRoom(roomId: string): Promise<void> {
       audioManager.playSFX(newState.gameResult === 'VICTORY' ? 'victory' : 'defeat');
     }
 
+    // Cheat code activation — broadcast a notification to every connected client.
+    if (
+      newState.lastAction?.type === 'ACTIVATE_CHEAT' &&
+      newState.lastAction.timestamp !== prevState?.lastAction?.timestamp
+    ) {
+      notificationManager.show({
+        type: 'alert',
+        variant: 'warning',
+        title: 'Cheat Activated',
+        message: newState.lastAction.description ?? 'A player activated a cheat code.',
+        priority: 'high',
+        duration: 6000,
+      });
+    }
+
     if (!gameHud) {
       gameHud = new GameHUD(inputController, playerId);
     }

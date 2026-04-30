@@ -3,12 +3,13 @@
 
 import * as PIXI from 'pixi.js';
 import { TileService, tileService } from '../../services/TileService';
-import { TileInstance, ScenarioMap, MapMarker, MarkerType } from '../../types/Map';
+import { TileInstance, ScenarioMap, MapMarker, MarkerType, WinConditionConfig } from '../../types/Map';
 import { PixiBoardRenderer } from '../PixiBoardRenderer';
 import { GameState, initialGameState, Zone, ZoneConnection } from '../../types/GameState';
 import { TILE_SIZE, TILE_CELLS_PER_SIDE, TILE_PIXEL_SIZE } from '../../config/Layout';
-import { EPIC_CRATE_LIMIT } from '../../config/EquipmentRegistry';
+import { EPIC_CRATE_LIMIT, EQUIPMENT_CARDS, EPIC_EQUIPMENT_CARDS } from '../../config/EquipmentRegistry';
 import { compileScenario } from '../../services/ScenarioCompiler';
+import { migrateImportedMap } from '../../services/MapMigration';
 import { getRotatedTileDefinition, getCellAt } from '../../services/TileDefinitionService';
 import { setZoneGeometry } from '../utils/zoneLayout';
 import { renderButton } from '../ui/components/Button';
@@ -89,11 +90,39 @@ const EDITOR_THEME = {
       strokeWidth: 2,
       dotColor: 0x000000,
     },
+    objectiveBlue: {
+      fill: 0x3D8BFD,
+      fillAlpha: 0.85,
+      stroke: 0x0B1E3F,
+      strokeWidth: 2,
+      dotColor: 0xFFFFFF,
+    },
+    objectiveGreen: {
+      fill: 0x33C16C,
+      fillAlpha: 0.85,
+      stroke: 0x0F3D22,
+      strokeWidth: 2,
+      dotColor: 0xFFFFFF,
+    },
     epicCrate: {
       fill: 0xCC2222,
       fillAlpha: 0.85,
       stroke: 0xFFCC00,
       strokeWidth: 2,
+    },
+    zombieSpawnBlue: {
+      fill: 0x3D8BFD,
+      fillAlpha: 0.55,
+      stroke: 0x0B1E3F,
+      strokeWidth: 2,
+      dashColor: 0xFFFFFF,
+    },
+    zombieSpawnGreen: {
+      fill: 0x33C16C,
+      fillAlpha: 0.55,
+      stroke: 0x0F3D22,
+      strokeWidth: 2,
+      dashColor: 0xFFFFFF,
     },
   },
 } as const;
@@ -103,15 +132,51 @@ enum EditorTool {
   Tile = 'TILE',
   PlayerStart = 'PLAYER_START',
   ZombieSpawn = 'ZOMBIE_SPAWN',
+  ZombieSpawnBlue = 'ZOMBIE_SPAWN_BLUE',
+  ZombieSpawnGreen = 'ZOMBIE_SPAWN_GREEN',
   Exit = 'EXIT',
   Objective = 'OBJECTIVE',
+  ObjectiveBlue = 'OBJECTIVE_BLUE',
+  ObjectiveGreen = 'OBJECTIVE_GREEN',
   EpicCrate = 'EPIC_CRATE',
   Eraser = 'ERASER',
 }
 
+import {
+  applyZoneClassMutex,
+  getMarkerClass,
+  OBJECTIVE_CLASS_MARKERS,
+  SPAWN_CLASS_MARKERS,
+} from './markerClasses';
+
 interface EditorSnapshot {
   tiles: TileInstance[];
   markers: MapMarker[];
+  winConditions: WinConditionConfig[];
+}
+
+const DEFAULT_WIN_CONDITIONS: WinConditionConfig[] = [{ type: 'REACH_EXIT' }];
+
+const WIN_CONDITION_TYPE_LABELS: Record<WinConditionConfig['type'], string> = {
+  REACH_EXIT: 'Reach Exit',
+  TAKE_OBJECTIVE: 'Take Objectives (yellow)',
+  TAKE_COLOR_OBJECTIVE: 'Take Color Objective',
+  TAKE_EPIC_CRATE: 'Take Epic Crates',
+  KILL_ZOMBIE: 'Kill Zombies',
+  COLLECT_ITEMS: 'Collect Items',
+  REACH_DANGER_LEVEL: 'Reach Danger Level',
+};
+
+function defaultWinCondition(type: WinConditionConfig['type']): WinConditionConfig {
+  switch (type) {
+    case 'REACH_EXIT': return { type: 'REACH_EXIT' };
+    case 'TAKE_OBJECTIVE': return { type: 'TAKE_OBJECTIVE', amount: 1 };
+    case 'TAKE_COLOR_OBJECTIVE': return { type: 'TAKE_COLOR_OBJECTIVE', color: 'BLUE', amount: 1 };
+    case 'TAKE_EPIC_CRATE': return { type: 'TAKE_EPIC_CRATE', amount: 1 };
+    case 'KILL_ZOMBIE': return { type: 'KILL_ZOMBIE', zombieType: 'ANY', amount: 1 };
+    case 'COLLECT_ITEMS': return { type: 'COLLECT_ITEMS', items: [] };
+    case 'REACH_DANGER_LEVEL': return { type: 'REACH_DANGER_LEVEL', threshold: 'YELLOW' };
+  }
 }
 
 const MAX_UNDO = 50;
@@ -131,6 +196,7 @@ export class MapEditor {
   // --- Authored scenario data ---
   private tiles: TileInstance[] = [];
   private markers: MapMarker[] = [];
+  private winConditions: WinConditionConfig[] = [{ type: 'REACH_EXIT' }];
 
   // --- Undo/Redo ---
   private undoStack: EditorSnapshot[] = [];
@@ -150,6 +216,19 @@ export class MapEditor {
   private paletteContainer!: HTMLElement;
   private statusText!: HTMLElement;
   private toolButtons: Map<EditorTool, HTMLButtonElement> = new Map();
+  private winConditionsListEl!: HTMLElement;
+  private winConditionRowEls: HTMLElement[] = [];
+  private migrationBannerEl: HTMLElement | null = null;
+  /** True from the moment a v1 map is imported until at least one win condition is authored. */
+  private migrationPending = false;
+
+  // --- Win Conditions panel collapse state (UI-only, not persisted) ---
+  private winConditionsCollapsed = false;
+  private winConditionsBodyEl: HTMLElement | null = null;
+  private winConditionsToggleBtn: HTMLButtonElement | null = null;
+  private winConditionsSummaryEl: HTMLElement | null = null;
+  /** Last computed row-error count, used to render the collapsed summary. */
+  private winConditionsLastErrorCount = 0;
 
   // Tile Definition Editor
   private tileDefEditor: TileDefinitionEditor | null = null;
@@ -216,6 +295,7 @@ export class MapEditor {
     this.paletteContainer.appendChild(this.statusText);
 
     this.createTilePalette();
+    this.createWinConditionPanel();
     this.createValidationPanel();
     this.createInstructions();
   }
@@ -309,6 +389,10 @@ export class MapEditor {
       { tool: EditorTool.Exit, label: 'Exit', key: '4' },
       { tool: EditorTool.Objective, label: 'Objective', key: '5' },
       { tool: EditorTool.EpicCrate, label: `Epic Crate (0/${EPIC_CRATE_LIMIT})`, key: '6' },
+      { tool: EditorTool.ObjectiveBlue, label: 'Obj. Blue', key: '7' },
+      { tool: EditorTool.ObjectiveGreen, label: 'Obj. Green', key: '8' },
+      { tool: EditorTool.ZombieSpawnBlue, label: 'Spawn Blue', key: '9' },
+      { tool: EditorTool.ZombieSpawnGreen, label: 'Spawn Green', key: '0' },
       { tool: EditorTool.Eraser, label: 'Eraser', key: 'E' },
     ];
 
@@ -367,13 +451,621 @@ export class MapEditor {
     this.paletteContainer.appendChild(this.validationPanelEl);
   }
 
+  // =============================================
+  // WIN CONDITION PANEL
+  // =============================================
+
+  private createWinConditionPanel() {
+    const section = document.createElement('div');
+    section.className = 'editor-section';
+
+    // --- Header row: label + collapsed-state summary + toggle button ---
+    const header = document.createElement('div');
+    header.style.display = 'flex';
+    header.style.alignItems = 'center';
+    header.style.gap = '6px';
+
+    const label = document.createElement('div');
+    label.className = 'editor-section__label';
+    label.innerText = 'Win Conditions';
+    label.style.flex = '1';
+    label.style.margin = '0';
+    header.appendChild(label);
+
+    // Compact summary shown next to the label when collapsed (e.g. "3 conditions").
+    const summary = document.createElement('span');
+    summary.style.fontSize = '11px';
+    summary.style.opacity = '0.7';
+    summary.style.display = 'none';
+    this.winConditionsSummaryEl = summary;
+    header.appendChild(summary);
+
+    const toggleBtn = document.createElement('button');
+    toggleBtn.className = 'editor-tool-btn';
+    toggleBtn.style.flex = '0 0 auto';
+    toggleBtn.style.padding = '0 8px';
+    toggleBtn.style.height = '24px';
+    toggleBtn.style.fontSize = '14px';
+    toggleBtn.style.lineHeight = '1';
+    toggleBtn.setAttribute('aria-expanded', 'true');
+    toggleBtn.setAttribute('aria-label', 'Toggle Win Conditions panel');
+    toggleBtn.innerText = '−';
+    toggleBtn.onclick = () => this.setWinConditionsCollapsed(!this.winConditionsCollapsed);
+    this.winConditionsToggleBtn = toggleBtn;
+    header.appendChild(toggleBtn);
+
+    section.appendChild(header);
+
+    // Phase F migration banner — non-dismissable. Visible only while a v1
+    // import is pending configuration. Hidden the moment `winConditions`
+    // becomes non-empty (or a v2 map is loaded over the top). Stays outside
+    // the collapsible body so it remains visible regardless of collapse state.
+    this.migrationBannerEl = document.createElement('div');
+    this.migrationBannerEl.className = 'editor-validation__error';
+    this.migrationBannerEl.style.fontSize = '11px';
+    this.migrationBannerEl.style.padding = '6px';
+    this.migrationBannerEl.style.marginTop = '6px';
+    this.migrationBannerEl.style.marginBottom = '6px';
+    this.migrationBannerEl.style.borderRadius = '4px';
+    this.migrationBannerEl.style.background = 'rgba(255, 90, 90, 0.18)';
+    this.migrationBannerEl.style.border = '1px solid rgba(255, 90, 90, 0.5)';
+    this.migrationBannerEl.innerText =
+      'This map was authored with an older format. Please configure win conditions before saving.';
+    this.migrationBannerEl.style.display = 'none';
+    section.appendChild(this.migrationBannerEl);
+
+    // --- Collapsible body: hint, condition rows, add controls ---
+    const body = document.createElement('div');
+    body.style.marginTop = '6px';
+    this.winConditionsBodyEl = body;
+
+    const hint = document.createElement('div');
+    hint.style.fontSize = '11px';
+    hint.style.opacity = '0.7';
+    hint.style.marginBottom = '6px';
+    hint.innerText = 'AND-composed (all must be met). Required: at least 1.';
+    body.appendChild(hint);
+
+    this.winConditionsListEl = document.createElement('div');
+    this.winConditionsListEl.className = 'win-conditions-list';
+    body.appendChild(this.winConditionsListEl);
+
+    const addRow = document.createElement('div');
+    addRow.style.display = 'flex';
+    addRow.style.gap = '4px';
+    addRow.style.marginTop = '6px';
+
+    const select = document.createElement('select');
+    select.className = 'input';
+    select.style.flex = '1';
+    select.style.height = '32px';
+    select.style.fontSize = '12px';
+    (Object.keys(WIN_CONDITION_TYPE_LABELS) as WinConditionConfig['type'][]).forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t;
+      opt.textContent = WIN_CONDITION_TYPE_LABELS[t];
+      select.appendChild(opt);
+    });
+    addRow.appendChild(select);
+
+    const addBtn = document.createElement('button');
+    addBtn.className = 'editor-tool-btn';
+    addBtn.style.flex = '0 0 auto';
+    addBtn.innerText = '+ Add';
+    addBtn.onclick = () => this.addWinCondition(select.value as WinConditionConfig['type']);
+    addRow.appendChild(addBtn);
+
+    body.appendChild(addRow);
+    section.appendChild(body);
+
+    this.paletteContainer.appendChild(section);
+
+    // Default collapsed state: expanded if zero conditions OR a migration is
+    // pending (legacy import banner must stay visible with the rows). Otherwise
+    // start collapsed to reduce sidebar clutter on layout-heavy phases.
+    const initialCollapsed = this.winConditions.length > 0 && !this.migrationPending;
+    this.setWinConditionsCollapsed(initialCollapsed);
+
+    this.renderWinConditionList();
+  }
+
+  /**
+   * Win Conditions panel collapse toggle. UI-only — not persisted to
+   * `EditorSnapshot`. When collapsed, the rows + Add controls hide but the
+   * panel header, the migration banner, and the global validation panel
+   * remain visible so error counts stay discoverable.
+   */
+  private setWinConditionsCollapsed(collapsed: boolean) {
+    this.winConditionsCollapsed = collapsed;
+    if (this.winConditionsBodyEl) {
+      this.winConditionsBodyEl.style.display = collapsed ? 'none' : '';
+    }
+    if (this.winConditionsToggleBtn) {
+      this.winConditionsToggleBtn.innerText = collapsed ? '+' : '−';
+      this.winConditionsToggleBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    }
+    this.refreshWinConditionsSummary();
+  }
+
+  /**
+   * Update the compact summary shown in the panel header when collapsed.
+   * Format: "3 conditions" or "3 conditions, 1 issue" if errors are present.
+   */
+  private refreshWinConditionsSummary() {
+    if (!this.winConditionsSummaryEl) return;
+    if (!this.winConditionsCollapsed) {
+      this.winConditionsSummaryEl.style.display = 'none';
+      return;
+    }
+    const count = this.winConditions.length;
+    const errorCount = this.winConditionsLastErrorCount;
+    const noun = count === 1 ? 'condition' : 'conditions';
+    let text = `${count} ${noun}`;
+    if (errorCount > 0) {
+      const issueNoun = errorCount === 1 ? 'issue' : 'issues';
+      text += `, ${errorCount} ${issueNoun}`;
+      this.winConditionsSummaryEl.style.color = 'rgb(255, 120, 120)';
+    } else {
+      this.winConditionsSummaryEl.style.color = '';
+    }
+    this.winConditionsSummaryEl.innerText = text;
+    this.winConditionsSummaryEl.style.display = '';
+  }
+
+  private addWinCondition(type: WinConditionConfig['type']) {
+    this.pushUndo();
+    this.winConditions = [...this.winConditions, defaultWinCondition(type)];
+    this.renderWinConditionList();
+    this.updateValidation();
+    this.refreshMigrationBanner();
+  }
+
+  private removeWinCondition(idx: number) {
+    this.pushUndo();
+    this.winConditions = this.winConditions.filter((_, i) => i !== idx);
+    this.renderWinConditionList();
+    this.updateValidation();
+    this.refreshMigrationBanner();
+  }
+
+  private updateWinCondition(idx: number, patch: Partial<WinConditionConfig>) {
+    const current = this.winConditions[idx];
+    if (!current) return;
+    const merged = { ...current, ...patch } as WinConditionConfig;
+    this.winConditions = this.winConditions.map((c, i) => (i === idx ? merged : c));
+    this.updateValidation();
+  }
+
+  /**
+   * Phase F migration banner: visible iff a v1 import is still missing
+   * win conditions. Once the user adds at least one, the banner clears and
+   * the migration is considered complete (next save writes schemaVersion 2).
+   */
+  private refreshMigrationBanner() {
+    if (!this.migrationBannerEl) return;
+    const showBanner = this.migrationPending && this.winConditions.length === 0;
+    this.migrationBannerEl.style.display = showBanner ? '' : 'none';
+    // Force-expand the panel while a migration is pending so the user sees
+    // both the banner and the empty rows area immediately on legacy import.
+    if (this.migrationPending && this.winConditionsCollapsed) {
+      this.setWinConditionsCollapsed(false);
+    }
+    if (this.migrationPending && this.winConditions.length > 0) {
+      // First condition authored — migration complete.
+      this.migrationPending = false;
+    }
+    this.refreshWinConditionsSummary();
+  }
+
+  private renderWinConditionList() {
+    if (!this.winConditionsListEl) return;
+    this.winConditionsListEl.replaceChildren();
+    this.winConditionRowEls = [];
+
+    if (this.winConditions.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'editor-validation__error';
+      empty.style.fontSize = '11px';
+      empty.innerText = 'At least one win condition is required';
+      this.winConditionsListEl.appendChild(empty);
+      return;
+    }
+
+    this.winConditions.forEach((cond, idx) => {
+      const row = this.createWinConditionRow(cond, idx);
+      this.winConditionsListEl.appendChild(row);
+      this.winConditionRowEls.push(row);
+    });
+  }
+
+  private createWinConditionRow(cond: WinConditionConfig, idx: number): HTMLElement {
+    const row = document.createElement('div');
+    row.className = 'win-condition-row';
+    row.style.border = '1px solid rgba(255,255,255,0.1)';
+    row.style.borderRadius = '4px';
+    row.style.padding = '6px';
+    row.style.marginBottom = '4px';
+    row.style.display = 'flex';
+    row.style.flexDirection = 'column';
+    row.style.gap = '4px';
+
+    const header = document.createElement('div');
+    header.style.display = 'flex';
+    header.style.alignItems = 'center';
+    header.style.justifyContent = 'space-between';
+    header.style.gap = '6px';
+
+    const title = document.createElement('strong');
+    title.style.fontSize = '12px';
+    title.innerText = WIN_CONDITION_TYPE_LABELS[cond.type];
+    header.appendChild(title);
+
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'editor-tool-btn';
+    removeBtn.style.flex = '0 0 auto';
+    removeBtn.style.padding = '2px 8px';
+    removeBtn.innerText = 'Remove';
+    removeBtn.title = 'Remove this condition';
+    removeBtn.onclick = () => this.removeWinCondition(idx);
+    header.appendChild(removeBtn);
+
+    row.appendChild(header);
+
+    const body = document.createElement('div');
+    body.style.display = 'flex';
+    body.style.flexDirection = 'column';
+    body.style.gap = '4px';
+    this.renderWinConditionFields(body, cond, idx);
+    row.appendChild(body);
+
+    const errorEl = document.createElement('div');
+    errorEl.className = 'editor-validation__error';
+    errorEl.style.fontSize = '11px';
+    errorEl.style.display = 'none';
+    errorEl.dataset.role = 'wc-error';
+    row.appendChild(errorEl);
+
+    return row;
+  }
+
+  private renderWinConditionFields(body: HTMLElement, cond: WinConditionConfig, idx: number) {
+    body.replaceChildren();
+
+    switch (cond.type) {
+      case 'REACH_EXIT':
+        // No fields.
+        return;
+      case 'TAKE_OBJECTIVE':
+        body.appendChild(this.makeNumberRow('Amount', cond.amount, 1, (v) => {
+          this.updateWinCondition(idx, { amount: v });
+        }));
+        return;
+      case 'TAKE_COLOR_OBJECTIVE': {
+        body.appendChild(this.makeSelectRow('Color', cond.color, [
+          { value: 'BLUE', label: 'Blue' },
+          { value: 'GREEN', label: 'Green' },
+        ], (v) => {
+          this.updateWinCondition(idx, { color: v as 'BLUE' | 'GREEN' });
+        }));
+        body.appendChild(this.makeNumberRow('Amount', cond.amount, 1, (v) => {
+          this.updateWinCondition(idx, { amount: v });
+        }));
+        return;
+      }
+      case 'TAKE_EPIC_CRATE':
+        body.appendChild(this.makeNumberRow('Amount', cond.amount, 1, (v) => {
+          this.updateWinCondition(idx, { amount: v });
+        }));
+        return;
+      case 'KILL_ZOMBIE':
+        body.appendChild(this.makeSelectRow('Type', cond.zombieType, [
+          { value: 'ANY', label: 'Any' },
+          { value: 'WALKER', label: 'Walker' },
+          { value: 'RUNNER', label: 'Runner' },
+          { value: 'BRUTE', label: 'Brute' },
+          { value: 'ABOMINATION', label: 'Abomination' },
+        ], (v) => {
+          this.updateWinCondition(idx, { zombieType: v as any });
+        }));
+        body.appendChild(this.makeNumberRow('Amount', cond.amount, 1, (v) => {
+          this.updateWinCondition(idx, { amount: v });
+        }));
+        return;
+      case 'COLLECT_ITEMS':
+        this.renderCollectItemsBody(body, cond, idx);
+        return;
+      case 'REACH_DANGER_LEVEL':
+        body.appendChild(this.makeSelectRow('Threshold', cond.threshold, [
+          { value: 'YELLOW', label: 'Yellow' },
+          { value: 'ORANGE', label: 'Orange' },
+          { value: 'RED', label: 'Red' },
+        ], (v) => {
+          this.updateWinCondition(idx, { threshold: v as 'YELLOW' | 'ORANGE' | 'RED' });
+        }));
+        return;
+    }
+  }
+
+  private renderCollectItemsBody(
+    body: HTMLElement,
+    cond: Extract<WinConditionConfig, { type: 'COLLECT_ITEMS' }>,
+    idx: number,
+  ) {
+    body.replaceChildren();
+
+    const equipmentOptions: { value: string; label: string }[] = [
+      ...Object.entries(EQUIPMENT_CARDS).map(([id, c]) => ({
+        value: id,
+        label: `${c.name} (${id}) — Standard`,
+      })),
+      ...Object.entries(EPIC_EQUIPMENT_CARDS).map(([id, c]) => ({
+        value: id,
+        label: `${c.name} (${id}) — Epic`,
+      })),
+    ];
+
+    if (cond.items.length === 0) {
+      const empty = document.createElement('div');
+      empty.style.fontSize = '11px';
+      empty.style.opacity = '0.7';
+      empty.innerText = 'No items configured';
+      body.appendChild(empty);
+    }
+
+    cond.items.forEach((item, itemIdx) => {
+      const itemRow = document.createElement('div');
+      itemRow.style.display = 'flex';
+      itemRow.style.gap = '4px';
+      itemRow.style.alignItems = 'center';
+
+      const select = document.createElement('select');
+      select.className = 'input';
+      select.style.flex = '1';
+      select.style.height = '28px';
+      select.style.fontSize = '11px';
+      equipmentOptions.forEach(opt => {
+        const o = document.createElement('option');
+        o.value = opt.value;
+        o.textContent = opt.label;
+        if (opt.value === item.equipmentId) o.selected = true;
+        select.appendChild(o);
+      });
+      // If current id isn't in catalog, add a fallback option so the select
+      // doesn't silently auto-pick the first entry.
+      if (!equipmentOptions.some(o => o.value === item.equipmentId)) {
+        const o = document.createElement('option');
+        o.value = item.equipmentId;
+        o.textContent = `${item.equipmentId} (unknown)`;
+        o.selected = true;
+        select.insertBefore(o, select.firstChild);
+      }
+      select.onchange = () => {
+        const next = { ...cond, items: cond.items.map((it, i) => i === itemIdx ? { ...it, equipmentId: select.value } : it) };
+        this.winConditions = this.winConditions.map((c, i) => i === idx ? next : c);
+        this.updateValidation();
+      };
+      itemRow.appendChild(select);
+
+      const qty = document.createElement('input');
+      qty.type = 'number';
+      qty.min = '1';
+      qty.value = String(item.quantity);
+      qty.className = 'input';
+      qty.style.width = '60px';
+      qty.style.height = '28px';
+      qty.style.fontSize = '11px';
+      qty.onchange = () => {
+        const v = Math.max(1, parseInt(qty.value, 10) || 1);
+        qty.value = String(v);
+        const next = { ...cond, items: cond.items.map((it, i) => i === itemIdx ? { ...it, quantity: v } : it) };
+        this.winConditions = this.winConditions.map((c, i) => i === idx ? next : c);
+        this.updateValidation();
+      };
+      itemRow.appendChild(qty);
+
+      const rm = document.createElement('button');
+      rm.className = 'editor-tool-btn';
+      rm.style.flex = '0 0 auto';
+      rm.style.padding = '2px 8px';
+      rm.innerText = '×';
+      rm.title = 'Remove item';
+      rm.onclick = () => {
+        this.pushUndo();
+        const next = { ...cond, items: cond.items.filter((_, i) => i !== itemIdx) };
+        this.winConditions = this.winConditions.map((c, i) => i === idx ? next : c);
+        // Structural change — re-render this row's body.
+        const rowEl = this.winConditionRowEls[idx];
+        const bodyEl = rowEl?.children[1] as HTMLElement | undefined;
+        if (bodyEl) this.renderCollectItemsBody(bodyEl, next, idx);
+        this.updateValidation();
+      };
+      itemRow.appendChild(rm);
+
+      body.appendChild(itemRow);
+    });
+
+    const addItemBtn = document.createElement('button');
+    addItemBtn.className = 'editor-tool-btn';
+    addItemBtn.style.alignSelf = 'flex-start';
+    addItemBtn.style.padding = '2px 8px';
+    addItemBtn.innerText = '+ Add item';
+    addItemBtn.onclick = () => {
+      this.pushUndo();
+      const firstId = equipmentOptions[0]?.value ?? '';
+      const next = { ...cond, items: [...cond.items, { equipmentId: firstId, quantity: 1 }] };
+      this.winConditions = this.winConditions.map((c, i) => i === idx ? next : c);
+      this.renderCollectItemsBody(body, next, idx);
+      this.updateValidation();
+    };
+    body.appendChild(addItemBtn);
+  }
+
+  private makeNumberRow(
+    label: string,
+    value: number,
+    min: number,
+    onChange: (v: number) => void,
+  ): HTMLElement {
+    const wrap = document.createElement('label');
+    wrap.style.display = 'flex';
+    wrap.style.alignItems = 'center';
+    wrap.style.gap = '6px';
+    wrap.style.fontSize = '11px';
+    const span = document.createElement('span');
+    span.innerText = label;
+    span.style.flex = '0 0 70px';
+    wrap.appendChild(span);
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.min = String(min);
+    input.value = String(value);
+    input.className = 'input';
+    input.style.flex = '1';
+    input.style.height = '28px';
+    input.style.fontSize = '11px';
+    input.onchange = () => {
+      const v = Math.max(min, parseInt(input.value, 10) || min);
+      input.value = String(v);
+      onChange(v);
+    };
+    wrap.appendChild(input);
+    return wrap;
+  }
+
+  private makeSelectRow(
+    label: string,
+    value: string,
+    options: { value: string; label: string }[],
+    onChange: (v: string) => void,
+  ): HTMLElement {
+    const wrap = document.createElement('label');
+    wrap.style.display = 'flex';
+    wrap.style.alignItems = 'center';
+    wrap.style.gap = '6px';
+    wrap.style.fontSize = '11px';
+    const span = document.createElement('span');
+    span.innerText = label;
+    span.style.flex = '0 0 70px';
+    wrap.appendChild(span);
+    const select = document.createElement('select');
+    select.className = 'input';
+    select.style.flex = '1';
+    select.style.height = '28px';
+    select.style.fontSize = '11px';
+    options.forEach(opt => {
+      const o = document.createElement('option');
+      o.value = opt.value;
+      o.textContent = opt.label;
+      if (opt.value === value) o.selected = true;
+      select.appendChild(o);
+    });
+    select.onchange = () => onChange(select.value);
+    wrap.appendChild(select);
+    return wrap;
+  }
+
+  private validateWinConditions(): { rowErrors: (string | null)[]; topLevelErrors: string[] } {
+    const rowErrors: (string | null)[] = this.winConditions.map(() => null);
+    const topLevelErrors: string[] = [];
+
+    if (this.winConditions.length === 0) {
+      topLevelErrors.push('At least one win condition is required');
+      return { rowErrors, topLevelErrors };
+    }
+
+    const seenKeys = new Map<string, number>();
+    this.winConditions.forEach((c, i) => {
+      const key = JSON.stringify(c);
+      const prev = seenKeys.get(key);
+      if (prev !== undefined) {
+        rowErrors[i] = `Duplicate of condition #${prev + 1}`;
+      } else {
+        seenKeys.set(key, i);
+      }
+    });
+
+    const exitCount = this.markers.filter(m => m.type === MarkerType.Exit).length;
+    const yellowCount = this.markers.filter(m => m.type === MarkerType.Objective).length;
+    const blueCount = this.markers.filter(m => m.type === MarkerType.ObjectiveBlue).length;
+    const greenCount = this.markers.filter(m => m.type === MarkerType.ObjectiveGreen).length;
+    const epicCount = this.markers.filter(m => m.type === MarkerType.EpicCrate).length;
+    const knownIds = new Set([
+      ...Object.keys(EQUIPMENT_CARDS),
+      ...Object.keys(EPIC_EQUIPMENT_CARDS),
+    ]);
+
+    this.winConditions.forEach((c, i) => {
+      if (rowErrors[i]) return;
+      switch (c.type) {
+        case 'REACH_EXIT':
+          if (exitCount === 0) rowErrors[i] = 'Requires at least 1 Exit marker on the map';
+          break;
+        case 'TAKE_OBJECTIVE':
+          if (c.amount < 1) rowErrors[i] = 'Amount must be at least 1';
+          else if (c.amount > yellowCount) rowErrors[i] = `Amount (${c.amount}) exceeds yellow Objectives placed (${yellowCount})`;
+          break;
+        case 'TAKE_COLOR_OBJECTIVE': {
+          const cnt = c.color === 'BLUE' ? blueCount : greenCount;
+          const colorLower = c.color.toLowerCase();
+          if (c.amount < 1) rowErrors[i] = 'Amount must be at least 1';
+          else if (cnt === 0) rowErrors[i] = `No ${colorLower} Objective markers placed`;
+          else if (c.amount > cnt) rowErrors[i] = `Amount (${c.amount}) exceeds ${colorLower} Objectives placed (${cnt})`;
+          break;
+        }
+        case 'TAKE_EPIC_CRATE':
+          if (c.amount < 1) rowErrors[i] = 'Amount must be at least 1';
+          else if (c.amount > epicCount) rowErrors[i] = `Amount (${c.amount}) exceeds Epic Crates placed (${epicCount})`;
+          else if (c.amount > EPIC_CRATE_LIMIT) rowErrors[i] = `Amount exceeds Epic deck size (${EPIC_CRATE_LIMIT})`;
+          break;
+        case 'KILL_ZOMBIE':
+          if (c.amount < 1) rowErrors[i] = 'Amount must be at least 1';
+          break;
+        case 'COLLECT_ITEMS':
+          if (c.items.length === 0) {
+            rowErrors[i] = 'Add at least one item';
+          } else {
+            for (const it of c.items) {
+              if (!knownIds.has(it.equipmentId)) {
+                rowErrors[i] = `Unknown equipment id: ${it.equipmentId}`;
+                break;
+              }
+              if (it.quantity < 1) {
+                rowErrors[i] = `Quantity for ${it.equipmentId} must be at least 1`;
+                break;
+              }
+            }
+          }
+          break;
+        case 'REACH_DANGER_LEVEL':
+          break;
+      }
+    });
+
+    return { rowErrors, topLevelErrors };
+  }
+
+  private applyWinConditionRowErrors(rowErrors: (string | null)[]) {
+    this.winConditionRowEls.forEach((row, i) => {
+      const errEl = row.querySelector('[data-role="wc-error"]') as HTMLElement | null;
+      if (!errEl) return;
+      const msg = rowErrors[i];
+      if (msg) {
+        errEl.style.display = '';
+        errEl.innerText = msg;
+      } else {
+        errEl.style.display = 'none';
+        errEl.innerText = '';
+      }
+    });
+  }
+
   private createInstructions() {
     const instructions = document.createElement('div');
     instructions.className = 'editor-instructions';
     instructions.innerHTML = `
         <b>Controls:</b><br>
         <b>Click</b> to place | <b>Right-click</b> to remove<br>
-        <b>R</b> rotate tile | <b>1-5, E</b> switch tools<br>
+        <b>R</b> rotate tile | <b>1-9, 0, E</b> switch tools<br>
         <b>Ctrl+Z</b> undo | <b>Ctrl+Shift+Z</b> redo<br>
         <b>Shift+Drag</b> brush fill (Tiles)<br>
         <b>Scroll</b> zoom | <b>Space+Drag</b> pan
@@ -389,15 +1081,21 @@ export class MapEditor {
     return {
       tiles: JSON.parse(JSON.stringify(this.tiles)),
       markers: JSON.parse(JSON.stringify(this.markers)),
+      winConditions: JSON.parse(JSON.stringify(this.winConditions)),
     };
   }
 
   private restoreSnapshot(snap: EditorSnapshot): void {
     this.tiles = JSON.parse(JSON.stringify(snap.tiles));
     this.markers = JSON.parse(JSON.stringify(snap.markers));
+    this.winConditions = JSON.parse(JSON.stringify(
+      snap.winConditions ?? DEFAULT_WIN_CONDITIONS
+    ));
     this.rebuildPreviewState();
+    this.renderWinConditionList();
     this.updateValidation();
     this.refreshEpicCrateButtonLabel();
+    this.refreshMigrationBanner();
   }
 
   private pushUndo(): void {
@@ -441,8 +1139,12 @@ export class MapEditor {
       [EditorTool.Tile]: 'Click grid to place/replace tiles. R to rotate.',
       [EditorTool.PlayerStart]: 'Click a STREET zone cell to set the Player Start position.',
       [EditorTool.ZombieSpawn]: 'Click STREET zone cells to place Zombie Spawn points.',
+      [EditorTool.ZombieSpawnBlue]: 'Click STREET zone cells to place a BLUE dormant Spawn (activates when a blue Objective is taken).',
+      [EditorTool.ZombieSpawnGreen]: 'Click STREET zone cells to place a GREEN dormant Spawn (activates when a green Objective is taken).',
       [EditorTool.Exit]: 'Click STREET zone cells to place Exit points.',
       [EditorTool.Objective]: 'Click any zone cell to place Objective tokens.',
+      [EditorTool.ObjectiveBlue]: 'Click any zone cell to place a BLUE Objective (activates BLUE dormant Spawn Zones when taken).',
+      [EditorTool.ObjectiveGreen]: 'Click any zone cell to place a GREEN Objective (activates GREEN dormant Spawn Zones when taken).',
       [EditorTool.EpicCrate]: `Click any zone cell to place Epic Weapon Crate (max ${EPIC_CRATE_LIMIT}).`,
       [EditorTool.Eraser]: 'Click to remove markers from cells.',
     };
@@ -555,6 +1257,8 @@ export class MapEditor {
       const toolMap: Record<string, EditorTool> = {
         '1': EditorTool.Tile, '2': EditorTool.PlayerStart, '3': EditorTool.ZombieSpawn,
         '4': EditorTool.Exit, '5': EditorTool.Objective, '6': EditorTool.EpicCrate,
+        '7': EditorTool.ObjectiveBlue, '8': EditorTool.ObjectiveGreen,
+        '9': EditorTool.ZombieSpawnBlue, '0': EditorTool.ZombieSpawnGreen,
         'e': EditorTool.Eraser,
       };
       if (toolMap[key]) this.setTool(toolMap[key]);
@@ -652,11 +1356,23 @@ export class MapEditor {
       case EditorTool.ZombieSpawn:
         this.handleMarkerPlacement(wx, wy, MarkerType.ZombieSpawn, false);
         break;
+      case EditorTool.ZombieSpawnBlue:
+        this.handleMarkerPlacement(wx, wy, MarkerType.ZombieSpawnBlue, false);
+        break;
+      case EditorTool.ZombieSpawnGreen:
+        this.handleMarkerPlacement(wx, wy, MarkerType.ZombieSpawnGreen, false);
+        break;
       case EditorTool.Exit:
         this.handleMarkerPlacement(wx, wy, MarkerType.Exit, false);
         break;
       case EditorTool.Objective:
         this.handleMarkerPlacement(wx, wy, MarkerType.Objective, false);
+        break;
+      case EditorTool.ObjectiveBlue:
+        this.handleMarkerPlacement(wx, wy, MarkerType.ObjectiveBlue, false);
+        break;
+      case EditorTool.ObjectiveGreen:
+        this.handleMarkerPlacement(wx, wy, MarkerType.ObjectiveGreen, false);
         break;
       case EditorTool.EpicCrate:
         this.handleMarkerPlacement(wx, wy, MarkerType.EpicCrate, false);
@@ -722,6 +1438,8 @@ export class MapEditor {
   private static readonly STREET_ONLY_MARKERS = [
     MarkerType.PlayerStart,
     MarkerType.ZombieSpawn,
+    MarkerType.ZombieSpawnBlue,
+    MarkerType.ZombieSpawnGreen,
     MarkerType.Exit,
   ];
 
@@ -745,7 +1463,7 @@ export class MapEditor {
     const cellKey = `${zx},${zy}`;
     const zoneId = this.state.zoneGeometry?.cellToZone[cellKey];
 
-    // Toggle off if clicking same cell
+    // Toggle off if clicking same cell with the SAME exact type
     const existingIndex = this.markers.findIndex(m => m.type === type && m.x === zx && m.y === zy);
     if (existingIndex !== -1) {
       this.markers.splice(existingIndex, 1);
@@ -760,8 +1478,39 @@ export class MapEditor {
         }
       }
 
-      // Check: only one marker of same type per zone
-      if (zoneId) {
+      // Zone-level class mutex: at most ONE objective-class and ONE
+      // spawn-class marker per zone. Placing a new class member replaces
+      // any pre-existing same-class marker anywhere in that zone (covers
+      // cell-level too). Cross-class markers still coexist (Spawn +
+      // Objective in the same zone is fine). Falls back to cell-only when
+      // the zone is unresolved.
+      //
+      // The compiler otherwise folds multiple class members in one zone
+      // into a single zone-level entry — colored variants win silently
+      // over yellow/normal — so we surface and resolve the conflict here.
+      const klass = getMarkerClass(type);
+      if (klass) {
+        const result = applyZoneClassMutex(
+          this.markers,
+          type,
+          zx,
+          zy,
+          zoneId,
+          this.state.zoneGeometry?.cellToZone,
+        );
+        if (result.replaced) {
+          const label = klass === SPAWN_CLASS_MARKERS
+            ? 'spawn'
+            : klass === OBJECTIVE_CLASS_MARKERS
+              ? 'objective'
+              : 'marker';
+          this.statusText.innerText = `Replaced existing ${label} marker in zone`;
+        }
+        this.markers = result.markers;
+      } else if (zoneId) {
+        // Non-class markers (PlayerStart, Exit): keep the original
+        // one-per-zone rejection — they're singletons per zone, not
+        // class-replaceable.
         const sameTypeInZone = this.markers.find(m => {
           if (m.type !== type) return false;
           const mk = `${m.x},${m.y}`;
@@ -779,9 +1528,8 @@ export class MapEditor {
       this.markers.push({ type, x: zx, y: zy });
       this.statusText.innerText = `Placed ${type} at (${zx},${zy})`;
     }
-    if (type === MarkerType.EpicCrate) {
-      this.refreshEpicCrateButtonLabel();
-    }
+    // Class-mutex may have removed an EpicCrate; always refresh.
+    this.refreshEpicCrateButtonLabel();
   }
 
   private refreshEpicCrateButtonLabel() {
@@ -1034,6 +1782,33 @@ export class MapEditor {
           g.fill({ color: EDITOR_THEME.marker.zombieSpawn.fill, alpha: EDITOR_THEME.marker.zombieSpawn.fillAlpha });
           g.stroke({ width: EDITOR_THEME.marker.zombieSpawn.strokeWidth, color: EDITOR_THEME.marker.zombieSpawn.stroke });
           break;
+        case MarkerType.ZombieSpawnBlue: {
+          const t = EDITOR_THEME.marker.zombieSpawnBlue;
+          g.moveTo(cx, cy - 18);
+          g.lineTo(cx + 14, cy);
+          g.lineTo(cx, cy + 18);
+          g.lineTo(cx - 14, cy);
+          g.closePath();
+          g.fill({ color: t.fill, alpha: t.fillAlpha });
+          g.stroke({ width: t.strokeWidth, color: t.stroke });
+          // Dormancy hint: small white "Z" cross-mark
+          g.rect(cx - 6, cy - 1, 12, 2);
+          g.fill({ color: t.dashColor });
+          break;
+        }
+        case MarkerType.ZombieSpawnGreen: {
+          const t = EDITOR_THEME.marker.zombieSpawnGreen;
+          g.moveTo(cx, cy - 18);
+          g.lineTo(cx + 14, cy);
+          g.lineTo(cx, cy + 18);
+          g.lineTo(cx - 14, cy);
+          g.closePath();
+          g.fill({ color: t.fill, alpha: t.fillAlpha });
+          g.stroke({ width: t.strokeWidth, color: t.stroke });
+          g.rect(cx - 6, cy - 1, 12, 2);
+          g.fill({ color: t.dashColor });
+          break;
+        }
         case MarkerType.Exit:
           g.rect(cx - 14, cy - 14, 28, 28);
           g.fill({ color: 0x22AA44, alpha: 0.85 });
@@ -1046,6 +1821,24 @@ export class MapEditor {
           g.circle(cx, cy, 5);
           g.fill({ color: EDITOR_THEME.marker.objective.dotColor });
           break;
+        case MarkerType.ObjectiveBlue: {
+          const t = EDITOR_THEME.marker.objectiveBlue;
+          g.circle(cx, cy, 14);
+          g.fill({ color: t.fill, alpha: t.fillAlpha });
+          g.stroke({ width: t.strokeWidth, color: t.stroke });
+          g.circle(cx, cy, 5);
+          g.fill({ color: t.dotColor });
+          break;
+        }
+        case MarkerType.ObjectiveGreen: {
+          const t = EDITOR_THEME.marker.objectiveGreen;
+          g.circle(cx, cy, 14);
+          g.fill({ color: t.fill, alpha: t.fillAlpha });
+          g.stroke({ width: t.strokeWidth, color: t.stroke });
+          g.circle(cx, cy, 5);
+          g.fill({ color: t.dotColor });
+          break;
+        }
         case MarkerType.EpicCrate:
           // Red square crate with yellow 'E' inside to differentiate from Exit.
           g.rect(cx - 14, cy - 14, 28, 28);
@@ -1063,10 +1856,12 @@ export class MapEditor {
     // --- 5. Spawn number labels ---
     // Remove old labels
     this.spawnLabelContainer.removeChildren();
-    // Count spawn markers in array order to assign numbers
+    // Count spawn markers (any variant) in placement order — this mirrors
+    // ScenarioCompiler's `spawnZoneIds` ordering, which all spawn variants
+    // share regardless of color.
     let spawnNum = 1;
     for (const marker of this.markers) {
-      if (marker.type !== MarkerType.ZombieSpawn) continue;
+      if (!SPAWN_CLASS_MARKERS.includes(marker.type)) continue;
       const cx = marker.x * TILE_SIZE + TILE_SIZE / 2;
       const cy = marker.y * TILE_SIZE + TILE_SIZE / 2;
       const label = new PIXI.Text({
@@ -1138,8 +1933,13 @@ export class MapEditor {
     const playerStart = this.markers.find(m => m.type === MarkerType.PlayerStart);
     if (!playerStart) warnings.push('Missing: Player Start');
 
-    const hasSpawn = this.markers.some(m => m.type === MarkerType.ZombieSpawn);
-    if (!hasSpawn) warnings.push('Missing: Zombie Spawn');
+    const hasSpawn = this.markers.some(m => SPAWN_CLASS_MARKERS.includes(m.type));
+    const hasAlwaysOnSpawn = this.markers.some(m => m.type === MarkerType.ZombieSpawn);
+    if (!hasSpawn) {
+      warnings.push('Missing: Zombie Spawn');
+    } else if (!hasAlwaysOnSpawn) {
+      warnings.push('Optional: All Spawn Zones are dormant — game starts with no active spawns');
+    }
 
     const hasExit = this.markers.some(m => m.type === MarkerType.Exit);
     if (!hasExit) warnings.push('Optional: No Exit point');
@@ -1193,6 +1993,18 @@ export class MapEditor {
       const buildingZones = Object.values(this.state.zones).filter(z => z.isBuilding).length;
       warnings.push(`Optional: ${zoneCount} zones (${streetZones} street, ${buildingZones} building)`);
     }
+
+    // Win condition validation — surfaces in panel rows + summarized here.
+    const wcVal = this.validateWinConditions();
+    this.applyWinConditionRowErrors(wcVal.rowErrors);
+    wcVal.topLevelErrors.forEach(e => warnings.push(e));
+    const rowErrorCount = wcVal.rowErrors.filter(Boolean).length;
+    if (rowErrorCount > 0) {
+      warnings.push(`Win Conditions: ${rowErrorCount} issue(s) — see panel`);
+    }
+    // Surface the same count in the collapsed-state header summary.
+    this.winConditionsLastErrorCount = rowErrorCount + wcVal.topLevelErrors.length;
+    this.refreshWinConditionsSummary();
 
     if (warnings.length === 0) {
       this.validationPanelEl.innerHTML = '<span class="editor-validation__ok">Map valid</span>';
@@ -1269,12 +2081,16 @@ export class MapEditor {
             modalManager.close();
             this.tiles = [];
             this.markers = [];
+            this.winConditions = JSON.parse(JSON.stringify(DEFAULT_WIN_CONDITIONS));
+            this.migrationPending = false;
             this.state.tiles = [];
             this.state.zones = {};
             this.state.zoneGeometry = undefined;
             setZoneGeometry(null);
+            this.renderWinConditionList();
             this.updateValidation();
             this.refreshEpicCrateButtonLabel();
+            this.refreshMigrationBanner();
           }
         });
       },
@@ -1289,6 +2105,12 @@ export class MapEditor {
 
     if (this.tiles.length === 0) {
       notificationManager.show({ variant: 'warning', message: 'Map is empty!' });
+      return;
+    }
+
+    const blockingError = this.firstWinConditionError();
+    if (blockingError) {
+      notificationManager.show({ variant: 'danger', message: `Cannot save — ${blockingError}` });
       return;
     }
 
@@ -1417,6 +2239,16 @@ export class MapEditor {
     }
   }
 
+  private firstWinConditionError(): string | null {
+    const wcVal = this.validateWinConditions();
+    if (wcVal.topLevelErrors.length > 0) return wcVal.topLevelErrors[0];
+    const rowError = wcVal.rowErrors.findIndex(e => e !== null);
+    if (rowError !== -1) {
+      return `Win Condition #${rowError + 1}: ${wcVal.rowErrors[rowError]}`;
+    }
+    return null;
+  }
+
   private buildScenarioMap(name: string): ScenarioMap {
     return {
       id: `map-${Date.now()}`,
@@ -1424,8 +2256,10 @@ export class MapEditor {
       width: Math.max(...this.tiles.map(t => t.x)) + 1,
       height: Math.max(...this.tiles.map(t => t.y)) + 1,
       gridSize: TILE_CELLS_PER_SIDE,
+      schemaVersion: 2,
       tiles: this.tiles,
       markers: this.markers,
+      winConditions: JSON.parse(JSON.stringify(this.winConditions)),
     };
   }
 
@@ -1443,6 +2277,11 @@ export class MapEditor {
   private exportCurrentMap(name: string) {
     if (this.tiles.length === 0) {
       notificationManager.show({ variant: 'warning', message: 'Map is empty — nothing to export' });
+      return;
+    }
+    const blockingError = this.firstWinConditionError();
+    if (blockingError) {
+      notificationManager.show({ variant: 'danger', message: `Cannot export — ${blockingError}` });
       return;
     }
     const finalName = name || `map-${Date.now()}`;
@@ -1478,8 +2317,11 @@ export class MapEditor {
 
   private loadMap(mapData: any) {
     // Migrate legacy coordinates to current grid size
-    const isLegacy = !mapData.gridSize || mapData.gridSize !== TILE_CELLS_PER_SIDE;
-    const scale = isLegacy ? TILE_CELLS_PER_SIDE / (mapData.gridSize || 3) : 1;
+    const isLegacyGrid = !mapData.gridSize || mapData.gridSize !== TILE_CELLS_PER_SIDE;
+    const scale = isLegacyGrid ? TILE_CELLS_PER_SIDE / (mapData.gridSize || 3) : 1;
+
+    // Phase F: detect v1 schema and gate save until win conditions are authored.
+    const migrated = migrateImportedMap(mapData);
 
     this.tiles = mapData.tiles || [];
     this.markers = (mapData.markers || []).map((m: any) => ({
@@ -1487,13 +2329,39 @@ export class MapEditor {
       x: m.x * scale, y: m.y * scale,
     }));
 
+    // v2 map → load authored conditions (or fall back to default if the file
+    // is v2 but somehow missing the array — defensive). v1 map → empty array,
+    // which the existing save validation will block until the user authors
+    // at least one. The migration banner surfaces this state.
+    if (migrated.isLegacy) {
+      this.winConditions = [];
+      this.migrationPending = true;
+    } else {
+      this.winConditions = migrated.winConditions.length > 0
+        ? migrated.winConditions
+        : JSON.parse(JSON.stringify(DEFAULT_WIN_CONDITIONS));
+      this.migrationPending = false;
+    }
+
     const nameInput = document.getElementById('map-name-input') as HTMLInputElement;
     if (nameInput) nameInput.value = mapData.name || '';
 
     this.rebuildPreviewState();
+    this.renderWinConditionList();
     this.updateValidation();
     this.refreshEpicCrateButtonLabel();
-    this.statusText.innerText = `Loaded: ${mapData.name}${isLegacy ? ' (migrated from 3x3)' : ''}`;
+    // Re-apply default collapse policy for the freshly loaded map: expanded
+    // when there are zero conditions or a migration is pending; otherwise
+    // collapsed. refreshMigrationBanner() force-expands if needed.
+    this.setWinConditionsCollapsed(
+      this.winConditions.length > 0 && !this.migrationPending,
+    );
+    this.refreshMigrationBanner();
+    const suffix = [
+      isLegacyGrid ? 'migrated from 3x3' : null,
+      migrated.isLegacy ? 'legacy schema — configure win conditions' : null,
+    ].filter(Boolean).join(', ');
+    this.statusText.innerText = `Loaded: ${mapData.name}${suffix ? ` (${suffix})` : ''}`;
   }
 
   // =============================================

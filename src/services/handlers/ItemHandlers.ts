@@ -4,6 +4,12 @@ import { ActionRequest, ActionType } from '../../types/Action';
 import { DeckService } from '../DeckService';
 import { EquipmentManager } from '../EquipmentManager';
 import { ZombiePhaseManager } from '../ZombiePhaseManager';
+import { XPManager } from '../XPManager';
+
+// RULEBOOK.md:604-621 — Bag of Rice / Canned Food / Water are Food cards;
+// "Consume for 1 AP". Match by registry key (equipmentId), not display name,
+// so renames don't desync game logic.
+const FOOD_EQUIPMENT_IDS = new Set(['bag_of_rice', 'canned_food', 'water']);
 
 export function handleUseItem(state: GameState, intent: ActionRequest): GameState {
   const newState = structuredClone(state);
@@ -17,14 +23,20 @@ export function handleUseItem(state: GameState, intent: ActionRequest): GameStat
 
   const item = survivor.inventory[itemIndex];
 
-  if (item.name === 'Canned Food' || item.name === 'Water') {
-    // Heal 1 wound
-    if (survivor.wounds <= 0) throw new Error('Survivor has no wounds to heal');
-    survivor.wounds = Math.max(0, survivor.wounds - 1);
-
-    // Consume item (discard)
+  if (FOOD_EQUIPMENT_IDS.has(item.equipmentId)) {
+    // Discard the card and award 1 AP. XPManager handles auto-promotion
+    // (Yellow grants +1 Action immediately).
     survivor.inventory.splice(itemIndex, 1);
     newState.equipmentDiscard.push(item);
+    newState.survivors[intent.survivorId!] = XPManager.addXP(survivor, 1);
+
+    newState.lastAction = {
+      type: ActionType.USE_ITEM,
+      playerId: intent.playerId,
+      survivorId: intent.survivorId,
+      timestamp: Date.now(),
+      description: `Consumed ${item.name} (+1 AP)`,
+    };
   } else {
     throw new Error(`Item "${item.name}" cannot be used as a consumable`);
   }
@@ -37,7 +49,7 @@ export function handleSearch(state: GameState, intent: ActionRequest): GameState
   const preSurvivor = state.survivors[intent.survivorId!];
   const preZone = state.zones[preSurvivor.position.zoneId];
 
-  if (preSurvivor.hasSearched && !preSurvivor.skills.includes('can_search_more_than_once')) {
+  if (preSurvivor.hasSearched && !preSurvivor.skills.includes('can_search_more_than_once') && !preSurvivor.cheatMode) {
     throw new Error('Already searched this turn');
   }
   if (!preZone.searchable && !preSurvivor.skills.includes('search_anywhere')) {

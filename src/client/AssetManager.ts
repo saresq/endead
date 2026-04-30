@@ -36,7 +36,7 @@ export class AssetManager {
     const zombieTypes = ['walker', 'runner', 'brute', 'abomination'];
     const items = [
       'fire_axe', 'crowbar', 'chainsaw', 'katana', 'kukri', 'machete', 'baseball_bat',
-      'pistol', 'sawed_off', 'shotgun', 'sub_mg', 'rifle', 'molotov',
+      'pistol', 'sawed_off', 'shotgun', 'sub_mg', 'sniper_rifle', 'molotov',
       'flashlight', 'plenty_of_bullets', 'plenty_of_shells',
       'canned_food', 'water', 'bag_of_rice', 'aaahh',
     ];

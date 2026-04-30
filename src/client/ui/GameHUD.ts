@@ -1,5 +1,5 @@
 
-import { GameState, PlayerId, EntityId, Survivor, GameResult, EquipmentCard } from '../../types/GameState';
+import { GameState, PlayerId, EntityId, Survivor, GameResult, EquipmentCard, ObjectiveType } from '../../types/GameState';
 import { ActionType } from '../../types/Action';
 import { networkManager } from '../NetworkManager';
 import { InputController } from '../InputController';
@@ -20,6 +20,11 @@ import { modalManager } from './overlays/ModalManager';
 import { notificationManager } from './NotificationManager';
 import { formatZoneId, formatActionType } from '../utils/zoneFormat';
 import { SKILL_DEFINITIONS } from '../../config/SkillRegistry';
+
+// Mirrors `FOOD_EQUIPMENT_IDS` in `services/handlers/ItemHandlers.ts`. Kept
+// in sync manually because the client has no direct dependency on handler
+// modules. If a fourth food card is ever added, update both sites.
+const FOOD_EQUIPMENT_IDS = new Set(['bag_of_rice', 'canned_food', 'water']);
 
 /** Map Zombicide danger level → SquadPlate rank color. */
 function dangerToRank(level: string): SquadPlateRank {
@@ -103,6 +108,7 @@ export class GameHUD {
   private state: GameState | null = null;
   private selectedSurvivorId: EntityId | null = null;
   private backpackModalId: string | null = null;
+  private foodConfirmModalId: string | null = null;
   private endGameModalId: string | null = null;
   private historyModalId: string | null = null;
   private woundPickerModalId: string | null = null;
@@ -114,6 +120,8 @@ export class GameHUD {
   private feedAutoDismissScheduledFor: number | null = null;
   private boundDelegateHandler: (e: Event) => void;
   private mobileActionsTrayOpen = false;
+  private laptopBreakpoint: MediaQueryList = window.matchMedia('(min-width: 1024px)');
+  private boundBreakpointHandler: () => void = () => this.render();
   // Stable shell elements — created once, updated per-section
   private elTopBar: HTMLDivElement | null = null;
   private elRailLeft: HTMLElement | null = null;
@@ -138,6 +146,7 @@ export class GameHUD {
 
     this.boundDelegateHandler = (e: Event) => this.handleDelegatedClick(e);
     this.container.addEventListener('click', this.boundDelegateHandler);
+    this.laptopBreakpoint.addEventListener('change', this.boundBreakpointHandler);
 
     // Add in-game class for overscroll-behavior
     document.documentElement.classList.add('in-game');
@@ -156,6 +165,7 @@ export class GameHUD {
     this.selectedSurvivorId = selectedSurvivorId;
     this.scheduleFeedAutoDismiss();
     this.render();
+    this.refreshBackpackModal();
   }
 
   public updateMode(_mode: string): void {
@@ -165,6 +175,7 @@ export class GameHUD {
   public destroy(): void {
     document.documentElement.removeAttribute('data-danger');
     this.container.removeEventListener('click', this.boundDelegateHandler);
+    this.laptopBreakpoint.removeEventListener('change', this.boundBreakpointHandler);
     if (this.feedAutoDismissTimer) {
       clearTimeout(this.feedAutoDismissTimer);
       this.feedAutoDismissTimer = null;
@@ -458,14 +469,15 @@ export class GameHUD {
 
     const isMyTurn = this.state.players[this.state.activePlayerIndex] === this.localPlayerId;
     const activeSurvivor = this.selectedSurvivorId ? this.state.survivors[this.selectedSurvivorId] : null;
+    const isLaptopOrLarger = this.laptopBreakpoint.matches;
 
     this.elTopBar!.innerHTML = this.renderTopBar(isMyTurn);
     this.elRailLeft!.innerHTML = this.renderSquadRail();
     const showActiveOp = activeSurvivor && activeSurvivor.playerId === this.localPlayerId;
     this.elRailRight!.innerHTML = showActiveOp
-      ? this.renderRightPanel(activeSurvivor, isMyTurn)
+      ? this.renderRightPanel(activeSurvivor, isMyTurn, isLaptopOrLarger)
       : '<span class="fm-bracket-tr"></span><span class="fm-bracket-bl"></span>';
-    this.elActions!.innerHTML = showActiveOp
+    this.elActions!.innerHTML = showActiveOp && !isLaptopOrLarger
       ? this.renderActionRow(activeSurvivor, isMyTurn)
       : '';
 
@@ -646,7 +658,7 @@ export class GameHUD {
     const survivor = state.survivors[last.survivorId];
     if (!survivor) return '';
     if (!survivor.skills.includes('lucky')) return '';
-    if (survivor.luckyUsedThisTurn) return '';
+    if (survivor.luckyUsedThisTurn && !survivor.cheatMode) return '';
     if (!last.rollbackSnapshot) return '';
     return `<button class="action-btn action-btn--lucky" data-action="reroll-lucky" title="Reroll dice (Lucky — commits to new result even if worse)">
       ${icon('Dices', 'sm')} Reroll (Lucky)
@@ -706,7 +718,7 @@ export class GameHUD {
 
     return `
       <div class="hud-actions__grid">
-        ${renderActionButton({ id: 'btn-search', icon: 'Search', label: 'Search', kbd: 'S', cost: survivor.freeSearchesRemaining > 0 ? 'FREE' : '1 AP', disabled: !isMyTurn || survivor.hasSearched || (noAP && survivor.freeSearchesRemaining <= 0) })}
+        ${renderActionButton({ id: 'btn-search', icon: 'Search', label: 'Search', kbd: 'S', cost: survivor.freeSearchesRemaining > 0 ? 'FREE' : '1 AP', disabled: !isMyTurn || (survivor.hasSearched && !survivor.cheatMode) || (noAP && survivor.freeSearchesRemaining <= 0) })}
         ${renderActionButton({ id: 'btn-noise', icon: 'Volume2', label: 'Noise', kbd: 'N', cost: '1 AP', disabled: !isMyTurn || noAP })}
         ${renderActionButton({ id: 'btn-door', icon: 'DoorOpen', label: 'Door', kbd: 'D', cost: '1 AP', disabled: !isMyTurn || noAP || !canOpenDoor })}
         ${objectiveBtn('')}
@@ -718,9 +730,9 @@ export class GameHUD {
       ${tray}`;
   }
 
-  // ─── Right panel — active op readout + loadout + field log ──
+  // ─── Right panel — active op readout + loadout + actions/log ─
 
-  private renderRightPanel(survivor: Survivor, isMyTurn: boolean): string {
+  private renderRightPanel(survivor: Survivor, isMyTurn: boolean, isLaptopOrLarger: boolean): string {
     const identity = getPlayerIdentity(this.state!, survivor.playerId);
     const idx = Math.max(0, this.state!.players.indexOf(survivor.playerId));
 
@@ -760,7 +772,7 @@ export class GameHUD {
         ${tagRow}
         <div class="hud-op__stats">
           ${renderStatCell({ icon: icon('Heart', 'sm'), label: 'VITALS', value: hp, max: survivor.maxHealth, color: 'danger', size: 'sm' })}
-          ${renderStatCell({ icon: icon('Zap', 'sm'), label: 'ACTIONS', value: survivor.actionsRemaining, max: survivor.actionsPerTurn, color: 'amber', size: 'sm' })}
+          ${renderStatCell({ icon: icon('Zap', 'sm'), label: 'ACTIONS', value: survivor.actionsRemaining, max: survivor.actionsPerTurn, color: 'amber', size: 'sm', infinite: !!survivor.cheatMode })}
           ${xpBar}
         </div>
       </div>`;
@@ -824,7 +836,13 @@ export class GameHUD {
         </button>`
       : '';
 
-    const fieldLog = this.renderFieldLog();
+    // Laptop/desktop: actions live in the right rail tail (replacing the
+     // field log, which is reachable via the TURN chip on every breakpoint).
+     // Tablet/mobile keep the field log here and render the action bar in
+     // its own bottom slot.
+    const tail = isLaptopOrLarger
+      ? `<div class="hud-rail__actions">${this.renderActionRow(survivor, isMyTurn)}</div>`
+      : this.renderFieldLog();
 
     return `
       <span class="fm-bracket-tr"></span><span class="fm-bracket-bl"></span>
@@ -832,7 +850,7 @@ export class GameHUD {
         ${opCard}
         ${loadout}
         ${woundAlert}
-        ${fieldLog}
+        ${tail}
       </div>`;
   }
 
@@ -973,34 +991,35 @@ export class GameHUD {
   private renderSkillActionButtons(survivor: Survivor, isMyTurn: boolean, noAP: boolean): string {
     const buttons: string[] = [];
 
+    const cheat = !!survivor.cheatMode;
     if (survivor.skills.includes('sprint')) {
       buttons.push(renderActionButton({
         id: 'btn-sprint', icon: 'Zap', label: 'Sprint',
-        cost: '1 AP', disabled: !isMyTurn || noAP || survivor.sprintUsedThisTurn,
+        cost: '1 AP', disabled: !isMyTurn || noAP || (survivor.sprintUsedThisTurn && !cheat),
       }));
     }
     if (survivor.skills.includes('charge')) {
       buttons.push(renderActionButton({
         id: 'btn-charge', icon: 'Swords', label: 'Charge',
-        cost: 'FREE', disabled: !isMyTurn || survivor.chargeUsedThisTurn,
+        cost: 'FREE', disabled: !isMyTurn || (survivor.chargeUsedThisTurn && !cheat),
       }));
     }
     if (survivor.skills.includes('born_leader')) {
       buttons.push(renderActionButton({
         id: 'btn-born-leader', icon: 'Crown', label: 'Born Leader',
-        cost: 'FREE', disabled: !isMyTurn || survivor.bornLeaderUsedThisTurn,
+        cost: 'FREE', disabled: !isMyTurn || (survivor.bornLeaderUsedThisTurn && !cheat),
       }));
     }
     if (survivor.skills.includes('bloodlust_melee')) {
       buttons.push(renderActionButton({
         id: 'btn-bloodlust', icon: 'Flame', label: 'Bloodlust',
-        cost: '1 AP', disabled: !isMyTurn || noAP || survivor.bloodlustUsedThisTurn,
+        cost: '1 AP', disabled: !isMyTurn || noAP || (survivor.bloodlustUsedThisTurn && !cheat),
       }));
     }
     if (survivor.skills.includes('lifesaver')) {
       buttons.push(renderActionButton({
         id: 'btn-lifesaver', icon: 'HeartHandshake', label: 'Lifesaver',
-        cost: 'FREE', disabled: !isMyTurn || survivor.lifesaverUsedThisTurn,
+        cost: 'FREE', disabled: !isMyTurn || (survivor.lifesaverUsedThisTurn && !cheat),
       }));
     }
 
@@ -1308,7 +1327,7 @@ export class GameHUD {
   // ─── Modals ──────────────────────────────────────────────────
 
   private openBackpack(): void {
-    const survivor = this.selectedSurvivorId && this.state ? this.state.survivors[this.selectedSurvivorId] : null;
+    const survivor = this.currentBackpackSurvivor();
     if (!survivor) return;
 
     if (this.backpackModalId && modalManager.isOpen(this.backpackModalId)) {
@@ -1317,22 +1336,169 @@ export class GameHUD {
       return;
     }
 
-    const BAG_CAPACITY = 3;
-
     this.backpackModalId = modalManager.open({
-      title: `Backpack (${survivor.inventory.filter(c => !c.inHand).length}/${BAG_CAPACITY})`,
+      title: this.backpackTitle(survivor),
       size: 'md',
       renderBody: () => {
-        const bagItems = survivor.inventory.filter(c => !c.inHand);
-        const emptyCount = Math.max(0, BAG_CAPACITY - bagItems.length);
-
-        return `<div class="grid grid--2 gap-2">
-          ${bagItems.map(item => renderItemCard(item)).join('')}
-          ${renderEmptySlotsCounter(emptyCount)}
-        </div>`;
+        const current = this.currentBackpackSurvivor() ?? survivor;
+        return this.renderBackpackBody(current);
       },
       renderFooter: () => renderButton({ label: 'Close', variant: 'secondary', dataAction: 'modal-close' }),
+      onOpen: (el) => {
+        el.addEventListener('click', (e) => {
+          const btn = (e.target as HTMLElement).closest('[data-action="use-food"]') as HTMLElement | null;
+          if (!btn) return;
+          const cardId = btn.dataset.id;
+          if (!cardId) return;
+          this.requestFoodConsume(cardId);
+        });
+      },
       onClose: () => { this.backpackModalId = null; },
+    });
+  }
+
+  private static readonly BAG_CAPACITY = 3;
+
+  private currentBackpackSurvivor(): Survivor | null {
+    return this.selectedSurvivorId && this.state ? this.state.survivors[this.selectedSurvivorId] ?? null : null;
+  }
+
+  private renderBackpackBody(survivor: Survivor): string {
+    const bagItems = survivor.inventory.filter(c => !c.inHand);
+    const emptyCount = Math.max(0, GameHUD.BAG_CAPACITY - bagItems.length);
+
+    return `<div class="grid grid--2 gap-2">
+      ${bagItems.map(item => {
+        const card = renderItemCard(item);
+        if (!FOOD_EQUIPMENT_IDS.has(item.equipmentId)) return card;
+        const safeName = escapeHtml(item.name);
+        return `
+          <div class="food-slot">
+            ${card}
+            <button type="button"
+                    class="food-slot__eat"
+                    data-action="use-food"
+                    data-id="${item.id}"
+                    title="Consume ${safeName} for +1 AP"
+                    aria-label="Consume ${safeName} for +1 AP">
+              ${icon('Utensils', 'sm')}
+              <span class="food-slot__eat-label">+1 AP</span>
+            </button>
+          </div>`;
+      }).join('')}
+      ${renderEmptySlotsCounter(emptyCount)}
+    </div>`;
+  }
+
+  private backpackTitle(survivor: Survivor): string {
+    return `Backpack (${survivor.inventory.filter(c => !c.inHand).length}/${GameHUD.BAG_CAPACITY})`;
+  }
+
+  private refreshBackpackModal(): void {
+    if (!this.backpackModalId || !modalManager.isOpen(this.backpackModalId)) return;
+    const survivor = this.currentBackpackSurvivor();
+    if (!survivor) return;
+    modalManager.updateBody(this.backpackModalId, this.renderBackpackBody(survivor));
+    const el = modalManager.getElement(this.backpackModalId);
+    const titleEl = el?.querySelector('.modal__title');
+    if (titleEl) titleEl.textContent = this.backpackTitle(survivor);
+  }
+
+  /**
+   * Eat-food click flow. Always prompts before consuming so the player can
+   * back out, and surfaces a stronger warning when the consume would leave
+   * a pending COLLECT_ITEMS objective unsatisfied.
+   */
+  private requestFoodConsume(cardId: EntityId): void {
+    if (!this.state || !this.selectedSurvivorId) return;
+    const survivor = this.state.survivors[this.selectedSurvivorId];
+    if (!survivor) return;
+    const card = survivor.inventory.find(c => c.id === cardId);
+    if (!card) return;
+
+    const wouldBreak = this.foodConsumptionWouldBreakObjective(card);
+    this.openFoodConsumeConfirm(card, wouldBreak);
+  }
+
+  /**
+   * Returns the objective description that consuming `card` would un-satisfy,
+   * or null if no objective would be broken. Mirrors the server CollectItems
+   * evaluator (living-survivors × inventory, match by equipmentId).
+   */
+  private foodConsumptionWouldBreakObjective(card: EquipmentCard): string | null {
+    if (!this.state) return null;
+    const objectives = this.state.objectives ?? [];
+    const livingSurvivors = Object.values(this.state.survivors).filter(s => s.wounds < s.maxHealth);
+
+    for (const obj of objectives) {
+      if (obj.type !== ObjectiveType.CollectItems || obj.completed) continue;
+      for (const req of obj.itemRequirements) {
+        if (req.equipmentId !== card.equipmentId) continue;
+        let total = 0;
+        for (const s of livingSurvivors) {
+          for (const c of s.inventory) {
+            if (c.equipmentId === req.equipmentId) total += 1;
+          }
+        }
+        // After consume the count drops by 1 — would the requirement still hold?
+        if (total - 1 < req.quantity) {
+          return obj.description || `Collect ${req.quantity}× ${req.equipmentId}`;
+        }
+      }
+    }
+    return null;
+  }
+
+  private openFoodConsumeConfirm(card: EquipmentCard, objectiveDescription: string | null): void {
+    if (this.foodConfirmModalId && modalManager.isOpen(this.foodConfirmModalId)) return;
+
+    const safeName = escapeHtml(card.name);
+    const body = objectiveDescription
+      ? `
+        <div class="stack stack--sm">
+          <p class="text-secondary">Eating <strong>${safeName}</strong> will break your objective:</p>
+          <p><em>${escapeHtml(objectiveDescription)}</em></p>
+          <p class="text-secondary">You'll need to find another copy to satisfy it again.</p>
+        </div>`
+      : `
+        <div class="stack stack--sm">
+          <p class="text-secondary">Consume <strong>${safeName}</strong> to gain <strong>+1 AP</strong> this turn?</p>
+          <p class="text-secondary">The card will be discarded.</p>
+        </div>`;
+
+    const confirmLabel = objectiveDescription ? 'Eat anyway (+1 AP)' : 'Eat (+1 AP)';
+    const confirmVariant: 'destructive' | 'primary' = objectiveDescription ? 'destructive' : 'primary';
+
+    this.foodConfirmModalId = modalManager.open({
+      title: 'Eat this food?',
+      size: 'sm',
+      renderBody: () => body,
+      renderFooter: () => `
+        ${renderButton({ label: 'Cancel', variant: 'secondary', dataAction: 'modal-close' })}
+        ${renderButton({ label: confirmLabel, variant: confirmVariant, dataAction: 'confirm-eat-food' })}
+      `,
+      onOpen: (el) => {
+        el.addEventListener('click', (e) => {
+          const t = (e.target as HTMLElement).closest('[data-action="confirm-eat-food"]');
+          if (t) {
+            modalManager.close(this.foodConfirmModalId!);
+            this.dispatchFoodConsume(card);
+          }
+        });
+      },
+      onClose: () => { this.foodConfirmModalId = null; },
+    });
+  }
+
+  private dispatchFoodConsume(card: EquipmentCard): void {
+    // No optimistic toast — server's `lastAction.description` populates the
+    // action feed on success, and the standard ERROR pipeline surfaces a red
+    // alert on rejection. An optimistic toast would lie if the server says no.
+    networkManager.sendAction({
+      playerId: this.localPlayerId,
+      survivorId: this.selectedSurvivorId!,
+      type: ActionType.USE_ITEM,
+      payload: { itemId: card.id },
     });
   }
 
