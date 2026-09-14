@@ -518,8 +518,8 @@ export class LobbyUI {
             type="button"
             id="room-pill"
             class="lobby-room-chip${copiedClass}${pulseClass}"
-            title="Copy room code"
-            aria-label="Copy room code to clipboard"
+            title="Copy join link"
+            aria-label="Copy join link to clipboard"
           >
             <span class="lobby-room-chip__label">${label}</span>
             <span class="lobby-room-chip__id">${this.escHtml(this.roomId)}</span>
@@ -969,9 +969,11 @@ export class LobbyUI {
       }, 1200);
     };
 
+    const joinUrl = `${window.location.origin}/room/${encodeURIComponent(this.roomId)}`;
+
     if (navigator.clipboard?.writeText) {
       try {
-        await navigator.clipboard.writeText(this.roomId);
+        await navigator.clipboard.writeText(joinUrl);
         setCopied();
         return;
       } catch {
@@ -982,7 +984,7 @@ export class LobbyUI {
     // Legacy fallback for non-secure contexts / older browsers.
     try {
       const ta = document.createElement('textarea');
-      ta.value = this.roomId;
+      ta.value = joinUrl;
       ta.setAttribute('readonly', '');
       ta.style.position = 'fixed';
       ta.style.opacity = '0';
@@ -998,7 +1000,7 @@ export class LobbyUI {
       // fall through to notification
     }
 
-    notificationManager.show({ variant: 'warning', message: 'Could not copy. Room code: ' + this.roomId });
+    notificationManager.show({ variant: 'warning', message: 'Could not copy. Join link: ' + joinUrl });
   }
 
   // ─── Dossier drawer ──────────────────────────────────────────
