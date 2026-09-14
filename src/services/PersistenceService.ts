@@ -1,6 +1,5 @@
 import Database from 'better-sqlite3';
 import path from 'path';
-import { GameState } from '../types/GameState';
 import { ScenarioMap } from '../types/Map';
 
 const DB_PATH = path.resolve(process.cwd(), 'data/endead.db');
@@ -16,11 +15,7 @@ class PersistenceService {
 
   private migrate(): void {
     this.db.exec(`
-      CREATE TABLE IF NOT EXISTS rooms (
-        id TEXT PRIMARY KEY,
-        state TEXT NOT NULL,
-        updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
-      );
+      DROP TABLE IF EXISTS rooms;
 
       CREATE TABLE IF NOT EXISTS maps (
         id TEXT PRIMARY KEY,
@@ -35,40 +30,6 @@ class PersistenceService {
         updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
       );
     `);
-  }
-
-  // --- Room State ---
-
-  saveRoom(roomId: string, state: GameState): void {
-    const stmt = this.db.prepare(
-      `INSERT OR REPLACE INTO rooms (id, state, updated_at) VALUES (?, ?, ?)`
-    );
-    stmt.run(roomId, JSON.stringify(state), Date.now());
-  }
-
-  loadRoom(roomId: string): GameState | null {
-    const row = this.db.prepare('SELECT state FROM rooms WHERE id = ?').get(roomId) as
-      | { state: string }
-      | undefined;
-    if (!row) return null;
-    try {
-      return JSON.parse(row.state) as GameState;
-    } catch {
-      return null;
-    }
-  }
-
-  deleteRoom(roomId: string): void {
-    this.db.prepare('DELETE FROM rooms WHERE id = ?').run(roomId);
-  }
-
-  /**
-   * Delete rooms that haven't been updated in the given interval (ms).
-   */
-  cleanupStaleRooms(maxAgeMs: number): number {
-    const cutoff = Date.now() - maxAgeMs;
-    const result = this.db.prepare('DELETE FROM rooms WHERE updated_at < ?').run(cutoff);
-    return result.changes;
   }
 
   // --- Maps ---

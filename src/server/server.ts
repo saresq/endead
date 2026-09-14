@@ -9,7 +9,6 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { HeartbeatManager } from './HeartbeatManager';
 import { persistenceService } from '../services/PersistenceService';
-import { validateInFlightGameStateSchema } from '../services/GameStateSchema';
 import { TILE_DEFINITIONS, registerTileDefinitions } from '../config/TileDefinitions';
 import { repairExternalEdges } from '../services/TileDefinitionService';
 import { TileDefinition } from '../types/TileDefinition';
@@ -217,40 +216,11 @@ function createRoom(roomId: string): RoomContext {
 
 type EnsureRoomResult =
   | { kind: 'ROOM'; room: RoomContext }
-  | { kind: 'NOT_FOUND' }
-  | { kind: 'SCHEMA_INCOMPATIBLE' };
+  | { kind: 'NOT_FOUND' };
 
 function ensureRoom(roomId: string): EnsureRoomResult {
   const existing = rooms.get(roomId);
   if (existing) return { kind: 'ROOM', room: existing };
-
-  // Try to restore from DB
-  const savedState = persistenceService.loadRoom(roomId);
-  if (savedState) {
-    const schemaCheck = validateInFlightGameStateSchema(savedState);
-    if (!schemaCheck.ok) {
-      // Pre-Phase-F in-flight save — not resumable. Drop the row so the
-      // room id frees up for a fresh game and the user gets a clear error.
-      log(`Rejecting room ${roomId} — schema incompatible: ${schemaCheck.reason}`);
-      try {
-        persistenceService.deleteRoom(roomId);
-      } catch (e) {
-        console.error(`Failed to delete incompatible room ${roomId}:`, e);
-      }
-      return { kind: 'SCHEMA_INCOMPATIBLE' };
-    }
-    log(`Restoring room ${roomId} from database.`);
-    const room: RoomContext = {
-      id: roomId,
-      gameState: savedState,
-      previousState: null,
-      clients: new Map(),
-      connections: new Map(),
-      cleanupTimer: null,
-    };
-    rooms.set(roomId, room);
-    return { kind: 'ROOM', room };
-  }
 
   return { kind: 'NOT_FOUND' };
 }
@@ -274,7 +244,6 @@ function scheduleRoomCleanup(room: RoomContext): void {
     }
 
     rooms.delete(room.id);
-    persistenceService.deleteRoom(room.id);
     log(`Room ${room.id} deleted after 5 minutes idle.`);
   }, ROOM_IDLE_CLEANUP_MS);
 
@@ -307,13 +276,6 @@ function broadcastRoomState(room: RoomContext, excludeSocket?: WebSocket): void 
       ws.send(message);
     }
   });
-
-  // Persist room state to DB on every change (SQLite WAL mode makes this fast)
-  try {
-    persistenceService.saveRoom(room.id, room.gameState);
-  } catch (e) {
-    console.error(`Failed to persist room ${room.id}:`, e);
-  }
 }
 
 heartbeatManager.start();
@@ -398,13 +360,6 @@ function handleJoin(ws: WebSocket, payload: { roomId: string; playerId: PlayerId
   }
 
   const ensured = ensureRoom(roomId);
-  if (ensured.kind === 'SCHEMA_INCOMPATIBLE') {
-    sendError(ws, {
-      code: 'SAVE_INCOMPATIBLE',
-      message: 'This room was saved with an older format and cannot be resumed. Please start a new game.',
-    });
-    return;
-  }
   if (ensured.kind === 'NOT_FOUND') {
     sendError(ws, { code: 'ROOM_NOT_FOUND', message: 'Room not found.' });
     return;
@@ -633,26 +588,6 @@ function handleAction(ws: WebSocket, request: ActionRequest) {
   if (ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({ type: 'STATE_UPDATE', payload: room.gameState }));
   }
-}
-
-// Cleanup stale DB-persisted rooms on startup and every 30 minutes
-const STALE_ROOM_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
-const STALE_ROOM_CLEANUP_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
-
-function runStaleRoomCleanup() {
-  try {
-    const removed = persistenceService.cleanupStaleRooms(STALE_ROOM_MAX_AGE_MS);
-    if (removed > 0) {
-      log(`Cleaned up ${removed} stale room(s) from database.`);
-    }
-  } catch (e) {
-    console.error('Failed to cleanup stale rooms:', e);
-  }
-}
-
-if (process.env.VITEST !== 'true') {
-  runStaleRoomCleanup();
-  setInterval(runStaleRoomCleanup, STALE_ROOM_CLEANUP_INTERVAL_MS);
 }
 
 // Guard the listen call so vitest can import this module without binding

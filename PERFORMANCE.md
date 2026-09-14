@@ -17,7 +17,7 @@ Target: reduce perceived and actual response time for Endead when hosted on Rend
 - **Messages**: `JOIN`, `ACTION` (client→server); `STATE_UPDATE`, `STATE_PATCH`, `ERROR` (server→client). All `JSON.stringify`, no binary frames.
 - **Action round-trip**: `InputController.ts:176` → `NetworkManager.sendAction` → server `handleAction` → `processAction` (`ActionProcessor.ts:109`) → `broadcastRoomState` → client `applyPatch` → `gameStore.update` → Pixi re-render.
 - **No optimistic/predictive layer on the client.** Every action blocks on the full round-trip.
-- **Persistence**: synchronous `better-sqlite3` write (WAL mode) on every broadcast (`PersistenceService.ts:42-47`, `server.ts:293-296`).
+- **Persistence**: running rooms are memory-only; SQLite is used for maps/tile-definition authoring APIs, not for per-action room updates.
 - **Static assets**: served by `express.static` with default options (no `Cache-Control`, no `maxAge`).
 - **No HTTP compression** middleware.
 - **No `/healthz` endpoint** — Render probes fall through to the SPA `sendFile`.
@@ -77,25 +77,22 @@ Target: reduce perceived and actual response time for Endead when hosted on Rend
 
 ### 5. Prepare SQLite statements once
 - **Impact**: M | **Effort**: S
-- **Evidence**: `src/services/PersistenceService.ts:43-47` — `this.db.prepare(...)` called inside `saveRoom` on every invocation. Same pattern in `loadRoom`, `saveMap`, etc. (~7 methods). `saveRoom` is called per action at `server.ts:294`.
+- **Evidence**: `src/services/PersistenceService.ts` still calls `this.db.prepare(...)` inside each method (`saveMap`, `loadMap`, `loadAllMaps`, `deleteMap`, tile-definition methods).
 - **Fix**: compile statements in the constructor, store as class fields, reuse:
   ```ts
-  private saveRoomStmt = this.db.prepare(
-    'INSERT OR REPLACE INTO rooms (id, state, updated_at) VALUES (?, ?, ?)'
+  private saveMapStmt = this.db.prepare(
+    'INSERT OR REPLACE INTO maps (id, name, data, created_at) VALUES (?, ?, ?, ?)'
   );
-  saveRoom(roomId: string, state: GameState): void {
-    this.saveRoomStmt.run(roomId, JSON.stringify(state), Date.now());
+  saveMap(map: ScenarioMap): void {
+    this.saveMapStmt.run(map.id, map.name, JSON.stringify(map), Date.now());
   }
   ```
-  Apply to every method that currently calls `this.db.prepare` inside its body.
+  This is now a lower-priority optimization because it does not affect action latency.
 
-### 6. Move SQLite write off the broadcast critical path
-- **Impact**: M | **Effort**: S
-- **Evidence**: `src/server/server.ts:293-296` — synchronous `persistenceService.saveRoom` runs before/around broadcast.
-- **Fix**: queue the write behind `setImmediate`, or debounce per-room at ~100ms, so the WS frame reaches clients before the disk write completes. Acceptable for a turn-based game.
-  ```ts
-  setImmediate(() => persistenceService.saveRoom(room.id, room.gameState));
-  ```
+### 6. Keep room updates off SQLite (already done)
+- **Impact**: M | **Effort**: Done
+- **Evidence**: `src/server/server.ts` no longer persists room state on broadcast and no longer restores rooms from DB; active rooms are in-memory only.
+- **Status**: complete; no further action required for this item.
 
 ### 7. Collapse triple `getActiveZombies` re-scan
 - **Impact**: M | **Effort**: S
@@ -157,7 +154,7 @@ Target: reduce perceived and actual response time for Endead when hosted on Rend
 ## Suggested sequencing
 
 1. **PR 1 — Tier 1** (compression + `/healthz` + static cache headers). ~15 min of work, globally noticeable.
-2. **PR 2 — Tier 2** (broadcast dedup + prepared statements + async persist + zombie-scan). Single CPU gets its breathing room back.
+2. **PR 2 — Tier 2** (broadcast dedup + zombie-scan + optional prepared statements for map/tile APIs). Single CPU gets its breathing room back.
 3. **PR 3 — Optimistic MOVE** (#8). Biggest "feels like a different game" moment.
 4. **PR 4 — Cold-start splash + bundle audit** (#9, #10). Polish.
 5. **Optional** — keep-warm self-ping (#11), only after a call on the Render ToS question.

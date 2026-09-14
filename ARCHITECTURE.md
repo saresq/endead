@@ -57,7 +57,7 @@ src/
 │   ├── XPManager.ts             # XP tracking, danger level, skill unlocks
 │   ├── ScenarioCompiler.ts      # Converts MapData -> zones/connections/objectives
 │   ├── TileService.ts           # Tile texture loading from spritesheet
-│   ├── PersistenceService.ts    # Save/load state to SQLite (better-sqlite3)
+│   ├── PersistenceService.ts    # SQLite persistence for maps + tile definitions
 │   └── ReplayService.ts         # Replay actions for validation
 ├── config/
 │   ├── EquipmentRegistry.ts     # 18 equipment definitions, 37-card deck composition
@@ -204,7 +204,7 @@ Largest files (most logic):
 ## Active Initiatives
 
 - **UI Redesign**: See `tasks/00-implementation-plan.md`. Phased migration from inline styles to CSS design tokens (`src/styles/`). New component library in `src/client/ui/components/`. Currently in progress.
-- **Persistence**: Migrated from JSON files to SQLite via better-sqlite3 (`PersistenceService.ts`).
+- **Persistence**: Authoring data (maps + tile definitions) is stored in SQLite via better-sqlite3 (`PersistenceService.ts`). Running game rooms are in-memory only and are not resumed after restart.
 - **Review**: See `REVIEW.md` for comprehensive rules accuracy audit and code quality findings.
 
 ---
@@ -217,15 +217,8 @@ Largest files (most logic):
 
 **Rule**: any future rename of an `EQUIPMENT_CARDS` key requires a migration table in `src/services/ScenarioCompiler.ts` mapping old → new IDs at load time. Do not rename in place. The `rifle → sniper_rifle` rename in Phase G was done before `equipmentId` was introduced and so did not need a migration table; future renames will.
 
-### Save-game schema break (in-flight games)
+### In-flight room persistence
 
-The win-conditions / colored-objective work added these fields to `GameState` and its sub-types:
+Active game rooms are intentionally ephemeral: they live only in server memory and are deleted after idle cleanup or process restart. There is no room-state save/resume path in `server.ts`.
 
-- `Zone.objectiveColor`, `Zone.spawnColor`, `Zone.hasEpicCrate`
-- `GameState.spawnColorActivation`
-- `GameState.epicDeck`, `GameState.epicDiscard`
-- `Objective` discriminated union (replaces the previous flat shape)
-
-These are not backward-compatible with any pre-change save. Per project policy (`feedback_no_backward_compat`), in-flight games saved before this change are intentionally not resumable.
-
-**Enforcement**: `src/services/GameStateSchema.ts:validateInFlightGameStateSchema` rejects incompatible saves at load time. The server returns `SAVE_INCOMPATIBLE` and deletes the corrupt row so the room id frees up for reuse, rather than crashing in `ZombiePhaseManager` when the new fields are accessed.
+`GameStateSchema.ts` is retained as a schema utility reference for older persisted-state workflows, but it is not used by the current room lifecycle.
