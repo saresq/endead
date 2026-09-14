@@ -1,7 +1,7 @@
 import express from 'express';
 import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
-import { initialGameState, GameState, PlayerId, GamePhase } from '../types/GameState';
+import { initialGameState, GameState, PlayerId, GamePhase, GameResult } from '../types/GameState';
 import { processAction } from '../services/ActionProcessor';
 import { ActionRequest, ActionResponse, ActionType } from '../types/Action';
 import { seedFromString } from '../services/Rng';
@@ -22,6 +22,8 @@ const wss = new WebSocketServer({ server });
 const heartbeatManager = new HeartbeatManager(wss);
 const MAX_PLAYERS = 6;
 const ROOM_IDLE_CLEANUP_MS = 5 * 60 * 1000;
+// A player disconnected mid-game for this long has abandoned it: the game ends.
+const ABANDON_TIMEOUT_MS = 10 * 60 * 1000;
 
 app.get('/api/maps', async (_req, res) => {
   try {
@@ -173,6 +175,7 @@ interface RoomContext {
   clients: Map<WebSocket, PlayerId>;
   connections: Map<PlayerId, WebSocket>;
   cleanupTimer: NodeJS.Timeout | null;
+  abandonTimers: Map<PlayerId, NodeJS.Timeout>;
 }
 
 interface SocketSession {
@@ -211,6 +214,7 @@ function createRoom(roomId: string): RoomContext {
     clients: new Map(),
     connections: new Map(),
     cleanupTimer: null,
+    abandonTimers: new Map(),
   };
 }
 
@@ -243,11 +247,63 @@ function scheduleRoomCleanup(room: RoomContext): void {
       return;
     }
 
+    clearAbandonTimers(latestRoom);
     rooms.delete(room.id);
     log(`Room ${room.id} deleted after 5 minutes idle.`);
   }, ROOM_IDLE_CLEANUP_MS);
 
   log(`Room ${room.id} scheduled for cleanup in 5 minutes.`);
+}
+
+function isGameInProgress(state: GameState): boolean {
+  return state.phase === GamePhase.Players || state.phase === GamePhase.Zombies;
+}
+
+function clearAbandonTimer(room: RoomContext, playerId: PlayerId): void {
+  const timer = room.abandonTimers.get(playerId);
+  if (timer) clearTimeout(timer);
+  room.abandonTimers.delete(playerId);
+}
+
+function clearAbandonTimers(room: RoomContext): void {
+  for (const timer of room.abandonTimers.values()) clearTimeout(timer);
+  room.abandonTimers.clear();
+}
+
+function scheduleAbandon(room: RoomContext, playerId: PlayerId): void {
+  clearAbandonTimer(room, playerId);
+  room.abandonTimers.set(playerId, setTimeout(() => abandonGame(room, playerId), ABANDON_TIMEOUT_MS));
+  log(`Player ${playerId} left game in room ${room.id}; ending it in ${ABANDON_TIMEOUT_MS / 1000}s unless they return.`);
+}
+
+/**
+ * Ends the game when a player never came back: the campaign can't continue
+ * without their survivors. The player leaves the roster, so the next lobby
+ * player becomes host and can return everyone to the lobby.
+ */
+function abandonGame(room: RoomContext, playerId: PlayerId): void {
+  room.abandonTimers.delete(playerId);
+  if (rooms.get(room.id) !== room) return;
+  if (room.connections.has(playerId) || !isGameInProgress(room.gameState)) return;
+
+  const newState = structuredClone(room.gameState) as GameState;
+  const player = newState.lobby.players.find((p) => p.id === playerId);
+  newState.lobby.players = newState.lobby.players.filter((p) => p.id !== playerId);
+  newState.phase = GamePhase.GameOver;
+  newState.gameResult = GameResult.Defeat;
+  newState.abandonedBy = player?.name ?? playerId;
+  newState.history.push({
+    playerId,
+    survivorId: '',
+    actionType: 'ABANDON',
+    timestamp: Date.now(),
+    payload: {},
+  });
+
+  clearAbandonTimers(room);
+  room.gameState = newState;
+  log(`Game in room ${room.id} ended: player ${playerId} abandoned it.`);
+  broadcastRoomState(room);
 }
 
 function sendError(ws: WebSocket, error: { code: string; message: string }) {
@@ -408,6 +464,7 @@ function handleJoin(ws: WebSocket, payload: { roomId: string; playerId: PlayerId
   socketSessions.set(ws, { roomId, playerId });
   room.clients.set(ws, playerId);
   room.connections.set(playerId, ws);
+  clearAbandonTimer(room, playerId);
 
   if (isLobby) {
     const lobbyPlayer = room.gameState.lobby.players.find((p) => p.id === playerId);
@@ -480,6 +537,8 @@ function handleDisconnect(ws: WebSocket) {
 
       room.gameState = newState;
       broadcastRoomState(room);
+    } else if (isGameInProgress(room.gameState) && room.gameState.players.includes(playerId)) {
+      scheduleAbandon(room, playerId);
     }
   }
 
@@ -606,4 +665,6 @@ export const __test__ = {
   rooms,
   socketSessions,
   scheduleRoomCleanup,
+  handleJoin,
+  ABANDON_TIMEOUT_MS,
 };

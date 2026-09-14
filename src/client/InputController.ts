@@ -2,6 +2,7 @@
 import * as PIXI from 'pixi.js';
 import { GameState, EntityId, ZoneId, PlayerId, Zombie, EquipmentCard } from '../types/GameState';
 import { ActionType } from '../types/Action';
+import { visibleZones } from '../services/LineOfSight';
 import { TILE_SIZE, ENTITY_RADIUS } from '../config/Layout';
 import { getZoneLayout } from './utils/zoneLayout';
 import { networkManager } from './NetworkManager';
@@ -446,27 +447,10 @@ export class InputController {
     const maxRange = stats.range[1] + (hasPlus1Range ? 1 : 0);
 
     const targets: ZoneId[] = [];
-    const queue: { zoneId: ZoneId; dist: number }[] = [{ zoneId: currentZoneId, dist: 0 }];
-    const visited = new Set<ZoneId>([currentZoneId]);
-
-    while (queue.length > 0) {
-      const { zoneId, dist } = queue.shift()!;
-
+    for (const [zoneId, dist] of visibleZones(state, currentZoneId)) {
       const effectiveMin = hasPointBlank && dist === 0 ? 0 : minRange;
       if (dist >= effectiveMin && dist <= maxRange && zonesWithZombies.has(zoneId)) {
         targets.push(zoneId);
-      }
-
-      if (dist >= maxRange) continue;
-
-      const zone = state.zones[zoneId];
-      if (!zone) continue;
-
-      for (const conn of zone.connections) {
-        if (visited.has(conn.toZoneId)) continue;
-        if (conn.hasDoor && !conn.doorOpen) continue;
-        visited.add(conn.toZoneId);
-        queue.push({ zoneId: conn.toZoneId, dist: dist + 1 });
       }
     }
 

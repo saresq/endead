@@ -1,8 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { handleOpenDoor } from '../handlers/DoorHandlers';
-import { GameState, DangerLevel, GamePhase, Zone, Survivor, EquipmentCard, EquipmentType } from '../../types/GameState';
+import { processAction } from '../ActionProcessor';
+import { GameState, DangerLevel, GamePhase, Zone, Survivor, EquipmentCard, EquipmentType, SpawnCard, SpawnDetail, ZombieType } from '../../types/GameState';
 import { ActionRequest, ActionType } from '../../types/Action';
 import { seedFromString } from '../Rng';
+import { makeGridState, makeZombie, edgeKey } from './gridFixture';
+import { makeSurvivor } from './winConditionHelpers';
 
 function makeZone(overrides: Partial<Zone> & { id: string }): Zone {
   return {
@@ -182,5 +185,90 @@ describe('handleOpenDoor — building spawn (Rule 302)', () => {
 
     const next = openDoor(state, 'roomB');
     expect(next.lastAction?.description).not.toContain('zombies spawned');
+  });
+});
+
+describe('handleOpenDoor — standard spawn rules (C6)', () => {
+  const card = (detail: SpawnDetail): SpawnCard => ({
+    id: 'test-card',
+    [DangerLevel.Blue]: detail,
+    [DangerLevel.Yellow]: detail,
+    [DangerLevel.Orange]: detail,
+    [DangerLevel.Red]: detail,
+  });
+
+  // x — w — street |door| roomA (dark building)
+  function board(detail: SpawnDetail, zombies: GameState['zombies'], level = DangerLevel.Yellow): GameState {
+    const survivor = makeSurvivor({ id: 's1', zoneId: 'street', dangerLevel: level, experience: level === DangerLevel.Yellow ? 7 : 0 });
+    survivor.inventory = [makeOpener()];
+    const state = makeGridState(
+      { rows: ['x w street roomA'], buildings: ['roomA'], edges: { [edgeKey(2, 0, 3, 0)]: 'door' } },
+      { survivors: { s1: survivor }, zombies, currentDangerLevel: level },
+    );
+    state.zones.roomA.isDark = true;
+    state.lobby.players = [{ id: 'p1', name: 'P1', ready: true } as any];
+    state.spawnDeck = [card(detail)];
+    return state;
+  }
+
+  it('resolves Extra Activation cards: all Walkers activate', () => {
+    const state = board({ extraActivation: ZombieType.Walker }, { w1: makeZombie('w1', ZombieType.Walker, 'w') });
+    const next = openDoor(state, 'roomA');
+    expect(next.zombies.w1.position.zoneId).toBe('street');
+  });
+
+  it('Extra Activation has no effect at Blue', () => {
+    const state = board({ extraActivation: ZombieType.Walker }, { w1: makeZombie('w1', ZombieType.Walker, 'w') }, DangerLevel.Blue);
+    const next = openDoor(state, 'roomA');
+    expect(next.zombies.w1.position.zoneId).toBe('w');
+  });
+
+  it('activates Walkers instead of placing them when the pool is exhausted', () => {
+    const state = board({ zombies: { [ZombieType.Walker]: 2 } }, { w1: makeZombie('w1', ZombieType.Walker, 'w') });
+    state.config.zombiePool = { [ZombieType.Walker]: 1 } as never;
+    const next = openDoor(state, 'roomA');
+    expect(Object.keys(next.zombies)).toEqual(['w1']);
+    expect(next.zombies.w1.position.zoneId).toBe('street');
+  });
+
+  it('uses the Danger Level refreshed by the previous action', () => {
+    const state = board({ extraActivation: ZombieType.Walker }, { w1: makeZombie('w1', ZombieType.Walker, 'w') });
+    state.currentDangerLevel = DangerLevel.Blue; // stale: survivor is already Yellow
+
+    const noise = processAction(state, { playerId: 'p1', survivorId: 's1', type: ActionType.MAKE_NOISE });
+    expect(noise.success).toBe(true);
+    expect(noise.newState!.currentDangerLevel).toBe(DangerLevel.Yellow);
+
+    const res = processAction(noise.newState!, {
+      playerId: 'p1', survivorId: 's1', type: ActionType.OPEN_DOOR, payload: { targetZoneId: 'roomA' },
+    });
+    expect(res.success).toBe(true);
+    expect(res.newState!.zombies.w1.position.zoneId).toBe('street');
+  });
+
+  it('Abomination Fest activates existing Abominations only once when the pool is full', () => {
+    const state = board({ zombies: { [ZombieType.Abomination]: 1 } }, { a1: makeZombie('a1', ZombieType.Abomination, 'x') });
+    state.config.abominationFest = true;
+    state.config.zombiePool = { [ZombieType.Abomination]: 1 } as never;
+    const next = openDoor(state, 'roomA');
+    expect(Object.keys(next.zombies)).toEqual(['a1']);
+    expect(next.zombies.a1.position.zoneId).toBe('w');
+  });
+
+  it('queues wounds from a door-open activation and blocks play until resolved', () => {
+    const state = board({ extraActivation: ZombieType.Walker }, { w1: makeZombie('w1', ZombieType.Walker, 'street') });
+    state.survivors.s2 = makeSurvivor({ id: 's2', playerId: 'p1', zoneId: 'street' });
+
+    const res = processAction(state, {
+      playerId: 'p1', survivorId: 's1', type: ActionType.OPEN_DOOR, payload: { targetZoneId: 'roomA' },
+    });
+    expect(res.success).toBe(true);
+    expect(res.newState!.pendingZombieWounds).toEqual([{ zoneId: 'street', totalWounds: 1, survivorIds: ['s1', 's2'] }]);
+
+    const blocked = processAction(res.newState!, {
+      playerId: 'p1', survivorId: 's1', type: ActionType.MOVE, payload: { targetZoneId: 'w' },
+    });
+    expect(blocked.success).toBe(false);
+    expect(blocked.error?.message).toContain('Resolve pending wounds');
   });
 });

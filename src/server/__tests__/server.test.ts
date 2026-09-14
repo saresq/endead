@@ -1,9 +1,11 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { WebSocket } from 'ws';
 import { __test__ } from '../server';
-import { GamePhase } from '../../types/GameState';
+import { GamePhase, GameResult } from '../../types/GameState';
+import { processAction } from '../../services/ActionProcessor';
+import { ActionType } from '../../types/Action';
 
-const { handleDisconnect, createRoom, rooms, socketSessions, scheduleRoomCleanup } = __test__;
+const { handleDisconnect, handleJoin, createRoom, rooms, socketSessions, scheduleRoomCleanup, ABANDON_TIMEOUT_MS } = __test__;
 
 /**
  * handleDisconnect's host-left logic (server.ts:476–501) should only stamp
@@ -21,7 +23,7 @@ const { handleDisconnect, createRoom, rooms, socketSessions, scheduleRoomCleanup
 function makeStubSocket(): WebSocket {
   // handleDisconnect treats the WebSocket purely as a Map key. None of its
   // methods are invoked, so a typed stub object is sufficient.
-  return {} as unknown as WebSocket;
+  return { readyState: 1, send: () => {} } as unknown as WebSocket;
 }
 
 function seedLobbyRoom(roomId: string, playerIds: string[]) {
@@ -49,6 +51,7 @@ beforeEach(() => {
   // Fresh state per test — handleDisconnect mutates the module-level maps.
   for (const room of rooms.values()) {
     if (room.cleanupTimer) clearTimeout(room.cleanupTimer);
+    for (const timer of room.abandonTimers.values()) clearTimeout(timer);
   }
   rooms.clear();
   socketSessions.clear();
@@ -104,6 +107,50 @@ describe('handleDisconnect — host-left signaling', () => {
     // In-game disconnect doesn't filter the lobby roster nor stamp hostLeftAt.
     expect(after.gameState.lobby.players.map((p) => p.id)).toEqual(['host-1', 'survivor-2']);
     expect(after.gameState.lobby.hostLeftAt).toBeUndefined();
+  });
+});
+
+describe('handleDisconnect — abandoned game', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  function seedGameRoom(roomId: string) {
+    const seeded = seedLobbyRoom(roomId, ['host-1', 'survivor-2']);
+    seeded.room.gameState.phase = GamePhase.Players;
+    seeded.room.gameState.players = ['host-1', 'survivor-2'];
+    return seeded;
+  }
+
+  it('ends the game when a player stays away past the timeout; next player becomes host', () => {
+    const { sockets } = seedGameRoom('room-abandon');
+
+    handleDisconnect(sockets.get('host-1')!);
+    vi.advanceTimersByTime(ABANDON_TIMEOUT_MS - 1);
+    expect(rooms.get('room-abandon')!.gameState.phase).toBe(GamePhase.Players);
+
+    vi.advanceTimersByTime(1);
+    const state = rooms.get('room-abandon')!.gameState;
+    expect(state.phase).toBe(GamePhase.GameOver);
+    expect(state.gameResult).toBe(GameResult.Defeat);
+    expect(state.abandonedBy).toBe('host-1');
+    expect(state.lobby.players.map((p) => p.id)).toEqual(['survivor-2']);
+
+    const reset = processAction(state, { playerId: 'survivor-2', type: ActionType.END_GAME });
+    expect(reset.success).toBe(true);
+    expect(reset.newState!.phase).toBe(GamePhase.Lobby);
+  });
+
+  it('keeps the game when the player reconnects in time', () => {
+    const { sockets } = seedGameRoom('room-return');
+
+    handleDisconnect(sockets.get('survivor-2')!);
+    vi.advanceTimersByTime(ABANDON_TIMEOUT_MS / 2);
+    handleJoin(makeStubSocket(), { roomId: 'room-return', playerId: 'survivor-2' });
+    vi.advanceTimersByTime(ABANDON_TIMEOUT_MS);
+
+    const state = rooms.get('room-return')!.gameState;
+    expect(state.phase).toBe(GamePhase.Players);
+    expect(state.abandonedBy).toBeUndefined();
   });
 });
 

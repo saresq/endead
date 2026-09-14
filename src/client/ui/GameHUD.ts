@@ -20,6 +20,7 @@ import { modalManager } from './overlays/ModalManager';
 import { notificationManager } from './NotificationManager';
 import { formatZoneId, formatActionType } from '../utils/zoneFormat';
 import { SKILL_DEFINITIONS } from '../../config/SkillRegistry';
+import { XPManager } from '../../services/XPManager';
 
 // Mirrors `FOOD_EQUIPMENT_IDS` in `services/handlers/ItemHandlers.ts`. Kept
 // in sync manually because the client has no direct dependency on handler
@@ -115,6 +116,8 @@ export class GameHUD {
   private woundPickerSelected: Set<string> = new Set();
   private woundDistModalId: string | null = null;
   private woundDistAssignments: Record<string, number> = {};
+  private skillChoiceModalId: string | null = null;
+  private skillChoiceSurvivorId: EntityId | null = null;
   private dismissedFeedTimestamp: number | null = null;
   private feedAutoDismissTimer: ReturnType<typeof setTimeout> | null = null;
   private feedAutoDismissScheduledFor: number | null = null;
@@ -481,24 +484,105 @@ export class GameHUD {
       ? this.renderActionRow(activeSurvivor, isMyTurn)
       : '';
 
-    this.elFeed!.innerHTML = this.renderFeed();
+    this.elFeed!.innerHTML = this.renderWaitingBanner() + this.renderFeed();
     this.elFab!.innerHTML = '';
 
     this.syncTradeAndPickup(activeSurvivor);
 
     // Auto-open wound distribution modal if there are pending zombie wounds (host only)
-    const isHost = this.state?.players[0] === this.localPlayerId;
-    if (isHost && this.state?.pendingZombieWounds && this.state.pendingZombieWounds.length > 0
+    if (this.isHost() && this.state.pendingZombieWounds && this.state.pendingZombieWounds.length > 0
         && !this.woundDistModalId) {
       this.openWoundDistribution(this.state.pendingZombieWounds[0]);
     }
 
-    // Auto-open wound picker if survivor has pending wounds
-    if (activeSurvivor && activeSurvivor.pendingWounds && activeSurvivor.pendingWounds > 0
-        && activeSurvivor.playerId === this.localPlayerId
-        && !this.woundPickerModalId && !this.woundDistModalId) {
-      this.openWoundPicker(activeSurvivor);
+    const mySurvivors = Object.values(this.state.survivors).filter(s => s.playerId === this.localPlayerId);
+
+    // Auto-open wound picker for any owned survivor with pending wounds
+    const woundedSurvivor = mySurvivors.find(s => (s.pendingWounds ?? 0) > 0);
+    if (woundedSurvivor && !this.woundPickerModalId && !this.woundDistModalId) {
+      this.openWoundPicker(woundedSurvivor);
     }
+
+    this.syncSkillChoice(mySurvivors);
+  }
+
+  /** Host = first lobby player, same rule the server uses for wound distribution. */
+  private isHost(): boolean {
+    return this.state?.lobby.players[0]?.id === this.localPlayerId;
+  }
+
+  // ─── Waiting banner ─────────────────────────────────────────
+
+  /** One line per pending decision the local player is not making. */
+  private renderWaitingBanner(): string {
+    const state = this.state!;
+    const lines: string[] = [];
+
+    if (!this.isHost()) {
+      const hostName = state.lobby.players[0]?.name ?? 'Host';
+      for (const entry of state.pendingZombieWounds ?? []) {
+        lines.push(`${escapeHtml(hostName)} is assigning ${entry.totalWounds} zombie wound${entry.totalWounds > 1 ? 's' : ''} in ${formatZoneId(entry.zoneId, state)}`);
+      }
+    }
+
+    for (const survivor of Object.values(state.survivors)) {
+      if (survivor.playerId === this.localPlayerId) continue;
+      if ((survivor.pendingWounds ?? 0) > 0) {
+        lines.push(`${escapeHtml(survivor.name)} is deciding Is That All You've Got?`);
+      }
+      if (XPManager.getPendingSkillChoice(survivor)) {
+        lines.push(`${escapeHtml(survivor.name)} is choosing a skill`);
+      }
+    }
+
+    if (lines.length === 0) return '';
+    return `<div class="hud-waiting">${lines.map(l => `<div class="event-entry event-entry--waiting">${l}</div>`).join('')}</div>`;
+  }
+
+  // ─── Skill Choice Modal ─────────────────────────────────────
+
+  private syncSkillChoice(mySurvivors: Survivor[]): void {
+    const pending = mySurvivors.find(s => XPManager.getPendingSkillChoice(s));
+
+    // Close once the server state no longer has the choice we are showing.
+    if (this.skillChoiceModalId && this.skillChoiceSurvivorId !== pending?.id) {
+      modalManager.close(this.skillChoiceModalId);
+      this.skillChoiceModalId = null;
+      this.skillChoiceSurvivorId = null;
+    }
+
+    if (!pending || this.skillChoiceModalId || this.woundPickerModalId || this.woundDistModalId) return;
+
+    const choice = XPManager.getPendingSkillChoice(pending)!;
+    this.skillChoiceSurvivorId = pending.id;
+    this.skillChoiceModalId = modalManager.open({
+      title: `${pending.name} reached ${choice.level}: choose a skill`,
+      size: 'md',
+      persistent: true,
+      renderBody: () => choice.options.map(skillId => {
+        const def = SKILL_DEFINITIONS[skillId];
+        return `<div class="mb-3">
+          ${renderButton({ label: escapeHtml(def?.name ?? skillId), variant: 'primary', fullWidth: true, dataAction: 'choose-skill', dataId: skillId })}
+          <p class="text-secondary mt-1">${escapeHtml(def?.description ?? '')}</p>
+        </div>`;
+      }).join(''),
+      onOpen: (el) => {
+        el.addEventListener('click', (e) => {
+          const btn = (e.target as HTMLElement).closest('[data-action="choose-skill"]') as HTMLElement | null;
+          if (!btn?.dataset.id) return;
+          networkManager.sendAction({
+            playerId: this.localPlayerId,
+            survivorId: pending.id,
+            type: ActionType.CHOOSE_SKILL,
+            payload: { skillId: btn.dataset.id },
+          });
+        });
+      },
+      onClose: () => {
+        this.skillChoiceModalId = null;
+        this.skillChoiceSurvivorId = null;
+      },
+    });
   }
 
   // ─── Top phase bar ──────────────────────────────────────────
@@ -1300,12 +1384,17 @@ export class GameHUD {
 
   private renderGameOver(): void {
     const isVictory = this.state?.gameResult === GameResult.Victory;
-    const isHost = this.state?.players[0] === this.localPlayerId;
+    const isHost = this.isHost();
+    const abandonedBy = this.state?.abandonedBy;
 
     const resultIcon = isVictory ? 'Trophy' : 'Skull';
     const resultClass = isVictory ? 'victory' : 'defeat';
-    const resultText = isVictory ? 'Victory!' : 'Defeat';
-    const desc = isVictory ? 'All survivors have escaped!' : 'The zombies have overwhelmed you...';
+    const resultText = isVictory ? 'Victory!' : abandonedBy ? 'Game Abandoned' : 'Defeat';
+    const desc = isVictory
+      ? 'All survivors have escaped!'
+      : abandonedBy
+        ? `${escapeHtml(abandonedBy)} left the game.`
+        : 'The zombies have overwhelmed you...';
 
     const actions = isHost
       ? renderButton({ label: 'Play Again', icon: 'Play', variant: 'primary', size: 'lg', dataAction: 'play-again' })
@@ -1527,7 +1616,7 @@ export class GameHUD {
   }
 
   private openPauseMenu(): void {
-    const isHost = this.state?.players[0] === this.localPlayerId;
+    const isHost = this.isHost();
     const muteLabel = audioManager.muted ? 'Unmute' : 'Mute';
     const muteIcon = audioManager.muted ? 'VolumeX' : 'Volume2';
 

@@ -22,16 +22,28 @@ export class ZombiePhaseManager {
     }
 
     // 1. Activation Step
-    newState = this.processActivations(newState);
+    const livingZombieIds = Object.values(newState.zombies)
+      .filter(z => !this.isZombieDead(z))
+      .map(z => z.id);
+    this.activateZombieSet(newState, livingZombieIds);
 
     // 2. Spawn Step
     newState.spawnContext = { cards: [], timestamp: Date.now() };
     newState = this.processSpawns(newState);
 
-    // 3. End Round / Cleanup
-    newState = this.endRound(newState);
+    // 3. End Phase — waits in the Zombies phase until wound decisions are made;
+    // ActionProcessor runs it once the last one is resolved.
+    if (!this.hasPendingWounds(newState)) {
+      newState = this.endRound(newState);
+    }
 
     return newState;
+  }
+
+  /** Zombie wound distribution or "Is That All You've Got?" still to decide. */
+  public static hasPendingWounds(state: GameState): boolean {
+    return (state.pendingZombieWounds?.length ?? 0) > 0 ||
+      Object.values(state.survivors).some(s => (s.pendingWounds ?? 0) > 0);
   }
 
   private static isZombieDead(zombie: Zombie): boolean {
@@ -46,77 +58,6 @@ export class ZombiePhaseManager {
       case ZombieType.Brute: return 2;
       case ZombieType.Abomination: return 3;
     }
-  }
-
-  /**
-   * Three-pass activation per Zombicide v2 rulebook §9:
-   * Pass 1: ALL zombie attacks (including Runners' first action)
-   * Pass 2: ALL zombie moves (zombies that couldn't attack)
-   * Pass 3: Runner second actions (after ALL zombies complete first action)
-   *
-   * Per rules: players choose how to distribute wounds among survivors in a zone.
-   * When only 1 survivor is present, wounds apply directly. When multiple survivors
-   * share a zone, wounds are deferred to pendingZombieWounds for player resolution.
-   */
-  private static processActivations(state: GameState): GameState {
-    // We are mutating 'state' (which is already a copy from executeZombiePhase)
-    const getActiveZombies = () => {
-      const zombies = Object.values(state.zombies)
-        .filter(z => !this.isZombieDead(z));
-      zombies.sort((a, b) => a.id.localeCompare(b.id));
-      return zombies;
-    };
-
-    // Track which zombies attacked (they don't move in pass 2)
-    const attackedSet = new Set<string>();
-
-    // Pass 1: ALL attacks — accumulate per zone
-    const pass1Attacks: Record<string, number> = {};
-    for (const zombie of getActiveZombies()) {
-      const action: ZombieAction = ZombieAI.getAction(state, zombie);
-      if (action.type === 'ATTACK') {
-        pass1Attacks[zombie.position.zoneId] = (pass1Attacks[zombie.position.zoneId] || 0) + 1;
-        attackedSet.add(zombie.id);
-      }
-    }
-    this.distributeZoneWounds(state, pass1Attacks);
-
-    // Pass 2: ALL moves (only zombies that didn't attack)
-    for (const zombie of getActiveZombies()) {
-      if (attackedSet.has(zombie.id)) continue;
-
-      const action: ZombieAction = ZombieAI.getAction(state, zombie);
-      if (action.type === 'MOVE' && action.toZoneId) {
-        zombie.position.zoneId = action.toZoneId;
-        state.zombies[zombie.id] = zombie;
-      } else if (action.type === 'BREAK_DOOR' && action.toZoneId) {
-        this.breakDoor(state, zombie.position.zoneId, action.toZoneId);
-      }
-    }
-
-    // Mark all zombies as having completed first action
-    for (const zombie of getActiveZombies()) {
-      zombie.activated = true;
-    }
-
-    // Pass 3: Runner second actions (after ALL first actions complete)
-    const pass3Attacks: Record<string, number> = {};
-    for (const zombie of getActiveZombies()) {
-      if (zombie.type !== ZombieType.Runner) continue;
-
-      const action: ZombieAction = ZombieAI.getAction(state, zombie);
-      if (action.type === 'ATTACK') {
-        pass3Attacks[zombie.position.zoneId] = (pass3Attacks[zombie.position.zoneId] || 0) + 1;
-      } else if (action.type === 'MOVE' && action.toZoneId) {
-        zombie.position.zoneId = action.toZoneId;
-        state.zombies[zombie.id] = zombie;
-      } else if (action.type === 'BREAK_DOOR' && action.toZoneId) {
-        this.breakDoor(state, zombie.position.zoneId, action.toZoneId);
-      }
-    }
-    this.distributeZoneWounds(state, pass3Attacks);
-
-    return state;
   }
 
   /**
@@ -160,7 +101,7 @@ export class ZombiePhaseManager {
 
   /**
    * Applies a zombie attack to a survivor, respecting Tough skill and armor.
-   * Shared by processActivations and extra activation logic.
+   * Used by activateZombieSet via distributeZoneWounds.
    */
   private static applyZombieAttack(state: GameState, targetId: string): void {
     const survivor = state.survivors[targetId];
@@ -194,29 +135,6 @@ export class ZombiePhaseManager {
     }
   }
 
-  /**
-   * Opens a closed door between two zones (zombie breaking through).
-   * Updates both directions of the connection.
-   */
-  private static breakDoor(state: GameState, fromZoneId: string, toZoneId: string): void {
-    const fromZone = state.zones[fromZoneId];
-    const toZone = state.zones[toZoneId];
-
-    if (fromZone?.connections) {
-      const conn = fromZone.connections.find(c => c.toZoneId === toZoneId);
-      if (conn && conn.hasDoor && !conn.doorOpen) {
-        conn.doorOpen = true;
-      }
-    }
-    // Bidirectional
-    if (toZone?.connections) {
-      const conn = toZone.connections.find(c => c.toZoneId === fromZoneId);
-      if (conn && conn.hasDoor && !conn.doorOpen) {
-        conn.doorOpen = true;
-      }
-    }
-  }
-
   private static processSpawns(state: GameState): GameState {
     let newState = state;
     
@@ -242,20 +160,8 @@ export class ZombiePhaseManager {
       });
 
     for (const zone of spawnZones) {
-       // Self-healing: Initialize Spawn Deck if empty
-       if (newState.spawnDeck.length === 0 && newState.spawnDiscard.length === 0) {
-          console.warn('Spawn deck empty. Auto-initializing.');
-          const deckResult = DeckService.initializeSpawnDeck(newState.seed);
-          newState.spawnDeck = deckResult.deck;
-          newState.seed = deckResult.newSeed;
-       }
-
-       // Draw Card
-       let drawResult = DeckService.drawSpawnCard(newState);
-       newState = drawResult.newState;
-       let card = drawResult.card;
-
-       if (!card) continue; 
+       const card = this.drawSpawnCard(newState);
+       if (!card) continue;
 
        // 3. Get Spawn Detail for Current Level
        const detail: SpawnDetail = card[currentLevel];
@@ -270,33 +176,27 @@ export class ZombiePhaseManager {
            });
        }
 
-       // Always apply the first card's spawn detail
        this.applySpawnDetail(newState, zone.id, detail);
-
-       // Handle Double Spawn: draw a second card and apply it too
-       if (detail.doubleSpawn) {
-          drawResult = DeckService.drawSpawnCard(newState);
-          newState = drawResult.newState;
-          const secondCard = drawResult.card;
-
-          if (secondCard) {
-            const secondDetail = secondCard[currentLevel];
-            if (secondDetail) {
-               if (newState.spawnContext) {
-                   newState.spawnContext.cards.push({
-                       zoneId: zone.id,
-                       cardId: secondCard.id,
-                       detail: secondDetail,
-                       dangerLevel: currentLevel
-                   });
-               }
-               this.applySpawnDetail(newState, zone.id, secondDetail);
-            }
-          }
-       }
     }
 
     return newState;
+  }
+
+  /**
+   * Draws one Zombie card into `state` (mutated), rebuilding the deck when both
+   * deck and discard are empty. Shared by the Spawn Step and building spawns.
+   */
+  public static drawSpawnCard(state: GameState): SpawnCard | null {
+    if (state.spawnDeck.length === 0 && state.spawnDiscard.length === 0) {
+      const deckResult = DeckService.initializeSpawnDeck(state.seed);
+      state.spawnDeck = deckResult.deck;
+      state.seed = deckResult.newSeed;
+    }
+    const { card, newState } = DeckService.drawSpawnCard(state);
+    state.spawnDeck = newState.spawnDeck;
+    state.spawnDiscard = newState.spawnDiscard;
+    state.seed = newState.seed;
+    return card;
   }
 
   /**
@@ -307,19 +207,19 @@ export class ZombiePhaseManager {
   }
 
   /**
-   * Runs a two-pass activation (attack then move) for a specific set of zombies.
-   * Used by both extra activation cards and rush card logic.
+   * Activates a set of zombies per Zombicide v2 rulebook §9. Used by the
+   * Activation Step, Extra Activation cards, Rush and pool exhaustion.
+   * Pass 1: ALL attacks. Pass 2: moves of zombies that didn't attack.
+   * Pass 3: Runner second actions.
+   *
+   * Single-survivor zones take wounds directly; multi-survivor zones queue
+   * them in pendingZombieWounds for the host to distribute.
    */
   private static activateZombieSet(state: GameState, zombieIds: string[]): void {
     const getZombies = () => zombieIds
       .map(id => state.zombies[id])
       .filter(z => z && !this.isZombieDead(z))
       .sort((a, b) => a.id.localeCompare(b.id));
-
-    // Reset activated flags
-    for (const zombie of getZombies()) {
-      zombie.activated = false;
-    }
 
     const attackedSet = new Set<string>();
 
@@ -340,15 +240,7 @@ export class ZombiePhaseManager {
       const action = ZombieAI.getAction(state, zombie);
       if (action.type === 'MOVE' && action.toZoneId) {
         zombie.position.zoneId = action.toZoneId;
-        state.zombies[zombie.id] = zombie;
-      } else if (action.type === 'BREAK_DOOR' && action.toZoneId) {
-        this.breakDoor(state, zombie.position.zoneId, action.toZoneId);
       }
-    }
-
-    // Mark activated
-    for (const zombie of getZombies()) {
-      zombie.activated = true;
     }
 
     // Runner second actions
@@ -362,16 +254,13 @@ export class ZombiePhaseManager {
           runnerAttacks[zombie.position.zoneId] = (runnerAttacks[zombie.position.zoneId] || 0) + 1;
         } else if (action.type === 'MOVE' && action.toZoneId) {
           zombie.position.zoneId = action.toZoneId;
-          state.zombies[zombie.id] = zombie;
-        } else if (action.type === 'BREAK_DOOR' && action.toZoneId) {
-          this.breakDoor(state, zombie.position.zoneId, action.toZoneId);
         }
       }
       this.distributeZoneWounds(state, runnerAttacks);
     }
   }
 
-  private static applySpawnDetail(state: GameState, zoneId: ZoneId, detail: SpawnDetail) {
+  public static applySpawnDetail(state: GameState, zoneId: ZoneId, detail: SpawnDetail) {
       // Handle Extra Activation: re-activate ALL zombies of that type
       // Per rulebook §9/§15: Extra Activation cards have no effect at Blue Danger Level
       if (detail.extraActivation) {
@@ -391,7 +280,9 @@ export class ZombiePhaseManager {
          for (const [type, count] of Object.entries(detail.zombies)) {
             const zombieType = type as ZombieType;
 
-            // Abomination spawn rules
+            // Abomination spawn rules. In Fest mode the existing Abominations
+            // activate once here, so pool exhaustion must not activate them again.
+            let festActivated = false;
             if (zombieType === ZombieType.Abomination) {
               const activeAbomCount = this.countZombiesOfType(state, ZombieType.Abomination);
 
@@ -404,6 +295,7 @@ export class ZombiePhaseManager {
 
                 // Abomination Fest: also spawn the new one after activation
                 if (!state.config.abominationFest) continue;
+                festActivated = true;
               }
             }
 
@@ -414,6 +306,7 @@ export class ZombiePhaseManager {
 
             if (available === 0) {
               // Pool exhausted: extra activation of all zombies of that type instead
+              if (festActivated) continue;
               const typeIds = Object.values(state.zombies)
                 .filter(z => z.type === zombieType && !this.isZombieDead(z))
                 .map(z => z.id);
@@ -429,7 +322,7 @@ export class ZombiePhaseManager {
             }
 
             // If we couldn't place all, trigger extra activation for that type
-            if (toSpawn < (count as number)) {
+            if (toSpawn < (count as number) && !festActivated) {
               const typeIds = Object.values(state.zombies)
                 .filter(z => z.type === zombieType && !this.isZombieDead(z))
                 .map(z => z.id);
@@ -471,12 +364,11 @@ export class ZombiePhaseManager {
       type,
       position: { x, y, zoneId },
       wounds: 0,
-      activated: false
     };
     state.zombies[id] = zombie;
   }
 
-  private static getCurrentDangerLevel(state: GameState): DangerLevel {
+  public static getCurrentDangerLevel(state: GameState): DangerLevel {
     let maxDangerVal = 0;
     let maxLevel = DangerLevel.Blue;
 
@@ -492,18 +384,13 @@ export class ZombiePhaseManager {
     return maxLevel;
   }
 
-  private static endRound(state: GameState): GameState {
+  public static endRound(state: GameState): GameState {
     const newState = state;
 
     // 1. Clear Noise
     newState.noiseTokens = 0;
     for (const zoneId in newState.zones) {
       newState.zones[zoneId].noiseTokens = 0;
-    }
-
-    // 2. Reset Zombies (activated flags)
-    for (const zombieId in newState.zombies) {
-      newState.zombies[zombieId].activated = false;
     }
 
     // 2b. Medic Healing — free during End Phase
@@ -532,27 +419,7 @@ export class ZombiePhaseManager {
 
     // 3. Reset Survivors
     for (const survivorId in newState.survivors) {
-      const survivor = newState.survivors[survivorId];
-      survivor.actionsRemaining = survivor.actionsPerTurn;
-      survivor.hasMoved = false;
-      survivor.hasSearched = false;
-      // Compute free actions from skills
-      survivor.freeMovesRemaining = survivor.skills.includes('plus_1_free_move') ? 1 : 0;
-      survivor.freeSearchesRemaining = survivor.skills.includes('plus_1_free_search') ? 1 : 0;
-      survivor.freeCombatsRemaining = survivor.skills.includes('plus_1_free_combat') ? 1 : 0;
-      survivor.toughUsedZombieAttack = false;
-      survivor.toughUsedFriendlyFire = false;
-      // Free melee/ranged actions
-      survivor.freeMeleeRemaining = survivor.skills.includes('plus_1_free_melee') ? 1 : 0;
-      survivor.freeRangedRemaining = survivor.skills.includes('plus_1_free_ranged') ? 1 : 0;
-      // Once-per-turn skills
-      survivor.sprintUsedThisTurn = false;
-      survivor.chargeUsedThisTurn = false;
-      survivor.bornLeaderUsedThisTurn = false;
-      survivor.bloodlustUsedThisTurn = false;
-      survivor.lifesaverUsedThisTurn = false;
-      survivor.hitAndRunFreeMove = false;
-      survivor.luckyUsedThisTurn = false;
+      XPManager.resetSurvivorTurn(newState.survivors[survivorId]);
     }
 
     // 4. Rotate First Player (index-based, no array mutation)

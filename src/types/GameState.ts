@@ -72,7 +72,6 @@ export interface SpawnDetail {
     [key in ZombieType]?: number;
   };
   extraActivation?: ZombieType; // e.g. "All Walkers move"
-  doubleSpawn?: boolean;
   rush?: boolean; // Spawned zombies immediately activate (only the just-spawned ones)
 }
 
@@ -153,7 +152,6 @@ export interface Survivor extends Entity {
 export interface Zombie extends Entity {
   type: ZombieType;
   wounds: number; // For multi-wound zombies like Abominations/Fatties (if house rules or specific types)
-  activated: boolean; // Track if acted this turn
 }
 
 // --- World ---
@@ -294,6 +292,8 @@ export interface GameState {
   turn: number;
   phase: GamePhase;
   gameResult?: GameResult;
+  /** Name of the player whose disconnect ended the game (set with gameResult). */
+  abandonedBy?: string;
   
   // Lobby Data (Only active during LOBBY phase, but kept for reference)
   lobby: LobbyState;

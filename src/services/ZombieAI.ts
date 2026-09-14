@@ -1,20 +1,13 @@
 
-import { GameState, Zombie, Zone, ZoneId, Survivor, Position } from '../types/GameState';
+import { GameState, Zombie, Zone, ZoneId } from '../types/GameState';
+import { visibleZones } from './LineOfSight';
 
-// Direction vectors for grid movement logic
-const DIRECTIONS = [
-  { x: 0, y: -1 }, // North
-  { x: 1, y: 0 },  // East
-  { x: 0, y: 1 },  // South
-  { x: -1, y: 0 }, // West
-];
-
-export type ZombieActionType = 'ATTACK' | 'MOVE' | 'BREAK_DOOR' | 'NONE';
+export type ZombieActionType = 'ATTACK' | 'MOVE' | 'NONE';
 
 export interface ZombieAction {
   type: ZombieActionType;
   targetId?: string; // For Attack (Survivor ID)
-  toZoneId?: string; // For Move or Break Door (target zone behind the door)
+  toZoneId?: string; // For Move
 }
 
 export class ZombieAI {
@@ -43,19 +36,11 @@ export class ZombieAI {
     
     if (targetZoneId && targetZoneId !== currentZone.id) {
       const nextZoneId = this.getNextStep(state, currentZone.id, targetZoneId);
+      // No open path: zombies never open doors, so they stay put.
       if (nextZoneId) {
         return {
           type: 'MOVE',
           toZoneId: nextZoneId
-        };
-      }
-
-      // Path blocked — check if a closed door is the obstacle
-      const blockedDoor = this.findBlockedDoor(state, currentZone);
-      if (blockedDoor) {
-        return {
-          type: 'BREAK_DOOR',
-          toZoneId: blockedDoor
         };
       }
     }
@@ -72,15 +57,10 @@ export class ZombieAI {
     const allSurvivors = Object.values(state.survivors).filter(s => s.wounds < s.maxHealth);
     
     // Check Visibility First
-    // Group survivors by zone
-    const visibleSurvivorZones: ZoneId[] = [];
-    
-    for (const survivor of allSurvivors) {
-      const survivorZoneId = survivor.position.zoneId;
-      if (this.hasLineOfSight(state, currentZone.id, survivorZoneId)) {
-        visibleSurvivorZones.push(survivorZoneId);
-      }
-    }
+    const visible = visibleZones(state, currentZone.id);
+    const visibleSurvivorZones = allSurvivors
+      .map(s => s.position.zoneId)
+      .filter(zoneId => visible.has(zoneId));
 
     if (visibleSurvivorZones.length > 0) {
       // Per rulebook §9: Among visible zones, pick the one with most Noise
@@ -166,106 +146,6 @@ export class ZombieAI {
             visited.add(neighborId);
             queue.push({ id: neighborId, path: [...path, neighborId] });
         }
-      }
-    }
-    return null;
-  }
-
-  /**
-   * Get all grid cells for a zone. Uses zoneGeometry if available,
-   * otherwise falls back to parsing z_x_y format.
-   */
-  /**
-   * Get all grid cells for a zone from zoneGeometry.
-   */
-  private static getZoneCells(state: GameState, zoneId: string): { col: number; row: number }[] {
-    if (state.zoneGeometry?.zoneCells[zoneId]) {
-      return state.zoneGeometry.zoneCells[zoneId].map(c => ({ col: c.x, row: c.y }));
-    }
-    return [];
-  }
-
-  /**
-   * Checks Line of Sight between two zones.
-   * LOS requires that at least one cell pair (one from each zone)
-   * shares the same row or column with an unobstructed path between them.
-   */
-  private static hasLineOfSight(state: GameState, zoneAId: string, zoneBId: string): boolean {
-    if (zoneAId === zoneBId) return true;
-
-    const cellsA = this.getZoneCells(state, zoneAId);
-    const cellsB = this.getZoneCells(state, zoneBId);
-
-    if (cellsA.length === 0 || cellsB.length === 0) return false;
-
-    // Check all cell pairs for orthogonal alignment
-    for (const a of cellsA) {
-      for (const b of cellsB) {
-        const sameRow = a.row === b.row;
-        const sameCol = a.col === b.col;
-        if (!sameRow && !sameCol) continue;
-
-        // Found an aligned pair — check if the path between them is clear
-        if (this.checkRaycast(state, zoneAId, zoneBId, sameRow ? 'row' : 'col', sameRow ? a.row : a.col)) {
-          return true;
-        }
-      }
-    }
-
-    return false;
-  }
-
-  /**
-   * BFS raycast along a single axis (row or col) from start zone to end zone.
-   * Only follows connections that stay on the given axis line.
-   */
-  private static checkRaycast(
-    state: GameState,
-    startId: string,
-    endId: string,
-    axis: 'row' | 'col',
-    axisValue: number,
-  ): boolean {
-    const queue = [startId];
-    const visited = new Set<string>();
-    visited.add(startId);
-
-    while (queue.length > 0) {
-      const currentId = queue.shift()!;
-      if (currentId === endId) return true;
-
-      const currentZone = state.zones[currentId];
-      for (const connEntry of currentZone.connections) {
-        const neighborId = connEntry.toZoneId;
-        if (visited.has(neighborId)) continue;
-
-        // Check if the neighbor zone has any cell on the same axis line
-        const neighborCells = this.getZoneCells(state, neighborId);
-        const onAxis = neighborCells.some(c =>
-          axis === 'row' ? c.row === axisValue : c.col === axisValue
-        );
-        if (!onAxis) continue;
-
-        // Closed doors block LOS
-        const conn = connEntry;
-        if (conn && conn.hasDoor && !conn.doorOpen) continue;
-
-        visited.add(neighborId);
-        queue.push(neighborId);
-      }
-    }
-    return false;
-  }
-
-  /**
-   * Checks if any adjacent connection has a closed door blocking the zombie.
-   * Returns the target zone ID behind the first closed door found, or null.
-   */
-  private static findBlockedDoor(state: GameState, currentZone: Zone): ZoneId | null {
-    if (!currentZone.connections) return null;
-    for (const conn of currentZone.connections) {
-      if (conn.hasDoor && !conn.doorOpen) {
-        return conn.toZoneId;
       }
     }
     return null;

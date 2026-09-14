@@ -10,6 +10,14 @@ const XP_THRESHOLDS: Record<DangerLevel, number> = {
   [DangerLevel.Red]: 43
 };
 
+const FREE_ACTION_SKILLS: Record<string, 'freeMovesRemaining' | 'freeSearchesRemaining' | 'freeCombatsRemaining' | 'freeMeleeRemaining' | 'freeRangedRemaining'> = {
+  plus_1_free_move: 'freeMovesRemaining',
+  plus_1_free_search: 'freeSearchesRemaining',
+  plus_1_free_combat: 'freeCombatsRemaining',
+  plus_1_free_melee: 'freeMeleeRemaining',
+  plus_1_free_ranged: 'freeRangedRemaining',
+};
+
 export class XPManager {
 
   /**
@@ -49,41 +57,24 @@ export class XPManager {
   }
 
   /**
-   * Validates if a survivor CAN choose a specific skill at their current level.
+   * Orange/Red skill choice the survivor still has to make, derived from
+   * experience and owned skills (no stored flag). Orange comes first.
    */
-  public static canChooseSkill(survivor: Survivor, skillId: string): boolean {
+  public static getPendingSkillChoice(survivor: Survivor): { level: DangerLevel; options: string[] } | null {
     const progression = SURVIVOR_CLASSES[survivor.characterClass] || SURVIVOR_CLASSES['Wanda'];
-    const level = survivor.dangerLevel;
-
-    // 1. Check if already known
-    if (survivor.skills.includes(skillId)) return false;
-
-    // 2. Check if skill is in the pool for current level (or previous levels skipped?)
-    // In Zombicide, you pick ONE skill per level band.
-    
-    // Check Orange
-    if (level === DangerLevel.Orange || level === DangerLevel.Red) {
-      // If we haven't picked an Orange skill yet...
-      // How do we know? We check if ANY of the Orange options are in the skills list.
-      const orangeOptions = progression[DangerLevel.Orange];
-      const hasOrangeSkill = orangeOptions.some(s => survivor.skills.includes(s));
-      
-      if (!hasOrangeSkill && orangeOptions.includes(skillId)) {
-        return true;
+    const levels = [DangerLevel.Orange, DangerLevel.Red];
+    for (const level of levels) {
+      if (survivor.experience < XP_THRESHOLDS[level]) break;
+      const options = progression[level];
+      if (!options.some(skillId => survivor.skills.includes(skillId))) {
+        return { level, options };
       }
     }
+    return null;
+  }
 
-    // Check Red
-    if (level === DangerLevel.Red) {
-      const redOptions = progression[DangerLevel.Red];
-      const hasRedSkill = redOptions.some(s => survivor.skills.includes(s));
-      
-      if (!hasRedSkill && redOptions.includes(skillId)) {
-        return true;
-      }
-    }
-
-    return false;
+  public static canChooseSkill(survivor: Survivor, skillId: string): boolean {
+    return !!this.getPendingSkillChoice(survivor)?.options.includes(skillId);
   }
 
   /**
@@ -98,14 +89,43 @@ export class XPManager {
       skills: [...survivor.skills, skillId],
     };
 
-    // Apply immediate effects
+    // Apply immediate effects — Zombicide rules: "Immediately gains the benefit".
     if (skillId === 'plus_1_action') {
       updated.actionsPerTurn = survivor.actionsPerTurn + 1;
-      // Zombicide rules: "Immediately gains the benefit".
       updated.actionsRemaining = survivor.actionsRemaining + 1;
+    }
+    const freeCounter = FREE_ACTION_SKILLS[skillId];
+    if (freeCounter) {
+      updated[freeCounter] = (survivor[freeCounter] || 0) + 1;
     }
 
     return updated;
+  }
+
+  /**
+   * Per-turn survivor reset (mutates). Used at game start and in the End Phase.
+   */
+  public static resetSurvivorTurn(survivor: Survivor): void {
+    survivor.actionsRemaining = survivor.actionsPerTurn;
+    survivor.hasMoved = false;
+    survivor.hasSearched = false;
+    survivor.freeMovesRemaining = 0;
+    survivor.freeSearchesRemaining = 0;
+    survivor.freeCombatsRemaining = 0;
+    survivor.freeMeleeRemaining = 0;
+    survivor.freeRangedRemaining = 0;
+    for (const [skillId, counter] of Object.entries(FREE_ACTION_SKILLS)) {
+      if (survivor.skills.includes(skillId)) survivor[counter] = 1;
+    }
+    survivor.toughUsedZombieAttack = false;
+    survivor.toughUsedFriendlyFire = false;
+    survivor.sprintUsedThisTurn = false;
+    survivor.chargeUsedThisTurn = false;
+    survivor.bornLeaderUsedThisTurn = false;
+    survivor.bloodlustUsedThisTurn = false;
+    survivor.lifesaverUsedThisTurn = false;
+    survivor.hitAndRunFreeMove = false;
+    survivor.luckyUsedThisTurn = false;
   }
 
   public static getDangerLevel(xp: number): DangerLevel {

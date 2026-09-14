@@ -1,7 +1,7 @@
 
 import { GameState, ZoneId, Zone, ZoneConnection, EquipmentCard, ZombieType } from '../../types/GameState';
 import { ActionType } from '../../types/Action';
-import { advanceTurnState, checkEndTurn } from '../TurnManager';
+import { checkEndTurn } from '../TurnManager';
 
 export type ActionHandler = (state: GameState, intent: any) => GameState;
 
@@ -49,9 +49,9 @@ export function handleSurvivorDeath(state: GameState, survivorId: string): void 
 }
 
 /**
- * Checks if a free action is available for this action type.
- * If so, consumes the free action instead of deducting AP.
- * Otherwise falls through to normal AP deduction via advanceTurnState.
+ * Charges an action: a matching free action covers the base cost, otherwise 1 AP.
+ * `extraCost` (zombies in the zone left) is always paid in AP. Throws when the
+ * survivor cannot pay the full cost — never clamps.
  */
 export function deductAPWithFreeCheck(state: GameState, survivorId: string, actionType: ActionType, extraCost: number = 0): GameState {
   const newState = { ...state };
@@ -79,10 +79,6 @@ export function deductAPWithFreeCheck(state: GameState, survivorId: string, acti
     survivor.freeSearchesRemaining--;
     usedFree = true;
     freeType = 'Free Search';
-  } else if (actionType === ActionType.ATTACK && survivor.freeCombatsRemaining > 0) {
-    survivor.freeCombatsRemaining--;
-    usedFree = true;
-    freeType = 'Free Combat';
   } else if (actionType === ActionType.ATTACK && survivor.freeMeleeRemaining > 0 && state._attackIsMelee) {
     survivor.freeMeleeRemaining--;
     usedFree = true;
@@ -91,93 +87,27 @@ export function deductAPWithFreeCheck(state: GameState, survivorId: string, acti
     survivor.freeRangedRemaining--;
     usedFree = true;
     freeType = 'Free Ranged';
+  } else if (actionType === ActionType.ATTACK && survivor.freeCombatsRemaining > 0) {
+    survivor.freeCombatsRemaining--;
+    usedFree = true;
+    freeType = 'Free Combat';
   }
 
-  if (usedFree) {
-    // Tag lastAction with free action info
-    if (newState.lastAction) {
-      newState.lastAction.usedFreeAction = true;
-      newState.lastAction.freeActionType = freeType;
-    }
-    // Free action covers the base cost; only apply extra cost (e.g. zombie zone penalty)
-    if (extraCost > 0) {
-      survivor.actionsRemaining = Math.max(0, survivor.actionsRemaining - extraCost);
-    }
-    newSurvivors[survivorId] = survivor;
-    newState.survivors = newSurvivors;
-    return checkEndTurn(newState);
+  // Free action covers the base cost; the extra cost (zombies in the zone left) is always paid.
+  const required = (usedFree ? 0 : 1) + extraCost;
+  if (required > survivor.actionsRemaining) {
+    throw new Error(`Not enough actions (need ${required})`);
+  }
+  survivor.actionsRemaining -= required;
+
+  if (usedFree && newState.lastAction) {
+    newState.lastAction.usedFreeAction = true;
+    newState.lastAction.freeActionType = freeType;
   }
 
-  // No free action — normal AP deduction (including any extra cost)
   newSurvivors[survivorId] = survivor;
   newState.survivors = newSurvivors;
-
-  if (extraCost > 0) {
-    // Deduct extra cost on top of the normal 1 AP from advanceTurnState
-    const s = { ...newState.survivors[survivorId] };
-    s.actionsRemaining = Math.max(0, s.actionsRemaining - extraCost);
-    newState.survivors = { ...newState.survivors, [survivorId]: s };
-  }
-
-  return advanceTurnState(newState, survivorId);
-}
-
-export function getDistance(state: GameState, startZoneId: ZoneId, endZoneId: ZoneId): number {
-  if (startZoneId === endZoneId) return 0;
-
-  const queue: { id: ZoneId; dist: number }[] = [{ id: startZoneId, dist: 0 }];
-  const visited = new Set<string>();
-  visited.add(startZoneId);
-
-  while (queue.length > 0) {
-    const { id, dist } = queue.shift()!;
-    if (id === endZoneId) return dist;
-
-    if (dist > 10) continue;
-
-    const zone = state.zones[id];
-    if (!zone) continue;
-
-    for (const conn of zone.connections) {
-      if (!visited.has(conn.toZoneId)) {
-        visited.add(conn.toZoneId);
-        queue.push({ id: conn.toZoneId, dist: dist + 1 });
-      }
-    }
-  }
-  return Infinity;
-}
-
-/**
- * BFS-based Line of Sight check for ranged attacks.
- * An attack path is blocked if it must pass through a wall-blocked edge
- * or a closed door. Returns true if there exists a path with no wall/closed-door edges.
- */
-export function hasLineOfSight(state: GameState, startZoneId: ZoneId, endZoneId: ZoneId): boolean {
-  if (startZoneId === endZoneId) return true;
-
-  const queue: ZoneId[] = [startZoneId];
-  const visited = new Set<string>();
-  visited.add(startZoneId);
-
-  while (queue.length > 0) {
-    const current = queue.shift()!;
-    const zone = state.zones[current];
-    if (!zone) continue;
-
-    for (const conn of zone.connections) {
-      if (visited.has(conn.toZoneId)) continue;
-
-      // Block LOS through closed doors
-      if (conn.hasDoor && !conn.doorOpen) continue;
-
-      visited.add(conn.toZoneId);
-      if (conn.toZoneId === endZoneId) return true;
-      queue.push(conn.toZoneId);
-    }
-  }
-
-  return false;
+  return checkEndTurn(newState);
 }
 
 export function getZombieToughness(type: ZombieType): number {

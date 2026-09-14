@@ -1,9 +1,7 @@
 
-import { GameState, EquipmentCard, DangerLevel, ZoneId, ZombieType, SpawnDetail } from '../../types/GameState';
+import { GameState, EquipmentCard, ZoneId } from '../../types/GameState';
 import { ActionRequest, ActionType } from '../../types/Action';
-import { DeckService } from '../DeckService';
 import { ZombiePhaseManager } from '../ZombiePhaseManager';
-import { XPManager } from '../XPManager';
 import { getConnection, openDoorEdge } from './handlerUtils';
 
 export function handleOpenDoor(state: GameState, intent: ActionRequest): GameState {
@@ -83,31 +81,11 @@ export function handleOpenDoor(state: GameState, intent: ActionRequest): GameSta
       }
     }
 
-    const currentLevel: DangerLevel = newState.currentDangerLevel;
+    // Same card resolution as the Spawn Step (Extra Activation, Rush, pool
+    // limits, Abomination rules). Wounds from activations queue as pending.
     for (const zid of zonesToSpawn) {
-      if (newState.spawnDeck.length === 0 && newState.spawnDiscard.length === 0) {
-        const deckResult = DeckService.initializeSpawnDeck(newState.seed);
-        newState.spawnDeck = deckResult.deck;
-        newState.seed = deckResult.newSeed;
-      }
-
-      const drawResult = DeckService.drawSpawnCard(newState);
-      newState.spawnDeck = drawResult.newState.spawnDeck;
-      newState.spawnDiscard = drawResult.newState.spawnDiscard;
-      newState.seed = drawResult.newState.seed;
-      const card = drawResult.card;
-      if (!card) continue;
-
-      const detail = card[currentLevel] as SpawnDetail;
-      if (!detail || detail.extraActivation) continue;
-
-      if (detail.zombies) {
-        for (const [type, count] of Object.entries(detail.zombies)) {
-          for (let i = 0; i < (count as number); i++) {
-            ZombiePhaseManager.spawnZombie(newState, zid, type as ZombieType);
-          }
-        }
-      }
+      const detail = ZombiePhaseManager.drawSpawnCard(newState)?.[newState.currentDangerLevel];
+      if (detail) ZombiePhaseManager.applySpawnDetail(newState, zid, detail);
     }
   }
 

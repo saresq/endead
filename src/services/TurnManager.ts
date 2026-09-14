@@ -84,27 +84,6 @@ export function validateTurn(state: GameState, request: ActionRequest): ActionEr
           message: `Survivor ${survivor.name} has no actions remaining.`,
         };
       }
-
-      // Zombie zone control: moving out of a zone with zombies costs +1 AP penalty
-      // Slippery skill waives the penalty entirely
-      if (request.type === 'MOVE' && !survivor.skills.includes('slippery') && !survivor.cheatMode) {
-        const currentZone = state.zones[survivor.position.zoneId];
-        const hasZombies = currentZone && Object.values(state.zombies).some(
-          (z: any) => z.position.zoneId === currentZone.id
-        );
-        if (hasZombies) {
-          // With free move: free covers base cost, need 1 AP for penalty
-          // Without free move: need 2 AP total (1 base + 1 penalty)
-          const hasFreeMove = survivor.freeMovesRemaining > 0;
-          const apNeeded = hasFreeMove ? 1 : 2;
-          if (survivor.actionsRemaining < apNeeded) {
-            return {
-              code: 'NOT_ENOUGH_AP',
-              message: `Moving out of a zone with zombies requires ${apNeeded} action(s).`,
-            };
-          }
-        }
-      }
   }
 
   return null;

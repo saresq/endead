@@ -457,6 +457,14 @@
 
 .event-entry--action { border-left-color: var(--amber-400); }
 .event-entry--spawn  { border-left-color: var(--rust-400); }
+.event-entry--waiting { border-left-color: var(--amber-400); color: var(--bone-100); }
+
+.hud-waiting {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 4px;
+}
 
 .event-entry__desc { color: var(--bone-100); font-size: 11px; letter-spacing: 0.02em; }
 
@@ -485,7 +493,6 @@
 }
 
 .event-entry__extra { display: block; font-size: 10px; color: var(--amber-400); font-weight: 700; letter-spacing: 0.04em; }
-.event-entry__double { display: inline-block; font-size: 10px; color: var(--rust-300); font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
 .event-entry__badges { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
 
 .event-entry__free {

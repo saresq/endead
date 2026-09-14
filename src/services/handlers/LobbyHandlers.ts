@@ -2,6 +2,7 @@
 import { GameState, GamePhase, DangerLevel, EquipmentCard, Survivor, initialGameState, ObjectiveColor } from '../../types/GameState';
 import { ActionRequest } from '../../types/Action';
 import { DeckService } from '../DeckService';
+import { XPManager } from '../XPManager';
 import { compileScenario } from '../ScenarioCompiler';
 import { SURVIVOR_CLASSES } from '../../config/SkillRegistry';
 import { DEFAULT_MAP } from '../../config/DefaultMap';
@@ -134,11 +135,11 @@ export function handleStartGame(state: GameState, intent: ActionRequest): GameSt
             actionsRemaining: startingActionsPerTurn,
             hasMoved: false,
             hasSearched: false,
-            freeMovesRemaining: startingSkills.includes('start_move') ? 1 : 0,
-            freeSearchesRemaining: startingSkills.includes('plus_1_free_search') ? 1 : 0,
-            freeCombatsRemaining: startingSkills.includes('plus_1_free_combat') ? 1 : 0,
-            freeMeleeRemaining: startingSkills.includes('plus_1_free_melee') ? 1 : 0,
-            freeRangedRemaining: startingSkills.includes('plus_1_free_ranged') ? 1 : 0,
+            freeMovesRemaining: 0,
+            freeSearchesRemaining: 0,
+            freeCombatsRemaining: 0,
+            freeMeleeRemaining: 0,
+            freeRangedRemaining: 0,
             sprintUsedThisTurn: false,
             chargeUsedThisTurn: false,
             bornLeaderUsedThisTurn: false,
@@ -149,6 +150,7 @@ export function handleStartGame(state: GameState, intent: ActionRequest): GameSt
             toughUsedZombieAttack: false,
             toughUsedFriendlyFire: false,
         } as Survivor;
+        XPManager.resetSurvivorTurn(survivor);
         newState.survivors[survivorId] = survivor;
     });
 

@@ -2,13 +2,16 @@
 import { GameState, Survivor } from '../../types/GameState';
 import { ActionRequest } from '../../types/Action';
 import { XPManager } from '../XPManager';
-import { getConnection, isDoorBlocked, getDistance, hasLineOfSight } from './handlerUtils';
+import { visibleZones } from '../LineOfSight';
+import { getConnection, isDoorBlocked } from './handlerUtils';
 
 export function handleChooseSkill(state: GameState, intent: ActionRequest): GameState {
   const newState = structuredClone(state);
   const survivor = newState.survivors[intent.survivorId!];
   const skillId = intent.payload?.skillId;
 
+  if (!survivor) throw new Error('Survivor not found');
+  if (survivor.playerId !== intent.playerId) throw new Error('You do not control this survivor');
   if (!skillId) throw new Error('Skill ID required');
 
   if (!XPManager.canChooseSkill(survivor, skillId)) {
@@ -152,17 +155,9 @@ export function handleLifesaver(state: GameState, intent: ActionRequest): GameSt
   const targetZoneId = intent.payload?.targetZoneId;
   if (!targetZoneId) throw new Error('Target zone required');
 
-  // Must be at Range 1 with LOS and clear path
-  const distance = getDistance(state, survivor.position.zoneId, targetZoneId);
-  if (distance !== 1) throw new Error('Target zone must be at Range 1');
-  if (!hasLineOfSight(newState, survivor.position.zoneId, targetZoneId)) {
-    throw new Error('No line of sight to target zone');
-  }
-
-  // Check path is not blocked by door
-  const currentZone = newState.zones[survivor.position.zoneId];
-  if (isDoorBlocked(currentZone, targetZoneId)) {
-    throw new Error('Path blocked by closed door');
+  // Must be at Range 1 with LOS (a visible zone at Range 1 is always an open connection)
+  if (visibleZones(state, survivor.position.zoneId).get(targetZoneId) !== 1) {
+    throw new Error('Target zone must be visible at Range 1');
   }
 
   // Target zone must have at least 1 zombie AND at least 1 survivor

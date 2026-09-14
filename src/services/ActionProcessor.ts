@@ -1,7 +1,7 @@
 
 import { GameState, GamePhase, GameResult, ObjectiveType, Objective, Survivor, ZombieType, DangerLevel } from '../types/GameState';
 import { ActionRequest, ActionResponse, ActionType, ActionError } from '../types/Action';
-import { validateTurn, advanceTurnState, checkEndTurn } from './TurnManager';
+import { validateTurn, checkEndTurn } from './TurnManager';
 import { ZombiePhaseManager } from './ZombiePhaseManager';
 import { deductAPWithFreeCheck, ActionHandler } from './handlers/handlerUtils';
 
@@ -131,25 +131,38 @@ export function checkGameEndConditions(state: GameState): GameResult | undefined
   return undefined;
 }
 
+// Wound / skill decisions: accepted out of turn, handlers check authority
+// (host distributes, owner resolves and chooses).
+const DECISION_ACTIONS = [
+  ActionType.DISTRIBUTE_ZOMBIE_WOUNDS, ActionType.RESOLVE_WOUNDS, ActionType.CHOOSE_SKILL,
+];
+
+// Not subject to turn checks nor blocked by pending wounds.
+const UNBLOCKED_ACTIONS = [
+  ...DECISION_ACTIONS,
+  ActionType.JOIN_LOBBY, ActionType.UPDATE_NICKNAME, ActionType.SELECT_CHARACTER,
+  ActionType.START_GAME, ActionType.END_GAME, ActionType.ACTIVATE_CHEAT,
+];
+
 export function processAction(state: GameState, intent: ActionRequest): ActionResponse {
-  // 0. Pre-check: Lobby Actions don't check Turns
-  if (
-    intent.type === ActionType.UPDATE_NICKNAME ||
-    intent.type === ActionType.SELECT_CHARACTER ||
-    intent.type === ActionType.START_GAME ||
-    intent.type === ActionType.END_GAME ||
-    intent.type === ActionType.DISTRIBUTE_ZOMBIE_WOUNDS ||
-    intent.type === ActionType.ACTIVATE_CHEAT
-  ) {
-      // Allow through (lobby actions + cooperative wound distribution)
+  // 0. Pending wounds block everything except decisions and lobby/meta actions
+  if (!UNBLOCKED_ACTIONS.includes(intent.type) && ZombiePhaseManager.hasPendingWounds(state)) {
+    return {
+      success: false,
+      error: { code: 'PENDING_WOUNDS', message: 'Resolve pending wounds first.' },
+    };
+  }
+
+  if (UNBLOCKED_ACTIONS.includes(intent.type)) {
+      // Allow through without turn checks
   } else {
       // 1. Validate Turn Ownership
       let turnError: ActionError | null = validateTurn(state, intent);
 
       // Special Cases
-      if ((intent.type === ActionType.CHOOSE_SKILL || intent.type === ActionType.RESOLVE_SEARCH
+      if ((intent.type === ActionType.RESOLVE_SEARCH
           || intent.type === ActionType.CHARGE || intent.type === ActionType.BORN_LEADER
-          || intent.type === ActionType.LIFESAVER || intent.type === ActionType.RESOLVE_WOUNDS
+          || intent.type === ActionType.LIFESAVER
           || intent.type === ActionType.END_TURN || intent.type === ActionType.REROLL_LUCKY)
           && turnError && turnError.code === 'NO_ACTIONS') {
         turnError = null;
@@ -224,24 +237,33 @@ export function processAction(state: GameState, intent: ActionRequest): ActionRe
            // Consume transient extra AP cost (e.g. zombie zone control penalty on MOVE)
            const extraCost = newState._extraAPCost || 0;
            delete newState._extraAPCost;
-           delete (newState as any)._attackIsMelee;
            newState = deductAPWithFreeCheck(newState, intent.survivorId!, intent.type, extraCost);
+           delete (newState as any)._attackIsMelee;
        }
     } else if (intent.type === ActionType.RESOLVE_SEARCH) {
         // Since RESOLVE_SEARCH doesn't cost AP (cost was paid in SEARCH),
         // we only need to check if the turn should end now that the blocking condition (drawnCard) is cleared.
         newState = checkEndTurn(newState);
-    } else if (intent.type === ActionType.RESOLVE_WOUNDS) {
-        // No AP cost — resolving pending wounds from ITAYG skill
-        newState = checkEndTurn(newState);
-    } else if (intent.type === ActionType.DISTRIBUTE_ZOMBIE_WOUNDS) {
-        // No AP cost — distributing zombie wounds among survivors
+    } else if (
+        (intent.type === ActionType.RESOLVE_WOUNDS || intent.type === ActionType.DISTRIBUTE_ZOMBIE_WOUNDS)
+        && newState.phase === GamePhase.Players
+    ) {
+        // No AP cost. Mid-turn wounds (door-open activations) may have been the
+        // last thing keeping the turn open. While paused in the Zombies phase,
+        // survivors have 0 actions, so checkEndTurn would wrongly advance players.
         newState = checkEndTurn(newState);
     }
 
-    // 5. Check for Zombie Phase Transition
-    if (newState.phase === GamePhase.Zombies) {
+    // 4b. Danger Level follows the highest living survivor after every action
+    if (newState.phase === GamePhase.Players || newState.phase === GamePhase.Zombies) {
+      newState.currentDangerLevel = ZombiePhaseManager.getCurrentDangerLevel(newState);
+    }
+
+    // 5. Zombie Phase: run on Players → Zombies; End Phase waits for pending wounds
+    if (state.phase === GamePhase.Players && newState.phase === GamePhase.Zombies) {
       newState = ZombiePhaseManager.executeZombiePhase(newState);
+    } else if (newState.phase === GamePhase.Zombies && !ZombiePhaseManager.hasPendingWounds(newState)) {
+      newState = ZombiePhaseManager.endRound(newState);
     }
 
     // 5b. Check Game End Conditions

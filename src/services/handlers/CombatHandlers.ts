@@ -7,7 +7,8 @@ import { EquipmentManager } from '../EquipmentManager';
 import { ZombiePhaseManager } from '../ZombiePhaseManager';
 import { Rng } from '../Rng';
 import { rollAttack, applyLuckyReroll, AttackRollResult } from '../CombatDice';
-import { handleSurvivorDeath, getDistance, hasLineOfSight, getZombieToughness, getZombieXP, deductAPWithFreeCheck } from './handlerUtils';
+import { visibleZones } from '../LineOfSight';
+import { handleSurvivorDeath, getZombieToughness, getZombieXP, deductAPWithFreeCheck } from './handlerUtils';
 
 /**
  * Capture pre-attack entity state for a potential Lucky reroll.
@@ -56,12 +57,8 @@ export function handleAttack(state: GameState, intent: ActionRequest): GameState
   const stats = weapon.stats;
 
   const currentZoneId = survivor.position.zoneId;
-  let distance = 0;
-
-  if (currentZoneId !== targetZoneId) {
-     distance = getDistance(state, currentZoneId, targetZoneId);
-     if (distance === Infinity) throw new Error('Target zone not reachable');
-  }
+  const distance = currentZoneId === targetZoneId ? 0 : visibleZones(state, currentZoneId).get(targetZoneId);
+  if (distance === undefined) throw new Error('No line of sight to target zone');
 
   // Point-Blank: ranged weapons can fire at Range 0, bypassing min range
   const hasPointBlank = survivor.skills.includes('point_blank');
@@ -87,13 +84,7 @@ export function handleAttack(state: GameState, intent: ActionRequest): GameState
       throw new Error('Melee attacks can only target your own zone');
   }
 
-  // Ranged LOS check: path must not pass through wall-blocked edges
   const isRangedWeapon = !isMelee;
-  if (isRangedWeapon && currentZoneId !== targetZoneId) {
-      if (!hasLineOfSight(newState, currentZoneId, targetZoneId)) {
-          throw new Error('No line of sight to target zone');
-      }
-  }
 
   // --- Molotov special handler ---
   if (stats.special === 'molotov') {
@@ -441,9 +432,12 @@ export function handleAttack(state: GameState, intent: ActionRequest): GameState
     }
   }
 
-  // Hit & Run: if any kill occurred, grant 1 free move
+  // Hit & Run: if any kill occurred, grant 1 free move that ignores the zombie-leave cost.
+  // Re-read: addXP / Hold Your Nose replace the survivor object.
   if (survivor.skills.includes('hit_and_run') && xpGained > 0) {
-    survivor.freeMovesRemaining = (survivor.freeMovesRemaining || 0) + 1;
+    const attacker = newState.survivors[intent.survivorId!];
+    attacker.freeMovesRemaining = (attacker.freeMovesRemaining || 0) + 1;
+    attacker.hitAndRunFreeMove = true;
   }
 
   if (stats.noise) {
@@ -459,6 +453,8 @@ export function handleResolveWounds(state: GameState, intent: ActionRequest): Ga
   const newState = structuredClone(state);
   const survivor = newState.survivors[intent.survivorId!];
 
+  if (!survivor) throw new Error('Survivor not found');
+  if (survivor.playerId !== intent.playerId) throw new Error('You do not control this survivor');
   if (!survivor.pendingWounds || survivor.pendingWounds <= 0) {
     throw new Error('No pending wounds to resolve');
   }
@@ -500,6 +496,9 @@ export function handleResolveWounds(state: GameState, intent: ActionRequest): Ga
 }
 
 export function handleDistributeZombieWounds(state: GameState, intent: ActionRequest): GameState {
+  const hostId = state.lobby.players[0]?.id;
+  if (!hostId || intent.playerId !== hostId) throw new Error('Only the host can distribute zombie wounds');
+
   const newState = structuredClone(state);
   const zoneId: string = intent.payload?.zoneId;
   const assignments: Record<string, number> = intent.payload?.assignments;
@@ -621,8 +620,8 @@ export function handleRerollLucky(state: GameState, intent: ActionRequest): Game
   // Without this, Lucky would refund the AP the original attack spent.
   const extraCost = reran._extraAPCost || 0;
   delete reran._extraAPCost;
-  delete (reran as { _attackIsMelee?: boolean })._attackIsMelee;
   reran = deductAPWithFreeCheck(reran, intent.survivorId!, ActionType.ATTACK, extraCost);
+  delete (reran as { _attackIsMelee?: boolean })._attackIsMelee;
 
   // 5. Annotate the new lastAction with reroll provenance
   if (reran.lastAction && reran.lastAction.type === ActionType.ATTACK) {
