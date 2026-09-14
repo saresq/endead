@@ -1,0 +1,13 @@
+node_modules
+dist
+.git
+.idea
+.claude
+.opencode
+.playwright-mcp
+tests
+rulebook.pdf
+data/*.db-shm
+data/*.db-wal
+data/gamestate.json
+data/history.json
