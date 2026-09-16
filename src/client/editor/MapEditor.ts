@@ -8,7 +8,9 @@ import { PixiBoardRenderer } from '../PixiBoardRenderer';
 import { GameState, initialGameState, Zone, ZoneConnection } from '../../types/GameState';
 import { TILE_SIZE, TILE_CELLS_PER_SIDE, TILE_PIXEL_SIZE } from '../../config/Layout';
 import { EPIC_CRATE_LIMIT, EQUIPMENT_CARDS, EPIC_EQUIPMENT_CARDS } from '../../config/EquipmentRegistry';
-import { compileScenario } from '../../services/ScenarioCompiler';
+import { compileScenario, CompiledScenario } from '../../services/ScenarioCompiler';
+import { validateMapPlayability } from '../../services/MapPlayability';
+import { editorFetch } from './editorSecret';
 import { migrateImportedMap } from '../../services/MapMigration';
 import { getRotatedTileDefinition, getCellAt } from '../../services/TileDefinitionService';
 import { setZoneGeometry } from '../utils/zoneLayout';
@@ -444,6 +446,10 @@ export class MapEditor {
   }
 
   private validationPanelEl!: HTMLElement;
+  /** Playability reasons from the shared validator; non-empty disables Save. */
+  private playabilityReasons: string[] = [];
+  /** Last preview compilation, reused by updateValidation. Null = nothing to compile. */
+  private compiledPreview: CompiledScenario | null = null;
   private createValidationPanel() {
     this.validationPanelEl = document.createElement('div');
     this.validationPanelEl.id = 'validation-panel';
@@ -616,7 +622,7 @@ export class MapEditor {
     this.pushUndo();
     this.winConditions = [...this.winConditions, defaultWinCondition(type)];
     this.renderWinConditionList();
-    this.updateValidation();
+    this.onWinConditionsChanged();
     this.refreshMigrationBanner();
   }
 
@@ -624,7 +630,7 @@ export class MapEditor {
     this.pushUndo();
     this.winConditions = this.winConditions.filter((_, i) => i !== idx);
     this.renderWinConditionList();
-    this.updateValidation();
+    this.onWinConditionsChanged();
     this.refreshMigrationBanner();
   }
 
@@ -633,6 +639,15 @@ export class MapEditor {
     if (!current) return;
     const merged = { ...current, ...patch } as WinConditionConfig;
     this.winConditions = this.winConditions.map((c, i) => (i === idx ? merged : c));
+    this.onWinConditionsChanged();
+  }
+
+  /**
+   * Win conditions feed the compiled objectives, so a change there needs the
+   * preview recompiled before the panel can judge playability.
+   */
+  private onWinConditionsChanged() {
+    this.rebuildPreviewState();
     this.updateValidation();
   }
 
@@ -842,7 +857,7 @@ export class MapEditor {
       select.onchange = () => {
         const next = { ...cond, items: cond.items.map((it, i) => i === itemIdx ? { ...it, equipmentId: select.value } : it) };
         this.winConditions = this.winConditions.map((c, i) => i === idx ? next : c);
-        this.updateValidation();
+        this.onWinConditionsChanged();
       };
       itemRow.appendChild(select);
 
@@ -859,7 +874,7 @@ export class MapEditor {
         qty.value = String(v);
         const next = { ...cond, items: cond.items.map((it, i) => i === itemIdx ? { ...it, quantity: v } : it) };
         this.winConditions = this.winConditions.map((c, i) => i === idx ? next : c);
-        this.updateValidation();
+        this.onWinConditionsChanged();
       };
       itemRow.appendChild(qty);
 
@@ -877,7 +892,7 @@ export class MapEditor {
         const rowEl = this.winConditionRowEls[idx];
         const bodyEl = rowEl?.children[1] as HTMLElement | undefined;
         if (bodyEl) this.renderCollectItemsBody(bodyEl, next, idx);
-        this.updateValidation();
+        this.onWinConditionsChanged();
       };
       itemRow.appendChild(rm);
 
@@ -895,7 +910,7 @@ export class MapEditor {
       const next = { ...cond, items: [...cond.items, { equipmentId: firstId, quantity: 1 }] };
       this.winConditions = this.winConditions.map((c, i) => i === idx ? next : c);
       this.renderCollectItemsBody(body, next, idx);
-      this.updateValidation();
+      this.onWinConditionsChanged();
     };
     body.appendChild(addItemBtn);
   }
@@ -1593,6 +1608,7 @@ export class MapEditor {
     this.state.tiles = [...this.tiles];
 
     if (this.tiles.length === 0) {
+      this.compiledPreview = null;
       this.state.zones = {};
       this.state.zoneGeometry = undefined;
       this.state.edgeClassMap = undefined;
@@ -1609,10 +1625,14 @@ export class MapEditor {
       height: Math.max(...this.tiles.map(t => t.y)) + 1,
       tiles: this.tiles,
       markers: this.markers,
+      // Carried so the compiled objectives match the authored map, which lets
+      // updateValidation reuse this compilation instead of paying for its own.
+      winConditions: this.winConditions,
     };
 
     try {
       const compiled = compileScenario(scenarioMap);
+      this.compiledPreview = compiled;
       this.state.zones = compiled.zones;
       this.state.zoneGeometry = compiled.zoneGeometry;
       this.state.edgeClassMap = compiled.edgeClassMap;
@@ -1621,6 +1641,7 @@ export class MapEditor {
       setZoneGeometry(compiled.zoneGeometry);
     } catch (e) {
       console.warn('Preview compile error:', e);
+      this.compiledPreview = null;
       this.state.zones = {};
       this.state.zoneGeometry = undefined;
       this.state.edgeClassMap = undefined;
@@ -1930,16 +1951,12 @@ export class MapEditor {
       warnings.push('No tiles placed');
     }
 
+    // Player start and spawn coverage are judged below by
+    // validateMapPlayability, against the compiled zones. Reading the markers
+    // here as well would give a second, weaker answer: a plain spawn marker
+    // sharing a compiled zone with a coloured one looks fine per-marker and is
+    // dormant in the game.
     const playerStart = this.markers.find(m => m.type === MarkerType.PlayerStart);
-    if (!playerStart) warnings.push('Missing: Player Start');
-
-    const hasSpawn = this.markers.some(m => SPAWN_CLASS_MARKERS.includes(m.type));
-    const hasAlwaysOnSpawn = this.markers.some(m => m.type === MarkerType.ZombieSpawn);
-    if (!hasSpawn) {
-      warnings.push('Missing: Zombie Spawn');
-    } else if (!hasAlwaysOnSpawn) {
-      warnings.push('Optional: All Spawn Zones are dormant — game starts with no active spawns');
-    }
 
     const hasExit = this.markers.some(m => m.type === MarkerType.Exit);
     if (!hasExit) warnings.push('Optional: No Exit point');
@@ -1993,6 +2010,16 @@ export class MapEditor {
       const buildingZones = Object.values(this.state.zones).filter(z => z.isBuilding).length;
       warnings.push(`Optional: ${zoneCount} zones (${streetZones} street, ${buildingZones} building)`);
     }
+
+    // Playability — the same check the server runs on save, so the author sees
+    // the refusal here first. Reuses the preview compilation rather than
+    // compiling the map a second time on every edit.
+    this.playabilityReasons = this.compiledPreview
+      ? validateMapPlayability(this.buildScenarioMap('validation'), this.compiledPreview)
+      : [];
+    this.playabilityReasons.forEach(r => warnings.push(`Not playable: ${r}`));
+    const saveBtn = this.paletteContainer.querySelector('[data-action="map-save"]') as HTMLButtonElement | null;
+    if (saveBtn) saveBtn.disabled = this.playabilityReasons.length > 0;
 
     // Win condition validation — surfaces in panel rows + summarized here.
     const wcVal = this.validateWinConditions();
@@ -2114,10 +2141,17 @@ export class MapEditor {
       return;
     }
 
+    // updateValidation keeps this current on every edit, and it is what
+    // disabled the Save button that got us here.
+    if (this.playabilityReasons.length > 0) {
+      notificationManager.show({ variant: 'danger', message: `Cannot save — ${this.playabilityReasons.join('; ')}` });
+      return;
+    }
+
     const mapData: ScenarioMap = this.buildScenarioMap(name);
 
     try {
-      const response = await fetch('/api/maps', {
+      const response = await editorFetch('/api/maps', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(mapData),
@@ -2126,7 +2160,9 @@ export class MapEditor {
       if (response.ok) {
         notificationManager.show({ variant: 'success', message: `Map "${name}" saved` });
       } else {
-        notificationManager.show({ variant: 'danger', message: 'Failed to save map' });
+        const body = await response.json().catch(() => null) as { reasons?: string[] } | null;
+        const detail = body?.reasons?.length ? ` — ${body.reasons.join('; ')}` : '';
+        notificationManager.show({ variant: 'danger', message: `Failed to save map${detail}` });
       }
     } catch (e) {
       console.error(e);
@@ -2215,7 +2251,7 @@ export class MapEditor {
                     el.addEventListener('click', async (e) => {
                       if (!(e.target as HTMLElement).closest('[data-action="confirm-delete"]')) return;
                       try {
-                        await fetch(`/api/maps/${encodeURIComponent(map.id)}`, { method: 'DELETE' });
+                        await editorFetch(`/api/maps/${encodeURIComponent(map.id)}`, { method: 'DELETE' });
                         maps.splice(idx, 1);
                         modalManager.close();
                         if (maps.length > 0) {

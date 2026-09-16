@@ -1,6 +1,7 @@
 import { GameState, ObjectiveType, Objective } from '../../types/GameState';
 import { ActionRequest, ActionType } from '../../types/Action';
 import { Rng } from '../Rng';
+import { es, equipmentName } from '../../strings/es';
 
 /**
  * TAKE_EPIC_CRATE handler. Triggered when a survivor occupies a zone with a
@@ -23,11 +24,11 @@ export function handleTakeEpicCrate(state: GameState, intent: ActionRequest): Ga
   if (!survivor) throw new Error('Survivor not found');
 
   const zone = newState.zones[survivor.position.zoneId];
-  if (!zone?.hasEpicCrate) throw new Error('No Epic Crate in this zone');
+  if (!zone?.hasEpicCrate) throw new Error(es.errors.noEpicCrate);
 
   // The drawnCard staging slot must be free — otherwise the survivor has an
   // unresolved search and can't take a new card.
-  if (survivor.drawnCard) throw new Error('Resolve pending card before taking Epic Crate');
+  if (survivor.drawnCard) throw new Error(es.errors.resolvePendingCard);
 
   // Draw the top epic card (reshuffle from epicDiscard if empty).
   if (newState.epicDeck.length === 0 && newState.epicDiscard.length > 0) {
@@ -50,7 +51,7 @@ export function handleTakeEpicCrate(state: GameState, intent: ActionRequest): Ga
     // Both deck and discard empty — should not occur because EPIC_CRATE_LIMIT
     // clamps editor placements at the deck size, but guard explicitly so a
     // misconfigured map fails loudly.
-    throw new Error('Epic deck empty — cannot draw a weapon for the crate');
+    throw new Error(es.errors.epicDeckEmpty);
   }
 
   // Stage the new card so the existing drawnCard UI lets the player slot it
@@ -75,7 +76,7 @@ export function handleTakeEpicCrate(state: GameState, intent: ActionRequest): Ga
     playerId: intent.playerId,
     survivorId: intent.survivorId,
     timestamp: Date.now(),
-    description: `Drew Epic Weapon: ${card.name}`,
+    description: es.log.epicWeapon(equipmentName(card)),
     epicWeaponDrawn: card.equipmentId,
   };
 

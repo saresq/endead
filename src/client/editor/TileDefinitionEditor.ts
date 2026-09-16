@@ -25,6 +25,7 @@ import {
 import { TILE_CELLS_PER_SIDE } from '../../config/Layout';
 import { notificationManager } from '../ui/NotificationManager';
 import { modalManager } from '../ui/overlays/ModalManager';
+import { editorFetch } from './editorSecret';
 
 // --- Constants ---
 
@@ -1287,7 +1288,7 @@ export class TileDefinitionEditor {
     this.state.def.gridSize = GRID;
     regenerateEdges(this.state.def);
     try {
-      const res = await fetch('/api/tile-definitions', {
+      const res = await editorFetch('/api/tile-definitions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(this.state.def),
@@ -1357,7 +1358,7 @@ export class TileDefinitionEditor {
         const text = await file.text();
         const defs = JSON.parse(text);
         if (!Array.isArray(defs)) { notificationManager.show({ variant: 'danger', message: 'JSON must be an array of tile definitions' }); return; }
-        const res = await fetch('/api/tile-definitions/import', {
+        const res = await editorFetch('/api/tile-definitions/import', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: text,

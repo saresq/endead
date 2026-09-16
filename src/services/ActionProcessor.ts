@@ -17,6 +17,7 @@ import { handleTakeObjective } from './handlers/ObjectiveHandlers';
 import { handleTakeEpicCrate } from './handlers/EpicCrateHandlers';
 import { handleNothing, handleEndTurn } from './handlers/TurnHandlers';
 import { handleActivateCheat } from './handlers/CheatHandlers';
+import { es } from '../strings/es';
 
 const handlers: Partial<Record<ActionType, ActionHandler>> = {
   [ActionType.JOIN_LOBBY]: handleJoinLobby,
@@ -149,7 +150,7 @@ export function processAction(state: GameState, intent: ActionRequest): ActionRe
   if (!UNBLOCKED_ACTIONS.includes(intent.type) && ZombiePhaseManager.hasPendingWounds(state)) {
     return {
       success: false,
-      error: { code: 'PENDING_WOUNDS', message: 'Resolve pending wounds first.' },
+      error: { code: 'PENDING_WOUNDS', message: es.errors.pendingWounds },
     };
   }
 
@@ -286,23 +287,28 @@ export function processAction(state: GameState, intent: ActionRequest): ActionRe
             turn: newState.turn,
         };
 
-        // Capture rich combat/action feedback from lastAction
-        if (newState.lastAction) {
-            historyEntry.description = newState.lastAction.description;
-            historyEntry.dice = newState.lastAction.dice;
-            historyEntry.hits = newState.lastAction.hits;
-            historyEntry.damagePerHit = newState.lastAction.damagePerHit;
-            historyEntry.bonusDice = newState.lastAction.bonusDice;
-            historyEntry.bonusDamage = newState.lastAction.bonusDamage;
-            historyEntry.rerolledFrom = newState.lastAction.rerolledFrom;
-            historyEntry.rerollSource = newState.lastAction.rerollSource;
-            historyEntry.usedFreeAction = newState.lastAction.usedFreeAction;
-            historyEntry.freeActionType = newState.lastAction.freeActionType;
+        // Capture feedback only when this action produced it (handlers stamp
+        // lastAction / spawnContext with a fresh timestamp); never copy stale ones.
+        const la = newState.lastAction;
+        if (la && la.timestamp !== state.lastAction?.timestamp) {
+            historyEntry.description = la.description;
+            historyEntry.dice = la.dice;
+            historyEntry.hits = la.hits;
+            historyEntry.threshold = la.threshold;
+            historyEntry.damagePerHit = la.damagePerHit;
+            historyEntry.bonusDice = la.bonusDice;
+            historyEntry.bonusDamage = la.bonusDamage;
+            historyEntry.rerolledFrom = la.rerolledFrom;
+            historyEntry.rerollSource = la.rerollSource;
+            historyEntry.usedFreeAction = la.usedFreeAction;
+            historyEntry.freeActionType = la.freeActionType;
         }
 
-        // Capture spawn context for zombie phase entries
-        if (newState.spawnContext?.cards?.length) {
-            historyEntry.spawnContext = newState.spawnContext;
+        // Capture spawn context (spawns + zombie wounds) for zombie phase entries
+        const sc = newState.spawnContext;
+        if (sc && sc.timestamp !== state.spawnContext?.timestamp
+            && (sc.cards?.length || sc.zombieWounds?.length)) {
+            historyEntry.spawnContext = sc;
         }
 
         newState.history = [

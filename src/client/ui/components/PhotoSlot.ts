@@ -6,8 +6,10 @@
  * notches, optional amber "selected" dot, and an optional caption.
  *
  * Usage:
- *   renderPhotoSlot({ size: 'md', name: 'REVENANT', role: 'CALLSIGN P-01', selected: true })
+ *   renderPhotoSlot({ size: 'md', name: 'Wanda', role: 'Exploradora', selected: true })
  */
+
+import { es } from '../../../strings/es';
 
 export type PhotoSlotSize = 'sm' | 'md' | 'lg';
 
@@ -49,7 +51,7 @@ export function renderPhotoSlot(opts: PhotoSlotOptions): string {
   `;
 
   const selectedDotHtml = selected
-    ? `<span class="fm-photoslot__tag" aria-hidden="true">■ SELECTED</span>`
+    ? `<span class="fm-photoslot__tag" aria-hidden="true">■ ${es.board.selected}</span>`
     : '';
 
   const hasCaption = !!(opts.name || opts.role);

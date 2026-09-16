@@ -2,6 +2,7 @@
 import { GameState } from '../../types/GameState';
 import { ActionRequest, ActionType } from '../../types/Action';
 import { getConnection, isDoorBlocked } from './handlerUtils';
+import { es, skillName } from '../../strings/es';
 
 export function handleMove(state: GameState, intent: ActionRequest): GameState {
   const newState = structuredClone(state);
@@ -21,8 +22,8 @@ export function handleMove(state: GameState, intent: ActionRequest): GameState {
     movePath = [targetId];
   }
 
-  if (movePath.length > 2) throw new Error('Cannot move more than 2 zones');
-  if (movePath.length > 1 && !hasExtraZone) throw new Error('Survivor cannot move 2 zones');
+  if (movePath.length > 2) throw new Error(es.errors.tooManyZones);
+  if (movePath.length > 1 && !hasExtraZone) throw new Error(es.errors.oneZoneOnly);
 
   let currentZoneId = survivor.position.zoneId;
   let extraAPCost = 0;
@@ -36,11 +37,11 @@ export function handleMove(state: GameState, intent: ActionRequest): GameState {
     if (!nextZone) throw new Error('Target zone invalid');
 
     if (!getConnection(currentZone, nextZoneId)) {
-      throw new Error(`Zones not connected: ${currentZoneId} -> ${nextZoneId}`);
+      throw new Error(es.errors.zonesNotConnected);
     }
 
     if (isDoorBlocked(currentZone, nextZoneId)) {
-      throw new Error('Door is closed. You must open it first.');
+      throw new Error(es.errors.doorClosed);
     }
 
     // Zombie zone control: leaving a zone with zombies costs +1 AP per zombie
@@ -73,7 +74,6 @@ export function handleMove(state: GameState, intent: ActionRequest): GameState {
     survivor.hitAndRunFreeMove = false;
   }
 
-  const fromZoneId = state.survivors[intent.survivorId!].position.zoneId;
   survivor.position.zoneId = currentZoneId;
   survivor.hasMoved = true;
 
@@ -82,7 +82,7 @@ export function handleMove(state: GameState, intent: ActionRequest): GameState {
     playerId: intent.playerId,
     survivorId: intent.survivorId,
     timestamp: Date.now(),
-    description: `Moved from ${fromZoneId} to ${currentZoneId}`,
+    description: es.log.moved,
   };
 
   return newState;
@@ -93,15 +93,15 @@ export function handleSprint(state: GameState, intent: ActionRequest): GameState
   const survivor = newState.survivors[intent.survivorId!];
 
   if (!survivor.skills.includes('sprint')) {
-    throw new Error('Survivor does not have Sprint skill');
+    throw new Error(es.errors.noSkill(skillName('sprint')));
   }
   if (survivor.sprintUsedThisTurn && !survivor.cheatMode) {
-    throw new Error('Sprint already used this turn');
+    throw new Error(es.errors.skillUsed(skillName('sprint')));
   }
 
   const path: string[] = intent.payload?.path;
   if (!path || !Array.isArray(path) || path.length < 2 || path.length > 3) {
-    throw new Error('Sprint requires a path of 2-3 zones');
+    throw new Error(es.errors.pathLength(skillName('sprint'), 2, 3));
   }
 
   let currentZoneId = survivor.position.zoneId;
@@ -113,11 +113,11 @@ export function handleSprint(state: GameState, intent: ActionRequest): GameState
     if (!currentZone) throw new Error(`Zone ${currentZoneId} invalid`);
 
     if (!getConnection(currentZone, targetZoneId)) {
-      throw new Error(`Zones not connected: ${currentZoneId} -> ${targetZoneId}`);
+      throw new Error(es.errors.zonesNotConnected);
     }
 
     if (isDoorBlocked(currentZone, targetZoneId)) {
-      throw new Error('Door is closed along sprint path');
+      throw new Error(es.errors.doorClosedOnPath);
     }
 
     // Leaving a zone with zombies costs +1 AP per zombie (same as regular move)
@@ -135,7 +135,7 @@ export function handleSprint(state: GameState, intent: ActionRequest): GameState
     if (hasZombiesInTarget) {
       // Must have moved at least 2 zones for a valid sprint
       if (i + 1 < 2) {
-        throw new Error('Sprint requires moving at least 2 zones but was stopped by zombies');
+        throw new Error(es.errors.sprintBlocked);
       }
       break;
     }

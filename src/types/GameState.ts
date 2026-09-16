@@ -394,6 +394,7 @@ export interface GameState {
     description?: string;
     dice?: number[];
     hits?: number;
+    threshold?: number;
     damagePerHit?: number;
     bonusDice?: number;
     bonusDamage?: number;
@@ -412,6 +413,8 @@ export interface GameState {
     survivorId?: string;
     dice?: number[];
     hits?: number;
+    /** Minimum die face that hits (ATTACK only). */
+    threshold?: number;
     description?: string;
     timestamp: number;
     // Combat feedback metadata
@@ -452,6 +455,8 @@ export interface GameState {
           detail: SpawnDetail; // The detail that was applied
           dangerLevel: DangerLevel;
       }[];
+      /** Wounds applied directly by zombie attacks this phase (not deferred decisions). */
+      zombieWounds?: { survivorId: string; zoneId: string; amount: number }[];
       timestamp: number;
   };
 

@@ -1,117 +1,187 @@
 /**
- * EventEntry — Renders a single event log entry (last action, spawn info).
+ * EventEntry — one renderer for history entries, used by the latest-event
+ * card and the event log.
  */
 
-import { ZombieType } from '../../../types/GameState';
-import { renderZombieBadge } from './ZombieBadge';
+import type { GameState, ZombieType } from '../../../types/GameState';
+import type { HistoryEntry } from '../eventLog';
+import { formatZoneId, formatActionType } from '../../utils/zoneFormat';
+import { displayName } from '../../utils/displayName';
+import { es, zombieLabel } from '../../../strings/es';
 
-export interface LastActionData {
-  type: string;
-  description?: string;
-  dice?: number[];
-  hits?: number;
-  // Combat feedback metadata
-  rerolledFrom?: number[];
-  rerollSource?: 'lucky' | 'plenty_of_bullets' | 'plenty_of_shells';
-  bonusDice?: number;
-  bonusDamage?: number;
-  damagePerHit?: number;
-  usedFreeAction?: boolean;
-  freeActionType?: string;
+/** Hit threshold for entries recorded before `threshold` was stored. */
+const DEFAULT_THRESHOLD = 4;
+
+function escapeHtml(s: string): string {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
-export function renderLastActionEntry(action: LastActionData): string {
-  // FREE label
-  const freeLabel = action.usedFreeAction
-    ? `<span class="event-entry__free">${action.freeActionType || 'FREE'}</span>`
-    : '';
+export interface DieOptions {
+  hit?: boolean;
+  discarded?: boolean;
+  /** Play the roll-in keyframe, staggered by `index`. */
+  roll?: boolean;
+  index?: number;
+}
 
-  // Damage boost indicator
-  const damageBoost = action.bonusDamage && action.bonusDamage > 0
-    ? `<span class="event-entry__boost">+${action.bonusDamage} Dmg</span>`
-    : '';
+/** A d6 face: nine pip slots, `data-face` selects which ones show. */
+export function renderDie(value: number, opts: DieOptions = {}): string {
+  const classes = [
+    'die',
+    opts.hit ? 'die--hit' : 'die--miss',
+    opts.discarded ? 'die--discarded' : '',
+    opts.roll ? 'die--roll' : '',
+  ].filter(Boolean).join(' ');
+  const label = es.log.dieLabel(value, opts.discarded ? 'discarded' : opts.hit ? 'hit' : 'miss');
+  const style = opts.roll ? ` style="--i:${opts.index ?? 0}"` : '';
+  return `<span class="${classes}" data-face="${value}" role="img" aria-label="${label}"${style}>${'<i></i>'.repeat(9)}</span>`;
+}
 
-  // Bonus dice indicator
-  const diceBoost = action.bonusDice && action.bonusDice > 0
-    ? `<span class="event-entry__boost">+${action.bonusDice} Dice</span>`
-    : '';
+function actorName(entry: HistoryEntry, state: GameState): string {
+  const survivor = entry.survivorId ? state.survivors[entry.survivorId] : undefined;
+  if (survivor) return displayName(survivor.name, survivor.characterClass);
+  const player = state.lobby?.players.find(p => p.id === entry.playerId);
+  return displayName(player?.name, player?.characterClass);
+}
 
-  const boostLine = (damageBoost || diceBoost)
-    ? `<div class="event-entry__boosts">${diceBoost}${damageBoost}</div>`
-    : '';
+function survivorName(state: GameState, id: string): string {
+  const survivor = state.survivors[id];
+  return survivor ? displayName(survivor.name, survivor.characterClass) || id : id;
+}
 
-  // Reroll indicator (Lucky / Plenty of Bullets / Plenty of Shells)
-  let rerollHtml = '';
-  if (action.rerolledFrom && action.rerolledFrom.length > 0) {
-    const label = action.rerollSource === 'lucky'
-      ? 'Lucky — rerolled:'
-      : action.rerollSource === 'plenty_of_bullets'
-        ? 'Plenty of Bullets — rerolled:'
-        : action.rerollSource === 'plenty_of_shells'
-          ? 'Plenty of Shells — rerolled:'
-          : 'Rerolled:';
-    const originalDice = action.rerolledFrom.map(d =>
-      `<span class="event-die event-die--discarded">${d}</span>`
-    ).join('');
-    rerollHtml = `<div class="event-entry__lucky">
-      <span class="event-entry__lucky-label">${label}</span>
-      ${originalDice}
-    </div>`;
+function renderAttackBody(entry: HistoryEntry, roll: boolean): string {
+  const threshold = entry.threshold ?? DEFAULT_THRESHOLD;
+  const parts: string[] = [];
+
+  const boosts: string[] = [];
+  if (entry.bonusDice) boosts.push(es.log.bonusDice(entry.bonusDice));
+  if (entry.bonusDamage) boosts.push(es.log.bonusDamage(entry.bonusDamage));
+  if (boosts.length) {
+    parts.push(`<div class="event-entry__boosts">${boosts.map(b => `<span class="event-entry__boost">${b}</span>`).join('')}</div>`);
   }
 
-  let diceHtml = '';
-  if (action.dice && action.dice.length > 0) {
-    const diceValues = action.dice.map(d =>
-      `<span class="event-die ${d >= 4 ? 'event-die--hit' : ''}">${d}</span>`
-    ).join('');
-    const dmgInfo = action.damagePerHit && action.damagePerHit > 1
-      ? ` (${action.damagePerHit} dmg each)`
-      : '';
-    diceHtml = `<div class="event-entry__dice">${diceValues} <span class="event-entry__hits">${action.hits} hit${action.hits !== 1 ? 's' : ''}${dmgInfo}</span></div>`;
+  if (entry.rerolledFrom?.length) {
+    const source = es.log.rerollSources[entry.rerollSource ?? ''] ?? es.log.rerolledFallback;
+    parts.push(`<div class="event-entry__reroll">
+      <span class="event-entry__reroll-label">${es.log.rerolled(source)}</span>
+      ${entry.rerolledFrom.map(d => renderDie(d, { hit: d >= threshold, discarded: true })).join('')}
+    </div>`);
   }
 
-  return `
-    <div class="event-entry event-entry--action">
-      <div class="event-entry__desc">${freeLabel}${action.description || action.type}</div>
-      ${boostLine}
-      ${rerollHtml}
-      ${diceHtml}
+  if (entry.dice?.length) {
+    const hits = entry.hits ?? entry.dice.filter(d => d >= threshold).length;
+    const dmg = entry.damagePerHit && entry.damagePerHit > 1 && hits > 0 ? es.log.damageEach(entry.damagePerHit) : '';
+    const result = hits === 0
+      ? `<span class="event-entry__miss">${es.log.miss}</span>`
+      : `<span class="event-entry__hits">${es.log.hits(hits)}${dmg}</span>`;
+    const dice = entry.dice.map((d, i) => renderDie(d, { hit: d >= threshold, roll, index: i })).join('');
+    parts.push(`<div class="event-entry__dice">${dice}${result}</div>`);
+  }
+
+  return parts.join('');
+}
+
+function renderZombiePhase(entry: HistoryEntry, state: GameState): string {
+  const ctx = entry.spawnContext;
+  if (!ctx) return '';
+  const lines: string[] = [];
+
+  for (const card of ctx.cards ?? []) {
+    const zone = escapeHtml(formatZoneId(card.zoneId, state));
+    if (card.detail?.extraActivation) {
+      lines.push(`<div class="event-entry__line"><span class="event-entry__zone">${zone}</span> ${escapeHtml(es.log.extraActivation(zombieLabel(card.detail.extraActivation, 2)))}</div>`);
+      continue;
+    }
+    const zombies = Object.entries(card.detail?.zombies ?? {})
+      .filter(([, n]) => (n ?? 0) > 0)
+      .map(([type, n]) => `${n} ${escapeHtml(zombieLabel(type as ZombieType, n ?? 0))}`);
+    if (zombies.length) {
+      lines.push(`<div class="event-entry__line"><span class="event-entry__zone">${zone}:</span> ${zombies.join(', ')}</div>`);
+    }
+  }
+
+  const wounds = (ctx.zombieWounds ?? []).map(w =>
+    `<span class="event-entry__wound">${escapeHtml(survivorName(state, w.survivorId))} -${w.amount}</span>`);
+  if (wounds.length) lines.push(`<div class="event-entry__line event-entry__wounds">${wounds.join(' ')}</div>`);
+
+  if (!lines.length) return '';
+  return `<div class="event-entry__zombies"><div class="event-entry__subtitle">${es.common.zombiePhase}</div>${lines.join('')}</div>`;
+}
+
+function zoneTarget(entry: HistoryEntry, state: GameState): string {
+  const p = entry.payload;
+  if (p?.targetZoneId) return `→ ${escapeHtml(formatZoneId(p.targetZoneId, state))}`;
+  if (Array.isArray(p?.path)) return `→ ${(p.path as string[]).map(id => escapeHtml(formatZoneId(id, state))).join(' → ')}`;
+  return '';
+}
+
+export interface EventEntryOptions {
+  /** Play the dice roll-in (latest-event card, first render of the entry). */
+  roll?: boolean;
+}
+
+export function renderEventEntry(entry: HistoryEntry, state: GameState, opts: EventEntryOptions = {}): string {
+  const name = escapeHtml(actorName(entry, state));
+  // Handler descriptions are full sentences, so they replace the action label.
+  let label = entry.description ? '' : formatActionType(entry.actionType);
+  let detail = entry.description ? escapeHtml(entry.description) : zoneTarget(entry, state);
+  let body = '';
+  let kind = 'action';
+
+  switch (entry.actionType) {
+    case 'ATTACK':
+    case 'REROLL_LUCKY':
+      if (entry.actionType === 'REROLL_LUCKY') label = es.log.luckyReroll;
+      body = renderAttackBody(entry, !!opts.roll);
+      break;
+    case 'MOVE':
+    case 'SPRINT':
+    case 'CHARGE':
+      // Move descriptions don't name the zones; the payload does.
+      label = formatActionType(entry.actionType);
+      detail = zoneTarget(entry, state);
+      break;
+    case 'OPEN_DOOR': {
+      label = escapeHtml(entry.description || es.log.doorOpenedShort);
+      detail = zoneTarget(entry, state);
+      break;
+    }
+    case 'TRADE_START': {
+      const target = entry.payload?.targetSurvivorId ? state.survivors[entry.payload.targetSurvivorId] : undefined;
+      detail = target ? es.log.tradeWith(escapeHtml(displayName(target.name, target.characterClass))) : '';
+      break;
+    }
+    case 'DISTRIBUTE_ZOMBIE_WOUNDS': {
+      const zone = entry.payload?.zoneId ? escapeHtml(formatZoneId(entry.payload.zoneId, state)) : '';
+      label = es.log.zombieWounds;
+      detail = zone ? es.log.inZone(zone) : '';
+      const parts = Object.entries((entry.payload?.assignments ?? {}) as Record<string, number>)
+        .filter(([, n]) => n > 0)
+        .map(([sid, n]) => `<span class="event-entry__wound">${escapeHtml(survivorName(state, sid))} -${n}</span>`);
+      if (parts.length) body = `<div class="event-entry__line event-entry__wounds">${parts.join(' ')}</div>`;
+      kind = 'spawn';
+      break;
+    }
+  }
+
+  // The zombie phase rides on whichever action ended the round: END_TURN, or
+  // the last action of a turn that ran out of AP.
+  const zombiePhase = renderZombiePhase(entry, state);
+  if (zombiePhase) {
+    body += zombiePhase;
+    kind = 'spawn';
+  }
+
+  const free = entry.usedFreeAction
+    ? `<span class="event-entry__free">${escapeHtml(entry.freeActionType || es.common.free)}</span>`
+    : '';
+
+  return `<div class="event-entry event-entry--${kind}">
+      <div class="event-entry__desc">${name ? `<span class="event-entry__actor">${name}</span> ` : ''}${free}${label ? `<span class="event-entry__label">${label}</span>` : ''}${label && detail ? ' ' : ''}${detail}</div>
+      ${body}
     </div>`;
-}
-
-export interface SpawnCardData {
-  zoneId: string;
-  detail: {
-    zombies?: { [key in ZombieType]?: number };
-    extraActivation?: ZombieType;
-  };
-}
-
-export function renderSpawnEntry(cards: SpawnCardData[]): string {
-  if (cards.length === 0) return '';
-
-  const entries = cards.map(c => {
-    const zombieBadges = c.detail.zombies
-      ? Object.entries(c.detail.zombies)
-          .filter(([, n]) => n && n > 0)
-          .map(([type, count]) => renderZombieBadge(type as ZombieType, count))
-          .join(' ')
-      : '';
-
-    const extra = c.detail.extraActivation
-      ? `<span class="event-entry__extra">Extra: All ${c.detail.extraActivation} activate!</span>`
-      : '';
-
-    return `
-      <div class="event-entry event-entry--spawn">
-        <span class="event-entry__zone">Zone ${c.zoneId}</span>
-        ${extra}
-        <div class="event-entry__badges">${zombieBadges}</div>
-      </div>`;
-  }).join('');
-
-  return `<div class="event-log__section">
-    <div class="event-log__title">Spawn</div>
-    ${entries}
-  </div>`;
 }

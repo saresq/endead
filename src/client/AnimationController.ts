@@ -2,6 +2,19 @@
 
 import * as PIXI from 'pixi.js';
 import { EntityId, ZoneId } from '../types/GameState';
+import { BOARD_THEME } from './config/BoardTheme';
+import type { CueTone } from './ui/eventLog';
+
+/** Board surface floating text is drawn on. */
+export interface FxTarget {
+  fxLayer: PIXI.Container;
+  cameraScale: number;
+  zoneCenter(zoneId: ZoneId): { x: number; y: number };
+}
+
+const FLOAT_TEXT_MS = 1200;
+const FLOAT_TEXT_RISE_PX = 30;
+const FLOAT_TEXT_FONT_PX = 22;
 
 export interface AnimationEvent {
   type: 'SPAWN' | 'MOVE' | 'ATTACK' | 'DEATH';
@@ -19,9 +32,63 @@ export class AnimationController {
   /** Entities currently being animated — the renderer should not snap their position. */
   private animatingEntities: Set<EntityId> = new Set();
 
-  constructor(app: PIXI.Application, getSprite: (id: EntityId) => PIXI.Container | undefined) {
+  private fx: FxTarget | null;
+
+  constructor(
+    app: PIXI.Application,
+    getSprite: (id: EntityId) => PIXI.Container | undefined,
+    fx: FxTarget | null = null,
+  ) {
     this.app = app;
     this.getSprite = getSprite;
+    this.fx = fx;
+  }
+
+  /**
+   * Short text over a zone that rises and fades (no rise under reduced motion).
+   * Sized in screen pixels at spawn time, whatever the camera zoom.
+   */
+  public floatText(zoneId: ZoneId, text: string, tone: CueTone): void {
+    const fx = this.fx;
+    if (!fx) return;
+    const scale = fx.cameraScale || 1;
+    const label = new PIXI.Text({
+      text,
+      style: {
+        fontFamily: BOARD_THEME.font.display,
+        fontSize: FLOAT_TEXT_FONT_PX,
+        fill: BOARD_THEME.cue[tone],
+        stroke: { color: BOARD_THEME.cue.stroke, width: 4 },
+        letterSpacing: 1,
+      },
+    });
+    label.anchor.set(0.5);
+    label.scale.set(1 / scale);
+    const c = fx.zoneCenter(zoneId);
+    // Stack cues that land on the same zone at once.
+    const stacked = fx.fxLayer.children.filter(ch => (ch as { cueZone?: string }).cueZone === zoneId).length;
+    const startY = c.y - (stacked * (FLOAT_TEXT_FONT_PX + 4)) / scale;
+    label.position.set(c.x, startY);
+    (label as unknown as { cueZone: string }).cueZone = zoneId;
+    fx.fxLayer.addChild(label);
+
+    const rise = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : FLOAT_TEXT_RISE_PX / scale;
+    const start = performance.now();
+    const animate = () => {
+      if (label.destroyed) {
+        this.app.ticker.remove(animate);
+        return;
+      }
+      const t = Math.min((performance.now() - start) / FLOAT_TEXT_MS, 1);
+      label.y = startY - rise * (1 - (1 - t) * (1 - t));
+      // Hold fully visible for the first half, then fade.
+      label.alpha = t < 0.5 ? 1 : 1 - (t - 0.5) / 0.5;
+      if (t >= 1) {
+        this.app.ticker.remove(animate);
+        label.destroy();
+      }
+    };
+    this.app.ticker.add(animate);
   }
 
   /** Returns true if the entity is mid-animation (renderer should skip position snap). */

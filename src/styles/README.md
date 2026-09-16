@@ -2,92 +2,103 @@
 
 Single source of truth: `src/styles/tokens.css`.
 
+The skin is **pulp comic**: cream paper panels with black ink text, solid ink
+outlines and a hard, unblurred ink offset shadow, floating on a dark ink page.
+Comic red is primary and destructive, comic yellow is selected / active /
+"your turn", green and blue are success and info.
+
 The PIXI canvas renderer uses a parallel hex-literal table at
 `src/client/config/BoardTheme.ts`. CSS vars are unreadable from PIXI, so the
 two are hand-kept in sync — the comments in `BoardTheme.ts` reference the
 matching CSS token name. When you change a palette anchor in `tokens.css`,
 update the corresponding entry in `BoardTheme.ts`.
 
-## Naming
+## Rules
 
-The Field Manual palette uses a `--{role}-{step}` convention. **Use these
-canonical names in all new code.** The deprecated aliases at the bottom of
-`tokens.css` (`--surface-0..5`, `--accent`, `--accent-bright`,
-`--accent-hover`, `--text-primary`, `--text-secondary`) are a migration
-shim only and will be removed in a future cleanup.
+1. **No colour literals outside `tokens.css`.** `base.css`, `layout.css`,
+   `utilities.css` and everything under `components/` reference tokens only.
+   `transparent`, `currentColor` and colours inside `@media (forced-colors)`
+   are the only exceptions.
+2. **Coloured text only on `--paper` or `--paper-2`.** `--paper-3` (inputs,
+   wells, empty slots) carries `--text` or `--text-muted` only.
+3. **Text over `--page` or the board** uses `--paper`, `--highlight` or
+   `--text-on-page-muted`, and keeps an ink outline so it reads over tile art.
+4. **No decoration layers.** No grain, noise, scanlines, vignettes, rust
+   stains, hazard tape, corner brackets, chamfer `clip-path`s or glow shadows.
+5. **No looping skin animation.** Functional motion only (die roll-in, board
+   cues, sheet transitions, toasts), and it honours `prefers-reduced-motion`.
+
+## Palette
+
+| Token | Role |
+|---|---|
+| `--page`, `--page-2` | dark ink ground: menu, lobby, board, scrim base |
+| `--paper`, `--paper-2`, `--paper-3` | panels/cards, raised rows and hover, inputs and wells |
+| `--ink` | outlines, shadows, text on yellow |
+| `--text`, `--text-2`, `--text-muted` | body, secondary, muted text on paper |
+| `--text-on-page`, `--text-on-page-muted` | text over the page or the board |
+| `--text-inverse` | text on `--accent` / `--ink` fills |
+| `--accent`, `--accent-text`, `--accent-soft` | red fill, red text on paper, red tinted row |
+| `--highlight`, `--highlight-soft` | selected / active / your turn, and its tinted row |
+| `--success`, `--info`, `--warning`, `--danger`, `--danger-orange` (+ `-soft`) | status |
+| `--line`, `--line-strong` | hairlines and dividers |
+| `--scrim` | modal and overlay backdrop |
+| `--player-1..6` (+ `-soft`) | player identity; equal to `PlayerIdentities.ts` |
+| `--zombie-*` (+ `-soft`) | zombie types; equal to `BoardTheme.ts` and `ZombieTypeConfig.ts` |
+
+Every pair the skin uses clears WCAG AA (4.5:1 for body text, 3:1 for large
+text and non-text indicators). `--accent` is `#c7241c` rather than a deeper
+red so a red fill on the dark page still clears 3:1.
+
+## Surfaces
+
+A paper panel is exactly this:
 
 ```css
-/* OLD — do not use in new code */
-color: var(--text-primary);
-background: var(--surface-2);
-
-/* NEW — canonical Field Manual names */
-color: var(--bone-100);
-background: var(--bg-2);
+background: var(--paper);
+color: var(--text);
+border: var(--border);            /* 2px solid ink; --border-heavy = 3px */
+border-radius: var(--radius);     /* 6px; --radius-sm 4px for small chips */
+box-shadow: var(--shadow);        /* 3px 3px 0 ink; --shadow-lg for modals */
 ```
 
-> **Not deprecated:** the four alpha-tinted tokens `--accent-muted`,
-> `--accent-glow`, `--accent-border`, and `--surface-inset` are
-> **canonical semantic tokens**, not legacy aliases. They encode an
-> opacity tint that has no direct role/step equivalent. Keep using them
-> and do not rename.
+`--border` and `--border-heavy` are **full shorthands**, not widths. When a
+rule needs its own colour, compose it from `--border-width` /
+`--border-width-heavy`.
 
-### Role / step palette
+A pressed control translates onto its own shadow and drops it — never a
+layout-affecting change:
 
-| Role        | Steps                              | Purpose                          |
-|-------------|------------------------------------|----------------------------------|
-| `--bg-*`    | `bg-0` (body) → `bg-3` (input)     | Background surface tiers.        |
-| `--olive-*` | `olive-300`, `500`, `700`, `900`   | Cool olive structural ramp.      |
-| `--rust-*`  | `rust-300`, `400`, `500`, `700`    | Warning / corrosion ramp.        |
-| `--amber-*` | `amber-200`, `400`, `500`          | Brand accent ramp (amber CTAs).  |
-| `--bone-*`  | `bone-100` (text), `300`, `500`    | Bone-white text ramp.            |
+```css
+:active { transform: translate(var(--press-offset), var(--press-offset)); box-shadow: none; }
+```
 
-The number is a luminance step, not a saturation step — higher = brighter.
+`--halftone` is the one texture in the system: a flat dot field used on the
+menu and lobby page ground only.
 
-### Semantic tokens (canonical)
+## Type
 
-Layered on top of the role/step palette. Use these when the role IS the
-meaning, not a raw color:
+Two web families, loaded from Google Fonts in `index.html`:
 
-- Status: `--success`, `--danger`, `--warning`, `--info`
-- HUD: `--hud-phosphor`, `--hud-amber`, `--hud-readout-bg`
-- Surfaces: `--card-bg`, `--modal-bg`, `--menu-bg`
-- Text: `--text-muted`, `--text-disabled`, `--text-inverse`, `--text-danger-red`
-- Alpha tints: `--accent-muted`, `--accent-glow`, `--accent-border`,
-  `--surface-inset` (these encode an opacity, not a hue step — keep using them)
-- Atmosphere: `--hazard`, `--ready`, `--grain-url`, `--rust-url`
+- `--font-display` — **Bangers** (one weight). Headings, button labels, big
+  numbers, kickers, board cues. Do not add `font-weight` to it.
+- `--font-body` — **Barlow Condensed** (400/500/600/700). Everything else.
 
-### Deprecated aliases (migration shim)
+`--font-stencil`, `--font-sans`, `--font-mono` and `--font-hud` are aliases of
+those two so existing call sites keep working. Do not introduce a third
+family. `body` sets `font-variant-numeric: tabular-nums` so readouts align.
 
-The token file keeps a wired-up alias block so any unmigrated surface still
-resolves. Do **not** target these in new code:
+## Danger level
 
-| Deprecated         | Canonical replacement |
-|--------------------|-----------------------|
-| `--surface-0`–`-3` | `--bg-0`–`-3`         |
-| `--surface-4`      | `--olive-700`         |
-| `--surface-5`      | `--olive-500`         |
-| `--accent`         | `--amber-400`         |
-| `--accent-bright`  | `--amber-200`         |
-| `--accent-hover`   | `--amber-500`         |
-| `--text-primary`   | `--bone-100`          |
-| `--text-secondary` | `--bone-300`          |
-
-Component CSS under `src/styles/components/`, `src/styles/base.css`,
-`src/styles/layout.css`, and `src/styles/utilities.css` has been migrated.
-The aliases survive only for reference assets in `handoff/` and any
-third-party-shaped overlay we may wire in later.
-
-## Noise overlay coverage
-
-Comment block in `tokens.css` lists which surfaces get the grain overlay
-and which intentionally don't. Mirror those rules in any component that
-applies grain locally (don't redefine the policy per file).
+The current danger level is one token, `--dl-accent` (plus `--dl-accent-text`
+for the label on it), set by `[data-danger="blue|yellow|orange|red"]` on the
+root element and neutral ink when unset. It colours **the top bar's bottom
+edge and the danger chip, and nothing else**. Danger level never changes page,
+panel or text colours, and never starts an animation.
 
 ## Animation
 
-- Compositor-friendly only: `transform`, `opacity`, `clip-path`, sparingly
-  `filter`.
-- Respect `prefers-reduced-motion` — the global rule in `base.css` neutralises
-  durations; new animations should not bypass it.
+- Compositor-friendly only: `transform`, `opacity`, sparingly `clip-path`.
+- The global rule in `base.css` neutralises durations under
+  `prefers-reduced-motion`; new animations must not bypass it.
 - Standard durations live in tokens (`--duration-fast`, `-normal`, `-slow`).

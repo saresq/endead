@@ -1,6 +1,7 @@
 
 import { GamePhase, type GameState } from '../types/GameState';
 import type { ActionRequest, ActionError } from '../types/Action';
+import { es } from '../strings/es';
 
 /**
  * Validates if an action request is permissible under the current game state.
@@ -11,7 +12,7 @@ export function validateTurn(state: GameState, request: ActionRequest): ActionEr
   if (state.phase !== GamePhase.Players) {
     return {
       code: 'INVALID_PHASE',
-      message: `Cannot perform actions during ${state.phase} phase. Wait for Players phase.`,
+      message: es.errors.notPlayersPhase,
     };
   }
 
@@ -37,7 +38,7 @@ export function validateTurn(state: GameState, request: ActionRequest): ActionEr
   if (request.playerId !== activePlayerId && !isTradeException) {
     return {
       code: 'NOT_YOUR_TURN',
-      message: `It is currently ${activePlayerId}'s turn. You are ${request.playerId}.`,
+      message: es.errors.notYourTurn,
     };
   }
 
@@ -54,7 +55,7 @@ export function validateTurn(state: GameState, request: ActionRequest): ActionEr
       if (survivor.playerId !== request.playerId) {
         return {
           code: 'NOT_OWNER',
-          message: `You do not control survivor ${survivor.name}.`,
+          message: es.errors.notYourSurvivor,
         };
       }
 
@@ -62,7 +63,7 @@ export function validateTurn(state: GameState, request: ActionRequest): ActionEr
       if (survivor.wounds >= survivor.maxHealth) {
         return {
           code: 'SURVIVOR_DEAD',
-          message: `Survivor ${survivor.name} is dead and cannot perform actions.`,
+          message: es.errors.survivorDead(survivor.name),
         };
       }
 
@@ -81,7 +82,7 @@ export function validateTurn(state: GameState, request: ActionRequest): ActionEr
       if (survivor.actionsRemaining <= 0 && !isTradeException && !isPickupException && !hasFreeAction && !survivor.cheatMode) {
         return {
           code: 'NO_ACTIONS',
-          message: `Survivor ${survivor.name} has no actions remaining.`,
+          message: es.errors.noActionsLeft(survivor.name),
         };
       }
   }

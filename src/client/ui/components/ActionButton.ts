@@ -2,17 +2,18 @@
  * ActionButton — Game action button with icon, label, keyboard hint, and states.
  *
  * Usage:
- *   renderActionButton({ id: 'btn-search', icon: 'Search', label: 'Search', kbd: 'S', cost: 'FREE', disabled: true })
+ *   renderActionButton({ id: 'btn-search', icon: 'Search', label: es.actions.SEARCH, kbd: 'S', cost: es.common.free, disabled: true })
  */
 
 import { icon as renderIcon } from './icons';
+import { es } from '../../../strings/es';
 
 export interface ActionButtonOptions {
   id: string;
   icon: string;         // Lucide icon name
   label: string;
   kbd?: string;         // Keyboard shortcut hint (desktop only)
-  cost?: string;        // e.g. "1 AP", "FREE" — "1 AP" is hidden (default), only FREE or 2+ AP shown
+  cost?: string;        // es.common.actions(n) or es.common.free — es.common.actions(1) is hidden (default)
   disabled?: boolean;
   selected?: boolean;   // Active targeting mode
   highlight?: boolean;  // Special highlight (e.g. objective available)
@@ -29,15 +30,16 @@ export function renderActionButton(opts: ActionButtonOptions): string {
 
   const kbdHtml = opts.kbd ? `<span class="action-btn__kbd">${opts.kbd}</span>` : '';
 
-  // Only show cost if it's FREE or something other than the default "1 AP"
-  const showCost = opts.cost && opts.cost !== '1 AP';
-  const costHtml = showCost ? `<span class="action-btn__cost${opts.cost === 'FREE' ? ' action-btn__cost--free' : ''}">${opts.cost}</span>` : '';
+  // Only show cost if it's free or something other than the default 1 action
+  const showCost = opts.cost && opts.cost !== es.common.actions(1);
+  const costHtml = showCost ? `<span class="action-btn__cost${opts.cost === es.common.free ? ' action-btn__cost--free' : ''}">${opts.cost}</span>` : '';
 
   const ariaAttrs = [
     `role="button"`,
-    `aria-label="${opts.label}${opts.cost ? ` (${opts.cost})` : ''}${opts.kbd ? ` — key: ${opts.kbd}` : ''}"`,
+    `aria-label="${opts.label}${opts.cost ? ` (${opts.cost})` : ''}${opts.kbd ? ` — ${es.board.keyHint(opts.kbd)}` : ''}"`,
+    // aria-pressed is a toggle state, not a styling hook: only `selected`
+    // (targeting mode active) is pressed. `highlight` means merely available.
     opts.selected ? `aria-pressed="true"` : '',
-    opts.highlight ? `aria-pressed="true"` : '',
   ].filter(Boolean).join(' ');
 
   return `

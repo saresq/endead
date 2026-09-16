@@ -1,26 +1,31 @@
 import { renderButton } from './components/Button';
+import { es } from '../../strings/es';
 
 /**
- * Inline failure state surfaced on the entry card after a rejected
- * room-id submission. `null` is the nominal/non-error state.
- *  - `not-found` → `// ROOM NOT FOUND`
- *  - `full`      → `// ROOM AT CAPACITY · 6/6`
+ * Room code from the join field: a bare code or a pasted invite link
+ * containing `/room/<code>`. Whitespace is ignored. Anything else is
+ * returned trimmed (the server answers ROOM_NOT_FOUND).
+ */
+export function parseRoomInput(value: string): string {
+  const trimmed = value.trim();
+  const match = trimmed.match(/\/room\/([a-zA-Z0-9_-]+)/);
+  return match ? match[1] : trimmed;
+}
+
+/**
+ * Inline failure state after a rejected room submission. Marks the
+ * code field invalid and shakes `Unirme` once. `null` = no error.
+ *  - `not-found` → bad/expired code
+ *  - `full`      → server returned SERVER_FULL
  */
 export type MenuErrorState = 'not-found' | 'full' | null;
 
-const ROOM_CAPACITY = 6;
-
 /**
- * MenuUI — Field Manual entry screen (Phase C1).
- *
- * Single bracketed dossier panel on a dark gridded field. Hazard-tape stripes
- * top and bottom, bracketed stencil wordmark, tactical call-sign entry, then
- * a divider leading to the room-id join row.
+ * MenuUI — entry screen. One card: wordmark, optional message, name,
+ * `Crear sala`, divider, code/link join row, `Volver` when a message shows.
  *
  * Preserves: element ids (#menu-ui, #menu-nickname, #menu-room-id),
- * data-action attributes (create-room, join-room, go-back), callbacks
- * (onNicknameChange, onCreateRoom, onJoinRoom, onBack) and the infoMessage
- * contract.
+ * data-action attributes (create-room, join-room, go-back) and callbacks.
  */
 export class MenuUI {
   private container: HTMLElement;
@@ -36,16 +41,6 @@ export class MenuUI {
     onJoinRoom: (roomId: string, nickname: string) => void;
     onBack: () => void;
     infoMessage?: string;
-    /**
-     * Inline failure-state for the entry card after a rejected
-     * room-id submission. When non-null, the room-id field renders
-     * with the rust .fm-input--error border, the header kicker
-     * swaps to a state-specific tag, and the JOIN button plays a
-     * one-shot shake on mount. See design/states/room-not-found.html.
-     *
-     *  - `not-found` → bad/expired code
-     *  - `full`      → server returned SERVER_FULL / ROOM_FULL
-     */
     errorState?: MenuErrorState;
   }) {
     this.onCreateRoom = options.onCreateRoom;
@@ -58,35 +53,28 @@ export class MenuUI {
       document.body.appendChild(this.container);
     }
 
+    const t = es.menu;
     const errorState: MenuErrorState = options.errorState ?? null;
     const isError = errorState !== null;
+
+    // Every menu message reports a problem (not found, full, kicked,
+    // replaced session, create failed), so all of them are alerts.
     const infoBlock = options.infoMessage
       ? `
-        <div class="menu-message" role="${isError ? 'alert' : 'status'}">
+        <div class="menu-message" role="alert">
           <span class="menu-message__marker" aria-hidden="true">!</span>
           <span class="menu-message__text">${escapeHtml(options.infoMessage)}</span>
         </div>
       `
       : '';
 
-    // Kicker swaps based on which inline failure state was raised.
-    // Default kicker remains `SURVIVOR OPS // ENTRY`.
-    const headerKicker =
-      errorState === 'not-found'
-        ? '// ROOM NOT FOUND'
-        : errorState === 'full'
-          ? `// ROOM AT CAPACITY · ${ROOM_CAPACITY}/${ROOM_CAPACITY}`
-          : 'SURVIVOR OPS // ENTRY';
-
-    // Rust error border on the room-id input + one-shot shake on the
-    // JOIN button. Both are scoped to the failed-submission case.
     const roomInputErrorClass = isError ? ' fm-input--error' : '';
     const roomInputAriaInvalid = isError ? 'aria-invalid="true"' : '';
-    const joinShakeClass = isError ? ' fm-btn--shake' : '';
+    const joinShakeClass = isError ? 'fm-btn--shake' : '';
 
     const backButton = options.infoMessage
       ? renderButton({
-          label: 'Go Back',
+          label: t.back,
           icon: 'ArrowLeft',
           variant: 'ghost',
           fullWidth: true,
@@ -95,106 +83,82 @@ export class MenuUI {
       : '';
 
     this.container.innerHTML = `
-      <div class="menu-field" aria-hidden="true">
-        <div class="menu-field__grid"></div>
-        <div class="menu-field__vignette"></div>
-      </div>
+      <div class="menu-field" aria-hidden="true"></div>
 
       <div class="menu-stack">
         <section
-          class="menu-card menu-card--id fm-panel"
+          class="menu-card fm-panel"
           role="dialog"
           aria-labelledby="menu-wordmark"
         >
           <span class="fm-panel-dot fm-panel-dot--tl" aria-hidden="true"></span>
           <span class="fm-panel-dot fm-panel-dot--br" aria-hidden="true"></span>
 
-          <div class="fm-hazard-tape menu-card__stripe menu-card__stripe--top" aria-hidden="true"></div>
-
           <header class="menu-header">
-            <div class="menu-header__kicker fm-kicker">${headerKicker}</div>
-
-            <div class="menu-wordmark fm-brackets fm-brackets--amber fm-brackets--lg">
-              <span class="fm-bracket-tr" aria-hidden="true"></span>
-              <span class="fm-bracket-bl" aria-hidden="true"></span>
+            <div class="menu-wordmark">
               <h1 id="menu-wordmark" class="menu-wordmark__text fm-stencil">Endead</h1>
             </div>
-
-            <div class="menu-header__subline fm-mono">// FIELD MANUAL &middot; TACTICAL SURVIVAL</div>
+            <div class="menu-header__subline fm-mono">${escapeHtml(t.subline)}</div>
           </header>
 
           ${infoBlock}
 
           <div class="menu-form">
             <div class="menu-field-group">
-              <label class="fm-input__label fm-kicker" for="menu-nickname">CALL SIGN</label>
+              <label class="fm-input__label fm-kicker" for="menu-nickname">${escapeHtml(t.nameLabel)}</label>
               <input
                 id="menu-nickname"
                 class="fm-input menu-input"
                 type="text"
                 maxlength="24"
                 value="${escapeHtml(options.nickname)}"
-                placeholder="designate operator"
+                placeholder="${escapeHtml(t.namePlaceholder)}"
                 autocomplete="off"
                 spellcheck="false"
               />
             </div>
-          </div>
 
-          <div class="menu-card__divider" aria-hidden="true"></div>
-        </section>
+            ${renderButton({
+              label: escapeHtml(t.createRoom),
+              icon: 'Play',
+              variant: 'primary',
+              size: 'lg',
+              fullWidth: true,
+              dataAction: 'create-room',
+            })}
 
-        <div class="menu-action menu-action--standalone">
-          ${renderButton({
-            label: 'Create Room',
-            icon: 'Play',
-            variant: 'primary',
-            size: 'lg',
-            fullWidth: true,
-            dataAction: 'create-room',
-          })}
-        </div>
+            <div class="menu-divider" role="separator">
+              <span class="menu-divider__line" aria-hidden="true"></span>
+              <span class="menu-divider__label fm-kicker">${escapeHtml(t.joinDivider)}</span>
+              <span class="menu-divider__line" aria-hidden="true"></span>
+            </div>
 
-        <div class="menu-divider menu-divider--standalone" role="separator" aria-label="or join by room id">
-          <span class="menu-divider__line" aria-hidden="true"></span>
-          <span class="menu-divider__label fm-kicker">// OR JOIN BY ROOM ID</span>
-          <span class="menu-divider__line" aria-hidden="true"></span>
-        </div>
-
-        <section
-          class="menu-card menu-card--join fm-panel"
-          aria-label="Join existing room"
-        >
-          <span class="fm-panel-dot fm-panel-dot--tl" aria-hidden="true"></span>
-          <span class="fm-panel-dot fm-panel-dot--br" aria-hidden="true"></span>
-
-          <div class="menu-form">
             <div class="menu-field-group">
-              <label class="fm-input__label fm-kicker" for="menu-room-id">ROOM ID</label>
+              <label class="fm-input__label fm-kicker" for="menu-room-id">${escapeHtml(t.joinLabel)}</label>
               <div class="menu-join-row">
                 <input
                   id="menu-room-id"
-                  class="fm-input menu-input${roomInputErrorClass}"
+                  class="fm-input menu-input menu-input--code${roomInputErrorClass}"
                   type="text"
                   value="${escapeHtml(options.roomIdPrefill || '')}"
-                  placeholder="XXXX-XXXX"
+                  placeholder="${escapeHtml(t.joinPlaceholder)}"
                   autocomplete="off"
+                  autocapitalize="off"
                   spellcheck="false"
+                  enterkeyhint="go"
                   ${roomInputAriaInvalid}
                 />
                 ${renderButton({
-                  label: 'Join',
+                  label: escapeHtml(t.join),
                   variant: 'secondary',
                   dataAction: 'join-room',
-                  className: joinShakeClass.trim(),
+                  className: joinShakeClass,
                 })}
               </div>
             </div>
 
             ${backButton}
           </div>
-
-          <div class="menu-card__divider" aria-hidden="true"></div>
         </section>
       </div>
     `;
@@ -207,13 +171,12 @@ export class MenuUI {
     });
 
     const submitJoin = () => {
-      const roomId = (roomInput?.value || '').trim();
+      const roomId = parseRoomInput(roomInput?.value || '');
       const nickname = (nicknameInput?.value || '').trim();
       if (!roomId) return;
       this.onJoinRoom(roomId, nickname);
     };
 
-    // Delegated clicks
     this.container.addEventListener('click', (e) => {
       const target = (e.target as HTMLElement).closest('[data-action]') as HTMLElement | null;
       if (!target) return;
@@ -233,10 +196,8 @@ export class MenuUI {
       if (event.key === 'Enter') submitJoin();
     });
 
-    // One-shot shake on the JOIN button. Strip the class on
-    // animationend so a *second* failure (re-mount with an errorState)
-    // re-applies it cleanly. Without this strip the browser would
-    // skip the animation on identical class membership.
+    // One-shot shake on `Unirme`. Strip the class on animationend so a
+    // second failure (re-mount with an errorState) re-applies it cleanly.
     if (isError) {
       const joinBtn = this.container.querySelector('[data-action="join-room"]') as HTMLElement | null;
       if (joinBtn) {

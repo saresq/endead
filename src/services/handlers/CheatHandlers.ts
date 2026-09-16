@@ -1,12 +1,13 @@
 import { GameState, GamePhase } from '../../types/GameState';
 import { ActionRequest } from '../../types/Action';
+import { es } from '../../strings/es';
 
 const CHEAT_NAME = 'H4x0r';
 const CHEAT_ACTIONS_PER_TURN = 999;
 
 export function handleActivateCheat(state: GameState, intent: ActionRequest): GameState {
   if (state.phase === GamePhase.Lobby || state.phase === GamePhase.GameOver) {
-    throw new Error('Cheats can only be activated during a live game');
+    throw new Error(es.errors.cheatsOnlyInGame);
   }
 
   const newState = structuredClone(state) as GameState;
@@ -28,13 +29,13 @@ export function handleActivateCheat(state: GameState, intent: ActionRequest): Ga
   }
 
   if (!touchedSurvivor) {
-    throw new Error('No survivor found for player');
+    throw new Error(es.errors.noSurvivor);
   }
 
   newState.lastAction = {
     type: 'ACTIVATE_CHEAT',
     playerId: intent.playerId,
-    description: `${previousName} unleashed a cheat code — now playing as ${CHEAT_NAME} with unlimited actions.`,
+    description: es.log.cheat(previousName, CHEAT_NAME),
     timestamp: Date.now(),
   };
 

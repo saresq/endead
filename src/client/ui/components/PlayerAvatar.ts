@@ -8,6 +8,7 @@
  */
 
 import { PlayerIdentity } from '../../config/PlayerIdentities';
+import { es } from '../../../strings/es';
 
 export type AvatarSize = 'sm' | 'md';
 export type AvatarState = 'active' | 'dead' | 'disconnected' | undefined;
@@ -52,9 +53,9 @@ export function renderAvatar(
   const portraitClass = imgUrl ? ' player-avatar--portrait' : '';
   const classes = `player-avatar player-avatar--${size}${stateClass}${portraitClass}`;
 
-  const glowStyle = state === 'active'
-    ? `box-shadow: 0 0 0 3px ${identity.muted}, 0 0 12px ${identity.primary};`
-    : '';
+  // The active-turn ring is a flat --highlight outline from CSS
+  // (`.player-avatar--active`); no inline glow, or it would win over it.
+  const glowStyle = '';
 
   const face = imgUrl
     ? `<img class="player-avatar__img" src="${imgUrl}" alt="" draggable="false"><span class="player-avatar__initial player-avatar__initial--fallback">${initial}</span>`
@@ -82,7 +83,7 @@ export function renderPlayerTag(
   const avatar = renderAvatar(name, identity, size, state, characterClass);
 
   const hostBadge = isHost
-    ? '<span class="player-tag__host" title="Host"><svg class="icon icon--sm" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5.09 20h13.82"/></svg></span>'
+    ? `<span class="player-tag__host" title="${es.common.host}"><svg class="icon icon--sm" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5.09 20h13.82"/></svg></span>`
     : '';
 
   return `<span class="player-tag ${className}">${avatar}<span class="player-tag__name truncate">${name}</span>${hostBadge}${suffix}</span>`;

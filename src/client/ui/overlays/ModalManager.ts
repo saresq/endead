@@ -4,10 +4,10 @@
  *
  * Usage:
  *   const id = modalManager.open({
- *     title: 'Backpack',
+ *     title: es.common.backpack,
  *     size: 'md',
  *     renderBody: () => '<div>...</div>',
- *     renderFooter: () => renderButton({ label: 'Close', variant: 'secondary', dataAction: 'modal-close' }),
+ *     renderFooter: () => renderButton({ label: es.common.close, variant: 'secondary', dataAction: 'modal-close' }),
  *   });
  *
  *   modalManager.close(id);   // close specific
@@ -15,6 +15,7 @@
  */
 
 import { icon } from '../components/icons';
+import { es } from '../../../strings/es';
 
 export interface ModalOptions {
   size?: 'sm' | 'md' | 'lg';
@@ -68,7 +69,7 @@ class ModalManagerImpl {
     // Header
     const closeBtn = options.persistent
       ? ''
-      : `<button class="btn btn--icon btn--sm modal__close" data-action="modal-close" title="Close" aria-label="Close">${icon('X', 'sm')}</button>`;
+      : `<button class="btn btn--icon btn--sm modal__close" data-action="modal-close" title="${es.common.close}" aria-label="${es.common.close}">${icon('X', 'sm')}</button>`;
     const subtitleHtml = options.subtitle
       ? `<div class="modal__subtitle">${options.subtitle}</div>`
       : '';

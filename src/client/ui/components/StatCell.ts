@@ -5,15 +5,17 @@
  * action counters, ammo, etc. on the HUD.
  *
  * Usage:
- *   renderStatCell({ label: 'VITALS', value: 3, max: 3, color: 'danger' })
+ *   renderStatCell({ label: es.board.hp, value: 3, max: 3, color: 'danger' })
  */
+
+import { es } from '../../../strings/es';
 
 export type StatCellColor = 'danger' | 'amber' | 'blue' | 'ready';
 export type StatCellSize = 'sm' | 'md';
 
 export interface StatCellOptions {
   icon?: string;             // SVG string or glyph character
-  label: string;             // e.g. 'VITALS'
+  label: string;             // e.g. es.board.hp
   value: number;
   max: number;
   color?: StatCellColor;     // default 'amber'
@@ -49,7 +51,7 @@ export function renderStatCell(opts: StatCellOptions): string {
 
   const valueHtml = opts.infinite
     ? `
-    <div class="fm-statcell__value fm-statcell__value--infinite" aria-label="Unlimited">
+    <div class="fm-statcell__value fm-statcell__value--infinite" aria-label="${es.board.unlimited}">
       <span class="fm-statcell__num">&infin;</span>
     </div>
   `

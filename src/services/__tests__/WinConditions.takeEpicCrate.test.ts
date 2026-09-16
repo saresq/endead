@@ -10,6 +10,7 @@ import {
   makeCard,
   takeEpicObj,
 } from './winConditionHelpers';
+import { es } from '../../strings/es';
 
 function takeReq(): ActionRequest {
   return { playerId: 'p1', survivorId: 's1', type: ActionType.TAKE_EPIC_CRATE };
@@ -93,7 +94,7 @@ describe('handleTakeEpicCrate — Epic Weapon Crate (red)', () => {
       epicDeck: [card],
     });
 
-    expect(() => handleTakeEpicCrate(state, takeReq())).toThrow(/pending card/i);
+    expect(() => handleTakeEpicCrate(state, takeReq())).toThrow(es.errors.resolvePendingCard);
   });
 
   it('reshuffles epicDiscard back into epicDeck when the deck runs dry', () => {

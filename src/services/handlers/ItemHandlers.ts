@@ -5,6 +5,7 @@ import { DeckService } from '../DeckService';
 import { EquipmentManager } from '../EquipmentManager';
 import { ZombiePhaseManager } from '../ZombiePhaseManager';
 import { XPManager } from '../XPManager';
+import { es, equipmentName } from '../../strings/es';
 
 // RULEBOOK.md:604-621 — Bag of Rice / Canned Food / Water are Food cards;
 // "Consume for 1 AP". Match by registry key (equipmentId), not display name,
@@ -35,10 +36,10 @@ export function handleUseItem(state: GameState, intent: ActionRequest): GameStat
       playerId: intent.playerId,
       survivorId: intent.survivorId,
       timestamp: Date.now(),
-      description: `Consumed ${item.name} (+1 AP)`,
+      description: es.log.consumed(equipmentName(item)),
     };
   } else {
-    throw new Error(`Item "${item.name}" cannot be used as a consumable`);
+    throw new Error(es.errors.notConsumable(equipmentName(item)));
   }
 
   return newState;
@@ -50,13 +51,13 @@ export function handleSearch(state: GameState, intent: ActionRequest): GameState
   const preZone = state.zones[preSurvivor.position.zoneId];
 
   if (preSurvivor.hasSearched && !preSurvivor.skills.includes('can_search_more_than_once') && !preSurvivor.cheatMode) {
-    throw new Error('Already searched this turn');
+    throw new Error(es.errors.alreadySearched);
   }
   if (!preZone.searchable && !preSurvivor.skills.includes('search_anywhere')) {
-    throw new Error('Can only search inside buildings');
+    throw new Error(es.errors.searchOnlyInBuildings);
   }
   if (Object.values(state.zombies).some((z: any) => z.position.zoneId === preZone.id)) {
-    throw new Error('Cannot search zone with zombies');
+    throw new Error(es.errors.searchWithZombies);
   }
 
   // Clone state first, then handle deck operations on the clone only
@@ -71,7 +72,7 @@ export function handleSearch(state: GameState, intent: ActionRequest): GameState
 
   // Flashlight or Search: +1 Card skill: draw 2 cards instead of 1
   const hasFlashlight = newState.survivors[intent.survivorId!].inventory.some(
-    (c: EquipmentCard) => c.name === 'Flashlight'
+    (c: EquipmentCard) => c.equipmentId === 'flashlight'
   );
   const hasSearchPlus1 = newState.survivors[intent.survivorId!].skills.includes('search_plus_1');
   const cardsToDraw = (hasFlashlight || hasSearchPlus1) ? 2 : 1;
@@ -83,7 +84,7 @@ export function handleSearch(state: GameState, intent: ActionRequest): GameState
     if (drawResult.card) drawnCards.push(drawResult.card);
   }
 
-  if (drawnCards.length === 0) throw new Error('Deck empty');
+  if (drawnCards.length === 0) throw new Error(es.errors.deckEmpty);
 
   const survivor = newState.survivors[intent.survivorId!];
   const zone = newState.zones[survivor.position.zoneId];
@@ -107,7 +108,7 @@ export function handleSearch(state: GameState, intent: ActionRequest): GameState
       if (card.stats?.dualWield) {
         // Find another copy by name in equipment deck
         const deckIndex = newState.equipmentDeck.findIndex(
-          (d: EquipmentCard) => d.name === card.name
+          (d: EquipmentCard) => d.equipmentId === card.equipmentId
         );
         if (deckIndex >= 0) {
           const [matchCard] = newState.equipmentDeck.splice(deckIndex, 1);
@@ -137,15 +138,14 @@ export function handleSearch(state: GameState, intent: ActionRequest): GameState
 
   newState.survivors[intent.survivorId!].hasSearched = true;
 
-  const foundNames = equipCards.map(c => c.name).join(', ');
+  const foundNames = equipCards.map(c => equipmentName(c));
   const trapCount = drawnCards.length - equipCards.length;
-  const trapNote = trapCount > 0 ? ` (${trapCount} Aaahh!!)` : '';
   newState.lastAction = {
     type: ActionType.SEARCH,
     playerId: intent.playerId,
     survivorId: intent.survivorId,
     timestamp: Date.now(),
-    description: foundNames ? `Found: ${foundNames}${trapNote}` : `Aaahh!! — zombie spawned!`,
+    description: foundNames.length > 0 ? es.log.found(foundNames, trapCount) : es.log.searchTrap,
   };
 
   return newState;
@@ -153,7 +153,7 @@ export function handleSearch(state: GameState, intent: ActionRequest): GameState
 
 export function handleResolveSearch(state: GameState, intent: ActionRequest): GameState {
   const survivor = state.survivors[intent.survivorId!];
-  if (!survivor.drawnCard) throw new Error('No drawn card to resolve');
+  if (!survivor.drawnCard) throw new Error(es.errors.noDrawnCard);
 
   const action = intent.payload?.action;
 
@@ -171,7 +171,7 @@ export function handleResolveSearch(state: GameState, intent: ActionRequest): Ga
 
     // Check if slot occupied
     const occupied = s.inventory.some((c: EquipmentCard) => c.slot === targetSlot);
-    if (occupied) throw new Error(`Slot ${targetSlot} is occupied. Move item first.`);
+    if (occupied) throw new Error(es.errors.slotOccupied);
 
     // Equip
     const newCard = s.drawnCard!;
@@ -184,7 +184,7 @@ export function handleResolveSearch(state: GameState, intent: ActionRequest): Ga
     return newState;
   } else if (action === 'KEEP') {
     const discardId = intent.payload?.discardCardId;
-    if (!discardId) throw new Error('Must specify which card to replace');
+    if (!discardId) throw new Error(es.errors.chooseCardToReplace);
 
     return EquipmentManager.swapDrawnCard(state, intent.survivorId!, discardId);
   }

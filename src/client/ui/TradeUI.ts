@@ -6,6 +6,7 @@ import { renderButton } from './components/Button';
 import { renderItemCard, renderEmptySlot } from './components/ItemCard';
 import { icon } from './components/icons';
 import { modalManager } from './overlays/ModalManager';
+import { es } from '../../strings/es';
 
 // Icons used: Backpack, ArrowLeftRight, Trash2
 
@@ -63,8 +64,8 @@ export class TradeUI {
 
     if (!this.modalId) {
       this.modalId = modalManager.open({
-        title: `Trading with ${this.partnerSurvivor.name}`,
-        subtitle: 'Tap an item to select, then tap where to move it.',
+        title: es.trade.title(this.partnerSurvivor.name),
+        subtitle: es.trade.hint,
         size: 'md',
         persistent: true,
         bodyClassName: 'modal__body--stack',
@@ -97,8 +98,8 @@ export class TradeUI {
   private rerender(): void {
     if (!this.modalId) return;
     const hint = this.tapSelectedId
-      ? 'Now tap a slot or the offer zone to move the item.'
-      : 'Tap an item to select, then tap where to move it.';
+      ? es.trade.hintSelected
+      : es.trade.hint;
     modalManager.updateSubtitle(this.modalId, hint);
     modalManager.updateBody(this.modalId, this.renderBody());
     modalManager.updateFooter(this.modalId, this.renderFooter());
@@ -126,15 +127,15 @@ export class TradeUI {
     return `
       <div class="trade-status">
         <span class="trade-status__item ${myStatus ? 'trade-status__item--ready' : ''}">
-          <span class="trade-status__dot"></span>Me: ${myStatus ? 'Ready' : 'Not Ready'}
+          <span class="trade-status__dot"></span>${es.trade.status(es.trade.me, myStatus ? es.trade.ready : es.trade.notReady)}
         </span>
         <span class="trade-status__item ${partnerStatus ? 'trade-status__item--ready' : ''}">
-          <span class="trade-status__dot"></span>${this.partnerSurvivor.name}: ${partnerStatus ? 'Ready' : 'Not Ready'}
+          <span class="trade-status__dot"></span>${es.trade.status(this.partnerSurvivor.name, partnerStatus ? es.trade.ready : es.trade.notReady)}
         </span>
       </div>
       <div class="trade-footer__actions">
-        ${renderButton({ label: 'Cancel', icon: 'X', variant: 'secondary', size: 'sm', dataAction: 'cancel-trade' })}
-        ${renderButton({ label: myStatus ? 'Unaccept' : 'Accept', icon: myStatus ? 'X' : 'Check', variant: myStatus ? 'secondary' : 'primary', size: 'sm', dataAction: 'accept-trade' })}
+        ${renderButton({ label: es.trade.cancel, icon: 'X', variant: 'secondary', size: 'sm', dataAction: 'cancel-trade' })}
+        ${renderButton({ label: myStatus ? es.trade.unaccept : es.trade.accept, icon: myStatus ? 'X' : 'Check', variant: myStatus ? 'secondary' : 'primary', size: 'sm', dataAction: 'accept-trade' })}
       </div>`;
   }
 
@@ -164,7 +165,7 @@ export class TradeUI {
         ? `data-tap-item="${data.card.id}" data-tap-from="${tapFrom}"`
         : '';
       const content = data.card
-        ? renderItemCard(data.card, { variant: data.ghost ? 'ghost' : 'default', badge: data.ghost ? 'GET' : undefined, tappable: true, showSlot: false })
+        ? renderItemCard(data.card, { variant: data.ghost ? 'ghost' : 'default', badge: data.ghost ? es.trade.badgeGet : undefined, tappable: true, showSlot: false })
         : renderEmptySlot();
       return `<div class="${cls}" data-tap-slot="${slot}" ${tapAttrs}>${labelHtml}${content}</div>`;
     };
@@ -177,10 +178,10 @@ export class TradeUI {
 
     return `
       <div class="inv-panel">
-        <div class="inv-panel__header">${icon('Backpack', 'sm')} Your Equipment</div>
+        <div class="inv-panel__header">${icon('Backpack', 'sm')} ${es.trade.yourEquipment}</div>
         <div class="slot-row slot-row--hands">
-          ${renderSlot(hand1, 'HAND_1', 'Hand 1')}
-          ${renderSlot(hand2, 'HAND_2', 'Hand 2')}
+          ${renderSlot(hand1, 'HAND_1', es.slots.HAND_1)}
+          ${renderSlot(hand2, 'HAND_2', es.slots.HAND_2)}
         </div>
         <div class="slot-row slot-row--backpack">
           ${renderSlot(bp0, 'BACKPACK_0')}
@@ -208,13 +209,13 @@ export class TradeUI {
     return `
       <div class="offer-panel">
         <div class="offer-section ${offerTargetable ? 'tap-target' : ''}" data-tap-slot="OFFER">
-          <div class="offer-section__title">${icon('ArrowLeftRight', 'sm')} I Give</div>
-          <div class="offer-section__items">${myOfferCards || '<span class="text-placeholder">Tap an item then tap here to offer</span>'}</div>
+          <div class="offer-section__title">${icon('ArrowLeftRight', 'sm')} ${es.trade.iGive}</div>
+          <div class="offer-section__items">${myOfferCards || `<span class="text-placeholder">${es.trade.offerEmpty}</span>`}</div>
         </div>
         <div class="offer-divider">${icon('ArrowLeftRight', 'sm')}</div>
         <div class="offer-section">
-          <div class="offer-section__title">${this.partnerSurvivor!.name} Gives</div>
-          <div class="offer-section__items">${partnerOfferCards || '<span class="text-placeholder">Nothing offered yet</span>'}</div>
+          <div class="offer-section__title">${es.trade.partnerGives(this.partnerSurvivor!.name)}</div>
+          <div class="offer-section__items">${partnerOfferCards || `<span class="text-placeholder">${es.trade.partnerOfferEmpty}</span>`}</div>
         </div>
       </div>`;
   }
@@ -228,13 +229,14 @@ export class TradeUI {
       const isG = ghostItems.some(g => g.id === c.id);
       const isSelected = this.tapSelectedId === c.id;
       const tapFrom = isG ? 'partner_offer' : 'inventory';
-      return `<div class="${isSelected ? 'tap-selected' : ''}" data-tap-item="${c.id}" data-tap-from="${tapFrom}">${renderItemCard(c, { variant: isG ? 'ghost' : 'default', badge: isG ? 'GET' : undefined, tappable: true, showSlot: false, discarded: true })}</div>`;
+      return `<div class="${isSelected ? 'tap-selected' : ''}" data-tap-item="${c.id}" data-tap-from="${tapFrom}">${renderItemCard(c, { variant: isG ? 'ghost' : 'default', badge: isG ? es.trade.badgeGet : undefined, tappable: true, showSlot: false, discarded: true })}</div>`;
     }).join('');
 
     return `
       <div class="inv-panel">
-        <div class="inv-panel__header">${icon('Trash2', 'sm')} Discard</div>
+        <div class="inv-panel__header">${icon('Trash2', 'sm')} ${es.trade.discard}</div>
         <div class="discard-zone ${this.tapSelectedId && !discarded.some(c => c.id === this.tapSelectedId) && !ghostDiscarded.some(c => c.id === this.tapSelectedId) ? 'tap-target' : ''}" data-tap-slot="DISCARD">
+          <span class="discard-zone__stamp" aria-hidden="true">${es.trade.discard}</span>
           ${discardContent || renderEmptySlot()}
         </div>
       </div>`;

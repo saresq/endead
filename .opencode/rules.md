@@ -47,8 +47,9 @@ Use this document as the default context for every OpenCode session in this repo
 
 ## Run and Verify
 - Install: `npm install`
+- Full stack dev (backend + frontend): `npm run dev`
 - Backend dev: `npm run server`
-- Frontend dev: `npm run dev`
+- Frontend dev: `npm run front`
 - Production build: `npm run build`
 - Tests: `npm test`
 

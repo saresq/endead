@@ -1,10 +1,11 @@
 /* ==========================================================================
-   Lobby — Field Manual staging screen (Phase C2)
+   Lobby — room staging screen
 
-   Vertical stack of fm-panel cards on a dark olive wash. Each card is an
-   independent "field document" — briefing, dossier, loadout, progression,
-   rules of engagement — stamped with corner brackets, hazard tape, and
-   stencil type.
+   Paper panels on the dark halftone page, keyed by `data-panel`:
+   hostLeftBanner, invite, you (name + character grid), players, map,
+   options, footer. Portrait: one column in that order. Landscape ≥700px:
+   two columns placed with grid-area (DOM order unchanged). The footer is
+   sticky at the bottom of the scrolling stack.
    ========================================================================== */
 
 /* ---------- Container ---------- */
@@ -13,60 +14,63 @@
   position: absolute;
   inset: 0;
   display: flex;
-  align-items: flex-start;
-  justify-content: center;
+  flex-direction: column;
   z-index: var(--z-overlay);
-  overflow-y: auto;
-  padding: var(--space-5) var(--space-4);
-  padding-top: calc(var(--space-5) + env(safe-area-inset-top));
-  padding-bottom: calc(var(--space-5) + env(safe-area-inset-bottom));
-  background:
-    radial-gradient(ellipse at 20% 10%, rgba(90, 99, 57, 0.08) 0%, transparent 55%),
-    radial-gradient(ellipse at 80% 90%, rgba(11, 13, 10, 0.65) 0%, transparent 50%),
-    linear-gradient(180deg, var(--bg-0) 0%, var(--bg-1) 40%, var(--bg-0) 100%);
+  overflow: hidden;
+  background-color: var(--page);
+  background-image: var(--halftone);
+  color: var(--text-on-page);
 }
 
-.lobby::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background-image:
-    linear-gradient(rgba(138, 149, 96, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(138, 149, 96, 0.03) 1px, transparent 1px);
-  background-size: 48px 48px;
-  z-index: 0;
-}
-
-/* ---------- Stack ---------- */
+/* ---------- Stack (the scroll container) ---------- */
 
 .lobby__stack {
+  --lobby-max: 520px;
+  --lobby-gutter: var(--space-4);
   position: relative;
   z-index: 1;
+  flex: 1 1 auto;
+  min-height: 0;
   width: 100%;
-  max-width: 420px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   gap: 14px;
-  margin: 0 auto;
+  /* Full-width scroller (wheel works anywhere); content is centred and
+     capped by the inline padding. */
+  padding-top: calc(var(--space-5) + env(safe-area-inset-top));
+  padding-bottom: 0;
+  padding-inline: max(var(--lobby-gutter), calc((100% - var(--lobby-max)) / 2));
 }
 
-@media (min-width: 960px) {
-  .lobby__stack {
-    max-width: 520px;
-  }
+.lobby__stack > * {
+  min-width: 0;
+}
+
+.lobby-panel h2 {
+  margin: 0;
+  font-weight: inherit;
 }
 
 /* ---------- Generic panel tweaks ---------- */
 
 .lobby-panel {
-  /* fm-panel already provides clip-path + inset border + fade-in. */
+  /* Paper panel: cream card, ink outline, hard offset shadow. */
   padding: 18px 20px;
+  background: var(--paper);
+  color: var(--text);
+  border: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
 }
 
 .lobby-panel--waiting {
   padding: 28px 20px;
   text-align: center;
+  margin-top: auto;
+  margin-bottom: auto;
 }
 
 /* Stagger the fade-in so sections cascade. */
@@ -76,129 +80,70 @@
 .lobby__stack > .lobby-panel:nth-child(5) { animation-delay: 160ms; }
 .lobby__stack > .lobby-panel:nth-child(6) { animation-delay: 200ms; }
 .lobby__stack > .lobby-panel:nth-child(7) { animation-delay: 240ms; }
-.lobby__stack > .lobby-panel:nth-child(8) { animation-delay: 280ms; }
-.lobby__stack > .lobby-panel:nth-child(9) { animation-delay: 320ms; }
-.lobby__stack > .lobby-panel:nth-child(10) { animation-delay: 360ms; }
 
-/* ---------- 1. Mission Briefing ---------- */
+/* ---------- Invite ---------- */
 
-.lobby-panel--briefing {
-  padding: 20px;
-}
-
-.lobby-briefing__body {
-  padding: 16px 20px 18px;
+.lobby-panel--invite {
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: 10px;
-  text-align: center;
 }
 
-.lobby-briefing__title {
-  font-size: 26px;
-  line-height: 1;
-  color: var(--bone-100);
-  margin: 4px 0 6px;
-  letter-spacing: 0.18em;
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
-}
-
-.lobby-room-chip {
-  display: inline-flex;
+.lobby-invite__row {
+  display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 5px 10px;
-  border: 1px solid var(--amber-400);
-  background: rgba(240, 169, 74, 0.06);
-  color: var(--amber-200);
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* The poster element of the screen: big display type, ink on comic yellow. */
+.lobby-invite__code {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--font-display);
+  font-size: 32px;
+  line-height: 1.1;
+  letter-spacing: 0.12em;
+  color: var(--ink);
+  background: var(--highlight);
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  padding: 2px 10px;
+  user-select: all;
+  overflow-wrap: anywhere;
+}
+
+.lobby-invite__copy {
+  flex: 0 0 auto;
+}
+
+.lobby-invite__copy--copied {
+  border-color: var(--success);
+  color: var(--success);
+  animation: lobby-copy-flash 320ms ease-out;
+}
+
+@keyframes lobby-copy-flash {
+  0% { filter: brightness(1.5); }
+  100% { filter: brightness(1); }
+}
+
+.lobby-invite__hint {
+  margin: 0;
   font-family: var(--font-mono);
   font-size: 11px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  border-radius: 2px;
-  cursor: pointer;
-  user-select: none;
-  transition: background 140ms ease, box-shadow 140ms ease, color 140ms ease;
-}
-
-.lobby-room-chip:hover {
-  background: rgba(240, 169, 74, 0.14);
-  box-shadow: 0 0 0 1px var(--amber-400), 0 0 10px rgba(240, 169, 74, 0.25);
-}
-
-.lobby-room-chip:focus-visible {
-  outline: 2px solid var(--amber-400);
-  outline-offset: 2px;
-}
-
-.lobby-room-chip__label {
-  color: var(--bone-500);
-}
-
-.lobby-room-chip__id {
-  color: var(--amber-200);
-  font-weight: 700;
-  letter-spacing: 0.18em;
-}
-
-.lobby-room-chip__glyph {
-  display: inline-flex;
-  opacity: 0.75;
-}
-
-.lobby-room-chip--copied {
-  border-color: var(--amber-200);
-  color: var(--amber-200);
-  background: rgba(240, 169, 74, 0.28);
-  box-shadow: 0 0 0 1px var(--amber-200), 0 0 14px rgba(240, 169, 74, 0.45);
-  animation: lobby-room-chip-flash 320ms ease-out;
-}
-
-.lobby-room-chip--copied .lobby-room-chip__label,
-.lobby-room-chip--copied .lobby-room-chip__id {
-  color: var(--amber-200);
-}
-
-@keyframes lobby-room-chip-flash {
-  0% {
-    background: rgba(240, 169, 74, 0.55);
-    box-shadow: 0 0 0 1px var(--amber-200), 0 0 22px rgba(240, 169, 74, 0.7);
-  }
-  100% {
-    background: rgba(240, 169, 74, 0.28);
-    box-shadow: 0 0 0 1px var(--amber-200), 0 0 14px rgba(240, 169, 74, 0.45);
-  }
-}
-
-/* Solo waiting — slow rust pulse on the room chip while the squad
-   is at 1/N. Promoted from design/states/waiting.html. Uses canonical
-   --rust-* tokens only. Animates outline + box-shadow (compositor-
-   friendly box-shadow at this small size). */
-.lobby-room-chip--pulse {
-  animation: rust-pulse 2.4s ease-in-out infinite;
-}
-
-@keyframes rust-pulse {
-  0%, 100% {
-    box-shadow:
-      0 0 0 1px rgba(196, 90, 44, 0),
-      0 0 0 0 rgba(196, 90, 44, 0);
-  }
-  50% {
-    box-shadow:
-      0 0 0 1px var(--rust-400),
-      0 0 14px rgba(196, 90, 44, 0.45);
-  }
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+  color: var(--text-muted);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .lobby-room-chip--pulse { animation: none; }
+  .lobby-invite__copy--copied { animation: none; }
 }
 
-/* ---------- 2. Squad roster ---------- */
+/* ---------- Players ---------- */
 
-.lobby-panel--squad {
+.lobby-panel--players {
   padding: 16px 20px 18px;
 }
 
@@ -212,7 +157,7 @@
 .lobby-squad__count {
   font-size: 11px;
   letter-spacing: 0.18em;
-  color: var(--bone-500);
+  color: var(--text-muted);
 }
 
 .lobby-squad {
@@ -229,12 +174,12 @@
   flex-direction: column;
   gap: 4px;
   padding: 8px 10px;
-  border-left: 2px solid var(--olive-700);
-  background: rgba(138, 149, 96, 0.04);
+  border-left: 2px solid var(--ink);
+  background: var(--paper-2);
 }
 
 .lobby-squad__row + .lobby-squad__row {
-  border-top: 1px dashed rgba(138, 149, 96, 0.18);
+  border-top: 1px dashed var(--line);
 }
 
 .lobby-squad__head {
@@ -247,9 +192,17 @@
 
 .lobby-squad__name {
   font-size: 14px;
-  color: var(--bone-100);
+  color: var(--text);
   line-height: 1;
   letter-spacing: 0.14em;
+  overflow-wrap: anywhere;
+}
+
+.lobby-squad__you {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
 }
 
 .lobby-squad__sub {
@@ -263,11 +216,11 @@
   font-size: 10px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--bone-500);
+  color: var(--text-muted);
 }
 
 .lobby-squad__dot {
-  color: var(--bone-500);
+  color: var(--text-muted);
   line-height: 1;
 }
 
@@ -275,18 +228,17 @@
   display: inline-flex;
   align-items: center;
   padding: 2px 6px;
-  font-family: var(--font-stencil);
+  font-family: var(--font-display);
   font-size: 9px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
   line-height: 1.4;
 }
 
 .lobby-pill--amber {
-  background: var(--amber-500);
-  color: var(--bg-0);
-  font-weight: 700;
+  background: var(--highlight);
+  color: var(--ink);
 }
 
 .lobby-status {
@@ -297,94 +249,44 @@
   line-height: 1;
 }
 
-.lobby-status--ready { color: var(--ready); }
-.lobby-status--standby { color: var(--bone-300); }
+.lobby-status--ready { color: var(--success); }
+.lobby-status--standby { color: var(--text-muted); }
 
-/* ---------- 3. Player plate (thin top strip) ---------- */
+/* ---------- You: name + character grid ---------- */
 
-.lobby-panel--player {
-  padding: 8px 14px;
-}
-
-.lobby-player {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 44px;
-  max-height: 48px;
-}
-
-.lobby-player__avatar {
-  flex-shrink: 0;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(180deg, var(--bg-3), var(--bg-2));
-  border: 1px solid var(--olive-700);
-  overflow: hidden;
-  clip-path: polygon(
-    0 4px, 4px 0,
-    calc(100% - 4px) 0, 100% 4px,
-    100% calc(100% - 4px), calc(100% - 4px) 100%,
-    4px 100%, 0 calc(100% - 4px)
-  );
-}
-
-.lobby-player__img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.lobby-player__img--empty {
-  background:
-    repeating-linear-gradient(
-      45deg,
-      transparent 0,
-      transparent 5px,
-      rgba(240, 169, 74, 0.18) 5px,
-      rgba(240, 169, 74, 0.18) 6px
-    );
-}
-
-.lobby-player__name {
-  flex: 1;
-  min-width: 0;
-  height: 36px;
-  padding: 0 10px;
-}
-
-.lobby-player__status {
-  flex-shrink: 0;
-  white-space: nowrap;
-}
-
-/* ---------- 4. Operative roster ---------- */
-
-.lobby-panel--roster {
+.lobby-panel--you {
   padding: 16px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lobby-you__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.lobby-you__name {
+  width: 100%;
+  min-width: 0;
+  height: 40px;
+  padding: 0 10px;
 }
 
 .lobby-roster {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
-  margin-top: 10px;
-}
-
-@media (max-width: 480px) {
-  .lobby-roster {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
-  }
+  margin-top: 2px;
 }
 
 .lobby-roster__cell {
   position: relative;
   display: block;
+  min-width: 44px;
+  min-height: 44px;
   padding: 0;
   background: transparent;
   border: 0;
@@ -395,13 +297,19 @@
   transition: transform 80ms ease, filter 140ms ease;
 }
 
+.lobby-roster__cell .fm-photoslot__name,
+.lobby-roster__cell .fm-photoslot__role {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Resting affordance — present on every device (touch + desktop).
    Layer onto the inner photo frame so the card reads as a pressable
-   surface, not a flat tile. Olive border at ~30% alpha + faint inset. */
+   surface, not a flat tile. Ink outline, hard offset shadow. */
 .lobby-roster__cell .fm-photoslot__frame {
-  border-color: rgba(138, 149, 96, 0.3);
-  box-shadow: inset 0 1px 0 rgba(232, 225, 204, 0.04),
-              inset 0 0 0 1px rgba(11, 13, 10, 0.35);
+  border-color: var(--ink);
+  box-shadow: var(--shadow-sm);
   transition: border-color 80ms ease, box-shadow 80ms ease, transform 80ms ease;
 }
 
@@ -410,13 +318,11 @@
 @media (hover: hover) {
   .lobby-roster__cell:hover:not(:disabled) {
     transform: translateY(-1px);
-    filter: drop-shadow(0 0 6px var(--accent-glow));
   }
 
   .lobby-roster__cell:hover:not(:disabled) .fm-photoslot__frame {
-    border-color: var(--accent-border);
-    box-shadow: inset 0 1px 0 rgba(232, 225, 204, 0.06),
-                inset 0 0 0 1px var(--accent-muted);
+    border-color: var(--ink);
+    box-shadow: var(--shadow);
   }
 }
 
@@ -427,23 +333,21 @@
 
 .lobby-roster__cell:not(:disabled):active .fm-photoslot__frame {
   transform: translateY(1px);
-  box-shadow: inset 0 1px 2px rgba(11, 13, 10, 0.55);
+  box-shadow: none;
 }
 
-/* Selected — must win over hover. Full amber border + inner glow +
-   4px shadow lift. The corner dot stays via fm-photoslot--selected. */
+/* Selected — must win over hover. Comic-yellow outline ring on top of the
+   ink shadow. The corner dot stays via fm-photoslot--selected. */
 .lobby-roster__cell--selected {
   transform: translateY(-3px);
-  filter: drop-shadow(0 4px 14px rgba(240, 169, 74, 0.4));
 }
 
 .lobby-roster__cell--selected .fm-photoslot__frame,
 .lobby-roster__cell--selected:hover:not(:disabled) .fm-photoslot__frame {
-  border-color: var(--amber-400);
+  border-color: var(--highlight);
   box-shadow:
-    inset 0 0 0 1px var(--amber-400),
-    inset 0 0 12px var(--accent-muted),
-    0 4px 10px rgba(11, 13, 10, 0.5);
+    0 0 0 var(--border-width-heavy) var(--highlight),
+    var(--shadow-sm);
 }
 
 @media (hover: hover) {
@@ -453,7 +357,7 @@
 }
 
 .lobby-roster__cell:focus-visible {
-  outline: 2px solid var(--amber-400);
+  outline: 2px solid var(--highlight);
   outline-offset: 3px;
 }
 
@@ -464,7 +368,8 @@
 }
 
 .lobby-roster__cell--taken .fm-photoslot__frame {
-  border-color: var(--olive-700);
+  border-color: var(--line-strong);
+  border-style: dashed;
   box-shadow: none;
 }
 
@@ -476,17 +381,13 @@
   font-size: 9px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--rust-300);
-  background: rgba(11, 13, 10, 0.75);
+  color: var(--paper);
+  background: var(--ink);
   padding: 2px 0;
   pointer-events: none;
 }
 
-/* ---------- 5. Operative (dossier + loadout + progression) ---------- */
-
-.lobby-panel--area {
-  padding: 16px 20px 18px;
-}
+/* ---------- Dossier modal body (name + loadout + progression) ---------- */
 
 .lobby-operative__section {
   display: block;
@@ -495,13 +396,7 @@
 .lobby-operative__section + .lobby-operative__divider {
   margin: 14px 0;
   height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent 0,
-    rgba(232, 225, 204, 0.1) 12%,
-    rgba(232, 225, 204, 0.1) 88%,
-    transparent 100%
-  );
+  background: var(--line);
 }
 
 .lobby-dossier__body {
@@ -515,7 +410,7 @@
 .lobby-dossier__name {
   font-size: 20px;
   line-height: 1;
-  color: var(--bone-100);
+  color: var(--text);
   letter-spacing: 0.14em;
 }
 
@@ -523,14 +418,7 @@
   font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--bone-500);
-}
-
-.lobby-dossier__chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 2px;
+  color: var(--text-muted);
 }
 
 .lobby-chip {
@@ -541,29 +429,19 @@
   font-size: 10px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--bone-300);
-  background: rgba(138, 149, 96, 0.08);
-  border: 1px solid var(--olive-700);
-  border-radius: 2px;
+  color: var(--text-2);
+  background: var(--paper-2);
+  border: 1px solid var(--ink);
+  border-radius: var(--radius-sm);
 }
 
 .lobby-chip--rust {
-  color: var(--rust-300);
-  border-color: var(--rust-500);
-  background: rgba(156, 63, 28, 0.12);
+  color: var(--paper);
+  border-color: var(--ink);
+  background: var(--accent);
 }
 
-.lobby-dossier__quote {
-  margin: 6px 0 0;
-  font-family: var(--font-body, serif);
-  font-style: italic;
-  font-size: 12px;
-  line-height: 1.45;
-  color: var(--bone-300);
-  letter-spacing: 0.01em;
-}
-
-/* ---------- 6. Starting loadout ---------- */
+/* ---------- Starting weapon ---------- */
 
 .lobby-loadout {
   display: flex;
@@ -578,20 +456,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(180deg, var(--bg-3), var(--bg-2));
-  border: 1px solid var(--olive-700);
-  color: var(--amber-400);
-  clip-path: polygon(
-    0 4px, 4px 0,
-    calc(100% - 4px) 0, 100% 4px,
-    100% calc(100% - 4px), calc(100% - 4px) 100%,
-    4px 100%, 0 calc(100% - 4px)
-  );
+  background: var(--paper-3);
+  border: 1px solid var(--ink);
+  border-radius: var(--radius-sm);
+  color: var(--text);
 }
 
 .lobby-loadout__icon {
   display: inline-flex;
-  opacity: 0.9;
 }
 
 .lobby-loadout__text {
@@ -604,7 +476,7 @@
 
 .lobby-loadout__name {
   font-size: 14px;
-  color: var(--bone-100);
+  color: var(--text);
   letter-spacing: 0.14em;
   line-height: 1;
 }
@@ -612,11 +484,11 @@
 .lobby-loadout__stats {
   font-size: 11px;
   letter-spacing: 0.14em;
-  color: var(--rust-300);
+  color: var(--accent-text);
   text-transform: uppercase;
 }
 
-/* ---------- 7. Progression track ---------- */
+/* ---------- Skills per danger level ---------- */
 
 .lobby-progression {
   display: flex;
@@ -638,8 +510,7 @@
   grid-row: 1 / -1;
   width: 10px;
   height: 24px;
-  background: var(--rank-color, var(--olive-500));
-  box-shadow: 0 0 6px var(--rank-color, var(--olive-500));
+  background: var(--rank-color, var(--text-muted));
   border-radius: 1px;
   align-self: center;
 }
@@ -656,13 +527,13 @@
 .lobby-rank-label {
   font-size: 11px;
   letter-spacing: 0.18em;
-  color: var(--bone-100);
+  color: var(--text);
 }
 
 .lobby-rank-xp {
   font-size: 10px;
   letter-spacing: 0.14em;
-  color: var(--bone-500);
+  color: var(--text-muted);
   text-transform: uppercase;
 }
 
@@ -683,10 +554,16 @@
   font-size: 9px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  border-radius: 2px;
-  border: 1px solid currentColor;
-  background: rgba(11, 13, 10, 0.35);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--ink);
+  background: var(--paper-2);
+  color: var(--text);
+  /* nowrap without an overflow rule let a long Spanish rank label push the
+     pill past the row. */
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
   max-width: 100%;
 }
 
@@ -696,24 +573,31 @@
   font-size: 9px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--bone-500);
+  color: var(--text-muted);
   opacity: 0.7;
 }
 
-.lobby-rank-pill--blue   { color: var(--rank-blue); }
-.lobby-rank-pill--yellow { color: var(--rank-yellow); }
-.lobby-rank-pill--orange { color: var(--rank-orange); }
-.lobby-rank-pill--red    { color: var(--rank-red); }
+/* Rank keeps its hue as the pill fill; the label stays ink so a yellow or
+   orange step is still legible on paper. */
+.lobby-rank-pill--blue   { background: var(--info-soft); border-color: var(--rank-blue); }
+.lobby-rank-pill--yellow { background: var(--highlight-soft); border-color: var(--rank-yellow); }
+.lobby-rank-pill--orange { background: var(--danger-orange-soft); border-color: var(--rank-orange); }
+.lobby-rank-pill--red    { background: var(--accent-soft); border-color: var(--rank-red); }
 
 .lobby-rank-empty {
   font-size: 10px;
-  color: var(--bone-500);
+  color: var(--text-muted);
   letter-spacing: 0.14em;
 }
 
-/* ---------- 8. Area of operation ---------- */
+/* ---------- Map ---------- */
+
+.lobby-panel--map {
+  padding: 16px 20px 18px;
+}
 
 .lobby-area {
+  margin-top: 10px;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -723,8 +607,7 @@
 .lobby-area__bar {
   width: 3px;
   align-self: stretch;
-  background: var(--amber-400);
-  box-shadow: 0 0 6px rgba(240, 169, 74, 0.35);
+  background: var(--accent);
 }
 
 .lobby-area__text {
@@ -738,15 +621,8 @@
 .lobby-area__name {
   font-size: 14px;
   line-height: 1.1;
-  color: var(--bone-100);
+  color: var(--text);
   letter-spacing: 0.14em;
-}
-
-.lobby-area__sub {
-  font-size: 10px;
-  letter-spacing: 0.14em;
-  color: var(--bone-500);
-  text-transform: uppercase;
 }
 
 .lobby-area__select-wrap {
@@ -760,14 +636,14 @@
 .lobby-area__select {
   appearance: none;
   -webkit-appearance: none;
-  background: transparent;
-  border: 1px solid var(--olive-700);
-  color: var(--bone-100);
+  background: var(--paper-3);
+  border: 1px solid var(--ink);
+  color: var(--text);
   font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.08em;
   padding: 6px 22px 6px 10px;
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   width: 100%;
   max-width: 100%;
@@ -779,40 +655,38 @@
 }
 
 .lobby-area__select:focus-visible {
-  outline: 2px solid var(--amber-400);
+  outline: 2px solid var(--highlight);
   outline-offset: 2px;
 }
 
 .lobby-area__select option {
-  background: var(--bg-2);
-  color: var(--bone-100);
+  background: var(--paper);
+  color: var(--text);
 }
 
 .lobby-area__caret {
   position: absolute;
   right: 8px;
   pointer-events: none;
-  color: var(--amber-400);
+  color: var(--text-muted);
   font-size: 10px;
 }
 
 .lobby-area__readonly {
+  align-self: flex-start;
   font-size: 10px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--bone-500);
-  padding: 6px 10px;
-  border: 1px dashed var(--olive-700);
-  border-radius: 2px;
+  color: var(--text-muted);
+  padding: 4px 8px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-sm);
 }
 
-/* ---------- 9. Rules of engagement ---------- */
+/* ---------- Options ---------- */
 
-.lobby-panel--roe {
+.lobby-panel--options {
   padding: 16px 20px;
-  background:
-    linear-gradient(180deg, rgba(156, 63, 28, 0.08), rgba(156, 63, 28, 0.02)),
-    linear-gradient(180deg, var(--bg-1), var(--bg-2));
 }
 
 .lobby-roe-list {
@@ -823,7 +697,7 @@
 }
 
 .lobby-roe-list > .lobby-roe + .lobby-roe {
-  border-top: 1px dashed rgba(138, 149, 96, 0.18);
+  border-top: 1px dashed var(--line);
   padding-top: 10px;
 }
 
@@ -832,6 +706,14 @@
   align-items: center;
   gap: 12px;
   cursor: pointer;
+  background: var(--paper-2);
+  border-radius: var(--radius-sm);
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+
+/* Checked rule reads as active: comic-yellow wash. */
+.lobby-roe:has(.lobby-roe__check:checked) {
+  background: var(--highlight-soft);
 }
 
 .lobby-roe--readonly .lobby-roe {
@@ -842,7 +724,7 @@
   flex-shrink: 0;
   width: 16px;
   height: 16px;
-  accent-color: var(--rust-400);
+  accent-color: var(--accent);
   cursor: pointer;
 }
 
@@ -861,14 +743,14 @@
 .lobby-roe__title {
   font-size: 13px;
   letter-spacing: 0.14em;
-  color: var(--bone-100);
+  color: var(--text);
   line-height: 1;
 }
 
 .lobby-roe__desc {
   font-size: 10px;
   letter-spacing: 0.1em;
-  color: var(--bone-500);
+  color: var(--text-muted);
   text-transform: uppercase;
   line-height: 1.4;
 }
@@ -877,30 +759,54 @@
   flex-shrink: 0;
 }
 
-/* ---------- 10. Footer (primary + leave) ---------- */
+/* ---------- Footer (primary + leave), sticky at the stack bottom ---------- */
 
 .lobby-panel--footer {
-  padding: 16px 20px 18px;
+  padding: 12px 20px calc(12px + env(safe-area-inset-bottom));
   position: sticky;
   bottom: 0;
   z-index: 5;
   margin-top: auto;
-  background:
-    linear-gradient(180deg, transparent 0, var(--bg-1) 24%, var(--bg-1) 100%);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  flex-shrink: 0;
+  background: var(--paper);
 }
 
 .lobby-footer {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
+}
+
+.lobby-footer__missing {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  line-height: 1.3;
+  color: var(--accent-text);
+  text-align: center;
+  overflow-wrap: anywhere;
 }
 
 /* ---------- Dossier drawer (modal-as-bottom-sheet on mobile) ---------- */
 
 .lobby-dossier-modal__body {
   padding: 16px 20px 20px;
+  min-height: 0;
+}
+
+/* Fit short viewports (844x390): header stays, body scrolls. */
+.modal-backdrop > .modal.lobby-dossier-modal {
+  max-height: min(85vh, 100svh);
+}
+
+@media (max-height: 500px) {
+  .modal-backdrop > .modal.lobby-dossier-modal {
+    max-height: calc(100svh - 8px);
+  }
+
+  .lobby-dossier-modal__body {
+    padding: 10px 16px 14px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -919,33 +825,157 @@
   font-size: 11px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--bone-500);
+  color: var(--text-muted);
   text-align: center;
   padding: 10px 0;
 }
 
 .lobby__waiting::after {
   content: '_';
-  animation: hud-blink-caret 1.1s step-end infinite;
-  color: var(--amber-400);
+  color: var(--accent-text);
   margin-left: 2px;
 }
 
 /* ---------- Mobile ---------- */
 
 @media (max-width: 480px) {
-  .lobby {
-    padding: var(--space-3);
+  .lobby__stack {
+    --lobby-gutter: var(--space-3);
+    gap: 10px;
+    padding-top: calc(var(--space-3) + env(safe-area-inset-top));
   }
 
   .lobby-panel {
     padding: 14px 16px;
   }
 
-  .lobby-briefing__title {
-    font-size: 22px;
+  .lobby-panel--footer {
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
   }
 
+  .lobby-roster {
+    gap: 8px;
+  }
+
+  .lobby-invite__code {
+    font-size: 28px;
+  }
+}
+
+/* ---------- Two columns: landscape phones, tablets, desktop ---------- */
+
+@media (orientation: landscape) and (min-width: 700px) {
+  .lobby__stack {
+    --lobby-max: 1040px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto auto auto auto auto 1fr auto;
+    grid-template-areas:
+      "banner  banner"
+      "you     invite"
+      "you     players"
+      "you     map"
+      "you     options"
+      "you     ."
+      "footer  footer";
+    column-gap: 14px;
+    row-gap: 0;
+    align-content: stretch;
+  }
+
+  /* row-gap 0 so an absent banner leaves no empty gap; panels space
+     themselves instead. */
+  .lobby__stack > [data-panel] { margin-bottom: 14px; }
+  .lobby__stack > [data-panel="hostLeftBanner"] { grid-area: banner; }
+  .lobby__stack > [data-panel="invite"]   { grid-area: invite; }
+  .lobby__stack > [data-panel="you"]      { grid-area: you; align-self: start; }
+  .lobby__stack > [data-panel="players"]  { grid-area: players; }
+  .lobby__stack > [data-panel="map"]      { grid-area: map; }
+  .lobby__stack > [data-panel="options"]  { grid-area: options; }
+  .lobby__stack > [data-panel="footer"]   { grid-area: footer; align-self: end; margin-bottom: 0; }
+
+  /* Footer in one row: primary action wide, leave narrow. */
+  .lobby-footer {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 220px);
+    align-items: center;
+    column-gap: 12px;
+    row-gap: 6px;
+  }
+
+  .lobby-footer__missing {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ---------- Landscape phones / short viewports: compact ---------- */
+
+@media (max-height: 500px) {
+  .lobby__stack {
+    gap: 8px;
+    padding-top: calc(var(--space-2) + env(safe-area-inset-top));
+  }
+
+  .lobby-panel {
+    padding: 10px 14px;
+  }
+
+  .lobby-panel--footer {
+    padding: 8px 14px calc(8px + env(safe-area-inset-bottom));
+  }
+
+  .lobby-invite__code {
+    font-size: 24px;
+  }
+
+  .lobby-panel--you {
+    gap: 6px;
+  }
+
+  .lobby-you__field {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 2px;
+  }
+
+  .lobby-you__field label {
+    flex-shrink: 0;
+  }
+
+  .lobby-roster {
+    gap: 8px;
+  }
+
+  /* Cap portraits so two rows of three fit beside the other column. */
+  .lobby-roster .fm-photoslot--md .fm-photoslot__frame {
+    aspect-ratio: auto;
+    height: clamp(44px, 18svh, 96px);
+  }
+
+  .lobby-roster .fm-photoslot {
+    gap: 3px;
+  }
+
+  .lobby-roster__cell--selected {
+    transform: translateY(-1px);
+  }
+
+  .lobby-footer .fm-btn {
+    min-height: 44px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  .lobby__waiting {
+    padding: 6px 0;
+  }
+}
+
+@media (orientation: landscape) and (min-width: 700px) and (max-height: 500px) {
+  .lobby__stack > [data-panel] { margin-bottom: 8px; }
+  .lobby__stack { column-gap: 10px; }
+  .lobby__stack > [data-panel="footer"] { margin-bottom: 0; }
 }
 
 /* ==========================================================================
@@ -960,17 +990,12 @@
   align-items: center;
   gap: 14px;
   padding: 12px 16px;
-  background:
-    linear-gradient(180deg, rgba(196, 90, 44, 0.14), rgba(156, 63, 28, 0.08)),
-    linear-gradient(180deg, var(--bg-2), var(--bg-1));
-  border: 1px solid var(--rust-500);
+  background: var(--accent-soft);
+  color: var(--text);
+  border: 1px solid var(--ink);
   border-left-width: 3px;
-  clip-path: polygon(
-    0 6px, 6px 0,
-    calc(100% - 6px) 0, 100% 6px,
-    100% calc(100% - 6px), calc(100% - 6px) 100%,
-    6px 100%, 0 calc(100% - 6px)
-  );
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
   animation: panel-fade-in 200ms var(--ease-out) both;
 }
 
@@ -978,10 +1003,8 @@
   width: 12px;
   height: 12px;
   align-self: center;
-  background: var(--rust-400);
+  background: var(--accent);
   border-radius: 1px;
-  box-shadow: 0 0 8px rgba(196, 90, 44, 0.55);
-  animation: rust-blink 1.6s ease-in-out infinite;
 }
 
 .lobby-banner__text {
@@ -992,11 +1015,11 @@
 }
 
 .lobby-banner__title {
-  font-family: var(--font-stencil);
+  font-family: var(--font-display);
   font-size: 13px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--rust-300);
+  color: var(--accent-text);
   line-height: 1;
 }
 
@@ -1005,7 +1028,7 @@
   font-size: 10px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--bone-300);
+  color: var(--text-2);
   line-height: 1.2;
 }
 
@@ -1017,10 +1040,10 @@
   font-family: var(--font-mono);
   font-size: 12px;
   letter-spacing: 0.18em;
-  color: var(--rust-300);
-  border: 1px solid var(--rust-500);
-  background: rgba(156, 63, 28, 0.16);
-  border-radius: 2px;
+  color: var(--accent-text);
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  border-radius: var(--radius-sm);
   min-width: 56px;
   justify-content: center;
 }
@@ -1028,25 +1051,12 @@
 .lobby-banner__countdown-num {
   font-size: 16px;
   font-weight: 700;
-  color: var(--rust-300);
+  color: var(--accent-text);
   font-family: var(--font-mono);
-  animation: countdown-pulse 1s steps(1, end) infinite;
-}
-
-@keyframes rust-blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.55; }
-}
-
-@keyframes countdown-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .lobby-banner { animation: none; }
-  .lobby-banner__icon,
-  .lobby-banner__countdown-num { animation: none; }
 }
 
 /* ==========================================================================
@@ -1070,21 +1080,8 @@
   align-items: center;
   justify-content: center;
   padding: var(--space-4);
-  background: var(--modal-backdrop);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background: var(--scrim);
   animation: panel-fade-in 200ms var(--ease-out) both;
-}
-
-.lobby-scrim::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background-image: var(--grain-url);
-  background-size: 160px 160px;
-  opacity: 0.04;
-  pointer-events: none;
-  mix-blend-mode: overlay;
 }
 
 .lobby-scrim__card {
@@ -1097,17 +1094,21 @@
   flex-direction: column;
   align-items: center;
   gap: 16px;
+  background: var(--paper);
+  color: var(--text);
+  border: var(--border-heavy);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
 }
 
 .lobby-scrim__title {
-  font-family: var(--font-stencil);
+  font-family: var(--font-display);
   font-size: 28px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--rust-300);
+  color: var(--accent-text);
   line-height: 1;
   margin: 0;
-  text-shadow: 0 0 18px rgba(196, 90, 44, 0.35);
 }
 
 .lobby-scrim__sub {
@@ -1115,7 +1116,7 @@
   font-size: 11px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--bone-300);
+  color: var(--text-2);
   line-height: 1.5;
   max-width: 30ch;
   margin: 0;
@@ -1125,14 +1126,13 @@
   font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.16em;
-  color: var(--bone-500);
+  color: var(--text-muted);
   text-transform: uppercase;
 }
 
 .lobby-scrim__meta::after {
   content: '_';
-  animation: hud-blink-caret 1.1s step-end infinite;
-  color: var(--rust-400);
+  color: var(--accent-text);
   margin-left: 2px;
 }
 
@@ -1144,8 +1144,5 @@
 
 @media (prefers-reduced-motion: reduce) {
   .lobby-scrim { animation: none; }
-  .lobby-scrim__meta::after { animation: none; }
 }
 
-/* Lobby stays a single column at every resolution — multi-column splits
-   leave large empty regions when one rail is shorter. */

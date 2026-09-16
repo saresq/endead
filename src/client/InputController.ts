@@ -12,6 +12,8 @@ import { RenderOptions } from './PixiBoardRenderer';
 import { modalManager } from './ui/overlays/ModalManager';
 import { getZombieTypeDisplay } from './config/ZombieTypeConfig';
 import { icon } from './ui/components/icons';
+import { notificationManager } from './ui/NotificationManager';
+import { es, equipmentName } from '../strings/es';
 
 export class InputController {
   private app: PIXI.Application;
@@ -203,7 +205,11 @@ export class InputController {
             }
             this.requestRender();
           } else {
-            console.warn('InputController: Target zone not reachable.');
+            notificationManager.show({
+              message: es.board.zoneUnreachable,
+              variant: 'warning',
+              priority: 'low',
+            });
             this.clearPendingMove();
           }
         }
@@ -588,7 +594,7 @@ export class InputController {
     const renderBody = () => {
       return `
         <div class="stack stack--sm">
-          <p class="text-muted-sm">Click zombies in the order you want to kill them. First click = first to die.</p>
+          <p class="text-muted-sm">${es.board.pickerBody}</p>
           <div class="zombie-picker-grid">
             ${zombies.map(z => {
               const display = getZombieTypeDisplay(z.type);
@@ -611,14 +617,14 @@ export class InputController {
     const renderFooter = () => {
       const disabled = selection.length === 0 ? 'disabled' : '';
       const label = selection.length === 0
-        ? 'Pick a target'
-        : `Attack (${selection.length} target${selection.length > 1 ? 's' : ''})`;
+        ? es.board.pickerNone
+        : es.board.pickerAttack(selection.length);
       return `<button class="btn btn-primary" data-action="confirm-attack" ${disabled}>${label}</button>`;
     };
 
     const modalId = modalManager.open({
-      title: 'Choose Targets',
-      subtitle: `${weapon.name} (Melee) — pick kill order`,
+      title: es.board.pickerTitle,
+      subtitle: es.board.pickerSubtitle(equipmentName(weapon)),
       size: 'md',
       renderBody,
       renderFooter,

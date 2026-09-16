@@ -6,6 +6,7 @@ import { renderButton } from './components/Button';
 import { renderItemCard, renderEmptySlot } from './components/ItemCard';
 import { icon } from './components/icons';
 import { modalManager } from './overlays/ModalManager';
+import { es } from '../../strings/es';
 
 const ALL_SLOTS = ['HAND_1', 'HAND_2', 'BACKPACK_0', 'BACKPACK_1', 'BACKPACK_2'] as const;
 
@@ -43,8 +44,8 @@ export class PickupUI {
     if (this.modalId) modalManager.close(this.modalId);
 
     this.modalId = modalManager.open({
-      title: 'New Item Found!',
-      subtitle: 'Tap an item to select it, then tap a slot to move it.',
+      title: es.pickup.title,
+      subtitle: es.pickup.hint,
       size: 'md',
       persistent: true,
       bodyClassName: 'modal__body--stack',
@@ -99,8 +100,8 @@ export class PickupUI {
   private rerender(): void {
     if (!this.modalId) return;
     const hint = this.tapSelectedId
-      ? 'Now tap a slot to place the item there.'
-      : 'Tap an item to select it, then tap a slot to move it.';
+      ? es.pickup.hintSelected
+      : es.pickup.hint;
     modalManager.updateSubtitle(this.modalId, hint);
     modalManager.updateBody(this.modalId, this.renderBody());
     modalManager.updateFooter(this.modalId, this.renderFooter());
@@ -114,7 +115,7 @@ export class PickupUI {
     const isTargetForUnplace = this.tapSelectedId && !newCardIsSelected && this.ghostSlot;
     const featuredCard = renderItemCard(this.newCard, {
       variant: 'featured',
-      badge: this.ghostSlot ? 'PLACED' : 'NEW',
+      badge: this.ghostSlot ? es.pickup.badgePlaced : es.pickup.badgeNew,
       tappable: true,
       showSlot: false,
       placed: !!this.ghostSlot,
@@ -126,10 +127,10 @@ export class PickupUI {
       </div>
 
       <div class="inv-panel">
-        <div class="inv-panel__header">${icon('Backpack', 'sm')} Your Equipment</div>
+        <div class="inv-panel__header">${icon('Backpack', 'sm')} ${es.trade.yourEquipment}</div>
         <div class="slot-row slot-row--hands">
-          ${this.renderSlot('HAND_1', 'Hand 1')}
-          ${this.renderSlot('HAND_2', 'Hand 2')}
+          ${this.renderSlot('HAND_1', es.slots.HAND_1)}
+          ${this.renderSlot('HAND_2', es.slots.HAND_2)}
         </div>
         <div class="slot-row slot-row--backpack">
           ${this.renderSlot('BACKPACK_0')}
@@ -139,8 +140,9 @@ export class PickupUI {
       </div>
 
       <div class="inv-panel">
-        <div class="inv-panel__header">${icon('Trash2', 'sm')} Discard</div>
+        <div class="inv-panel__header">${icon('Trash2', 'sm')} ${es.trade.discard}</div>
         <div class="discard-zone ${this.tapSelectedId && !(this.tapSelectedIsGhost && this.ghostSlot === 'DISCARD') ? 'tap-target' : ''}" data-tap-slot="DISCARD">
+          <span class="discard-zone__stamp" aria-hidden="true">${es.trade.discard}</span>
           ${this.renderDiscardItems()}
         </div>
       </div>`;
@@ -148,10 +150,10 @@ export class PickupUI {
 
   private renderFooter(): string {
     return `
-      <span class="trade-footer__hint">Tap to select, then tap a slot to place.</span>
+      <span class="trade-footer__hint">${es.pickup.footerHint}</span>
       <div class="trade-footer__actions">
-        ${renderButton({ label: 'Skip Item', icon: 'X', variant: 'ghost', size: 'sm', dataAction: 'discard-new' })}
-        ${renderButton({ label: 'Confirm', icon: 'Check', variant: 'primary', size: 'sm', disabled: !this.ghostSlot, dataAction: 'confirm-pickup' })}
+        ${renderButton({ label: es.pickup.skip, icon: 'X', variant: 'ghost', size: 'sm', dataAction: 'discard-new' })}
+        ${renderButton({ label: es.pickup.confirm, icon: 'Check', variant: 'primary', size: 'sm', disabled: !this.ghostSlot, dataAction: 'confirm-pickup' })}
       </div>`;
   }
 
@@ -174,7 +176,7 @@ export class PickupUI {
       : '';
 
     const content = displayItem
-      ? renderItemCard(displayItem, { variant: isGhostHere ? 'ghost' : 'default', badge: isGhostHere ? 'NEW' : undefined, tappable: true, showSlot: false })
+      ? renderItemCard(displayItem, { variant: isGhostHere ? 'ghost' : 'default', badge: isGhostHere ? es.pickup.badgeNew : undefined, tappable: true, showSlot: false })
       : renderEmptySlot();
 
     return `
@@ -210,12 +212,12 @@ export class PickupUI {
       if (target.dataset.action === 'discard-new') {
         const survivor = this.survivor!;
         modalManager.open({
-          title: 'Skip Item?',
+          title: es.pickup.skipTitle,
           size: 'sm',
-          renderBody: () => '<p class="text-secondary">This item will be discarded.</p>',
+          renderBody: () => `<p class="text-secondary">${es.pickup.skipBody}</p>`,
           renderFooter: () => `
-            ${renderButton({ label: 'Keep', variant: 'secondary', dataAction: 'modal-close' })}
-            ${renderButton({ label: 'Skip', variant: 'destructive', dataAction: 'confirm-skip' })}
+            ${renderButton({ label: es.pickup.keep, variant: 'secondary', dataAction: 'modal-close' })}
+            ${renderButton({ label: es.pickup.skipConfirm, variant: 'destructive', dataAction: 'confirm-skip' })}
           `,
           onOpen: (confirmEl) => {
             confirmEl.addEventListener('click', (ev) => {

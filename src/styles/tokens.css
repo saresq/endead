@@ -1,193 +1,124 @@
 /* ==========================================================================
-   Design Tokens — Single Source of Truth — Field Manual direction
+   Design Tokens — Single Source of Truth — Pulp Comic direction
 
-   Aesthetic: military / tactical survival field manual.
-   Stenciled type, hazard-tape accents, corner-bracketed panels.
-   Olive + rust + amber on near-black with cool olive undertone.
+   Aesthetic: newsprint pulp comic. Cream "paper" panels with black ink
+   text, solid 2–3px ink outlines and a hard, unblurred offset ink shadow,
+   floating on a dark ink page. Comic red for primary and destructive,
+   comic yellow for selected / active / "your turn", green and blue for
+   success and info.
 
    ──────────────────────────────────────────────────────────────────────
    Naming convention (CANONICAL — use in new code):
-     --{role}-{step}     e.g. --bg-0, --bg-1, --olive-500, --rust-400,
-                              --amber-400, --bone-100
-     --{semantic}        e.g. --hazard, --ready, --success, --danger,
-                              --text-muted, --modal-bg, --hud-phosphor
-   The role/step palette names self-document their place in the system
-   (background tier, olive ramp step, etc). Semantic tokens are layered
-   on top — use them when the role is the meaning (modal background,
-   readiness indicator) rather than a raw color step.
+     Surfaces   --page, --page-2, --paper, --paper-2, --paper-3
+     Ink/text   --ink, --text, --text-2, --text-muted,
+                --text-on-page, --text-on-page-muted, --text-inverse
+     Colour     --accent, --accent-text, --highlight, --success, --info,
+                --warning, --danger, --danger-orange, plus `*-soft` fills
+     Structure  --line, --scrim, --border, --border-heavy,
+                --shadow, --shadow-lg, --radius*, --halftone
+     Danger     --dl-accent, --dl-accent-text (set by [data-danger])
+
+   Rules:
+   - Component CSS references these tokens; it never writes a colour
+     literal (`#hex`, `rgb()`, `rgba()`, `hsl()`).
+   - Coloured text (--accent-text, --success, --info) only sits on
+     --paper or --paper-2. --paper-3 carries --text or --text-muted only.
+   - Text over --page or the board uses --paper, --highlight or
+     --text-on-page-muted.
 
    See `src/styles/README.md` for the full design-system naming rules.
    ────────────────────────────────────────────────────────────────────── */
 
 :root {
-  /* ---------- Field Manual core palette (new) ---------- */
-  --bg-0: #0b0d0a;                 /* near-black, cool olive undertone */
-  --bg-1: #12140f;                 /* panel base */
-  --bg-2: #1a1d16;                 /* raised surface */
-  --bg-3: #24281e;                 /* input / sunken */
+  /* ---------- Page (dark ink ground: menu, lobby, board) ---------- */
+  --page: #1a1614;
+  --page-2: #2a2320;
 
-  --olive-900: #2a2e1f;
-  --olive-700: #3e432c;
-  --olive-500: #5a6339;
-  --olive-300: #8a9560;
+  /* ---------- Paper (panels, modals, cards) ---------- */
+  --paper: #f4ead2;
+  --paper-2: #e9dbb9;
+  --paper-3: #dccaa0;
 
-  --rust-700: #6b2a12;
-  --rust-500: #9c3f1c;
-  --rust-400: #c45a2c;
-  --rust-300: #e07548;
+  /* ---------- Ink & text ---------- */
+  --ink: #1a1614;
+  --text: var(--ink);
+  --text-2: #3d342d;
+  --text-muted: #5c5046;
+  --text-on-page: var(--paper);
+  --text-on-page-muted: #b9ab90;
+  --text-inverse: var(--paper); /* text on --accent / --ink fills */
 
-  --amber-500: #d99336;
-  --amber-400: #f0a94a;
-  --amber-200: #f7d28a;
+  /* ---------- Accent (comic red) ----------
+     --accent is #c7241c rather than design D1's #c01f18 so a red fill on
+     the dark page clears the 3:1 non-text ratio (3.16) while cream text
+     on red still clears 4.5:1 (4.75). */
+  --accent: #c7241c;
+  --accent-text: #a31a14; /* red text, --paper / --paper-2 only */
+  --accent-soft: #f6d3c8;
 
-  --bone-100: #e8e1cc;
-  --bone-300: #b8b39e;
-  --bone-500: #8a8674;
+  /* ---------- Highlight (comic yellow: selected, active, your turn) --- */
+  --highlight: #ffcc1a;
+  --highlight-soft: #fff0b3;
 
-  --hazard: #d4c24a;
-  --ready: #7aa64a;
+  /* ---------- Status ---------- */
+  --success: #256a31;
+  --success-soft: #d5e8c9;
+  --info: #1f5fa8;
+  --info-soft: #cfe0f2;
+  --warning: var(--highlight);
+  --warning-soft: var(--highlight-soft);
+  --danger: var(--accent);
+  --danger-soft: var(--accent-soft);
+  --danger-orange: #d8661c; /* ink text only */
+  --danger-orange-soft: #f7d9c2;
 
-  /* Rank / danger anchor colors (progression track + squad plates) */
-  --rank-blue: #4a90d9;
-  --rank-yellow: var(--amber-400);
-  --rank-orange: var(--rust-400);
-  --rank-red: #b23025;
+  /* ---------- Rank / danger anchors (progression track, squad plates) - */
+  --rank-blue: var(--info);
+  --rank-yellow: var(--highlight);
+  --rank-orange: var(--danger-orange);
+  --rank-red: var(--accent);
 
-  /* ====================================================================
-     @deprecated — LEGACY ALIAS SHIM. Do not use in new code.
-     ────────────────────────────────────────────────────────────────────
-     These aliases predate the Field Manual palette and are kept only as
-     a migration shim for surfaces still pointing at the old names. New
-     CSS should reference the canonical names directly:
+  /* ---------- Hairlines & scrim ---------- */
+  --line: color-mix(in srgb, var(--ink) 25%, transparent);
+  --line-strong: color-mix(in srgb, var(--ink) 45%, transparent);
+  --scrim: color-mix(in srgb, var(--page) 80%, transparent);
 
-         OLD                       →  NEW (canonical)
-         --surface-0 .. --surface-3 →  --bg-0 .. --bg-3
-         --surface-4                →  --olive-700
-         --surface-5                →  --olive-500
-         --accent                   →  --amber-400
-         --accent-bright            →  --amber-200
-         --accent-hover             →  --amber-500
-         --text-primary             →  --bone-100
-         --text-secondary           →  --bone-300
+  /* ---------- Player colours (equal to PlayerIdentities.ts) ---------- */
+  --player-1: #d94444;
+  --player-2: #4a82c8;
+  --player-3: #4a9e50;
+  --player-4: #c8a830;
+  --player-5: #9060c0;
+  --player-6: #3a9aaa;
+  --player-1-soft: color-mix(in srgb, var(--player-1) 22%, var(--paper));
+  --player-2-soft: color-mix(in srgb, var(--player-2) 22%, var(--paper));
+  --player-3-soft: color-mix(in srgb, var(--player-3) 22%, var(--paper));
+  --player-4-soft: color-mix(in srgb, var(--player-4) 22%, var(--paper));
+  --player-5-soft: color-mix(in srgb, var(--player-5) 22%, var(--paper));
+  --player-6-soft: color-mix(in srgb, var(--player-6) 22%, var(--paper));
 
-     Component CSS under `src/styles/components/` and `src/styles/{base,
-     layout,utilities}.css` has been migrated. As of Wave 6 follow-up #03
-     these aliases have ZERO references in src/ and ZERO references in
-     node_modules CSS. They are kept only as a safety net for any
-     third-party-shaped overlay we may wire in. Target removal: next
-     palette milestone after Wave 6 ships. If you add new code, do not
-     reach for these names — use the canonical replacements above.
-
-     The rgba-tinted aliases (--accent-muted, --accent-glow,
-     --accent-border, --surface-inset) are intentionally kept as
-     SEMANTIC tokens — they encode an alpha tint, not a raw color step.
-     Treat those as canonical. They are not subject to the rename above.
-     ==================================================================== */
-  --surface-0: var(--bg-0);
-  --surface-1: var(--bg-1);
-  --surface-2: var(--bg-2);
-  --surface-3: var(--bg-3);
-  --surface-4: var(--olive-700);
-  --surface-5: var(--olive-500);
-  --surface-inset: rgba(11, 13, 10, 0.6); /* semantic — alpha-tinted bg-0 */
-
-  /* ---------- Text ---------- */
-  /* @deprecated --text-primary, --text-secondary — use --bone-100, --bone-300.
-     The rest below are canonical semantic tokens; keep using them. */
-  --text-primary: var(--bone-100);
-  --text-secondary: var(--bone-300);
-  --text-muted: var(--bone-500);
-  --text-disabled: #4a4a3c;
-  --text-inverse: var(--bg-0);
-  --text-danger-red: #d94a3a;
-  --text-hud: var(--amber-200);
-  --text-hud-amber: var(--amber-400);
-  --text-hud-dim: rgba(247, 210, 138, 0.4);
-
-  /* ---------- Accent / Brand (amber) ---------- */
-  /* @deprecated --accent, --accent-bright, --accent-hover —
-     use --amber-400, --amber-200, --amber-500 instead.
-     The -muted/-glow/-border variants remain canonical: they are
-     alpha-tinted amber and have no role/step equivalent. */
-  --accent: var(--amber-400);
-  --accent-bright: var(--amber-200);
-  --accent-hover: var(--amber-500);
-  --accent-muted: rgba(240, 169, 74, 0.14);
-  --accent-glow: rgba(240, 169, 74, 0.3);
-  --accent-border: rgba(240, 169, 74, 0.35);
-
-  /* ---------- Semantic / Status ---------- */
-  --success: var(--ready);
-  --success-bright: #9cca70;
-  --success-muted: rgba(122, 166, 74, 0.18);
-  --success-border: rgba(122, 166, 74, 0.4);
-  --warning: var(--hazard);
-  --warning-muted: rgba(212, 194, 74, 0.18);
-  --warning-border: rgba(212, 194, 74, 0.4);
-  --danger: #b23025;
-  --danger-bright: #d94a3a;
-  --danger-muted: rgba(178, 48, 37, 0.2);
-  --danger-border: rgba(178, 48, 37, 0.45);
-  --info: var(--rank-blue);
-  --info-muted: rgba(74, 144, 217, 0.18);
-
-  /* ---------- Danger level palette (base chromatic anchors) ---------- */
-  --danger-blue: var(--rank-blue);
-  --danger-blue-bright: #6aa8ee;
-  --danger-blue-glow: rgba(74, 144, 217, 0.35);
-  --danger-yellow: var(--amber-500);
-  --danger-yellow-bright: var(--amber-400);
-  --danger-yellow-glow: rgba(240, 169, 74, 0.4);
-  --danger-orange: var(--rust-500);
-  --danger-orange-bright: var(--rust-400);
-  --danger-orange-glow: rgba(196, 90, 44, 0.55);
-  --danger-red: #982018;
-  --danger-red-bright: #c02820;
-  --danger-red-glow: rgba(152, 32, 24, 0.65);
-
-  /* ---------- Player colors ---------- */
-  --player-1: #c03838;
-  --player-1-bright: #e04848;
-  --player-1-muted: rgba(192, 56, 56, 0.18);
-  --player-2: #3868b0;
-  --player-2-bright: #5088d0;
-  --player-2-muted: rgba(56, 104, 176, 0.18);
-  --player-3: #388038;
-  --player-3-bright: #50a050;
-  --player-3-muted: rgba(56, 128, 56, 0.18);
-  --player-4: #a88820;
-  --player-4-bright: #c8a830;
-  --player-4-muted: rgba(168, 136, 32, 0.18);
-  --player-5: #704098;
-  --player-5-bright: #9060b8;
-  --player-5-muted: rgba(112, 64, 152, 0.18);
-  --player-6: #208898;
-  --player-6-bright: #38a8b8;
-  --player-6-muted: rgba(32, 136, 152, 0.18);
-
-  /* ---------- Zombie type colors ---------- */
-  --zombie-walker: #556240;
-  --zombie-walker-muted: rgba(85, 98, 64, 0.22);
-  --zombie-runner: var(--rust-400);
-  --zombie-runner-muted: rgba(196, 90, 44, 0.22);
-  --zombie-brute: #582070;
-  --zombie-brute-muted: rgba(88, 32, 112, 0.22);
-  --zombie-abom: #781010;
-  --zombie-abom-muted: rgba(120, 16, 16, 0.22);
-  --zombie-necromancer: #204860;
-  --zombie-necromancer-muted: rgba(32, 72, 96, 0.22);
+  /* ---------- Zombie colours (equal to BoardTheme.ts / ZombieTypeConfig) */
+  --zombie-walker: #5f7a3a;
+  --zombie-runner: #d8661c;
+  --zombie-brute: #6b3d8f;
+  --zombie-abom: #8f1611;
+  --zombie-necromancer: #1f5fa8;
+  --zombie-walker-soft: color-mix(in srgb, var(--zombie-walker) 22%, var(--paper));
+  --zombie-runner-soft: color-mix(in srgb, var(--zombie-runner) 22%, var(--paper));
+  --zombie-brute-soft: color-mix(in srgb, var(--zombie-brute) 22%, var(--paper));
+  --zombie-abom-soft: color-mix(in srgb, var(--zombie-abom) 22%, var(--paper));
+  --zombie-necromancer-soft: color-mix(in srgb, var(--zombie-necromancer) 22%, var(--paper));
 
   /* ---------- Typography ----------
-     Three-family stack: one display (Oswald), one body (Barlow Condensed),
-     one mono (JetBrains Mono). --font-stencil is kept as an alias to
-     --font-display so legacy stencil callers fall through to Oswald — do
-     not introduce a fourth family. */
-  --font-display: "Oswald", "Stencil Std", "Impact", sans-serif;
+     Two web families only: Bangers (display) and Barlow Condensed (body).
+     --font-stencil, --font-sans, --font-mono and --font-hud are aliases so
+     existing call sites keep working — do not introduce a third family. */
+  --font-display: "Bangers", "Impact", "Arial Narrow", sans-serif;
   --font-stencil: var(--font-display);
-  --font-body: "Barlow Condensed", "Roboto Condensed", system-ui, sans-serif;
+  --font-body: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
   --font-sans: var(--font-body);
-  --font-mono: "JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace;
-  --font-hud: var(--font-mono);
+  --font-mono: var(--font-body);
+  --font-hud: var(--font-body);
 
   --text-2xs: 0.65rem;
   --text-xs: 0.75rem;
@@ -203,13 +134,14 @@
   --font-medium: 500;
   --font-semibold: 600;
   --font-bold: 700;
-  --font-black: 900;
+  --font-black: 700;
 
-  --letter-spacing-tight: -0.02em;
+  /* Bangers has wide caps; tracking is pulled in so labels keep their box */
+  --letter-spacing-tight: -0.01em;
   --letter-spacing-normal: 0;
-  --letter-spacing-wide: 0.08em;
-  --letter-spacing-wider: 0.14em;
-  --letter-spacing-widest: 0.24em;
+  --letter-spacing-wide: 0.03em;
+  --letter-spacing-wider: 0.04em;
+  --letter-spacing-widest: 0.06em;
 
   /* ---------- Spacing ---------- */
   --space-px: 1px;
@@ -226,172 +158,43 @@
   --space-20: 80px;
   --space-24: 96px;
 
-  /* ---------- Border radii (sharp; chamfers via clip-path) ---------- */
-  --r-0: 0px;
-  --r-1: 2px;
-  --r-2: 4px;
+  /* ---------- Border radii ---------- */
+  --radius: 6px;
   --radius-none: 0px;
-  --radius-sm: 2px;
-  --radius-md: 2px;
-  --radius-lg: 4px;
-  --radius-xl: 4px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 6px;
+  --radius-xl: 8px;
   --radius-full: 9999px;
 
-  /* ---------- Border widths ---------- */
-  --border-thin: 1px;
-  --border-thick: 1.5px;
-  --border-heavy: 2px;
+  /* ---------- Outlines ----------
+     --border / --border-heavy are full shorthands (D3). The width-only
+     tokens stay for call sites that compose their own colour. */
+  --border-width: 2px;
+  --border-width-heavy: 3px;
+  --border: var(--border-width) solid var(--ink);
+  --border-heavy: var(--border-width-heavy) solid var(--ink);
 
   /* ---------- Touch ---------- */
   --hit: 44px;
 
-  /* ---------- Shadows & glows ---------- */
-  --shadow-hard: 0 2px 0 rgba(0,0,0,0.6), 0 8px 24px rgba(0,0,0,0.5);
-  --shadow-inset: inset 0 0 0 1px rgba(255,255,255,0.03), inset 0 1px 0 rgba(255,255,255,0.04);
-  --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.55);
-  --shadow-md: 0 2px 12px rgba(0, 0, 0, 0.7);
-  --shadow-lg: 0 6px 28px rgba(0, 0, 0, 0.8);
-  --shadow-xl: 0 12px 52px rgba(0, 0, 0, 0.88);
-  --shadow-panel: var(--shadow-inset), var(--shadow-hard);
-  --shadow-raised: 0 0 0 1px rgba(255,255,255,0.04), 0 4px 24px rgba(0,0,0,0.75);
-  --shadow-glow-accent: 0 0 14px var(--accent-glow), 0 0 36px var(--accent-muted);
-  --shadow-glow-danger: 0 0 18px var(--danger-muted);
-  --shadow-glow-success: 0 0 14px var(--success-muted);
-  --shadow-cutout: inset 0 2px 4px rgba(0,0,0,0.75), inset 0 0 0 1px rgba(0,0,0,0.5);
+  /* ---------- Shadows — hard, unblurred ink offsets ---------- */
+  --shadow: 3px 3px 0 var(--ink);
+  --shadow-lg: 5px 5px 0 var(--ink);
+  --shadow-sm: 2px 2px 0 var(--ink);
+  /* Offset applied to a pressed control so it "lands" on its shadow */
+  --press-offset: 3px;
 
-  /* ---------- HUD-specific tokens ---------- */
-  --hud-bg: rgba(11, 13, 10, 0.94);
-  --hud-panel-bg: rgba(18, 20, 15, 0.9);
-  --hud-border: rgba(138, 149, 96, 0.22);
-  --hud-border-bright: rgba(240, 169, 74, 0.4);
-  --hud-scanline-color: rgba(0, 0, 0, 0.22);
-  --hud-scanline-size: 2px;
-  --hud-phosphor: var(--amber-200);
-  --hud-phosphor-dim: rgba(247, 210, 138, 0.3);
-  --hud-amber: var(--amber-400);
-  --hud-amber-dim: rgba(240, 169, 74, 0.3);
-  --hud-reticle: rgba(240, 169, 74, 0.65);
-  --hud-reticle-center: var(--amber-200);
-  --hud-readout-bg: rgba(0, 0, 0, 0.6);
-  --hud-readout-border: rgba(138, 149, 96, 0.1);
-  --hud-stat-fill: rgba(240, 169, 74, 0.22);
-  --hud-critical-flash: rgba(178, 48, 37, 0.88);
-  --hud-noise-opacity: 0.06;
-  --hud-corner-size: 8px;
+  /* ---------- Halftone (menu / lobby page ground only) ---------- */
+  --halftone: radial-gradient(var(--page-2) 1px, transparent 1.5px) 0 0 / 8px 8px;
 
-  /* ---------- Card / item tokens ---------- */
-  --card-bg: var(--bg-2);
-  --card-border: var(--olive-700);
-  --card-bg-hover: var(--bg-3);
-  --card-border-hover: var(--olive-500);
-  --card-shadow: var(--shadow-md);
-  --card-shadow-hover: var(--shadow-lg);
-  --card-wear-opacity: 0.06;
-  --card-corner-clip: 6px;
+  /* ---------- Card / item ---------- */
+  --card-shadow: var(--shadow-sm);
+  --card-shadow-hover: var(--shadow);
 
-  /* ---------- Menu / lobby tokens ---------- */
-  --menu-bg: var(--bg-0);
-  --menu-overlay: rgba(11, 13, 10, 0.88);
-  --menu-title-glow: rgba(240, 169, 74, 0.35);
-  --menu-vignette: radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,0.88) 100%);
-  --menu-scanlines: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(0, 0, 0, 0.1) 2px,
-    rgba(0, 0, 0, 0.1) 4px
-  );
-  --menu-grid-color: rgba(240, 169, 74, 0.035);
-  --lobby-slot-empty-bg: rgba(18, 20, 15, 0.65);
-  --lobby-slot-empty-border: rgba(62, 67, 44, 0.85);
-  --lobby-slot-ready: rgba(122, 166, 74, 0.15);
-  --lobby-slot-ready-border: rgba(122, 166, 74, 0.4);
-
-  /* ---------- Modal tokens ---------- */
-  --modal-backdrop: rgba(5, 6, 4, 0.9);
-  --modal-bg: var(--bg-1);
-  --modal-border: var(--olive-500);
-  --modal-shadow: 0 0 0 1px rgba(255,255,255,0.03), 0 24px 80px rgba(0,0,0,0.92);
-  --modal-header-border: var(--olive-700);
-  --modal-corner-inset: 10px;
-
-  /* ---------- Trade UI tokens ---------- */
-  --trade-bg: var(--bg-1);
-  --trade-divider: var(--olive-700);
-  --trade-slot-bg: var(--bg-0);
-  --trade-slot-border: var(--olive-700);
-  --trade-slot-accept: var(--success-border);
-  --trade-slot-reject: var(--danger-border);
-  --trade-arrow-color: var(--text-muted);
-  --trade-highlight: rgba(240, 169, 74, 0.08);
-
-  /* ---------- Texture / grain ----------
-     Noise overlay coverage rules — canonical list. The grain texture
-     keeps dark surfaces from reading flat; opacity stays within 4–6%
-     so it modulates luminance without fuzzing text.
-
-     Apply grain to (target opacity in parens):
-       --bg-0  body background           (4%)
-       --bg-1  panel base                (5%)
-       --bg-2  raised surface            (6%)
-       modal scrim                       (4%)
-       HUD topbar                        (5%)
-
-     Do NOT apply grain to:
-       --bg-3 input background    — would fight input text legibility
-       hazard-tape stripe         — already textured
-       button surfaces            — would muddy chamfer edges
-
-     Implementation hook: the `.noise` utility class will apply the
-     shared overlay (gated on tracker task #13). Components that need
-     to opt out individually can use `.noise--off`.
-   --------------------------------------------------------------------- */
-  --grain-opacity: 0.06;
-  --grain-url: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.9 0 0 0 0 0.85 0 0 0 0 0.6 0 0 0 0.5 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.35'/%3E%3C/svg%3E");
-  --scratch-opacity: 0.04;
-  --vignette-base: radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,0.78) 100%);
-
-  /* ---------- Rust / corrosion texture ---------- */
-  --rust-url: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='r'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.04' numOctaves='3' seed='42' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0.35'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23r)' opacity='0.5'/%3E%3C/svg%3E");
-  --rust-opacity: 0.04;
-
-  /* ---------- Hazard-tape (diagonal yellow/dark stripe) ---------- */
-  --hazard-tape-bg: repeating-linear-gradient(
-    -45deg,
-    #1a1a0a,
-    #1a1a0a 10px,
-    var(--hazard) 10px,
-    var(--hazard) 20px
-  );
-
-  /* ---------- Danger-level reactive tokens (defaults = calm) ---------- */
-  --dl-bg: var(--bg-0);
-  --dl-surface-1: var(--bg-1);
-  --dl-surface-2: var(--bg-2);
-  --dl-border: var(--olive-700);
-  --dl-panel-border: var(--olive-700);
-  --dl-topbar-border: transparent;
-  --dl-topbar-glow: transparent;
-  --dl-glow: transparent;
-  --dl-glow-intense: transparent;
-  --dl-grain-opacity: 0.06;
-  --dl-vignette-opacity: 0.1;
-  --dl-vignette-color: rgba(0, 0, 0, 0.15);
-  --dl-vignette-radius: 55%;
-  --dl-rust-bleed: 0;
-  --dl-heat-distort: 0;
-  --dl-accent-pulse: none;
-  --dl-hud-tint: var(--hud-phosphor);
-  --dl-hud-border: var(--hud-border);
-  --dl-scanline-opacity: 0.14;
-  --dl-text-readout: var(--text-hud);
-  --dl-card-edge: transparent;
-  --dl-modal-shadow: var(--modal-shadow);
-  --dl-flicker-duration: none;
-  --dl-alert-bg: transparent;
-  --dl-status-indicator: var(--rank-blue);
-  --dl-spawn-indicator: var(--rank-blue);
-  --dl-menu-logo-glow: var(--menu-title-glow);
+  /* ---------- Danger level (one accent; see [data-danger] below) ------ */
+  --dl-accent: var(--ink);
+  --dl-accent-text: var(--paper);
 
   /* ---------- Motion / transitions ---------- */
   --duration-instant: 50ms;
@@ -402,7 +205,6 @@
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --ease-military: cubic-bezier(0.0, 0.0, 0.2, 1);
 
   /* ---------- Z-index scale ---------- */
   --z-base: 0;
@@ -423,11 +225,12 @@
   --icon-xl: 32px;
   --icon-2xl: 48px;
 
-  /* ---------- Game-specific sizing ---------- */
+  /* ---------- Game-specific sizing (unchanged by the skin) ---------- */
   --hud-topbar-height: 44px;
-  --hud-sidebar-width: 220px;
-  --hud-squad-rail-width: 220px;
-  --hud-right-panel-width: 300px;
+  /* Deck height is fixed so its contents can never be clipped; the
+     max-height query below 820px swaps in the single-row value. */
+  --hud-deck-height: 128px;
+  --hud-deck-pad: clamp(6px, 0.8vh, 12px);
   --hud-bottombar-height: 76px;
   --card-min-width: 140px;
   --card-max-width: 180px;
@@ -440,189 +243,24 @@
 }
 
 /* ==========================================================================
-   DANGER LEVEL OVERRIDES — Field Manual palette
+   DANGER LEVEL — one accent token, nothing else
    ========================================================================== */
 
-[data-danger="blue"] {
-  --dl-bg: #080b10;
-  --dl-surface-1: #0d1219;
-  --dl-surface-2: #141a22;
-  --dl-border: rgba(74, 144, 217, 0.22);
-  --dl-panel-border: rgba(74, 144, 217, 0.18);
-  --dl-topbar-border: var(--rank-blue);
-  --dl-topbar-glow: rgba(74, 144, 217, 0.4);
-  --dl-glow: rgba(74, 144, 217, 0.08);
-  --dl-glow-intense: rgba(74, 144, 217, 0.22);
-  --dl-grain-opacity: 0.05;
-  --dl-vignette-opacity: 0.15;
-  --dl-vignette-color: rgba(20, 50, 80, 0.2);
-  --dl-vignette-radius: 65%;
-  --dl-hud-tint: #88b4e6;
-  --dl-hud-border: rgba(120, 168, 220, 0.22);
-  --dl-scanline-opacity: 0.12;
-  --dl-text-readout: #88b4e6;
-  --dl-card-edge: rgba(74, 144, 217, 0.18);
-  --dl-modal-shadow: 0 0 0 1px rgba(74,144,217,0.14), 0 24px 80px rgba(0,0,0,0.93);
-  --dl-alert-bg: rgba(74, 144, 217, 0.06);
-  --dl-status-indicator: var(--rank-blue);
-  --dl-spawn-indicator: var(--rank-blue);
-  --dl-menu-logo-glow: rgba(74, 144, 217, 0.35);
-}
-
-[data-danger="yellow"] {
-  --dl-bg: #0d0d08;
-  --dl-surface-1: #15140c;
-  --dl-surface-2: #1d1c10;
-  --dl-border: rgba(212, 194, 74, 0.3);
-  --dl-panel-border: rgba(212, 194, 74, 0.24);
-  --dl-topbar-border: var(--hazard);
-  --dl-topbar-glow: rgba(212, 194, 74, 0.5);
-  --dl-glow: rgba(212, 194, 74, 0.08);
-  --dl-glow-intense: rgba(212, 194, 74, 0.24);
-  --dl-grain-opacity: 0.08;
-  --dl-vignette-opacity: 0.4;
-  --dl-vignette-color: rgba(120, 100, 20, 0.3);
-  --dl-vignette-radius: 50%;
-  --dl-rust-bleed: 0.04;
-  --dl-accent-pulse: dl-amber-pulse 2.4s ease-in-out infinite;
-  --dl-hud-tint: var(--amber-400);
-  --dl-hud-border: rgba(240, 169, 74, 0.26);
-  --dl-scanline-opacity: 0.16;
-  --dl-text-readout: var(--amber-400);
-  --dl-card-edge: rgba(212, 194, 74, 0.24);
-  --dl-modal-shadow: 0 0 0 1px rgba(212,194,74,0.22), 0 24px 80px rgba(0,0,0,0.91), 0 0 60px rgba(212,194,74,0.08);
-  --dl-flicker-duration: 8s;
-  --dl-alert-bg: rgba(212, 194, 74, 0.08);
-  --dl-status-indicator: var(--amber-400);
-  --dl-spawn-indicator: var(--hazard);
-  --dl-menu-logo-glow: rgba(240, 169, 74, 0.45);
-}
-
-[data-danger="orange"] {
-  --dl-bg: #0e0905;
-  --dl-surface-1: #17100a;
-  --dl-surface-2: #20160d;
-  --dl-border: rgba(196, 90, 44, 0.38);
-  --dl-panel-border: rgba(196, 90, 44, 0.3);
-  --dl-topbar-border: var(--rust-400);
-  --dl-topbar-glow: rgba(196, 90, 44, 0.6);
-  --dl-glow: rgba(196, 90, 44, 0.12);
-  --dl-glow-intense: rgba(196, 90, 44, 0.34);
-  --dl-grain-opacity: 0.1;
-  --dl-vignette-opacity: 0.65;
-  --dl-vignette-color: rgba(120, 50, 20, 0.4);
-  --dl-vignette-radius: 40%;
-  --dl-rust-bleed: 0.1;
-  --dl-heat-distort: 0.25;
-  --dl-accent-pulse: dl-ember-pulse 1.8s ease-in-out infinite;
-  --dl-hud-tint: var(--rust-300);
-  --dl-hud-border: rgba(224, 117, 72, 0.3);
-  --dl-scanline-opacity: 0.2;
-  --dl-text-readout: var(--rust-300);
-  --dl-card-edge: rgba(196, 90, 44, 0.34);
-  --dl-modal-shadow: 0 0 0 1px rgba(196,90,44,0.28), 0 24px 80px rgba(0,0,0,0.93), 0 0 80px rgba(196,90,44,0.12);
-  --dl-flicker-duration: 5s;
-  --dl-alert-bg: rgba(196, 90, 44, 0.12);
-  --dl-status-indicator: var(--rust-300);
-  --dl-spawn-indicator: var(--rust-400);
-  --dl-menu-logo-glow: rgba(196, 90, 44, 0.55);
-}
-
-[data-danger="red"] {
-  --dl-bg: #0e0605;
-  --dl-surface-1: #180806;
-  --dl-surface-2: #220c0a;
-  --dl-border: rgba(178, 48, 37, 0.48);
-  --dl-panel-border: rgba(178, 48, 37, 0.38);
-  --dl-topbar-border: var(--rank-red);
-  --dl-topbar-glow: rgba(178, 48, 37, 0.8);
-  --dl-glow: rgba(178, 48, 37, 0.2);
-  --dl-glow-intense: rgba(178, 48, 37, 0.48);
-  --dl-grain-opacity: 0.13;
-  --dl-vignette-opacity: 0.9;
-  --dl-vignette-color: rgba(100, 16, 8, 0.55);
-  --dl-vignette-radius: 28%;
-  --dl-rust-bleed: 0.18;
-  --dl-heat-distort: 0.55;
-  --dl-accent-pulse: dl-blood-pulse 1.2s ease-in-out infinite;
-  --dl-hud-tint: #d94a3a;
-  --dl-hud-border: rgba(217, 74, 58, 0.32);
-  --dl-scanline-opacity: 0.25;
-  --dl-text-readout: #d94a3a;
-  --dl-card-edge: rgba(178, 48, 37, 0.45);
-  --dl-modal-shadow: 0 0 0 1px rgba(178,48,37,0.35), 0 24px 80px rgba(0,0,0,0.95), 0 0 100px rgba(178,48,37,0.18);
-  --dl-flicker-duration: 3s;
-  --dl-alert-bg: rgba(178, 48, 37, 0.14);
-  --dl-status-indicator: #d94a3a;
-  --dl-spawn-indicator: var(--rank-red);
-  --dl-menu-logo-glow: rgba(178, 48, 37, 0.65);
-}
+[data-danger="blue"] { --dl-accent: var(--info); --dl-accent-text: var(--paper); }
+[data-danger="yellow"] { --dl-accent: var(--highlight); --dl-accent-text: var(--ink); }
+[data-danger="orange"] { --dl-accent: var(--danger-orange); --dl-accent-text: var(--ink); }
+[data-danger="red"] { --dl-accent: var(--accent); --dl-accent-text: var(--paper); }
 
 /* ==========================================================================
-   KEYFRAMES
+   KEYFRAMES — functional only (no looping skin animation)
    ========================================================================== */
-
-@keyframes dl-amber-pulse {
-  0%, 100% { opacity: 1; }
-  45%      { opacity: 0.72; }
-  55%      { opacity: 0.8; }
-}
-
-@keyframes dl-ember-pulse {
-  0%, 100% { opacity: 1; filter: brightness(1); }
-  25%      { opacity: 0.78; filter: brightness(0.85); }
-  50%      { opacity: 0.88; filter: brightness(1.08); }
-  75%      { opacity: 0.82; filter: brightness(0.9); }
-}
-
-@keyframes dl-blood-pulse {
-  0%   { opacity: 1; filter: brightness(1) saturate(1); }
-  20%  { opacity: 0.7; filter: brightness(0.72) saturate(1.25); }
-  45%  { opacity: 0.85; filter: brightness(0.95) saturate(1.15); }
-  70%  { opacity: 0.72; filter: brightness(0.78) saturate(1.2); }
-  100% { opacity: 1; filter: brightness(1) saturate(1); }
-}
-
-@keyframes hud-flicker {
-  0%, 94%, 100%  { opacity: 1; }
-  95%            { opacity: 0.6; }
-  96%            { opacity: 0.85; }
-  97%            { opacity: 0.65; }
-  98%            { opacity: 0.9; }
-  99%            { opacity: 0.72; }
-}
-
-@keyframes hud-scan {
-  0%   { transform: translateY(-100%); }
-  100% { transform: translateY(100vh); }
-}
-
-@keyframes hud-blink-caret {
-  0%, 49%  { opacity: 1; }
-  50%, 100% { opacity: 0; }
-}
-
-@keyframes critical-strobe {
-  0%, 100% { background-color: transparent; }
-  50%      { background-color: rgba(178, 48, 37, 0.08); }
-}
-
-@keyframes item-drop-in {
-  0%   { opacity: 0; transform: translateY(-6px) scale(0.96); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
-}
 
 @keyframes spawn-warn {
   0%, 100% { box-shadow: 0 0 0 0 transparent; }
-  50%      { box-shadow: 0 0 0 4px var(--dl-spawn-indicator); }
+  50%      { box-shadow: 0 0 0 4px var(--dl-accent); }
 }
 
 @keyframes panel-fade-in {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes hp-flash {
-  0%, 100% { filter: brightness(1); }
-  50%      { filter: brightness(1.4); }
 }

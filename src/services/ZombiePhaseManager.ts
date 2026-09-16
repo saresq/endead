@@ -21,6 +21,8 @@ export class ZombiePhaseManager {
       newState.phase = GamePhase.Zombies;
     }
 
+    newState.spawnContext = { cards: [], zombieWounds: [], timestamp: Date.now() };
+
     // 1. Activation Step
     const livingZombieIds = Object.values(newState.zombies)
       .filter(z => !this.isZombieDead(z))
@@ -28,7 +30,6 @@ export class ZombiePhaseManager {
     this.activateZombieSet(newState, livingZombieIds);
 
     // 2. Spawn Step
-    newState.spawnContext = { cards: [], timestamp: Date.now() };
     newState = this.processSpawns(newState);
 
     // 3. End Phase — waits in the Zombies phase until wound decisions are made;
@@ -120,6 +121,7 @@ export class ZombiePhaseManager {
     }
 
     survivor.wounds += 1;
+    this.recordZombieWound(state, survivor);
 
     // Handle death: drop equipment, zero out actions
     if (survivor.wounds >= survivor.maxHealth) {
@@ -133,6 +135,16 @@ export class ZombiePhaseManager {
       }
       survivor.actionsRemaining = 0;
     }
+  }
+
+  /** Adds one wound to this phase's record. No-op outside a zombie phase. */
+  private static recordZombieWound(state: GameState, survivor: Survivor): void {
+    const wounds = state.spawnContext?.zombieWounds;
+    if (!wounds || state.phase !== GamePhase.Zombies) return;
+    const zoneId = survivor.position.zoneId;
+    const rec = wounds.find(w => w.survivorId === survivor.id && w.zoneId === zoneId);
+    if (rec) rec.amount += 1;
+    else wounds.push({ survivorId: survivor.id, zoneId, amount: 1 });
   }
 
   private static processSpawns(state: GameState): GameState {

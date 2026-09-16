@@ -27,21 +27,22 @@ npm install
 ```
 
 ### Running Locally
-To develop, you need to run the backend and frontend separately.
+Start the backend server and the frontend client with one command:
 
-1. **Start the Backend Server**
-   ```bash
-   npm run server
-   ```
-   Server runs on `ws://localhost:8080`.
+```bash
+npm run dev
+```
 
-2. **Start the Frontend Client** (in a new terminal)
-   ```bash
-   npm run dev
-   ```
-   Client runs on `http://localhost:5173`.
+- Backend runs on `http://localhost:8080` (WebSocket at `/ws`).
+- Frontend runs on `http://localhost:5173`. Open this one; Vite proxies `/api` and `/ws` to the backend.
+- `Ctrl+C` stops both.
 
-The client will automatically connect to `ws://localhost:8080`.
+To run them separately (e.g. in two terminals):
+
+| Command | Runs |
+|---|---|
+| `npm run server` | Backend only |
+| `npm run front` | Frontend only (Vite dev server) |
 
 ## Deployment
 

@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Editor — Map Editor & Tile Definition Editor
+   Editor — Map Editor & Tile Definition Editor (dev-only tooling)
    ========================================================================== */
 
 /* ---------- Shared Layout ---------- */
@@ -10,11 +10,11 @@
   right: 0;
   width: 280px;
   height: 100vh;
-  background: var(--bg-1);
-  color: var(--bone-100);
+  background: var(--paper);
+  color: var(--text);
   overflow-y: auto;
   padding: var(--space-3);
-  border-left: 1px solid var(--olive-700);
+  border-left: 1px solid var(--line);
   font-family: var(--font-mono);
   z-index: var(--z-overlay);
   display: flex;
@@ -25,7 +25,7 @@
 .editor-sidebar__title {
   margin: 0;
   font-size: var(--text-lg);
-  color: var(--amber-400);
+  color: var(--accent-text);
   font-weight: var(--font-bold);
 }
 
@@ -46,11 +46,11 @@
 
 .editor-status {
   padding: var(--space-2);
-  background: var(--bg-0);
+  background: var(--paper-3);
   border-radius: var(--radius-sm);
   font-size: var(--text-sm);
   min-height: 20px;
-  color: var(--bone-300);
+  color: var(--text-2);
 }
 
 /* ---------- Tool Grid ---------- */
@@ -63,9 +63,9 @@
 
 .editor-tool-btn {
   padding: var(--space-2) var(--space-1);
-  background: var(--bg-2);
-  color: var(--bone-300);
-  border: 2px solid var(--olive-700);
+  background: var(--paper-2);
+  color: var(--text-2);
+  border: 2px solid var(--ink);
   border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: var(--text-xs);
@@ -75,14 +75,14 @@
 }
 
 .editor-tool-btn:hover {
-  background: var(--bg-3);
-  color: var(--bone-100);
+  background: var(--paper-3);
+  color: var(--text);
 }
 
 .editor-tool-btn--active {
-  outline: 2px solid var(--bone-100);
-  color: var(--bone-100);
-  background: var(--bg-3);
+  outline: 2px solid var(--ink);
+  color: var(--ink);
+  background: var(--highlight);
 }
 
 /* ---------- Button Row ---------- */
@@ -109,35 +109,35 @@
   max-width: 180px;
   height: auto;
   aspect-ratio: 1;
-  border: 1px solid var(--olive-700);
+  border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: var(--bg-2);
+  background: var(--paper-2);
   margin: 0 auto var(--space-2);
   image-rendering: pixelated;
 }
 
 .editor-tile-item {
-  border: 2px solid var(--olive-700);
+  border: 2px solid var(--ink);
   cursor: pointer;
   text-align: center;
   padding: var(--space-1);
-  background: var(--bg-2);
+  background: var(--paper-2);
   border-radius: var(--radius-sm);
   font-size: var(--text-sm);
   font-weight: var(--font-bold);
-  color: var(--bone-300);
+  color: var(--text-2);
   transition: all var(--duration-fast) var(--ease-in-out);
 }
 
 .editor-tile-item:hover {
   border-color: var(--text-muted);
-  background: var(--bg-3);
+  background: var(--paper-3);
 }
 
 .editor-tile-item--selected {
   border-color: var(--success);
-  background: var(--success-muted);
-  color: var(--bone-100);
+  background: var(--success-soft);
+  color: var(--text);
 }
 
 /* ---------- Room Panel ---------- */
@@ -151,8 +151,8 @@
 
 .editor-room-entry {
   padding: var(--space-1) var(--space-2);
-  background: var(--bg-2);
-  border: 1px solid var(--olive-700);
+  background: var(--paper-2);
+  border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   cursor: pointer;
   display: flex;
@@ -163,19 +163,19 @@
 }
 
 .editor-room-entry:hover {
-  background: var(--bg-3);
+  background: var(--paper-3);
 }
 
 .editor-room-entry--active {
-  background: var(--bg-3);
-  border-color: var(--amber-400);
+  background: var(--highlight-soft);
+  border-color: var(--ink);
 }
 
 /* ---------- Validation Panel ---------- */
 
 .editor-validation {
   padding: var(--space-2);
-  background: var(--bg-0);
+  background: var(--paper-3);
   border-radius: var(--radius-sm);
   font-size: var(--text-xs);
 }
@@ -185,11 +185,11 @@
 }
 
 .editor-validation__error {
-  color: var(--danger);
+  color: var(--accent-text);
 }
 
 .editor-validation__warn {
-  color: var(--warning);
+  color: var(--danger-orange);
 }
 
 /* ---------- Instructions ---------- */
@@ -199,7 +199,7 @@
   color: var(--text-muted);
   margin-top: auto;
   padding-top: var(--space-3);
-  border-top: 1px solid var(--olive-700);
+  border-top: 1px solid var(--line);
   line-height: 1.5;
 }
 
@@ -210,8 +210,8 @@
 .tde-container {
   position: absolute;
   inset: 0;
-  background: var(--bg-0);
-  color: var(--bone-100);
+  background: var(--page);
+  color: var(--text-on-page);
   font-family: var(--font-mono);
   z-index: var(--z-overlay);
   display: flex;
@@ -232,8 +232,9 @@
 
 .tde-list-panel {
   width: 220px;
-  background: var(--bg-1);
-  border-right: 1px solid var(--olive-700);
+  background: var(--paper);
+  color: var(--text);
+  border-right: 1px solid var(--line);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -241,7 +242,7 @@
 
 .tde-list-header {
   padding: var(--space-3);
-  border-bottom: 1px solid var(--olive-700);
+  border-bottom: 1px solid var(--line);
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
@@ -250,7 +251,7 @@
 .tde-list-header__title {
   margin: 0;
   font-size: var(--text-lg);
-  color: var(--amber-400);
+  color: var(--accent-text);
   font-weight: var(--font-bold);
 }
 
@@ -265,25 +266,25 @@
 
 .tde-tile-entry {
   padding: var(--space-2) var(--space-3);
-  background: var(--bg-2);
-  border: 1px solid var(--olive-700);
+  background: var(--paper-2);
+  border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: var(--text-sm);
   font-weight: var(--font-semibold);
-  color: var(--bone-300);
+  color: var(--text-2);
   transition: all var(--duration-fast) var(--ease-in-out);
 }
 
 .tde-tile-entry:hover {
-  background: var(--bg-3);
-  color: var(--bone-100);
+  background: var(--paper-3);
+  color: var(--text);
 }
 
 .tde-tile-entry--active {
-  background: var(--accent-muted);
-  border-color: var(--amber-400);
-  color: var(--amber-400);
+  background: var(--highlight-soft);
+  border-color: var(--ink);
+  color: var(--text);
 }
 
 /* ---------- Main Panel (right of list) ---------- */
@@ -299,8 +300,9 @@
 
 .tde-header {
   flex-shrink: 0;
-  border-bottom: 1px solid var(--olive-700);
-  background: var(--bg-1);
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--text);
 }
 
 .tde-toolbar {
@@ -319,7 +321,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-0);
+  background: var(--page);
   min-height: 0;
 }
 
@@ -332,8 +334,9 @@
 
 .tde-props-panel {
   flex-shrink: 0;
-  border-top: 1px solid var(--olive-700);
-  background: var(--bg-1);
+  border-top: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--text);
   padding: var(--space-2) var(--space-3);
   min-height: 40px;
   max-height: 120px;
@@ -374,7 +377,7 @@
 .tde-grid-wrapper {
   position: relative;
   flex-shrink: 0;
-  border: 2px solid var(--olive-700);
+  border: 2px solid var(--ink);
   border-radius: var(--radius-sm);
   overflow: visible;
 }
@@ -387,7 +390,7 @@
   position: absolute;
   cursor: crosshair;
   border: none;
-  outline: 1px solid rgba(232, 228, 217, 0.06);
+  outline: 1px solid var(--line);
   outline-offset: -1px;
   box-sizing: border-box;
   user-select: none;
@@ -424,9 +427,9 @@
 
 .tde-mode-btn {
   padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--olive-700);
-  background: var(--bg-2);
-  color: var(--bone-300);
+  border: 1px solid var(--line);
+  background: var(--paper-2);
+  color: var(--text-2);
   border-radius: var(--radius-sm);
   cursor: pointer;
   font-family: var(--font-mono);
@@ -435,18 +438,18 @@
 }
 
 .tde-mode-btn--active {
-  border-color: var(--amber-400);
-  background: var(--accent-muted);
-  color: var(--amber-400);
+  border-color: var(--ink);
+  background: var(--highlight);
+  color: var(--ink);
 }
 
 /* ---------- Brush Buttons ---------- */
 
 .tde-brush-btn {
   padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--olive-700);
-  background: var(--bg-2);
-  color: var(--bone-300);
+  border: 1px solid var(--line);
+  background: var(--paper-2);
+  color: var(--text-2);
   border-radius: var(--radius-sm);
   cursor: pointer;
   font-family: var(--font-mono);
@@ -455,45 +458,45 @@
 }
 
 .tde-brush-btn--active {
-  border-color: var(--bone-100);
-  color: var(--bone-100);
+  border-color: var(--ink);
+  color: var(--text);
 }
 
 .tde-brush-btn--street.tde-brush-btn--active {
-  background: var(--success-muted);
+  background: var(--success-soft);
   border-color: var(--success);
   color: var(--success);
 }
 
 .tde-brush-btn--building.tde-brush-btn--active {
-  background: var(--accent-muted);
-  border-color: var(--amber-400);
-  color: var(--amber-400);
+  background: var(--danger-orange-soft);
+  border-color: var(--danger-orange);
+  color: var(--text);
 }
 
 .tde-brush-btn--eraser.tde-brush-btn--active,
 .tde-brush-btn--open.tde-brush-btn--active {
-  background: var(--danger-muted);
-  border-color: var(--danger);
-  color: var(--danger);
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-text);
 }
 
 .tde-brush-btn--crosswalk.tde-brush-btn--active {
-  background: rgba(91, 143, 168, 0.2);
-  border-color: var(--danger-blue);
-  color: var(--danger-blue);
+  background: var(--info-soft);
+  border-color: var(--info);
+  color: var(--info);
 }
 
 .tde-brush-btn--wall.tde-brush-btn--active {
-  background: var(--warning-muted);
-  border-color: var(--warning);
-  color: var(--amber-500);
+  background: var(--highlight-soft);
+  border-color: var(--highlight);
+  color: var(--text);
 }
 
 .tde-brush-btn--doorway.tde-brush-btn--active {
-  background: var(--accent-muted);
-  border-color: var(--amber-400);
-  color: var(--amber-500);
+  background: var(--highlight);
+  border-color: var(--ink);
+  color: var(--ink);
 }
 
 /* ---------- Add Zone Button ---------- */
@@ -505,8 +508,8 @@
 
 .tde-add-zone-btn--active {
   border-style: solid !important;
-  background: rgba(232, 228, 217, 0.1) !important;
-  box-shadow: 0 0 6px currentColor;
+  background: var(--paper-3) !important;
+  box-shadow: var(--shadow-sm);
 }
 
 /* ---------- Room Buttons ---------- */
@@ -520,7 +523,7 @@
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   font-weight: var(--font-bold);
-  color: var(--bone-100);
+  color: var(--text);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -533,7 +536,7 @@
   flex-direction: column;
   gap: var(--space-3);
   font-size: var(--text-sm);
-  color: var(--bone-300);
+  color: var(--text-2);
   min-width: 180px;
 }
 
@@ -563,9 +566,9 @@
 
 .tde-dark-toggle {
   padding: 2px var(--space-2);
-  border: 1px solid var(--olive-700);
-  background: var(--warning-muted);
-  color: var(--warning);
+  border: 1px solid var(--line);
+  background: var(--highlight-soft);
+  color: var(--text);
   border-radius: var(--radius-sm);
   cursor: pointer;
   font-family: var(--font-mono);
@@ -574,7 +577,7 @@
 }
 
 .tde-dark-toggle--dark {
-  background: var(--bg-3);
+  background: var(--paper-3);
   color: var(--text-muted);
   border-color: var(--text-muted);
 }
@@ -590,8 +593,9 @@
   transform: translate(-50%, -50%);
   pointer-events: none;
   z-index: 2;
-  color: var(--warning);
-  filter: drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000);
+  color: var(--highlight);
+  /* Ink keyline so the glyph reads over any tile art */
+  filter: drop-shadow(0 0 1px var(--ink)) drop-shadow(0 0 1px var(--ink));
 }
 
 .tde-room-light-icon .icon {
@@ -603,15 +607,15 @@
 }
 
 .tde-room-light-icon--dark {
-  color: var(--bone-100);
+  color: var(--text-on-page);
 }
 
 .tde-room-name-input {
   width: 64px;
   padding: 1px var(--space-1);
-  border: 1px solid var(--olive-700);
-  background: var(--bg-2);
-  color: var(--bone-100);
+  border: 1px solid var(--line);
+  background: var(--paper-3);
+  color: var(--text);
   border-radius: var(--radius-sm);
   font-size: var(--text-xs);
   font-family: inherit;
@@ -625,7 +629,8 @@
 
 .tde-cell-info {
   padding: var(--space-2);
-  background: var(--bg-1);
+  background: var(--paper-3);
+  color: var(--text);
   border-radius: var(--radius-sm);
   min-height: 40px;
   font-size: var(--text-sm);
@@ -671,8 +676,8 @@
 
 .tde-door-marker {
   position: absolute;
-  background: rgba(184, 101, 48, 0.85);
-  border: 1px solid rgba(184, 101, 48, 0.6);
+  background: var(--danger-orange);
+  border: 1px solid var(--ink);
   border-radius: 1px;
   z-index: 3;
   pointer-events: none;
@@ -686,6 +691,6 @@
   gap: var(--space-2);
   justify-content: flex-end;
   padding: var(--space-2) var(--space-3);
-  border-top: 1px solid var(--olive-700);
-  background: var(--bg-1);
+  border-top: 1px solid var(--line);
+  background: var(--paper);
 }

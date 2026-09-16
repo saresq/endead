@@ -4,6 +4,7 @@ import { ActionType } from '../../types/Action';
 import { GameState, ZombieType } from '../../types/GameState';
 import { makeGridState, makeZombie, makeWeapon, withTwoPlayers } from './gridFixture';
 import { makeSurvivor } from './winConditionHelpers';
+import { es } from '../../strings/es';
 
 function boardWithZombies(count: number, actions: number, seedString = 'move-cost'): GameState {
   const zombies: GameState['zombies'] = {};
@@ -30,7 +31,7 @@ describe('Move cost when leaving zombies', () => {
     const state = boardWithZombies(3, 3);
     const res = move(state);
     expect(res.success).toBe(false);
-    expect(res.error?.message).toContain('need 4');
+    expect(res.error?.message).toBe(es.errors.notEnoughActions(4));
   });
 
   it('allows a move with exactly enough actions (4 actions, 3 zombies)', () => {

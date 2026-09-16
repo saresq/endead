@@ -2,6 +2,7 @@
 import { GameState, ZoneId, Zone, ZoneConnection, EquipmentCard, ZombieType } from '../../types/GameState';
 import { ActionType } from '../../types/Action';
 import { checkEndTurn } from '../TurnManager';
+import { es } from '../../strings/es';
 
 export type ActionHandler = (state: GameState, intent: any) => GameState;
 
@@ -74,29 +75,29 @@ export function deductAPWithFreeCheck(state: GameState, survivorId: string, acti
   if (actionType === ActionType.MOVE && survivor.freeMovesRemaining > 0) {
     survivor.freeMovesRemaining--;
     usedFree = true;
-    freeType = 'Free Move';
+    freeType = es.log.freeMove;
   } else if (actionType === ActionType.SEARCH && survivor.freeSearchesRemaining > 0) {
     survivor.freeSearchesRemaining--;
     usedFree = true;
-    freeType = 'Free Search';
+    freeType = es.log.freeSearch;
   } else if (actionType === ActionType.ATTACK && survivor.freeMeleeRemaining > 0 && state._attackIsMelee) {
     survivor.freeMeleeRemaining--;
     usedFree = true;
-    freeType = 'Free Melee';
+    freeType = es.log.freeMelee;
   } else if (actionType === ActionType.ATTACK && survivor.freeRangedRemaining > 0 && state._attackIsMelee === false) {
     survivor.freeRangedRemaining--;
     usedFree = true;
-    freeType = 'Free Ranged';
+    freeType = es.log.freeRanged;
   } else if (actionType === ActionType.ATTACK && survivor.freeCombatsRemaining > 0) {
     survivor.freeCombatsRemaining--;
     usedFree = true;
-    freeType = 'Free Combat';
+    freeType = es.log.freeCombat;
   }
 
   // Free action covers the base cost; the extra cost (zombies in the zone left) is always paid.
   const required = (usedFree ? 0 : 1) + extraCost;
   if (required > survivor.actionsRemaining) {
-    throw new Error(`Not enough actions (need ${required})`);
+    throw new Error(es.errors.notEnoughActions(required));
   }
   survivor.actionsRemaining -= required;
 

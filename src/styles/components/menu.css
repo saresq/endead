@@ -1,9 +1,9 @@
 /* ==========================================================================
-   Menu — Field Manual entry screen
-   Single bracketed dossier panel on a dark olive field. Hazard tape top and
-   bottom, bracketed stencil wordmark, CALL SIGN entry, then a dashed divider
-   before the ROOM ID join row. Tokens and primitives come from tokens.css,
-   utilities.css, and components/field-manual.css.
+   Menu — entry screen
+   One paper card on the dark halftone page: display wordmark, optional
+   message, name, `Crear sala`, dashed divider, code/link join row.
+   Tokens and primitives come from tokens.css, utilities.css, and
+   components/field-manual.css.
    ========================================================================== */
 
 /* ---------- Full-screen wrapper ---------- */
@@ -13,24 +13,32 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-0);
-  color: var(--bone-100);
+  background-color: var(--page);
+  background-image: var(--halftone);
+  color: var(--text-on-page);
   z-index: var(--z-overlay);
   padding: var(--space-4, 1rem);
-  overflow: hidden;
+  padding-top: calc(var(--space-4, 1rem) + env(safe-area-inset-top));
+  padding-bottom: calc(var(--space-4, 1rem) + env(safe-area-inset-bottom));
+  /* Scrolls vertically when the card is taller than the viewport
+     (landscape phones, open keyboard). */
+  overflow-x: hidden;
+  overflow-y: auto;
   font-family: var(--font-body);
 }
 
-/* ---------- Stack — identification panel, CTA, divider, join panel ---------- */
+/* ---------- Stack — holds the single card ---------- */
 .menu-stack {
   position: relative;
   z-index: 2;
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 18px;
   width: 420px;
-  max-width: 92vw;
+  max-width: 100%;
+  /* margin:auto centres inside the flex parent without clipping the top
+     when the card overflows (align-items:center would). */
+  margin: auto;
 }
 
 .menu-stack > .menu-card {
@@ -38,7 +46,9 @@
   max-width: 100%;
 }
 
-/* ---------- Background field: grid + vignette ---------- */
+/* ---------- Background field ----------
+   The grid + vignette layers are gone with the field-manual skin; the
+   wrapper stays so the markup keeps its (inert) slot. */
 .menu-field {
   position: absolute;
   inset: 0;
@@ -46,65 +56,23 @@
   z-index: 0;
 }
 
-.menu-field__grid {
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(to right, rgba(240, 169, 74, 0.03) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(240, 169, 74, 0.03) 1px, transparent 1px);
-  background-size: 40px 40px;
-  background-position: center center;
-  mask-image: radial-gradient(ellipse 80% 70% at 50% 50%, #000 30%, transparent 95%);
-  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 50%, #000 30%, transparent 95%);
-}
-
-.menu-field__vignette {
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(
-      ellipse 120% 90% at 50% 50%,
-      transparent 40%,
-      rgba(0, 0, 0, 0.55) 85%,
-      rgba(0, 0, 0, 0.8) 100%
-    );
-}
-
-/* ---------- Menu card ---------- */
+/* ---------- Menu card — paper panel ---------- */
 .menu-card {
   position: relative;
   z-index: 2;
 
-  width: 420px;
-  max-width: 92vw;
+  width: 100%;
 
-  /* fm-panel already provides chamfered clip-path + hairline + bg gradient.
-     We extend it here with explicit padding and flow. */
+  /* Padding and flow live on the header/form below. */
   padding: 0;
   display: flex;
   flex-direction: column;
 
-  box-shadow:
-    var(--shadow-hard, 0 12px 48px rgba(0, 0, 0, 0.6)),
-    var(--shadow-inset, inset 0 1px 0 rgba(255, 255, 255, 0.03));
-}
-
-/* Hazard-tape stripes sit flush against the top and bottom edges of the card. */
-.menu-card__stripe {
-  width: 100%;
-  flex: 0 0 auto;
-  display: block;
-}
-
-/* 1px olive closer used in place of a doubled hazard-tape stripe at the bottom
-   edge of the login panel — keeps the panel boundary readable without doubling
-   the hazard accent. */
-.menu-card__divider {
-  width: 100%;
-  height: 1px;
-  flex: 0 0 auto;
-  display: block;
-  background: var(--olive-700);
+  background: var(--paper);
+  color: var(--text);
+  border: var(--border-heavy);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
 }
 
 /* ---------- Header block ---------- */
@@ -117,11 +85,7 @@
   text-align: center;
 }
 
-.menu-header__kicker {
-  color: var(--bone-300);
-}
-
-/* Wordmark — bracketed stencil title. */
+/* Wordmark — display title, sits on the paper card. */
 .menu-wordmark {
   position: relative;
   display: inline-flex;
@@ -133,24 +97,19 @@
 
 .menu-wordmark__text {
   margin: 0;
-  font-family: var(--font-stencil);
+  font-family: var(--font-display);
   font-size: 62px;
-  font-weight: 900;
   line-height: 1;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--amber-400);
-  text-shadow:
-    0 0 20px rgba(240, 169, 74, 0.4),
-    0 0 48px rgba(240, 169, 74, 0.2),
-    0 2px 0 rgba(0, 0, 0, 0.9);
+  color: var(--accent-text);
 }
 
 .menu-header__subline {
   font-size: 10px;
   letter-spacing: 0.24em;
   text-transform: uppercase;
-  color: var(--bone-300);
+  color: var(--text-muted);
 }
 
 /* ---------- Form body ---------- */
@@ -158,7 +117,7 @@
   display: flex;
   flex-direction: column;
   gap: 18px;
-  padding: 8px 32px 28px;
+  padding: 16px 32px 28px;
 }
 
 .menu-field-group {
@@ -167,7 +126,6 @@
   gap: 6px;
 }
 
-/* Make our inputs align with the tactical amber left-border treatment. */
 .menu-input {
   width: 100%;
   font-family: var(--font-mono);
@@ -176,10 +134,15 @@
 }
 
 .menu-input::placeholder {
-  color: var(--bone-500);
-  opacity: 0.6;
+  color: var(--text-muted);
+  opacity: 0.8;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+/* Room codes are lowercase; an uppercased example would mislead. */
+.menu-input--code::placeholder {
+  text-transform: none;
 }
 
 /* ---------- Info / error strip ---------- */
@@ -189,9 +152,9 @@
   align-items: flex-start;
   gap: 10px;
   padding: 10px 12px;
-  background: rgba(156, 63, 28, 0.12);
-  border-left: 3px solid var(--rust-400);
-  color: var(--bone-100);
+  background: var(--accent-soft);
+  border-left: 3px solid var(--accent);
+  color: var(--text);
   font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1.5;
@@ -199,10 +162,9 @@
 }
 
 .menu-message__marker {
-  font-family: var(--font-stencil);
+  font-family: var(--font-display);
   font-size: 14px;
-  font-weight: 700;
-  color: var(--rust-300);
+  color: var(--accent-text);
   line-height: 1;
   flex-shrink: 0;
   margin-top: 1px;
@@ -225,19 +187,18 @@
 .menu-divider__line {
   flex: 1;
   height: 0;
-  border-top: 1px dashed var(--olive-500);
-  opacity: 0.8;
+  border-top: 1px dashed var(--line-strong);
 }
 
 .menu-divider__label {
-  color: var(--bone-300);
+  color: var(--text-muted);
   white-space: nowrap;
 }
 
-/* ---------- Join row — room-id + button ---------- */
+/* ---------- Join row — code/link input + button ---------- */
 .menu-join-row {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
   align-items: stretch;
 }
@@ -249,11 +210,6 @@
 /* ---------- Mobile adjustments ---------- */
 @media (max-width: 480px) {
   .menu-stack {
-    width: 100%;
-    gap: 14px;
-  }
-
-  .menu-card {
     width: 100%;
   }
 
@@ -274,14 +230,53 @@
     font-size: 48px;
     letter-spacing: 0.12em;
   }
+}
 
+/* Join row stacks only on very narrow phones. */
+@media (max-width: 359px) {
   .menu-join-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 8px;
   }
 
   .menu-join-row > *:last-child {
     width: 100%;
+  }
+}
+
+/* ---------- Landscape phones: smaller wordmark, tighter padding ---------- */
+@media (max-height: 500px) {
+  #menu-ui {
+    padding-top: calc(var(--space-2, 0.5rem) + env(safe-area-inset-top));
+    padding-bottom: calc(var(--space-2, 0.5rem) + env(safe-area-inset-bottom));
+  }
+
+  .menu-header {
+    padding: 14px 24px 8px;
+    gap: 4px;
+  }
+
+  .menu-wordmark {
+    padding: 4px 20px 6px;
+    margin: 0;
+  }
+
+  .menu-wordmark__text {
+    font-size: 36px;
+  }
+
+  .menu-message {
+    margin: 0 24px;
+    padding: 6px 10px;
+  }
+
+  .menu-form {
+    padding: 10px 24px 16px;
+    gap: 10px;
+  }
+
+  .menu-divider {
+    margin: 0;
   }
 }
 

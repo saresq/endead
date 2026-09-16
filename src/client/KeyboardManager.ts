@@ -7,6 +7,9 @@ import { GameHUD } from './ui/GameHUD';
 import { notificationManager } from './ui/NotificationManager';
 import { modalManager } from './ui/overlays/ModalManager';
 import { renderButton } from './ui/components/Button';
+import type { PixiBoardRenderer } from './PixiBoardRenderer';
+import { es } from '../strings/es';
+import { canTakeAction } from './utils/actionGate';
 
 const CHEAT_SEQUENCE = 'iddqd';
 
@@ -14,6 +17,7 @@ export class KeyboardManager {
   private localPlayerId: string;
   private inputController: InputController;
   private gameHud: () => GameHUD | null;
+  private renderer: Pick<PixiBoardRenderer, 'fitBoard'> | null;
   private boundHandler: (e: KeyboardEvent) => void;
   private boundKeyUp: (e: KeyboardEvent) => void;
   private backspaceHeld: boolean = false;
@@ -23,10 +27,12 @@ export class KeyboardManager {
     playerId: string,
     inputController: InputController,
     getGameHud: () => GameHUD | null,
+    renderer: Pick<PixiBoardRenderer, 'fitBoard'> | null = null,
   ) {
     this.localPlayerId = playerId;
     this.inputController = inputController;
     this.gameHud = getGameHud;
+    this.renderer = renderer;
 
     this.boundHandler = (e: KeyboardEvent) => this.handleKeyDown(e);
     this.boundKeyUp = (e: KeyboardEvent) => this.handleKeyUp(e);
@@ -106,6 +112,20 @@ export class KeyboardManager {
     // Game-over phase — no actions
     if (state.gameResult) return;
 
+    // L — toggle the event log
+    if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === 'l') {
+      e.preventDefault();
+      this.gameHud()?.toggleLog();
+      return;
+    }
+
+    // F / Home — recentre the board
+    if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'Home' || e.key.toLowerCase() === 'f')) {
+      e.preventDefault();
+      this.renderer?.fitBoard(true);
+      return;
+    }
+
     const isMyTurn = state.players[state.activePlayerIndex] === this.localPlayerId;
 
     // Tab — cycle through owned survivors
@@ -142,7 +162,7 @@ export class KeyboardManager {
 
     const survivor = state.survivors[survivorId];
     if (!survivor || survivor.playerId !== this.localPlayerId) return;
-    if (survivor.actionsRemaining < 1) return;
+    if (!canTakeAction(survivor)) return;
 
     const key = e.key.toLowerCase();
 
@@ -170,7 +190,7 @@ export class KeyboardManager {
       const canOpenDoor = survivor.inventory.some(c => c.inHand && c.canOpenDoor);
       if (canOpenDoor) {
         this.inputController.setMode('OPEN_DOOR');
-        notificationManager.show({ variant: 'info', message: 'Select a CLOSED DOOR zone to open it.', duration: 5000 });
+        notificationManager.show({ variant: 'info', message: es.keys.pickDoor, duration: 5000 });
       }
       return;
     }
@@ -204,7 +224,7 @@ export class KeyboardManager {
         const btn = document.getElementById('btn-trade');
         btn?.click();
       } else {
-        notificationManager.show({ variant: 'warning', message: 'No one else here to trade with.', duration: 3000 });
+        notificationManager.show({ variant: 'warning', message: es.keys.noTradePartner, duration: 3000 });
       }
       return;
     }
@@ -228,17 +248,19 @@ export class KeyboardManager {
 
   private openShortcutHelp(): void {
     const shortcuts = [
-      { key: 'S', desc: 'Search current zone' },
-      { key: 'N', desc: 'Make noise' },
-      { key: 'D', desc: 'Open door' },
-      { key: 'O', desc: 'Take objective' },
-      { key: 'T', desc: 'Start trade' },
-      { key: 'E', desc: 'End turn' },
-      { key: 'Space', desc: 'Confirm pending move / Pan map' },
-      { key: 'Tab', desc: 'Cycle through your survivors' },
-      { key: '1–6', desc: 'Select survivor by index' },
-      { key: 'Esc', desc: 'Cancel current action / Close modal' },
-      { key: '?', desc: 'Show this help' },
+      { key: 'S', desc: es.keys.search },
+      { key: 'N', desc: es.keys.noise },
+      { key: 'D', desc: es.keys.door },
+      { key: 'O', desc: es.keys.objective },
+      { key: 'T', desc: es.keys.trade },
+      { key: 'E', desc: es.keys.endTurn },
+      { key: es.keys.space, desc: es.keys.confirmMove },
+      { key: `F / ${es.keys.home}`, desc: es.keys.fitBoard },
+      { key: 'L', desc: es.keys.log },
+      { key: 'Tab', desc: es.keys.cycleSurvivors },
+      { key: '1–6', desc: es.keys.selectSurvivor },
+      { key: es.keys.esc, desc: es.keys.cancel },
+      { key: '?', desc: es.keys.help },
     ];
 
     const rows = shortcuts.map(s =>
@@ -249,10 +271,10 @@ export class KeyboardManager {
     ).join('');
 
     modalManager.open({
-      title: 'Keyboard Shortcuts',
+      title: es.keys.helpTitle,
       size: 'sm',
       renderBody: () => `<div class="shortcut-list">${rows}</div>`,
-      renderFooter: () => renderButton({ label: 'Close', variant: 'secondary', dataAction: 'modal-close' }),
+      renderFooter: () => renderButton({ label: es.common.close, variant: 'secondary', dataAction: 'modal-close' }),
     });
   }
 }

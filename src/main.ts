@@ -12,10 +12,13 @@ import { MenuUI, type MenuErrorState } from './client/ui/MenuUI';
 import { generateDiff } from './utils/StateDiff';
 import { GamePhase } from './types/GameState';
 import { MapEditor } from './client/editor/MapEditor';
+import { ensureEditorSecret } from './client/editor/editorSecret';
 import { loadTileDefinitionsFromServer } from './config/TileDefinitions';
 import { KeyboardManager } from './client/KeyboardManager';
 import { assetManager } from './client/AssetManager';
 import { audioManager } from './client/AudioManager';
+import { boardCuesFor } from './client/ui/eventLog';
+import { es } from './strings/es';
 
 const PLAYER_ID_KEY = 'endead_player_id';
 const NICKNAME_KEY = 'endead_nickname';
@@ -82,7 +85,7 @@ function showMenu(
         startRoom(roomId);
       } catch (error) {
         console.error(error);
-        showMenu('Could not create room. Please try again.');
+        showMenu(es.menu.createFailed);
       }
     },
     onJoinRoom: (roomId, nickname) => {
@@ -157,6 +160,9 @@ async function startRoom(roomId: string): Promise<void> {
     background: '#333333',
     resizeTo: window,
     antialias: true,
+    resolution: Math.min(window.devicePixelRatio || 1, 2),
+    autoDensity: true,
+    roundPixels: true,
   });
 
   if (token !== roomInitToken) {
@@ -188,7 +194,7 @@ async function startRoom(roomId: string): Promise<void> {
   document.addEventListener('keydown', initAudio);
 
   const renderer = new PixiBoardRenderer(app);
-  const animationController = new AnimationController(app, (id) => renderer.getSprite(id));
+  const animationController = new AnimationController(app, (id) => renderer.getSprite(id), renderer);
   renderer.setAnimationController(animationController);
   renderer.setAssetManager(assetManager);
 
@@ -210,7 +216,7 @@ async function startRoom(roomId: string): Promise<void> {
     }
   );
 
-  keyboardManager = new KeyboardManager(playerId, inputController, () => gameHud);
+  keyboardManager = new KeyboardManager(playerId, inputController, () => gameHud, renderer);
 
   unsubscribeStore = gameStore.subscribe((newState, prevState) => {
     if (!inputController) return;
@@ -253,15 +259,15 @@ async function startRoom(roomId: string): Promise<void> {
       notificationManager.show({
         type: 'alert',
         variant: 'warning',
-        title: 'Cheat Activated',
-        message: newState.lastAction.description ?? 'A player activated a cheat code.',
+        title: es.connection.cheatTitle,
+        message: newState.lastAction.description ?? es.connection.cheatMessage,
         priority: 'high',
         duration: 6000,
       });
     }
 
     if (!gameHud) {
-      gameHud = new GameHUD(inputController, playerId);
+      gameHud = new GameHUD(inputController, playerId, { renderer });
     }
 
     if (!inputController.selection) {
@@ -287,68 +293,107 @@ async function startRoom(roomId: string): Promise<void> {
           });
         }
       }
+
+      for (const cue of boardCuesFor(prevState, newState)) {
+        animationController.floatText(cue.zoneId, cue.text, cue.tone);
+      }
     }
 
     renderer.render(newState, inputController.getRenderOptions(newState));
     gameHud.update(newState, inputController.selection);
+
+    // Turn start notice: toast, plus a title marker while the tab is hidden.
+    if (prevState && prevState.phase !== GamePhase.Lobby && !newState.gameResult) {
+      const wasMine = prevState.players[prevState.activePlayerIndex] === playerId;
+      const isMine = newState.players[newState.activePlayerIndex] === playerId;
+      const newRound = newState.turn !== prevState.turn;
+      if (isMine && (!wasMine || newRound) && newState.phase === GamePhase.Players) {
+        notificationManager.show({ variant: 'info', message: es.connection.turnToast, duration: 2000 });
+        markTitleWhileHidden();
+      }
+    }
+
+    // Camera: frame the new active survivor when the turn passes, only if it is off-screen.
+    if (prevState && prevState.phase !== GamePhase.Lobby && prevState.activePlayerIndex !== newState.activePlayerIndex) {
+      const activePid = newState.players[newState.activePlayerIndex];
+      const activeSurvivor = Object.values(newState.survivors).find(s => s.playerId === activePid);
+      if (activeSurvivor) {
+        renderer.focusZone(activeSurvivor.position.zoneId, { onlyIfOffscreen: true, animate: true });
+      }
+    }
   });
 
   networkManager.onReconnecting = (attempt, maxAttempts) => {
-    showConnectionBanner(`Reconnecting... (${attempt}/${maxAttempts})`);
+    showConnectionBanner(es.connection.reconnecting(attempt, maxAttempts));
   };
 
+  let hasConnected = false;
   networkManager.onConnected = () => {
     networkManager.joinGame(playerId, roomId, nickname);
-    showConnectionBanner('Reconnected!', 2000);
+    // Only a real reconnect gets the banner, not the first connection.
+    if (hasConnected) {
+      showConnectionBanner(es.connection.reconnected, 2000);
+    } else if (connectionBannerId) {
+      notificationManager.dismiss(connectionBannerId);
+      connectionBannerId = null;
+    }
+    hasConnected = true;
   };
 
   networkManager.onDisconnected = () => {
-    showConnectionBanner('Connection lost. Please refresh the page.');
+    showConnectionBanner(es.connection.lost);
   };
 
   networkManager.onServerError = (error) => {
-    if (error.code === 'GAME_IN_PROGRESS') {
-      networkManager.disconnect();
-      window.history.pushState({}, '', '/');
-      showMenu('Game currently in progress', roomId);
-      return;
-    }
-
     if (error.code === 'ROOM_NOT_FOUND') {
       networkManager.disconnect();
       window.history.pushState({}, '', '/');
-      showMenu(`Room ${roomId} could not be located. Confirm the code with your host and try again.`, roomId, 'not-found');
+      showMenu(es.menu.roomNotFound(roomId), roomId, 'not-found');
       return;
     }
 
-    if (error.code === 'SERVER_FULL' || error.code === 'ROOM_FULL') {
+    if (error.code === 'SERVER_FULL') {
       networkManager.disconnect();
       window.history.pushState({}, '', '/');
-      showMenu(`Room ${roomId} is at capacity. Wait for a slot to open or coordinate with your host.`, roomId, 'full');
+      showMenu(es.menu.serverFull, roomId, 'full');
       return;
     }
 
     if (error.code === 'SESSION_REPLACED') {
-      showMenu('Session replaced by another connection.');
+      showMenu(es.menu.sessionReplaced);
       return;
     }
 
     if (error.code === 'KICKED') {
       networkManager.disconnect();
       window.history.pushState({}, '', '/');
-      showMenu('You were kicked by the host.');
+      showMenu(es.menu.kicked);
       return;
     }
 
     // Action rejection — show notification so player knows what went wrong
     notificationManager.show({
       variant: 'danger',
-      message: error.message || 'Action failed',
+      message: error.message || es.serverErrors.unknownError,
       duration: 3000,
     });
   };
 
   networkManager.connect();
+}
+
+const TITLE_MARK = '● ';
+
+/** Prefix the tab title until the player comes back to the tab. */
+function markTitleWhileHidden(): void {
+  if (!document.hidden || document.title.startsWith(TITLE_MARK)) return;
+  document.title = TITLE_MARK + document.title;
+  const restore = () => {
+    if (document.hidden) return;
+    if (document.title.startsWith(TITLE_MARK)) document.title = document.title.slice(TITLE_MARK.length);
+    document.removeEventListener('visibilitychange', restore);
+  };
+  document.addEventListener('visibilitychange', restore);
 }
 
 let connectionBannerId: string | null = null;
@@ -377,11 +422,20 @@ async function init(): Promise<void> {
       background: '#111111',
       resizeTo: window,
       antialias: true,
+      resolution: Math.min(window.devicePixelRatio || 1, 2),
+      autoDensity: true,
+      roundPixels: true,
     });
     app.canvas.style.position = 'absolute';
     app.canvas.style.top = '0';
     app.canvas.style.left = '0';
     document.body.appendChild(app.canvas);
+
+    if (!await ensureEditorSecret()) {
+      app.destroy(true);
+      document.body.innerHTML = '<p style="color:#ccc;font:14px monospace;padding:24px">Editor locked.</p>';
+      return;
+    }
 
     await loadTileDefinitionsFromServer();
     new MapEditor(app);

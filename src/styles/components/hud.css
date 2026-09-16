@@ -1,90 +1,52 @@
 /* ==========================================================================
-   HUD — Field Manual in-game overlay
-   Three-column command console over the PIXI map.
-   Grid layout at laptop+ (≥1024px), stacked single-column below.
+   HUD — pulp comic in-game overlay
    The PIXI canvas is mounted in #app BEHIND this overlay; the center column
-   is mostly transparent so the map shows through.
+   is transparent so the map shows through.
+
+   GameHUD stamps `data-layout` on #game-hud from the queries in
+   `src/client/ui/layoutQueries.ts` (do not repeat them here):
+     deck  — >= 744x600: topbar, full-height map, centred bottom deck
+     sheet — phone portrait: topbar, full-height map, bottom sheet
+     side  — phone landscape: map left, 300px operative panel right
+
+   All three arrangements render the same operative element (.hud-sheet);
+   only its placement and flow differ. Squad chips overlay the board in
+   every arrangement.
    ========================================================================== */
 
 /* ---------- HUD Shell ---------- */
 
 #game-hud {
   position: absolute;
-  inset: 0;
+  inset: 0 0 auto 0;
+  height: 100vh;
+  height: 100dvh;
   pointer-events: none;
   z-index: var(--z-sticky);
   display: grid;
-  grid-template-rows:
-    var(--hud-topbar-height, 44px)
-    auto
-    minmax(0, 1fr)
-    auto;
-  grid-template-columns:
-    minmax(0, 1fr)
-    var(--hud-right-panel-width, 260px);
+  /* deck and sheet share this: the squad overlay and the operative panel are
+     both out of flow, so the map gets every row the top bar does not. */
+  grid-template-rows: var(--hud-topbar-height, 44px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   grid-template-areas:
-    "topbar  topbar"
-    "rail-l  rail-l"
-    "center  rail-r"
-    "center  actions";
+    "topbar"
+    "center";
   gap: 0;
-  color: var(--bone-100);
+  color: var(--text);
   font-family: var(--font-body);
 }
 
-/* Stacked single-column at mobile and tablet (<1024px). Tablet adopts
-   mobile's vertical stack so the right rail surfaces only the dossier and
-   the actions bar pins to the bottom — same as a phone. The HUD no longer
-   has a dedicated tablet layout. */
-@media (max-width: 1023.98px) {
-  #game-hud {
-    grid-template-rows: var(--hud-topbar-height, 44px) auto 1fr auto auto;
-    /* `minmax(0, 1fr)` (not bare `1fr`, which resolves to min-content) so
-       a wide child like a 180px squad plate can't push the whole HUD
-       column past the viewport — the rail's own overflow-x: auto then
-       takes over inside the row. */
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-      "topbar"
-      "rail-l"
-      "center"
-      "rail-r"
-      "actions";
-  }
+#game-hud[data-layout="side"] {
+  grid-template-rows: var(--hud-topbar-height, 44px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) calc(var(--hud-side-panel-width, 300px) + env(safe-area-inset-right));
+  grid-template-areas:
+    "topbar topbar"
+    "center side";
 }
 
-#game-hud > .hud-topbar     { grid-area: topbar; pointer-events: auto; }
-#game-hud > .hud-rail--left { grid-area: rail-l; pointer-events: auto; }
-#game-hud > .hud-center     { grid-area: center; pointer-events: none; display: flex; flex-direction: column; min-height: 0; }
-#game-hud > .hud-rail--right{ grid-area: rail-r; pointer-events: auto; }
-#game-hud > .hud-fab-slot   { pointer-events: none; }
-
-/* Laptop default — `.hud-actions` is rendered inline at the tail of the
-   right rail (see `.hud-rail__actions`), so the dedicated bottom-right
-   grid slot collapses. Mobile/tablet still mount the standalone bar in
-   the `actions` grid area below. */
-#game-hud > .hud-actions {
-  grid-area: actions;
-  pointer-events: auto;
-  padding: 10px var(--space-3, 12px) var(--space-3, 12px);
-  background: var(--bg-0);
-  border-left: 1px solid var(--olive-700);
-  border-top: 1px solid var(--olive-700);
-}
-
-#game-hud > .hud-actions:empty { display: none; }
-
-/* Action row when mounted inside the right rail body (laptop/desktop).
-   Pushes itself to the bottom of the rail so actions align with the
-   panel's lower edge — same visual anchor the field log used to hold. */
-.hud-rail__actions {
-  margin-top: auto;
-  padding-top: 10px;
-  border-top: 1px solid var(--olive-700);
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
+#game-hud > .hud-topbar { grid-area: topbar; pointer-events: auto; }
+#game-hud > .hud-center { grid-area: center; pointer-events: none; display: flex; flex-direction: column; min-height: 0; }
+#game-hud > .hud-sheet  { pointer-events: auto; }
 
 /* ==========================================================================
    Top phase bar
@@ -93,8 +55,9 @@
 .hud-topbar {
   position: relative;
   height: var(--hud-topbar-height, 44px);
-  background: linear-gradient(180deg, var(--bg-1), var(--bg-2));
-  border-bottom: 1px solid var(--olive-700);
+  background: var(--paper);
+  color: var(--text);
+  border-bottom: var(--border);
   display: flex;
   align-items: stretch;
 }
@@ -111,22 +74,17 @@
   min-width: 0;
 }
 
-/* Hazard tape stripe at orange+ danger (overlaid under the topbar) */
+/* Bottom edge of the bar — the one place besides the danger chip that is
+   tinted by the current danger level. */
 .hud-topbar__inner::before {
   content: '';
   position: absolute;
   left: 0; right: 0; bottom: -2px;
   height: 2px;
-  background: var(--olive-500);
-  opacity: 0.6;
+  background: var(--dl-accent);
+  /* Ink hairlines above and below: the danger hue alone is 1.26:1 on paper. */
+  box-shadow: 0 1px 0 var(--ink), 0 -1px 0 var(--ink);
   pointer-events: none;
-}
-
-.hud-topbar--danger-orange::before,
-.hud-topbar--danger-red::before {
-  background: var(--hazard-tape-bg);
-  height: 4px;
-  opacity: 1;
 }
 
 .hud-topbar--my-turn::after {
@@ -134,8 +92,8 @@
   position: absolute;
   left: 0; right: 0; bottom: 0;
   height: 2px;
-  background: var(--amber-400);
-  box-shadow: 0 0 14px rgba(240, 169, 74, 0.6);
+  background: var(--highlight);
+  box-shadow: 0 1px 0 var(--ink), 0 -1px 0 var(--ink);
   pointer-events: none;
 }
 
@@ -156,35 +114,35 @@
   flex: 0 0 auto;
 }
 
-/* TURN chip — amber outline, mono */
+/* TURN chip — paper card with an ink outline */
 .hud-turnchip {
   display: inline-flex;
   align-items: baseline;
   gap: 6px;
   padding: 3px 10px;
-  background: transparent;
-  border: 1px solid var(--amber-500);
-  border-radius: 2px;
-  color: var(--amber-400);
+  background: var(--paper);
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
   font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   cursor: pointer;
   flex-shrink: 0;
-  transition: background 160ms ease, border-color 160ms ease;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
 }
 
-.hud-turnchip:hover { background: rgba(240, 169, 74, 0.08); }
-.hud-turnchip:focus-visible { outline: 2px solid var(--amber-400); outline-offset: 2px; }
+.hud-turnchip:hover { background: var(--paper-2); }
+.hud-turnchip:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 
-.hud-turnchip__label { opacity: 0.65; }
+.hud-turnchip__label { color: var(--text-muted); }
 
 .hud-turnchip__value {
   font-family: var(--font-stencil);
   font-size: 14px;
   letter-spacing: 0.08em;
-  color: var(--amber-200);
+  color: var(--text);
 }
 
 .hud-phaseindicator {
@@ -203,8 +161,7 @@
   font-family: var(--font-stencil);
   font-size: 12px;
   line-height: 1;
-  color: var(--amber-400);
-  opacity: 0.75;
+  color: var(--text-muted);
 }
 
 .hud-phaseindicator__label {
@@ -212,7 +169,7 @@
   font-size: 11px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--amber-200);
+  color: var(--text);
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
@@ -230,21 +187,29 @@
   display: inline-block;
   width: 10px;
   height: 2px;
-  background: var(--bone-500);
-  opacity: 0.35;
+  background: var(--paper-3);
   border-radius: 1px;
 }
 
 .hud-phasetick--current {
-  background: var(--amber-400);
-  opacity: 1;
+  background: var(--ink);
 }
 
+/* Decorative; dropped on portrait phones so the phase label fits. */
+#game-hud[data-layout="sheet"] .hud-channel,
+#game-hud[data-layout="sheet"] .hud-phaseindicator__ticks { display: none; }
+
+/* Danger chip — filled with the current danger accent. */
 .hud-channel {
+  padding: 2px 6px;
+  background: var(--dl-accent);
+  border: 1px solid var(--ink);
+  border-radius: var(--radius-sm);
+  color: var(--dl-accent-text);
   font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.16em;
-  color: var(--bone-500);
+  text-transform: uppercase;
   white-space: nowrap;
 }
 
@@ -254,99 +219,62 @@
   justify-content: center;
   width: 28px;
   height: 28px;
-  background: transparent;
-  border: 1px solid var(--olive-700);
-  border-radius: 2px;
-  color: var(--bone-300);
+  background: var(--paper);
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
   cursor: pointer;
-  transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
+  transition: border-color 160ms ease, color 160ms ease, background-color 160ms ease;
 }
 
 .hud-iconbtn:hover {
-  border-color: var(--amber-500);
-  color: var(--amber-200);
-  background: rgba(240, 169, 74, 0.06);
+  border-color: var(--ink);
+  color: var(--text);
+  background: var(--paper-2);
 }
 
-.hud-iconbtn:focus-visible { outline: 2px solid var(--amber-400); outline-offset: 2px; }
+.hud-iconbtn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 
-/* ==========================================================================
-   Rails (left squad, right op readout)
-   ========================================================================== */
+.hud-logbtn { position: relative; }
 
-.hud-rail {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  padding: var(--space-3, 12px);
-  gap: var(--space-2, 8px);
-  background: linear-gradient(180deg, var(--bg-1), var(--bg-0));
+/* Unread marker on the Log button. */
+.hud-iconbtn__dot {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--paper);
+  pointer-events: none;
+}
+
+/* Turn line under the operative name (sheet header, rail op card). */
+.hud-turnline {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.2;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-2);
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
 }
-
-/* Left squad rail — always a horizontal pill strip beneath the topbar.
-   The list scrolls horizontally when squad plates exceed the viewport
-   width so the rail never forces #game-hud to grow past 100vw. */
-.hud-rail--left {
-  flex-direction: row;
-  align-items: stretch;
-  border-bottom: 1px solid var(--olive-700);
-  padding: 6px 10px;
-  gap: 0;
-  min-width: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
-}
-
-.hud-rail--left .hud-rail__kicker { display: none; }
-
-.hud-rail--left .hud-rail__list {
-  flex-direction: row;
-  align-items: stretch;
-  gap: 6px;
-  overflow: visible;
-  min-width: 0;
-}
-
-.hud-rail--left .hud-rail__list > .fm-squadplate {
-  flex: 0 0 auto;
-  min-width: 180px;
-  max-width: 220px;
-}
-
-.hud-rail--right {
-  border-left: 1px solid var(--olive-700);
-  padding: var(--space-4, 16px) var(--space-3, 12px);
-}
-
-.hud-rail__kicker { margin-bottom: 4px; }
-
-.hud-rail__list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  overflow-y: auto;
-  min-height: 0;
-  scrollbar-width: thin;
-  scrollbar-color: var(--olive-700) transparent;
-}
-
-.hud-rail__list::-webkit-scrollbar { width: 6px; }
-.hud-rail__list::-webkit-scrollbar-thumb { background: var(--olive-700); border-radius: 3px; }
-
-.hud-rail__body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3, 12px);
-  min-height: 0;
-  height: 100%;
+.hud-turnline--mine {
+  padding: 1px 4px;
+  background: var(--highlight);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font-weight: 700;
 }
 
 /* ==========================================================================
-   Center column (map window + action row + feed)
+   Center column (map window + feed)
    ========================================================================== */
 
+/* Stays transparent: the PIXI board is painted behind it. */
 .hud-center {
   position: relative;
   display: flex;
@@ -356,14 +284,15 @@
   gap: var(--space-2, 8px);
 }
 
-/* Bracketed olive frame over the transparent map viewport. The PIXI canvas
-   lives in #app behind — this element only draws the chrome. */
+/* Ink frame over the transparent map viewport. The PIXI canvas lives in
+   #app behind — this element only draws the chrome, so it keeps no fill. */
 .hud-map-window {
   position: relative;
   flex: 1 1 auto;
   min-height: 0;
   pointer-events: none;
-  border: 1px dashed rgba(138, 134, 116, 0.18);
+  border: var(--border);
+  border-radius: var(--radius);
   background: transparent;
 }
 
@@ -389,6 +318,18 @@
 }
 .hud-feed::-webkit-scrollbar { display: none; }
 
+.hud-feed__card { position: relative; }
+
+/* Card body opens the log; the whole entry is the tap target. */
+.hud-feed__body {
+  display: block;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+.hud-feed__body:hover .event-entry { border-color: var(--ink); }
+.hud-feed__body:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.hud-feed__card--dismissable .event-entry__desc { padding-right: 24px; }
+
 .hud-feed__dismiss {
   position: absolute;
   top: 4px;
@@ -405,59 +346,46 @@
   height: 12px;
 }
 
-.hud-feed__section { position: relative; }
-
-.hud-feed__timer {
-  position: relative;
-  margin-top: 4px;
-  height: 2px;
-  background: rgba(62, 67, 44, 0.5);
-  border-radius: 1px;
-  overflow: hidden;
-  pointer-events: none;
+/* The glyph is 22px; the expander carries the hit area — 24px on fine
+   pointers, 44px on coarse. */
+.hud-feed__dismiss::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 24px;
+  height: 24px;
+  transform: translate(-50%, -50%);
 }
 
-.hud-feed__timer-bar {
-  height: 100%;
-  width: 100%;
-  background: var(--amber-400);
-  transform-origin: left center;
-  animation-name: hud-feed-countdown;
-  animation-timing-function: linear;
-  animation-fill-mode: forwards;
-  animation-iteration-count: 1;
-  box-shadow: 0 0 6px rgba(240, 169, 74, 0.4);
+@media (pointer: coarse) {
+  .hud-feed__dismiss::after {
+    width: 44px;
+    height: 44px;
+  }
 }
 
-@keyframes hud-feed-countdown {
-  from { transform: scaleX(1); }
-  to   { transform: scaleX(0); }
-}
+.hud-feed__card .action-btn--lucky { margin-top: 4px; }
 
-@media (prefers-reduced-motion: reduce) {
-  .hud-feed__timer-bar { animation-duration: 0ms !important; }
-}
+#game-hud:not([data-layout="deck"]) .hud-feed { max-height: 28vh; }
 
-@media (max-width: 1023.98px) {
-  .hud-feed { max-height: 28vh; }
-}
-
-/* Event entry */
+/* Event entry — latest-event paper card */
 .event-entry {
-  background: rgba(18, 20, 15, 0.94);
-  border: 1px solid var(--olive-700);
-  border-left: 2px solid var(--olive-500);
+  background: var(--paper);
+  color: var(--text);
+  border: var(--border);
+  border-left: var(--border-width-heavy) solid var(--ink);
   padding: var(--space-2, 8px) var(--space-3, 12px);
-  border-radius: 2px;
+  border-radius: var(--radius);
   font-family: var(--font-mono);
   font-size: 11px;
-  backdrop-filter: blur(6px);
+  box-shadow: var(--shadow);
   position: relative;
 }
 
-.event-entry--action { border-left-color: var(--amber-400); }
-.event-entry--spawn  { border-left-color: var(--rust-400); }
-.event-entry--waiting { border-left-color: var(--amber-400); color: var(--bone-100); }
+.event-entry--action { border-left-color: var(--highlight); }
+.event-entry--spawn  { border-left-color: var(--accent); }
+.event-entry--waiting { border-left-color: var(--highlight); color: var(--text); }
 
 .hud-waiting {
   display: flex;
@@ -466,168 +394,151 @@
   margin-bottom: 4px;
 }
 
-.event-entry__desc { color: var(--bone-100); font-size: 11px; letter-spacing: 0.02em; }
+.event-entry__desc { color: var(--text); font-size: 11px; letter-spacing: 0.02em; }
 
 .event-entry__dice {
-  display: flex; align-items: center; gap: 3px;
+  display: flex; align-items: center; gap: 4px;
   margin-top: 4px; flex-wrap: wrap;
 }
 
-.event-die {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 20px; height: 20px;
-  background: var(--bg-3); border: 1px solid var(--olive-700);
-  border-radius: 2px;
-  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
-  color: var(--bone-500);
+.event-entry__hits { font-size: 10px; color: var(--success); margin-left: 4px; letter-spacing: 0.04em; font-weight: 700; }
+.event-entry__miss { font-size: 10px; color: var(--accent-text); margin-left: 4px; letter-spacing: 0.12em; font-weight: 700; }
+
+/* d6 face: 3x3 pip grid, data-face picks the visible pips. */
+.die {
+  --size: 20px;
+  display: inline-grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  width: var(--size);
+  height: var(--size);
+  padding: calc(var(--size) * 0.14);
+  flex: 0 0 auto;
+  background: var(--paper-3);
+  border: 1px solid var(--ink);
+  border-radius: calc(var(--size) * 0.18);
+  color: var(--ink);
 }
+.die i {
+  display: block;
+  border-radius: 50%;
+  background: currentColor;
+  transform: scale(0.72);
+  visibility: hidden;
+}
+.die[data-face="1"] i:nth-child(5),
+.die[data-face="2"] i:is(:nth-child(1), :nth-child(9)),
+.die[data-face="3"] i:is(:nth-child(1), :nth-child(5), :nth-child(9)),
+.die[data-face="4"] i:is(:nth-child(1), :nth-child(3), :nth-child(7), :nth-child(9)),
+.die[data-face="5"] i:is(:nth-child(1), :nth-child(3), :nth-child(5), :nth-child(7), :nth-child(9)),
+.die[data-face="6"] i:is(:nth-child(1), :nth-child(3), :nth-child(4), :nth-child(6), :nth-child(7), :nth-child(9)) {
+  visibility: visible;
+}
+.die--hit { background: var(--highlight); border-color: var(--ink); color: var(--ink); }
+/* Discarded die — dashed outline plus muted ink pips, no opacity (which
+   dragged the pips to 2.20:1). */
+.die--discarded { background: var(--paper-2); border-style: dashed; color: var(--text-muted); }
 
-.event-die--hit { background: rgba(168, 200, 144, 0.16); border-color: var(--olive-500); color: var(--olive-300); }
-.event-die--discarded { color: var(--bone-500); text-decoration: line-through; opacity: 0.45; }
+.hud-feed .die { --size: 28px; }
 
-.event-entry__hits { font-size: 10px; color: var(--bone-300); margin-left: 4px; letter-spacing: 0.04em; }
+.die--roll {
+  animation: die-roll 400ms var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+@keyframes die-roll {
+  from { transform: rotate(-200deg) scale(0.4); opacity: 0; }
+  70%  { transform: rotate(12deg) scale(1.08); opacity: 1; }
+  to   { transform: none; opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .die--roll { animation: none; }
+}
 
 .event-entry__zone {
   font-family: var(--font-stencil);
-  font-size: 10px; color: var(--bone-300); letter-spacing: 0.1em; text-transform: uppercase;
+  font-size: 10px; color: var(--text-2); letter-spacing: 0.1em; text-transform: uppercase;
 }
 
-.event-entry__extra { display: block; font-size: 10px; color: var(--amber-400); font-weight: 700; letter-spacing: 0.04em; }
+.event-entry__extra { display: block; font-size: 10px; color: var(--accent-text); font-weight: 700; letter-spacing: 0.04em; }
 .event-entry__badges { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
 
 .event-entry__free {
   display: inline-block; padding: 1px 5px; margin-right: 4px;
-  background: rgba(168, 200, 144, 0.12); color: var(--olive-300);
-  border: 1px solid var(--olive-500); border-radius: 2px;
+  background: var(--success-soft); color: var(--success);
+  border: 1px solid var(--success); border-radius: var(--radius-sm);
   font-family: var(--font-stencil); font-size: 9px;
   text-transform: uppercase; letter-spacing: 0.1em; vertical-align: middle;
 }
 
 .event-entry__boosts { display: flex; gap: 8px; margin-top: 2px; }
-.event-entry__boost  { font-size: 10px; color: var(--olive-300); font-weight: 600; }
-.event-entry__lucky  { display: flex; align-items: center; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
-.event-entry__lucky-label { font-size: 10px; color: var(--amber-400); font-weight: 700; }
+.event-entry__boost  { font-size: 10px; color: var(--text-muted); font-weight: 600; }
+.event-entry__reroll { display: flex; align-items: center; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
+.event-entry__reroll-label { font-size: 10px; color: var(--accent-text); font-weight: 700; }
+.event-entry__reroll .die { --size: 20px; }
 
-.event-log__section { display: flex; flex-direction: column; gap: 2px; }
-.event-log__title {
-  font-size: 10px; font-family: var(--font-mono);
-  color: var(--bone-500); text-transform: uppercase; letter-spacing: 0.16em;
-  padding: 4px;
+.event-entry__actor {
+  font-family: var(--font-stencil); letter-spacing: 0.08em;
+  color: var(--text-2); text-transform: uppercase;
 }
+.event-entry__zombies { margin-top: 4px; display: flex; flex-direction: column; gap: 2px; }
+.event-entry__subtitle {
+  font-family: var(--font-stencil); font-size: 10px; color: var(--accent-text);
+  letter-spacing: 0.12em; text-transform: uppercase;
+}
+.event-entry__line { font-size: 10px; color: var(--text-2); }
+.event-entry__wounds { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
+.event-entry__wound { color: var(--accent-text); font-weight: 700; }
 
 /* ==========================================================================
-   Action row — six actions (+ skill buttons wrap)
+   Action grid (rail) — six actions + skill buttons
    ========================================================================== */
 
-.hud-actions {
-  position: relative;
+/* ==========================================================================
+   Action strip (sheet / side) — one scrollable row of square buttons
+   ========================================================================== */
+
+.hud-actionstrip {
   display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.hud-actions__grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 5px;
-}
-
-.hud-actions > .action-btn,
-.hud-actions__grid > .action-btn { min-height: 38px; }
-
-/* Slimmer action buttons on the bar — tighter padding, gap, label spacing. */
-.hud-actions .action-btn {
-  padding: 6px 8px;
   gap: 6px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+  background: var(--paper-2);
+  border-radius: var(--radius);
 }
-.hud-actions .action-btn__label {
-  letter-spacing: 0.12em;
-}
-.hud-actions .action-btn__kbd {
-  background: transparent;
-  border: none;
-  box-shadow: none;
-  padding: 0;
-  margin-right: 2px;
-  font-size: 10px;
-  line-height: 1;
-  opacity: 0.55;
-  flex-shrink: 0;
-}
+.hud-actionstrip::-webkit-scrollbar { display: none; }
 
-
-/* Skill buttons (Sprint, Charge, etc.) — packed grid below End Turn. */
-.hud-actions__skills {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 5px;
+.hud-actionstrip > .action-btn {
+  flex: 0 0 auto;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  width: 56px;
+  min-width: 56px;
+  height: 56px;
+  padding: 4px 2px;
+  position: relative;
 }
 
-/* Desktop / laptop: hide mobile-only "More" trigger and tray. */
-.hud-actions__more,
-.hud-actions__tray {
-  display: none;
+.hud-actionstrip .action-btn__label {
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: normal;
+  text-align: center;
 }
 
-@media (max-width: 1023.98px) {
-  .hud-actions__grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 4px;
-  }
-  /* On mobile, Objective/Trade migrate into the More tray. */
-  .hud-actions__grid > #btn-objective,
-  .hud-actions__grid > #btn-trade { display: none; }
+.hud-actionstrip .action-btn__spacer,
+.hud-actionstrip .action-btn__kbd { display: none; }
 
-  .action-btn__kbd { display: none; }
-  .hud-actions .action-btn { min-height: 44px; padding: 6px; }
-  .action-btn__label { font-size: 11px; }
-  .action-btn__cost { font-size: 9px; padding: 0 3px; }
-  .action-btn__spacer { display: none; }
-
-  .hud-actions__grid > #btn-end-turn {
-    grid-column: 1 / -1;
-  }
-
-  .hud-actions__more {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 44px;
-  }
-
-  .hud-actions__more--open {
-    background: var(--olive-700, #3a3a26);
-    color: var(--bone-100, #f5efe1);
-  }
-
-  .hud-actions__skills { gap: 4px; }
-
-  .hud-actions__tray {
-    display: grid;
-    position: absolute;
-    bottom: calc(100% + 6px);
-    right: 0;
-    grid-template-columns: repeat(2, minmax(120px, 1fr));
-    gap: 4px;
-    padding: 6px;
-    background: linear-gradient(180deg, var(--bg-2), var(--bg-1));
-    border: 1px solid var(--olive-700, #3a3a26);
-    border-radius: 2px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
-    z-index: 4;
-    min-width: min(260px, calc(100% - 16px));
-    transform-origin: bottom right;
-    opacity: 0;
-    transform: translateY(4px) scale(0.98);
-    pointer-events: none;
-    transition: opacity 120ms ease, transform 120ms ease;
-  }
-
-  .hud-actions__tray[data-open="true"] {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    pointer-events: auto;
-  }
+.hud-actionstrip .action-btn__cost {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 8px;
+  padding: 0 2px;
 }
 
 /* ==========================================================================
@@ -639,13 +550,16 @@
   flex-direction: column;
   gap: 10px;
   padding: 10px;
-  background: linear-gradient(180deg, var(--bg-2), var(--bg-1));
-  border: 1px solid var(--olive-700);
-  border-radius: 2px;
+  background: var(--paper);
+  color: var(--text);
+  border: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
 }
 
 .hud-op__head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
@@ -662,6 +576,7 @@
 
 .hud-op__head-right {
   flex: 0 0 auto;
+  margin-left: auto;
   text-align: right;
   white-space: nowrap;
 }
@@ -671,12 +586,12 @@
 
 .hud-op__name {
   font-family: var(--font-stencil); font-size: 14px;
-  letter-spacing: 0.08em; color: var(--bone-100); text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--text); text-transform: uppercase;
 }
 
 .hud-op__sub {
   font-family: var(--font-mono); font-size: 10px;
-  letter-spacing: 0.1em; color: var(--bone-500); text-transform: uppercase;
+  letter-spacing: 0.1em; color: var(--text-muted); text-transform: uppercase;
 }
 
 .hud-op__stats {
@@ -692,10 +607,10 @@
   flex-direction: column;
   gap: 4px;
   padding: 6px 8px;
-  background: rgba(0, 0, 0, 0.25);
-  border-left: 2px solid var(--amber-500);
+  background: var(--paper-2);
+  border-left: 2px solid var(--highlight);
   font-family: var(--font-display);
-  color: var(--bone-100);
+  color: var(--text);
   min-width: 0;
 }
 
@@ -716,44 +631,46 @@
   font-size: 9px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--bone-300);
+  color: var(--text-muted);
 }
 
-.hud-op__xp-label .icon { color: var(--amber-400); }
+.hud-op__xp-label .icon { color: var(--accent-text); }
 
 .hud-op__xp-value {
   font-family: var(--font-mono);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.04em;
-  color: var(--bone-100);
+  color: var(--text);
 }
 
 .hud-op__xp-track {
   position: relative;
   height: 6px;
-  background: rgba(232, 225, 204, 0.1);
-  border: 1px solid rgba(232, 225, 204, 0.18);
+  background: var(--paper-3);
+  border: 1px solid var(--ink);
   overflow: hidden;
 }
 
 .hud-op__xp-fill {
   height: 100%;
   transition: width 220ms ease;
-  background: var(--rank-blue);
-  box-shadow: 0 0 6px rgba(74, 144, 217, 0.4);
+  background: var(--info);
+  /* The yellow rank fill is 1.07:1 on its own track; the ink leading edge is
+     what makes the level readable, not the hue. */
+  box-shadow: inset -1px 0 0 var(--ink);
 }
 
-.hud-op__xp-fill--blue   { background: var(--rank-blue);   box-shadow: 0 0 6px rgba(74, 144, 217, 0.4); }
-.hud-op__xp-fill--yellow { background: var(--rank-yellow); box-shadow: 0 0 6px rgba(217, 147, 54, 0.45); }
-.hud-op__xp-fill--orange { background: var(--rank-orange); box-shadow: 0 0 6px rgba(196, 90, 44, 0.5); }
-.hud-op__xp-fill--red    { background: var(--rank-red);    box-shadow: 0 0 6px rgba(156, 63, 28, 0.55); }
+.hud-op__xp-fill--blue   { background: var(--info); }
+.hud-op__xp-fill--yellow { background: var(--highlight); }
+.hud-op__xp-fill--orange { background: var(--danger-orange); }
+.hud-op__xp-fill--red    { background: var(--accent); }
 
 /* Left decoration matches the survivor's current rank color. */
-.hud-op__xp--rank-blue   { border-left-color: var(--rank-blue); }
-.hud-op__xp--rank-yellow { border-left-color: var(--rank-yellow); }
-.hud-op__xp--rank-orange { border-left-color: var(--rank-orange); }
-.hud-op__xp--rank-red    { border-left-color: var(--rank-red); }
+.hud-op__xp--rank-blue   { border-left-color: var(--info); }
+.hud-op__xp--rank-yellow { border-left-color: var(--highlight); }
+.hud-op__xp--rank-orange { border-left-color: var(--danger-orange); }
+.hud-op__xp--rank-red    { border-left-color: var(--accent); }
 
 .hud-op__tags {
   display: flex;
@@ -801,36 +718,38 @@
 .hud-slot {
   display: flex; flex-direction: column; gap: 4px;
   padding: 6px;
-  background: var(--bg-1);
-  border: 1px solid var(--olive-700);
-  border-radius: 2px;
+  background: var(--paper);
+  color: var(--text);
+  border: var(--border);
+  border-radius: var(--radius-sm);
   min-width: 0;
 }
 
 .hud-slot--weapon {
-  border-color: var(--rust-500);
-  box-shadow: inset 0 0 0 1px rgba(156, 63, 28, 0.18);
+  border-color: var(--accent);
 }
 
+/* Empty slot — the dashed ink outline carries the state; opacity used to
+   drag the label to 2.09:1. --text-muted on --paper-3 is 4.83:1. */
 .hud-slot--empty {
-  opacity: 0.55;
-  border-color: var(--olive-700);
+  background: var(--paper-3);
+  color: var(--text-muted);
+  border-color: var(--ink);
   border-style: dashed;
 }
 
 .hud-slot--bag {
-  border-color: var(--amber-500);
-  box-shadow: inset 0 0 0 1px rgba(240, 169, 74, 0.18);
+  border-color: var(--highlight);
 }
 
 .hud-slot__label {
   font-family: var(--font-mono); font-size: 9px;
-  letter-spacing: 0.2em; color: var(--bone-500); text-transform: uppercase;
+  letter-spacing: 0.2em; color: var(--text-muted); text-transform: uppercase;
 }
 
 .hud-slot__empty {
   font-family: var(--font-mono); font-size: 10px;
-  color: var(--bone-500); letter-spacing: 0.12em;
+  color: var(--text-muted); letter-spacing: 0.12em; text-transform: uppercase;
   padding: 10px 0; text-align: center;
 }
 
@@ -844,13 +763,14 @@
   gap: 10px;
   min-height: 36px;
   padding: 6px 12px;
-  background: var(--bg-0);
-  border: 1px solid var(--amber-500);
-  border-radius: 2px;
-  color: var(--amber-200);
+  background: var(--highlight);
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
   cursor: pointer;
   pointer-events: auto;
-  transition: transform 120ms ease, background 120ms ease, box-shadow 120ms ease;
+  transition: transform 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
 }
 
 .hud-bag-button__icon {
@@ -858,7 +778,7 @@
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  color: var(--amber-200);
+  color: var(--ink);
 }
 
 .hud-bag-button__label {
@@ -868,19 +788,21 @@
   font-weight: 700;
   letter-spacing: 0.24em;
   text-transform: uppercase;
-  color: var(--amber-200);
+  color: var(--ink);
 }
 
 .hud-bag-button:hover {
   transform: translateY(-1px);
-  background: rgba(240, 169, 74, 0.08);
-  box-shadow: 0 0 12px rgba(240, 169, 74, 0.25);
+  background: var(--highlight-soft);
 }
 
-.hud-bag-button:active { transform: translateY(0); }
+.hud-bag-button:active {
+  transform: translate(var(--press-offset), var(--press-offset));
+  box-shadow: none;
+}
 
 .hud-bag-button:focus-visible {
-  outline: 2px solid var(--amber-400);
+  outline: 2px solid var(--ink);
   outline-offset: 2px;
 }
 
@@ -888,141 +810,472 @@
   position: absolute;
   top: -6px; right: -6px;
   min-width: 18px; height: 18px;
-  background: var(--amber-400);
-  color: var(--bg-0);
-  border-radius: 2px;
+  background: var(--accent);
+  color: var(--text-inverse);
+  border-radius: var(--radius-sm);
   font-size: 10px;
   font-weight: 800;
   font-family: var(--font-mono);
   display: flex; align-items: center; justify-content: center;
   padding: 0 4px;
-  box-shadow: 0 0 0 2px var(--bg-0);
+  box-shadow: 0 0 0 2px var(--paper);
 }
 
 /* ==========================================================================
-   Field Log (right panel tail)
+   Sheet / side layouts — shell pieces
    ========================================================================== */
 
-.hud-log {
-  display: flex; flex-direction: column; gap: 4px;
-  flex: 1 1 auto; min-height: 0;
+.hud-center { padding: 8px; }
+
+/* Squad chips overlay the board's top-left in every arrangement. */
+#game-hud > .hud-squad {
+  position: absolute;
+  top: calc(var(--hud-topbar-height, 44px) + 8px);
+  left: calc(8px + env(safe-area-inset-left));
+  z-index: 1;
+  pointer-events: none;
 }
 
-.hud-log__kicker { margin-bottom: 2px; }
+.hud-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  max-width: calc(100vw - 32px);
+}
 
-.hud-log__body {
-  flex: 1 1 auto; min-height: 0;
+/* Chip + its state readout. The pips sit below the chip and never take a
+   pointer, so the chip's 44px ::after expander still wins every hit test. */
+.hud-chip-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.hud-chip__state {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  pointer-events: none;
+}
+
+.hud-chip__pips {
+  display: flex;
+  gap: 2px;
+  justify-content: center;
+}
+
+/* Small enough to sit under a 36px chip, outlined so they read over tile art. */
+.hud-chip__pip {
+  width: 7px;
+  height: 5px;
+  border-radius: 1px;
+  border: 1px solid var(--ink);
+  background: var(--paper-2);
+  box-shadow: 0 0 0 1px var(--paper-2);
+}
+
+.hud-chip__pip--hp.hud-chip__pip--on { background: var(--accent); }
+.hud-chip__pip--ap.hud-chip__pip--on { background: var(--highlight); }
+
+/* Avatar chips float directly over the board — ink outline always. */
+.hud-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  padding: 0;
+  background: var(--paper-2);
+  box-shadow:
+    0 0 0 2px var(--chip-color, var(--ink)),
+    0 0 0 3px var(--ink);
+  color: var(--text);
+  font-family: var(--font-stencil);
+  font-size: 14px;
+  pointer-events: auto;
+}
+
+/* Extend the tap area to 44px without growing the chip. */
+.hud-chip::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+}
+
+/* Carries the circular clip that used to sit on .hud-chip, where it also
+   clipped the ::after tap expander out of hit-testing. */
+.hud-chip__img {
+  width: 100%; height: 100%; object-fit: cover;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+.hud-chip--turn {
+  box-shadow:
+    0 0 0 2px var(--chip-color, var(--ink)),
+    0 0 0 4px var(--highlight),
+    0 0 0 6px var(--ink);
+}
+
+.hud-chip--selected { outline: 2px solid var(--text-on-page); outline-offset: 5px; }
+
+/* Recentre button — bottom-left of the map window, above the sheet.
+   Sits on the board, so it keeps a paper fill and an ink outline. */
+.hud-recenter {
+  position: absolute;
+  left: 8px;
+  bottom: calc(var(--hud-sheet-offset, 0px) + 8px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  pointer-events: auto;
+  background: var(--paper);
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  transition: bottom 200ms ease, background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+.hud-recenter:hover { background: var(--paper-2); border-color: var(--ink); color: var(--text); }
+.hud-recenter:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+/* ---------- Operative sheet ---------- */
+
+.hud-sheet {
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  color: var(--text);
+}
+.hud-sheet[hidden] { display: none; }
+
+#game-hud[data-layout="sheet"] > .hud-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 85svh;
+  z-index: 2;
+  padding-bottom: env(safe-area-inset-bottom);
+  border-top: var(--border);
+  border-radius: 10px 10px 0 0;
+  /* Until BottomSheet measures, rest at roughly the peek height. */
+  transform: translateY(calc(85svh - 90px - env(safe-area-inset-bottom)));
+  transition: transform 220ms var(--ease-out);
+  will-change: transform;
+}
+
+#game-hud[data-layout="sheet"] > .hud-sheet.hud-sheet--dragging { transition: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  #game-hud[data-layout="sheet"] > .hud-sheet,
+  .hud-recenter { transition: none; }
+}
+
+/* ---------- Deck: desktop and tablet ----------
+   Pinned to the bottom of the window and centred, so the distance from the
+   board centre to End Turn stops growing with the viewport. It overlays the
+   map window; GameHUD subtracts its height from the camera viewport, the
+   same way the phone sheet's snap height is subtracted. */
+#game-hud[data-layout="deck"] > .hud-sheet {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: min(1400px, 100%);
+  /* Fixed height on a screen that can afford it, but the deck wraps rather
+     than starve a section when the viewport is narrower than its content
+     (iPad portrait). The short-screen rule below pins it back to one row. */
+  min-height: var(--hud-deck-height, 128px);
+  max-height: 40vh;
+  z-index: 2;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--hud-deck-pad);
+  padding: var(--hud-deck-pad) calc(var(--hud-deck-pad) * 1.5);
+  padding-bottom: calc(var(--hud-deck-pad) + env(safe-area-inset-bottom));
+  border: var(--border);
+  border-bottom: 0;
+  border-radius: 10px 10px 0 0;
+  box-shadow: var(--shadow-lg);
+}
+
+/* No drag handle and no drag gesture: the deck never snaps. */
+#game-hud[data-layout="deck"] .hud-sheet__handle { display: none; }
+#game-hud[data-layout="deck"] .hud-sheet__grab {
+  touch-action: auto;
+  padding: 0;
+  display: flex;
+  align-items: center;
+}
+
+#game-hud[data-layout="deck"] .hud-sheet__header,
+#game-hud[data-layout="deck"] .hud-sheet__body,
+#game-hud[data-layout="deck"] .hud-sheet__half,
+#game-hud[data-layout="deck"] .hud-sheet__more {
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  /* Wrap, so a viewport too narrow for one row drops a section to the next
+     line instead of pushing it off the edge. */
+  flex-wrap: wrap;
+  min-width: 0;
+  overflow: visible;
+  padding: 0;
+  gap: var(--hud-deck-pad);
+}
+
+/* Shrink order, most protected first: the action strip and End Turn are what
+   the player clicks, the loadout is read and clicked, the XP/tags row is only
+   read. Everything keeps min-width: 0 so flex may actually shrink it. */
+#game-hud[data-layout="deck"] .hud-sheet__grab { flex: 0 0 auto; }
+#game-hud[data-layout="deck"] .hud-sheet__body { flex: 1 1 auto; min-width: 0; }
+#game-hud[data-layout="deck"] .hud-sheet__half { flex: 1 1 auto; min-width: 0; }
+#game-hud[data-layout="deck"] .hud-actionstrip { flex: 1 1 auto; min-width: 200px; }
+#game-hud[data-layout="deck"] .hud-loadout { flex: 0 1 auto; min-width: 0; }
+#game-hud[data-layout="deck"] .hud-sheet__more { flex: 0 1 auto; min-width: 0; }
+
+/* Give the buttons the room the two-column rail grid never had. */
+#game-hud[data-layout="deck"] .hud-actionstrip > .action-btn {
+  width: auto;
+  min-width: 64px;
+  height: clamp(44px, 3.2vh, 56px);
+  padding: 4px 8px;
+}
+
+#game-hud[data-layout="deck"] .hud-actionstrip .action-btn__label {
+  font-size: clamp(10px, 0.55vw, 13px);
+  white-space: nowrap;
+}
+
+#game-hud[data-layout="deck"] .hud-loadout__grid { min-width: 200px; }
+#game-hud[data-layout="deck"] .hud-op__xp { flex: 1 1 auto; min-width: 120px; }
+
+/* 2.4 — short screens: one row. The XP/tags section is the only part a
+   player does not act on, so it is what the collapse spends. */
+@media (max-height: 820px) {
+  #game-hud[data-layout="deck"] { --hud-deck-height: 86px; }
+  #game-hud[data-layout="deck"] > .hud-sheet,
+  #game-hud[data-layout="deck"] .hud-sheet__body,
+  #game-hud[data-layout="deck"] .hud-sheet__half {
+    flex-wrap: nowrap;
+  }
+  #game-hud[data-layout="deck"] > .hud-sheet {
+    height: var(--hud-deck-height);
+    max-height: var(--hud-deck-height);
+  }
+  #game-hud[data-layout="deck"] .hud-sheet__more { display: none; }
+}
+
+/* 5.1 — the latest-event card belongs next to the controls that caused it. */
+#game-hud[data-layout="deck"] .hud-feed-slot {
+  position: absolute;
+  left: 50%;
+  right: auto;
+  top: auto;
+  bottom: calc(var(--hud-sheet-offset, var(--hud-deck-height, 128px)) + 8px);
+  transform: translateX(-50%);
+  width: min(640px, calc(100% - 32px));
+  z-index: 1;
+}
+
+#game-hud[data-layout="side"] > .hud-sheet {
+  grid-area: side;
+  min-height: 0;
   overflow-y: auto;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  line-height: 1.35;
-  color: var(--bone-300);
-  scrollbar-width: thin;
-  scrollbar-color: var(--amber-500) transparent;
+  overscroll-behavior: contain;
+  border-left: var(--border);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
 }
-.hud-log__body::-webkit-scrollbar { width: 4px; }
-.hud-log__body::-webkit-scrollbar-thumb {
-  background: var(--amber-500);
+
+.hud-sheet__grab {
+  flex: 0 0 auto;
+  padding: 4px 10px 8px;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+#game-hud[data-layout="side"] .hud-sheet__grab { touch-action: auto; padding-top: 8px; }
+
+.hud-sheet__handle {
+  width: 40px;
+  height: 4px;
+  margin: 2px auto 6px;
   border-radius: 2px;
+  background: var(--ink);
+}
+#game-hud[data-layout="side"] .hud-sheet__handle { display: none; }
+
+.hud-sheet__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
 }
 
-.hud-log__line {
-  display: grid;
-  grid-template-columns: auto auto 1fr;
-  column-gap: 6px;
-  padding: 1px 0;
-  border-bottom: 1px dashed rgba(62, 67, 44, 0.4);
+.hud-sheet__who {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
-.hud-log__ts { color: var(--amber-400); font-variant-numeric: tabular-nums; }
-.hud-log__actor { color: var(--bone-100); text-transform: uppercase; letter-spacing: 0.08em; }
-.hud-log__action { color: var(--bone-300); text-transform: uppercase; letter-spacing: 0.06em; }
-.hud-log__detail { grid-column: 1 / -1; color: var(--bone-500); padding-left: 24px; }
-
-.hud-log__empty {
-  font-family: var(--font-mono); font-size: 10px;
-  letter-spacing: 0.2em; color: var(--bone-500);
-  padding: 8px 0; text-transform: uppercase;
+.hud-sheet__ident {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
-/* ==========================================================================
-   Mobile + tablet overrides — stacked single-column layout (<1024px)
-   ========================================================================== */
+.hud-sheet__name {
+  font-family: var(--font-stencil);
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
-@media (max-width: 1023.98px) {
-  .hud-rail--right {
-    border-left: none;
-    border-top: 1px solid var(--olive-700);
-    padding: 10px;
+.hud-pips {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--text-muted);
+}
+.hud-pips .icon { width: 11px; height: 11px; margin-right: 2px; }
+
+.hud-pip {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 1px;
+  border: 1px solid var(--ink);
+  background: var(--paper-3);
+}
+.hud-pip--hp.hud-pip--on { background: var(--accent); border-color: var(--ink); }
+.hud-pip--ap.hud-pip--on { background: var(--highlight); border-color: var(--ink); }
+.hud-pips__inf { font-family: var(--font-mono); font-size: 11px; color: var(--accent-text); }
+
+.hud-sheet__endturn {
+  flex: 0 1 auto;
+  min-width: 104px;
+  min-height: 48px;
+  justify-content: center;
+}
+.hud-sheet__endturn .action-btn__label { white-space: normal; text-align: center; }
+.hud-sheet__ident .hud-turnline { white-space: normal; }
+
+.hud-sheet__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 10px 8px;
+  overflow: hidden;
+}
+
+#game-hud[data-layout="sheet"] > .hud-sheet[data-snap="full"] .hud-sheet__body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+#game-hud[data-layout="side"] .hud-sheet__body { overflow: visible; }
+
+.hud-sheet__half,
+.hud-sheet__more {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Compact loadout: weapons share a band with the bag tile pinned right.
+   Hand labels are dropped so the cells can show weapon stats inline. */
+.hud-sheet .hud-loadout { gap: 4px; }
+.hud-sheet .hud-loadout__kicker { display: none; }
+.hud-sheet .hud-loadout__grid {
+  grid-template-columns: 1fr 1fr 56px;
+  gap: 4px;
+}
+
+.hud-sheet .hud-loadout__grid .hud-slot--bag {
+  justify-self: stretch;
+  width: auto;
+  padding: 4px 6px;
+  background: var(--paper);
+  border: var(--border-width) solid var(--highlight);
+}
+
+.hud-sheet .hud-loadout .hud-slot { padding: 4px 6px; }
+.hud-sheet .hud-loadout .hud-slot__label { display: none; }
+.hud-sheet .hud-loadout .hud-slot--empty { justify-content: center; }
+
+.hud-sheet .hud-loadout .hud-slot--empty .hud-slot__empty {
+  padding: 6px 0;
+  font-size: 10px;
+  text-align: center;
+}
+
+.hud-sheet .hud-loadout .hud-weapon-btn { min-width: 0; }
+
+.hud-sheet .hud-loadout .hud-weapon-btn .item-card { padding: 4px 6px; }
+.hud-sheet .hud-loadout .hud-weapon-btn .item-card__icon { display: none; }
+.hud-sheet .hud-loadout .hud-weapon-btn .item-card__name,
+.hud-sheet .hud-loadout .hud-weapon-btn .item-card__stats { white-space: normal; }
+
+.hud-sheet .hud-loadout .hud-bag-button {
+  min-height: 48px;
+  padding: 4px;
+  justify-content: center;
+  gap: 0;
+}
+
+.hud-sheet .hud-loadout .hud-bag-button__label { display: none; }
+
+/* Landscape: keep the top bar clear of the notch. */
+#game-hud[data-layout="side"] .hud-topbar__inner {
+  padding-left: calc(var(--space-3, 12px) + env(safe-area-inset-left));
+  padding-right: calc(var(--space-3, 12px) + env(safe-area-inset-right));
+}
+
+/* ---------- Hit areas without growing the glyphs: 24px fine, 44px coarse ---------- */
+
+.hud-iconbtn,
+.hud-turnchip { position: relative; }
+
+.hud-iconbtn::after,
+.hud-turnchip::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100%, 24px);
+  height: max(100%, 24px);
+  transform: translate(-50%, -50%);
+}
+
+@media (pointer: coarse) {
+  .hud-iconbtn::after,
+  .hud-turnchip::after {
+    width: max(100%, 44px);
+    height: 44px;
   }
 
-  .hud-rail--right .hud-rail__body { gap: 8px; }
-
-  /* Mobile actions bar — drop laptop's left border, match the rail's
-     mobile padding so the bar reads as the column's bottom edge. */
-  #game-hud > .hud-actions {
-    border-left: 0;
-    padding: 10px;
-    background: linear-gradient(0deg, var(--bg-1), var(--bg-0));
-  }
-
-  .hud-center { padding: 8px; }
-  .hud-map-window { min-height: 380px; flex: 1 1 auto; }
-
-  .hud-log { display: none; }
-
-  /* Mobile loadout: weapons share a single horizontal band with the bag tile
-     pinned to the right. Hand labels are dropped (the player knows which thumb
-     they tapped) so the cells can show full weapon stats inline. */
-  .hud-loadout { gap: 4px; }
-  .hud-loadout__kicker { display: none; }
-  .hud-loadout__grid {
-    grid-template-columns: 1fr 1fr 56px;
-    gap: 4px;
-  }
-
-  .hud-loadout__grid .hud-slot--bag {
-    justify-self: stretch;
-    width: auto;
-    padding: 4px 6px;
-    background: var(--bg-1);
-    border: 1px solid var(--amber-500);
-    box-shadow: inset 0 0 0 1px rgba(240, 169, 74, 0.18);
-  }
-
-  .hud-loadout .hud-slot {
-    padding: 4px 6px;
-  }
-
-  .hud-loadout .hud-slot__label { display: none; }
-
-  .hud-loadout .hud-slot--empty {
-    justify-content: center;
-  }
-
-  .hud-loadout .hud-slot--empty .hud-slot__empty {
-    padding: 6px 0;
-    font-size: 10px;
-    text-align: center;
-  }
-
-  .hud-loadout .hud-weapon-btn {
-    min-width: 0;
-  }
-
-  .hud-loadout .hud-weapon-btn .item-card__icon {
-    width: 28px;
-    height: 28px;
-  }
-
-  .hud-loadout .hud-bag-button {
-    min-height: 48px;
-    padding: 4px;
-    justify-content: center;
-    gap: 0;
-  }
-
-  .hud-loadout .hud-bag-button__label { display: none; }
+  /* 3.4 — controls stage 1's 44px rule never reached. */
+  .hud-wound-alert { min-height: 44px; }
+  .hud-actionstrip > .action-btn { min-height: 44px; }
 }
 
 /* ==========================================================================
@@ -1035,7 +1288,7 @@
   cursor: pointer;
   background: none; border: none; padding: 0;
   text-align: left;
-  transition: transform 120ms var(--ease-military, ease-out);
+  transition: transform 120ms var(--ease-out);
 }
 
 .hud-weapon-btn--locked {
@@ -1045,17 +1298,15 @@
 .hud-weapon-btn:hover:not(.hud-weapon-btn--locked) { transform: translateY(-1px); }
 
 .hud-weapon-btn:hover:not(.hud-weapon-btn--locked) .item-card {
-  background: var(--bg-3);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+  background: var(--paper-2);
+  box-shadow: var(--shadow);
 }
 
 .hud-weapon-btn:active:not(.hud-weapon-btn--locked) { transform: translateY(0); }
 
 .hud-weapon-btn--active .item-card {
-  background: color-mix(in srgb, var(--rust-500) 22%, var(--bg-2));
-  box-shadow:
-    0 0 0 1px var(--rust-400),
-    0 0 18px color-mix(in srgb, var(--rust-400) 55%, transparent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 2px var(--accent);
 }
 
 /* ==========================================================================
@@ -1067,30 +1318,43 @@
 .skill-badge {
   display: inline-flex; align-items: center; gap: 4px;
   padding: 2px 8px;
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
   font-family: var(--font-stencil); font-size: 10px;
   letter-spacing: 0.08em; text-transform: uppercase;
+  /* Spanish skill names are long; clip rather than push the badge out of
+     the wrapping row. */
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  max-width: 100%;
   border: 1px solid;
 }
 
 .skill-badge .icon { flex: 0 0 auto; }
 
-.skill-badge--passive  { background: rgba(138, 149, 96, 0.12); color: var(--olive-300); border-color: var(--olive-500); }
-.skill-badge--action   { background: rgba(240, 169, 74, 0.1);  color: var(--amber-200); border-color: var(--amber-500); }
-.skill-badge--stat-mod { background: rgba(196, 90, 44, 0.12);  color: var(--rust-300);  border-color: var(--rust-500); }
+.skill-badge--passive  { background: var(--success-soft); color: var(--success); border-color: var(--success); }
+.skill-badge--action   { background: var(--highlight);    color: var(--ink);     border-color: var(--ink); }
+.skill-badge--stat-mod { background: var(--accent-soft);  color: var(--accent-text); border-color: var(--accent); }
 
-.skill-badge--used { opacity: 0.28; filter: grayscale(0.6); }
+/* Used skill — dashed ink outline plus muted ink text. Opacity plus
+   grayscale left the label at 1.46:1. */
+.skill-badge--used {
+  background: var(--paper-2);
+  color: var(--text-muted);
+  border-color: var(--ink);
+  border-style: dashed;
+}
 
 .hud-free-actions { display: flex; gap: 4px; flex-wrap: wrap; }
 
 .free-action-pip {
   display: inline-flex; align-items: center; gap: 3px;
   padding: 2px 6px;
-  background: rgba(168, 200, 144, 0.12);
-  border: 1px solid var(--olive-500);
-  border-radius: 2px;
-  color: var(--olive-300);
+  background: var(--success-soft);
+  border: 1px solid var(--success);
+  border-radius: var(--radius-sm);
+  color: var(--success);
   font-family: var(--font-stencil); font-size: 10px;
   letter-spacing: 0.08em; text-transform: uppercase;
 }
@@ -1101,25 +1365,20 @@
   display: flex; align-items: center; gap: 8px;
   width: 100%;
   padding: 6px 10px;
-  background: rgba(156, 63, 28, 0.18);
-  border: 1px solid var(--rust-500);
-  border-left: 3px solid var(--rust-400);
-  border-radius: 2px;
-  color: var(--rust-300);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  color: var(--accent-text);
   font-family: var(--font-stencil); font-size: 11px;
   letter-spacing: 0.1em; text-transform: uppercase;
   cursor: pointer;
-  animation: wound-pulse 1.4s ease-in-out infinite;
+  transition: background-color 160ms ease, color 160ms ease;
 }
 
 .hud-wound-alert:hover {
-  background: rgba(196, 90, 44, 0.24);
-  animation-duration: 0.7s;
-}
-
-@keyframes wound-pulse {
-  0%, 100% { border-color: var(--rust-500); box-shadow: 0 0 8px rgba(156, 63, 28, 0.2); }
-  50%      { border-color: var(--rust-300); box-shadow: 0 0 18px rgba(196, 90, 44, 0.4); }
+  background: var(--accent);
+  color: var(--text-inverse);
 }
 
 /* ==========================================================================
@@ -1130,28 +1389,30 @@
   position: absolute;
   inset: 0;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(6, 5, 4, 0.92);
+  background: var(--scrim);
   pointer-events: auto;
   z-index: var(--z-modal);
-  backdrop-filter: blur(2px);
 }
 
 .hud-game-over__card {
-  background: linear-gradient(180deg, var(--bg-2), var(--bg-1));
-  border: 1px solid var(--olive-700);
-  border-top: 3px solid var(--amber-400);
-  border-radius: 2px;
+  background: var(--paper);
+  color: var(--text);
+  border: var(--border-heavy);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
   padding: 32px;
   text-align: center;
   max-width: 420px; width: 90%;
+  max-height: calc(100svh - 32px);
+  overflow-y: auto;
   display: flex; flex-direction: column; align-items: center;
   gap: 14px;
   position: relative;
 }
 
 .hud-game-over__icon { display: inline-flex; }
-.hud-game-over__icon--victory { color: var(--olive-300); }
-.hud-game-over__icon--defeat  { color: var(--rust-300); }
+.hud-game-over__icon--victory { color: var(--success); }
+.hud-game-over__icon--defeat  { color: var(--accent-text); }
 
 .hud-game-over__title {
   font-family: var(--font-stencil);
@@ -1162,93 +1423,53 @@
   line-height: 1;
 }
 
-.hud-game-over__title--victory { color: var(--olive-300); text-shadow: 0 0 24px rgba(138, 149, 96, 0.6); }
-.hud-game-over__title--defeat  { color: var(--rust-300);  text-shadow: 0 0 24px rgba(196, 90, 44, 0.4); }
+.hud-game-over__title--victory { color: var(--success); }
+.hud-game-over__title--defeat  { color: var(--accent-text); }
 
 .hud-game-over__desc {
   font-family: var(--font-body);
   font-size: 14px;
-  color: var(--bone-300);
+  color: var(--text-2);
 }
 
 .hud-game-over__actions {
   display: flex; gap: 12px; margin-top: 6px;
 }
 
+@media (max-height: 500px) {
+  .hud-game-over__card { padding: 16px 20px; gap: 8px; }
+  .hud-game-over__title { font-size: 24px; }
+}
+
 /* ==========================================================================
    Turn History Modal
    ========================================================================== */
 
-.history-list {
-  display: flex; flex-direction: column; gap: 4px;
-  max-height: 60vh; overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--olive-700) transparent;
-}
+.event-log { display: flex; flex-direction: column; gap: 4px; }
 
-.history-turn-header {
+/* The log is read, not glanced at: the feed's 11px is too small in a modal. */
+.event-log .event-entry__desc { font-size: 12px; }
+
+.event-log__round {
   font-family: var(--font-stencil);
   font-size: 12px;
-  color: var(--amber-400);
+  color: var(--accent-text);
   padding: 4px 0;
-  border-bottom: 1px solid var(--olive-700);
+  border-bottom: 1px solid var(--line);
   margin-top: 12px;
   text-transform: uppercase;
   letter-spacing: 0.16em;
 }
+.event-log__round:first-child { margin-top: 0; }
+.event-log__round-current { color: var(--text-muted); font-size: 10px; margin-left: 6px; }
 
-.history-turn-header:first-child { margin-top: 0; }
-
-.history-entry {
-  display: flex; align-items: baseline; gap: 8px;
-  padding: 4px 0;
-  font-family: var(--font-mono); font-size: 11px;
-  border-bottom: 1px solid rgba(62, 67, 44, 0.4);
+.event-log__player {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 6px;
+  font-family: var(--font-mono); font-size: 10px;
+  color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.12em;
 }
-
-.history-entry__actor {
-  color: var(--bone-300);
-  font-family: var(--font-stencil); font-size: 11px;
-  letter-spacing: 0.08em; font-weight: 600;
-  flex-shrink: 0; min-width: 5ch;
-}
-
-.history-entry__content {
-  display: flex; flex-direction: column; gap: 2px;
-  flex: 1; min-width: 0;
-}
-
-.history-entry__action { color: var(--bone-100); }
-
-.history-entry__free {
-  display: inline-block;
-  padding: 0 4px; margin-right: 2px;
-  font-family: var(--font-stencil); font-size: 9px;
-  color: var(--amber-400);
-  background: rgba(240, 169, 74, 0.1);
-  border: 1px solid var(--amber-500);
-  border-radius: 2px;
-  letter-spacing: 0.08em;
-}
-
-.history-entry__dice { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }
-.history-entry__hits { font-size: 10px; color: var(--bone-300); margin-left: 4px; }
-.history-entry__boosts { font-size: 10px; color: var(--amber-400); }
-.history-entry__lucky  { font-size: 10px; color: var(--bone-500); }
-.history-entry__detail,
-.history-entry__spawn  { font-size: 10px; color: var(--bone-300); }
-
-.history-die {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 17px; height: 17px;
-  border-radius: 2px;
-  font-size: 10px; font-weight: 700;
-  background: var(--bg-3); color: var(--bone-300);
-  border: 1px solid var(--olive-700);
-}
-
-.history-die--hit { background: var(--olive-500); color: var(--bg-0); border-color: var(--olive-300); }
-.history-die--discarded { background: transparent; color: var(--bone-500); text-decoration: line-through; opacity: 0.5; }
+.event-log__player::after { content: ''; flex: 1; height: 1px; background: var(--line); }
 
 /* ==========================================================================
    Wound picker modal
@@ -1257,25 +1478,26 @@
 .wound-picker__summary {
   display: flex; justify-content: space-between; align-items: center;
   padding: 8px 12px;
-  background: var(--bg-0);
-  border: 1px solid var(--olive-700);
-  border-radius: 2px;
+  background: var(--paper-3);
+  color: var(--text);
+  border: 1px solid var(--ink);
+  border-radius: var(--radius-sm);
   font-family: var(--font-mono); font-size: 11px;
 }
 
 .wound-picker__card {
   cursor: pointer;
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
   transition: transform 120ms ease, box-shadow 120ms ease;
 }
 
 .wound-picker__card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+  box-shadow: var(--shadow);
 }
 
 .wound-picker__card--selected {
-  box-shadow: 0 0 0 2px var(--amber-400), 0 0 16px rgba(240, 169, 74, 0.28);
+  box-shadow: 0 0 0 3px var(--highlight);
 }
 
 /* ==========================================================================
@@ -1287,10 +1509,11 @@
 .wound-dist__row {
   display: flex; align-items: center; gap: 8px;
   padding: 8px 12px;
-  background: var(--bg-2);
-  border: 1px solid var(--olive-700);
-  border-left: 2px solid var(--rust-400);
-  border-radius: 2px;
+  background: var(--paper-2);
+  color: var(--text);
+  border: 1px solid var(--ink);
+  border-left: 2px solid var(--accent);
+  border-radius: var(--radius-sm);
 }
 
 .wound-dist__info { display: flex; flex-direction: column; flex: 1; min-width: 0; }
@@ -1298,18 +1521,17 @@
 .wound-dist__name {
   font-family: var(--font-stencil); font-size: 12px;
   letter-spacing: 0.08em; text-transform: uppercase;
-  color: var(--bone-100);
+  color: var(--text);
 }
 
-.wound-dist__hp { font-family: var(--font-mono); font-size: 11px; color: var(--bone-300); }
+.wound-dist__hp { font-family: var(--font-mono); font-size: 11px; color: var(--text-2); }
 
 .wound-dist__controls { display: flex; align-items: center; gap: 8px; }
 
 .wound-dist__count {
   font-family: var(--font-mono); font-size: 16px; font-weight: 800;
   min-width: 2ch; text-align: center;
-  color: var(--rust-300);
-  text-shadow: 0 0 8px rgba(196, 90, 44, 0.4);
+  color: var(--accent-text);
 }
 
 /* ==========================================================================
@@ -1321,7 +1543,7 @@
 .shortcut-row {
   display: flex; align-items: center; gap: 12px;
   padding: 4px 0;
-  border-bottom: 1px solid rgba(62, 67, 44, 0.4);
+  border-bottom: 1px solid var(--line);
 }
 
 .shortcut-row:last-child { border-bottom: none; }
@@ -1330,16 +1552,16 @@
   display: inline-flex; align-items: center; justify-content: center;
   min-width: 2rem;
   padding: 4px 8px;
-  background: var(--bg-2);
-  border: 1px solid var(--olive-700);
+  background: var(--paper-3);
+  border: 1px solid var(--ink);
   border-bottom-width: 2px;
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
   font-family: var(--font-mono); font-size: 11px; font-weight: 600;
-  color: var(--bone-100);
+  color: var(--text);
   flex-shrink: 0;
 }
 
 .shortcut-desc {
   font-family: var(--font-body); font-size: 13px;
-  color: var(--bone-300);
+  color: var(--text-2);
 }

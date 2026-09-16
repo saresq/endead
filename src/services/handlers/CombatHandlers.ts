@@ -9,6 +9,7 @@ import { Rng } from '../Rng';
 import { rollAttack, applyLuckyReroll, AttackRollResult } from '../CombatDice';
 import { visibleZones } from '../LineOfSight';
 import { handleSurvivorDeath, getZombieToughness, getZombieXP, deductAPWithFreeCheck } from './handlerUtils';
+import { es, equipmentName, skillName } from '../../strings/es';
 
 /**
  * Capture pre-attack entity state for a potential Lucky reroll.
@@ -43,22 +44,22 @@ export function handleAttack(state: GameState, intent: ActionRequest): GameState
   let weapon: EquipmentCard | undefined;
   if (weaponId) {
     weapon = survivor.inventory.find((c: EquipmentCard) => c.id === weaponId && c.inHand);
-    if (!weapon) throw new Error('Weapon not found or not equipped');
+    if (!weapon) throw new Error(es.errors.weaponNotInHand);
   } else {
     const weapons = survivor.inventory.filter((c: EquipmentCard) => c.type === 'WEAPON' && c.inHand);
     if (weapons.length === 1) weapon = weapons[0];
-    else if (weapons.length === 0) throw new Error('No weapon equipped');
-    else throw new Error('Multiple weapons equipped, specify weaponId');
+    else if (weapons.length === 0) throw new Error(es.errors.noWeaponInHand);
+    else throw new Error(es.errors.chooseWeapon);
   }
 
   if (!weapon) throw new Error('No weapon found');
-  if (weapon.type !== 'WEAPON' || !weapon.stats) throw new Error('Item is not a weapon');
+  if (weapon.type !== 'WEAPON' || !weapon.stats) throw new Error(es.errors.notAWeapon);
 
   const stats = weapon.stats;
 
   const currentZoneId = survivor.position.zoneId;
   const distance = currentZoneId === targetZoneId ? 0 : visibleZones(state, currentZoneId).get(targetZoneId);
-  if (distance === undefined) throw new Error('No line of sight to target zone');
+  if (distance === undefined) throw new Error(es.errors.noLineOfSight);
 
   // Point-Blank: ranged weapons can fire at Range 0, bypassing min range
   const hasPointBlank = survivor.skills.includes('point_blank');
@@ -74,14 +75,14 @@ export function handleAttack(state: GameState, intent: ActionRequest): GameState
   }
 
   if (distance < effectiveMinRange || distance > effectiveMaxRange) {
-      throw new Error(`Target out of range (${distance}). Weapon range: ${stats.range.join('-')}`);
+      throw new Error(es.errors.outOfRange(distance, stats.range.join('-')));
   }
 
   // Melee attacks can only target the attacker's own zone
   const isMelee = stats.range[1] === 0;
   (newState as any)._attackIsMelee = isMelee;
   if (isMelee && targetZoneId !== currentZoneId) {
-      throw new Error('Melee attacks can only target your own zone');
+      throw new Error(es.errors.meleeOwnZone);
   }
 
   const isRangedWeapon = !isMelee;
@@ -149,7 +150,7 @@ export function handleAttack(state: GameState, intent: ActionRequest): GameState
           dice: [],
           hits: zombiesInZone.length,
           timestamp: Date.now(),
-          description: `Threw Molotov — killed ${zombiesInZone.length} zombie(s), wounded ${survivorsInZone.length} survivor(s)`
+          description: es.log.molotov(zombiesInZone.length, survivorsInZone.length)
       };
 
       return newState;
@@ -183,7 +184,7 @@ export function handleAttack(state: GameState, intent: ActionRequest): GameState
   if (canDual) {
     const hand1 = survivor.inventory.find((c: EquipmentCard) => c.slot === 'HAND_1' && c.type === 'WEAPON');
     const hand2 = survivor.inventory.find((c: EquipmentCard) => c.slot === 'HAND_2' && c.type === 'WEAPON');
-    if (hand1 && hand2 && hand1.name === hand2.name) {
+    if (hand1 && hand2 && hand1.equipmentId === hand2.equipmentId) {
       isDualWielding = true;
     }
   }
@@ -192,7 +193,7 @@ export function handleAttack(state: GameState, intent: ActionRequest): GameState
   // matches the ammo type. Usable from any inventory slot (Hand or Backpack).
   const ammo = stats.ammo;
   const hasAmmoReroll = !!ammo && survivor.inventory.some(
-    (c: EquipmentCard) => c.name === (ammo === 'bullets' ? 'Plenty of Bullets' : 'Plenty of Shells')
+    (c: EquipmentCard) => c.equipmentId === (ammo === 'bullets' ? 'plenty_of_bullets' : 'plenty_of_shells')
   );
 
   // Barbarian: substitute weapon dice with zombie count in zone (melee only)
@@ -258,8 +259,9 @@ export function handleAttack(state: GameState, intent: ActionRequest): GameState
       survivorId: intent.survivorId,
       dice: allRolls,
       hits: totalHits,
+      threshold: effectiveThreshold,
       timestamp: Date.now(),
-      description: `Attacked with ${weapon.name}${isDualWielding ? ' (Dual Wield)' : ''} (Need ${effectiveThreshold}+)`,
+      description: es.log.attack(equipmentName(weapon), isDualWielding, effectiveThreshold),
       rerolledFrom: rerolledFromRolls.length > 0 ? rerolledFromRolls : undefined,
       rerollSource: rerolledFromRolls.length > 0 ? rerollSourceSeen : undefined,
       bonusDice: bonusDice > 0 ? bonusDice : undefined,
@@ -454,9 +456,9 @@ export function handleResolveWounds(state: GameState, intent: ActionRequest): Ga
   const survivor = newState.survivors[intent.survivorId!];
 
   if (!survivor) throw new Error('Survivor not found');
-  if (survivor.playerId !== intent.playerId) throw new Error('You do not control this survivor');
+  if (survivor.playerId !== intent.playerId) throw new Error(es.errors.notYourSurvivor);
   if (!survivor.pendingWounds || survivor.pendingWounds <= 0) {
-    throw new Error('No pending wounds to resolve');
+    throw new Error(es.errors.noPendingWounds);
   }
 
   const discardIds: string[] = intent.payload?.discardCardIds || [];
@@ -497,7 +499,7 @@ export function handleResolveWounds(state: GameState, intent: ActionRequest): Ga
 
 export function handleDistributeZombieWounds(state: GameState, intent: ActionRequest): GameState {
   const hostId = state.lobby.players[0]?.id;
-  if (!hostId || intent.playerId !== hostId) throw new Error('Only the host can distribute zombie wounds');
+  if (!hostId || intent.playerId !== hostId) throw new Error(es.errors.hostOnlyWounds);
 
   const newState = structuredClone(state);
   const zoneId: string = intent.payload?.zoneId;
@@ -506,17 +508,17 @@ export function handleDistributeZombieWounds(state: GameState, intent: ActionReq
   if (!zoneId || !assignments) throw new Error('Missing zoneId or assignments');
 
   const pending = newState.pendingZombieWounds as GameState['pendingZombieWounds'];
-  if (!pending || pending.length === 0) throw new Error('No pending zombie wounds');
+  if (!pending || pending.length === 0) throw new Error(es.errors.noPendingZombieWounds);
 
   const entryIndex = pending.findIndex((p: any) => p.zoneId === zoneId);
-  if (entryIndex < 0) throw new Error(`No pending wounds for zone ${zoneId}`);
+  if (entryIndex < 0) throw new Error(es.errors.noPendingZombieWounds);
 
   const entry = pending[entryIndex];
 
   // Validate: total assigned must equal totalWounds
   const totalAssigned = Object.values(assignments).reduce((sum, n) => sum + n, 0);
   if (totalAssigned !== entry.totalWounds) {
-    throw new Error(`Must assign exactly ${entry.totalWounds} wounds (got ${totalAssigned})`);
+    throw new Error(es.errors.assignExactWounds(entry.totalWounds, totalAssigned));
   }
 
   // Validate: all survivor IDs must be valid and in the zone
@@ -579,15 +581,15 @@ export function handleDistributeZombieWounds(state: GameState, intent: ActionReq
 export function handleRerollLucky(state: GameState, intent: ActionRequest): GameState {
   const survivor = state.survivors[intent.survivorId!];
   if (!survivor) throw new Error('Survivor not found');
-  if (!survivor.skills.includes('lucky')) throw new Error('Survivor does not have Lucky');
-  if (survivor.luckyUsedThisTurn && !survivor.cheatMode) throw new Error('Lucky already used this turn');
+  if (!survivor.skills.includes('lucky')) throw new Error(es.errors.noSkill(skillName('lucky')));
+  if (survivor.luckyUsedThisTurn && !survivor.cheatMode) throw new Error(es.errors.skillUsed(skillName('lucky')));
 
   const last = state.lastAction;
   if (!last || last.type !== ActionType.ATTACK || last.survivorId !== intent.survivorId) {
-    throw new Error('No recent attack to reroll');
+    throw new Error(es.errors.noAttackToReroll);
   }
   const snap = last.rollbackSnapshot;
-  if (!snap) throw new Error('Attack has no rollback snapshot — Lucky cannot apply');
+  if (!snap) throw new Error(es.errors.rerollUnavailable);
 
   // 1. Rebuild pre-attack entity state
   const restored = structuredClone(state) as GameState;

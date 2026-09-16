@@ -6,19 +6,20 @@
  *   notificationManager.show({
  *     type: 'toast',
  *     variant: 'success',
- *     message: 'Room code copied!',
+ *     message: '¡Enlace copiado!',
  *   });
  *
  *   notificationManager.show({
  *     type: 'alert',
  *     variant: 'danger',
- *     title: 'Zombie Spawn',
- *     message: '3 Walkers spawned in Zone A',
+ *     title: 'Aparición',
+ *     message: '3 Caminantes en la zona A',
  *     priority: 'high',
  *   });
  */
 
 import { icon } from './components/icons';
+import { es } from '../../strings/es';
 
 export type NotificationType = 'toast' | 'alert';
 export type NotificationVariant = 'info' | 'success' | 'warning' | 'danger';
@@ -135,7 +136,7 @@ class NotificationManagerImpl {
     const iconHtml = `<span class="toast__icon">${icon(VARIANT_ICONS[variant], 'md')}</span>`;
     const titleHtml = title ? `<strong class="toast__title">${title}</strong>` : '';
     const messageHtml = `<span class="toast__message">${message}</span>`;
-    const dismissHtml = `<button class="toast__dismiss btn btn--icon btn--sm" aria-label="Dismiss">${icon('X', 'sm')}</button>`;
+    const dismissHtml = `<button class="toast__dismiss btn btn--icon btn--sm" aria-label="${es.common.close}">${icon('X', 'sm')}</button>`;
     const progressHtml = duration > 0
       ? `<div class="toast__progress"><div class="toast__progress-bar" style="animation-duration:${duration}ms"></div></div>`
       : '';
@@ -187,7 +188,7 @@ class NotificationManagerImpl {
     const titleHtml = title ? `<strong class="alert-banner__title">${title}</strong>` : '';
     const messageHtml = `<span class="alert-banner__message">${message}</span>`;
     const dismissHtml = priority !== 'critical'
-      ? `<button class="alert-banner__dismiss btn btn--icon btn--sm" aria-label="Dismiss">${icon('X', 'sm')}</button>`
+      ? `<button class="alert-banner__dismiss btn btn--icon btn--sm" aria-label="${es.common.close}">${icon('X', 'sm')}</button>`
       : '';
 
     el.innerHTML = `${iconHtml}<div class="alert-banner__content">${titleHtml}${messageHtml}</div>${dismissHtml}`;

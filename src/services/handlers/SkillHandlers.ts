@@ -4,6 +4,7 @@ import { ActionRequest } from '../../types/Action';
 import { XPManager } from '../XPManager';
 import { visibleZones } from '../LineOfSight';
 import { getConnection, isDoorBlocked } from './handlerUtils';
+import { es, skillName } from '../../strings/es';
 
 export function handleChooseSkill(state: GameState, intent: ActionRequest): GameState {
   const newState = structuredClone(state);
@@ -11,11 +12,11 @@ export function handleChooseSkill(state: GameState, intent: ActionRequest): Game
   const skillId = intent.payload?.skillId;
 
   if (!survivor) throw new Error('Survivor not found');
-  if (survivor.playerId !== intent.playerId) throw new Error('You do not control this survivor');
+  if (survivor.playerId !== intent.playerId) throw new Error(es.errors.notYourSurvivor);
   if (!skillId) throw new Error('Skill ID required');
 
   if (!XPManager.canChooseSkill(survivor, skillId)) {
-    throw new Error(`Cannot choose skill ${skillId}`);
+    throw new Error(es.errors.cannotChooseSkill);
   }
 
   newState.survivors[intent.survivorId!] = XPManager.unlockSkill(survivor, skillId);
@@ -27,15 +28,15 @@ export function handleCharge(state: GameState, intent: ActionRequest): GameState
   const survivor = newState.survivors[intent.survivorId!];
 
   if (!survivor.skills.includes('charge')) {
-    throw new Error('Survivor does not have Charge skill');
+    throw new Error(es.errors.noSkill(skillName('charge')));
   }
   if (survivor.chargeUsedThisTurn && !survivor.cheatMode) {
-    throw new Error('Charge already used this turn');
+    throw new Error(es.errors.skillUsed(skillName('charge')));
   }
 
   const path: string[] = intent.payload?.path;
   if (!path || !Array.isArray(path) || path.length < 1 || path.length > 2) {
-    throw new Error('Charge requires a path of 1-2 zones');
+    throw new Error(es.errors.pathLength(skillName('charge'), 1, 2));
   }
 
   // Validate path
@@ -44,10 +45,10 @@ export function handleCharge(state: GameState, intent: ActionRequest): GameState
     const currentZone = newState.zones[currentZoneId];
     if (!currentZone) throw new Error(`Zone ${currentZoneId} invalid`);
     if (!getConnection(currentZone, nextZoneId)) {
-      throw new Error(`Zones not connected: ${currentZoneId} -> ${nextZoneId}`);
+      throw new Error(es.errors.zonesNotConnected);
     }
     if (isDoorBlocked(currentZone, nextZoneId)) {
-      throw new Error('Door is closed along charge path');
+      throw new Error(es.errors.doorClosedOnPath);
     }
     currentZoneId = nextZoneId;
   }
@@ -57,7 +58,7 @@ export function handleCharge(state: GameState, intent: ActionRequest): GameState
     (z: any) => z.position.zoneId === currentZoneId
   );
   if (destZombies.length === 0) {
-    throw new Error('Charge destination must contain at least 1 zombie');
+    throw new Error(es.errors.needZombieAtDestination(skillName('charge')));
   }
 
   survivor.position.zoneId = currentZoneId;
@@ -72,21 +73,21 @@ export function handleBornLeader(state: GameState, intent: ActionRequest): GameS
   const targetSurvivorId = intent.payload?.targetSurvivorId;
 
   if (!survivor.skills.includes('born_leader')) {
-    throw new Error('Survivor does not have Born Leader skill');
+    throw new Error(es.errors.noSkill(skillName('born_leader')));
   }
   if (survivor.bornLeaderUsedThisTurn && !survivor.cheatMode) {
-    throw new Error('Born Leader already used this turn');
+    throw new Error(es.errors.skillUsed(skillName('born_leader')));
   }
-  if (!targetSurvivorId) throw new Error('Target survivor required');
+  if (!targetSurvivorId) throw new Error(es.errors.chooseSurvivor);
 
   const target = newState.survivors[targetSurvivorId];
   if (!target) throw new Error('Target survivor not found');
-  if (target.wounds >= target.maxHealth) throw new Error('Target survivor is dead');
+  if (target.wounds >= target.maxHealth) throw new Error(es.errors.targetDead);
   if (target.position.zoneId !== survivor.position.zoneId) {
-    throw new Error('Target must be in the same zone');
+    throw new Error(es.errors.sameZone);
   }
   if (target.id === survivor.id) {
-    throw new Error('Cannot give action to yourself');
+    throw new Error(es.errors.giveActionSelf);
   }
 
   target.actionsRemaining += 1;
@@ -100,15 +101,15 @@ export function handleBloodlustMelee(state: GameState, intent: ActionRequest): G
   const survivor = newState.survivors[intent.survivorId!];
 
   if (!survivor.skills.includes('bloodlust_melee')) {
-    throw new Error('Survivor does not have Bloodlust: Melee skill');
+    throw new Error(es.errors.noSkill(skillName('bloodlust_melee')));
   }
   if (survivor.bloodlustUsedThisTurn && !survivor.cheatMode) {
-    throw new Error('Bloodlust: Melee already used this turn');
+    throw new Error(es.errors.skillUsed(skillName('bloodlust_melee')));
   }
 
   const path: string[] = intent.payload?.path;
   if (!path || !Array.isArray(path) || path.length < 1 || path.length > 2) {
-    throw new Error('Bloodlust requires a path of 1-2 zones');
+    throw new Error(es.errors.pathLength(skillName('bloodlust_melee'), 1, 2));
   }
 
   // Validate path
@@ -117,10 +118,10 @@ export function handleBloodlustMelee(state: GameState, intent: ActionRequest): G
     const currentZone = newState.zones[currentZoneId];
     if (!currentZone) throw new Error(`Zone ${currentZoneId} invalid`);
     if (!getConnection(currentZone, nextZoneId)) {
-      throw new Error(`Zones not connected: ${currentZoneId} -> ${nextZoneId}`);
+      throw new Error(es.errors.zonesNotConnected);
     }
     if (isDoorBlocked(currentZone, nextZoneId)) {
-      throw new Error('Door is closed along path');
+      throw new Error(es.errors.doorClosedOnPath);
     }
     currentZoneId = nextZoneId;
   }
@@ -130,7 +131,7 @@ export function handleBloodlustMelee(state: GameState, intent: ActionRequest): G
     (z: any) => z.position.zoneId === currentZoneId
   );
   if (destZombies.length === 0) {
-    throw new Error('Bloodlust destination must contain at least 1 zombie');
+    throw new Error(es.errors.needZombieAtDestination(skillName('bloodlust_melee')));
   }
 
   survivor.position.zoneId = currentZoneId;
@@ -146,10 +147,10 @@ export function handleLifesaver(state: GameState, intent: ActionRequest): GameSt
   const survivor = newState.survivors[intent.survivorId!];
 
   if (!survivor.skills.includes('lifesaver')) {
-    throw new Error('Survivor does not have Lifesaver skill');
+    throw new Error(es.errors.noSkill(skillName('lifesaver')));
   }
   if (survivor.lifesaverUsedThisTurn && !survivor.cheatMode) {
-    throw new Error('Lifesaver already used this turn');
+    throw new Error(es.errors.skillUsed(skillName('lifesaver')));
   }
 
   const targetZoneId = intent.payload?.targetZoneId;
@@ -157,7 +158,7 @@ export function handleLifesaver(state: GameState, intent: ActionRequest): GameSt
 
   // Must be at Range 1 with LOS (a visible zone at Range 1 is always an open connection)
   if (visibleZones(state, survivor.position.zoneId).get(targetZoneId) !== 1) {
-    throw new Error('Target zone must be visible at Range 1');
+    throw new Error(es.errors.lifesaverRange);
   }
 
   // Target zone must have at least 1 zombie AND at least 1 survivor
@@ -165,17 +166,17 @@ export function handleLifesaver(state: GameState, intent: ActionRequest): GameSt
     (z: any) => z.position.zoneId === targetZoneId
   );
   if (zombiesInTarget.length === 0) {
-    throw new Error('Target zone must contain at least 1 zombie');
+    throw new Error(es.errors.lifesaverNeedsZombie);
   }
 
   const survivorIds: string[] = intent.payload?.targetSurvivorIds || [];
-  if (survivorIds.length === 0) throw new Error('Must select at least 1 survivor to rescue');
+  if (survivorIds.length === 0) throw new Error(es.errors.lifesaverChooseSurvivor);
 
   const survivorsInTarget = (Object.values(newState.survivors) as Survivor[]).filter(
     s => s.position.zoneId === targetZoneId && s.id !== survivor.id && s.wounds < s.maxHealth
   );
   if (survivorsInTarget.length === 0) {
-    throw new Error('Target zone must contain at least 1 other survivor');
+    throw new Error(es.errors.lifesaverNeedsSurvivor);
   }
 
   // Move selected survivors to Lifesaver's zone (not a Move Action — no penalties)

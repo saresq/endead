@@ -4,6 +4,7 @@ import { ActionType } from '../../types/Action';
 import { GamePhase, GameResult, GameState, ZombieType } from '../../types/GameState';
 import { makeGridState, makeZombie, withTwoPlayers } from './gridFixture';
 import { makeCard, makeSurvivor } from './winConditionHelpers';
+import { es } from '../../strings/es';
 
 /** p2 is the last player of round 1; s1 (host p1) and s2 (p2) share zone a with walkers. */
 function roundEndBoard(walkers: number, s1Zone = 'a'): GameState {
@@ -59,7 +60,7 @@ describe('Pending wound decisions', () => {
     const paused = endRound1(roundEndBoard(2));
     const res = distribute(paused, 'p2', { s1: 1, s2: 1 });
     expect(res.success).toBe(false);
-    expect(res.error?.message).toContain('host');
+    expect(res.error?.message).toBe(es.errors.hostOnlyWounds);
   });
 
   it('rejects game actions while wounds are pending', () => {

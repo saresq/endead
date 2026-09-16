@@ -1,6 +1,7 @@
 /* ==========================================================================
-   Buttons — Tactical Switches, Stamped Labels, Field Controls
-   Heavy metal aesthetic. Not a web app. A survival instrument panel.
+   Buttons — Pulp Comic controls
+   Cream paper faces, solid ink outlines, hard offset ink shadows.
+   Red for primary/destructive, yellow for selected/active.
    ========================================================================== */
 
 /* ---------- Base — shared foundation ---------- */
@@ -13,36 +14,23 @@
   gap: var(--space-2);
   border-radius: var(--radius-sm);
   font-family: var(--font-display);
-  font-weight: var(--font-bold);
   font-size: var(--text-sm);
   letter-spacing: var(--letter-spacing-wider);
   text-transform: uppercase;
   cursor: pointer;
   transition:
-    background var(--duration-fast) var(--ease-military),
-    border-color var(--duration-fast) var(--ease-military),
-    box-shadow var(--duration-fast) var(--ease-military),
-    transform var(--duration-fast) var(--ease-military),
-    color var(--duration-fast) var(--ease-military);
+    background-color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
   white-space: nowrap;
   user-select: none;
   -webkit-user-select: none;
-  border: var(--border-thin) solid transparent;
+  border: var(--border-width) solid transparent;
   text-decoration: none;
   line-height: 1;
-  /* Buttons intentionally skip grain (followup #08) — would muddy chamfer edges. */
   isolation: isolate;
-}
-
-/* Top-edge highlight — stamped metal bevel */
-.btn::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), inset 0 -1px 0 rgba(0, 0, 0, 0.35);
-  pointer-events: none;
-  z-index: 2;
 }
 
 /* ---------- Sizes ---------- */
@@ -70,173 +58,113 @@
   letter-spacing: var(--letter-spacing-widest);
 }
 
-/* ---------- PRIMARY — Accent, high importance, the call to action ---------- */
+/* ---------- PRIMARY — comic red, the call to action ---------- */
 
 .btn--primary {
-  background:
-    linear-gradient(180deg, var(--amber-500) 0%, var(--amber-400) 60%, color-mix(in srgb, var(--amber-400) 80%, black) 100%);
-  color: var(--text-inverse);
-  border-color: color-mix(in srgb, var(--amber-400) 60%, black);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.15),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.3),
-    0 2px 8px rgba(0, 0, 0, 0.5),
-    0 0 0 1px rgba(0, 0, 0, 0.4);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  background: var(--accent);
+  color: var(--paper);
+  border: var(--border-heavy);
+  box-shadow: var(--shadow);
 }
 
 .btn--primary:hover:not(:disabled):not(.btn--loading) {
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--amber-500) 90%, white 10%) 0%, var(--amber-500) 60%, var(--amber-400) 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.2),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.25),
-    0 4px 14px rgba(0, 0, 0, 0.55),
-    0 0 0 1px rgba(0, 0, 0, 0.4),
-    0 0 18px var(--accent-glow);
-  transform: translateY(-1px);
+  background: var(--accent-text);
+  color: var(--paper);
 }
 
 .btn--primary:active:not(:disabled):not(.btn--loading) {
-  background:
-    linear-gradient(180deg, var(--amber-400) 0%, color-mix(in srgb, var(--amber-400) 80%, black) 100%);
-  box-shadow:
-    inset 0 2px 4px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(0, 0, 0, 0.2),
-    0 1px 4px rgba(0, 0, 0, 0.5);
-  transform: translateY(1px) scale(0.985);
+  transform: translate(var(--press-offset), var(--press-offset));
+  box-shadow: none;
 }
 
-/* ---------- SECONDARY — Recessed panel switch ---------- */
+/* ---------- SECONDARY — plain paper plate ---------- */
 
 .btn--secondary {
-  background:
-    linear-gradient(180deg, var(--bg-3) 0%, var(--bg-2) 50%, color-mix(in srgb, var(--bg-2) 90%, black) 100%);
-  color: var(--bone-100);
-  border-color: var(--olive-700);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.4),
-    0 2px 6px rgba(0, 0, 0, 0.45),
-    0 0 0 1px rgba(0, 0, 0, 0.3);
+  background: var(--paper);
+  color: var(--text);
+  border: var(--border);
+  box-shadow: var(--shadow);
 }
 
 .btn--secondary:hover:not(:disabled):not(.btn--loading) {
-  background:
-    linear-gradient(180deg, var(--olive-700) 0%, var(--bg-3) 50%, var(--bg-2) 100%);
-  border-color: var(--olive-500);
-  color: var(--bone-100);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.07),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
-    0 3px 10px rgba(0, 0, 0, 0.5);
-  transform: translateY(-1px);
+  background: var(--paper-2);
+  border-color: var(--ink);
+  color: var(--text);
 }
 
 .btn--secondary:active:not(:disabled):not(.btn--loading) {
-  background:
-    linear-gradient(180deg, var(--bg-2) 0%, var(--bg-3) 100%);
-  box-shadow:
-    inset 0 2px 5px rgba(0, 0, 0, 0.45),
-    0 1px 3px rgba(0, 0, 0, 0.4);
-  transform: translateY(1px) scale(0.985);
+  transform: translate(var(--press-offset), var(--press-offset));
+  box-shadow: none;
 }
 
-/* ---------- DESTRUCTIVE — High-voltage warning. Don't press this. ---------- */
+/* ---------- DESTRUCTIVE — comic red. Don't press this. ---------- */
 
 .btn--destructive {
-  background:
-    linear-gradient(180deg, var(--danger-bright) 0%, var(--danger) 55%, color-mix(in srgb, var(--danger) 75%, black) 100%);
-  color: #f0d0c8;
-  border-color: color-mix(in srgb, var(--danger) 55%, black);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.12),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.35),
-    0 2px 8px rgba(0, 0, 0, 0.5),
-    0 0 0 1px rgba(0, 0, 0, 0.4);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  background: var(--accent);
+  color: var(--paper);
+  border: var(--border-heavy);
+  box-shadow: var(--shadow);
 }
 
 .btn--destructive:hover:not(:disabled):not(.btn--loading) {
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--danger-bright) 85%, white 15%) 0%, var(--danger-bright) 55%, var(--danger) 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.15),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.3),
-    0 4px 14px rgba(0, 0, 0, 0.55),
-    0 0 20px var(--danger-muted);
-  transform: translateY(-1px);
+  background: var(--accent-text);
+  color: var(--paper);
 }
 
 .btn--destructive:active:not(:disabled):not(.btn--loading) {
-  background:
-    linear-gradient(180deg, var(--danger) 0%, color-mix(in srgb, var(--danger) 75%, black) 100%);
-  box-shadow:
-    inset 0 2px 5px rgba(0, 0, 0, 0.5),
-    0 1px 3px rgba(0, 0, 0, 0.4);
-  transform: translateY(1px) scale(0.985);
+  transform: translate(var(--press-offset), var(--press-offset));
+  box-shadow: none;
 }
 
-/* ---------- GHOST — Minimal. Etched outline. ---------- */
+/* ---------- GHOST — Minimal. No frame until hover. ---------- */
 
 .btn--ghost {
   background: transparent;
-  color: var(--bone-300);
+  color: var(--text);
   border-color: transparent;
   box-shadow: none;
 }
 
-.btn--ghost::after {
+.btn--ghost:hover:not(:disabled):not(.btn--loading) {
+  background: var(--paper-2);
+  color: var(--text);
+  border-color: var(--ink);
   box-shadow: none;
 }
 
-.btn--ghost:hover:not(:disabled):not(.btn--loading) {
-  background: var(--bg-3);
-  color: var(--bone-100);
-  border-color: var(--olive-700);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.04),
-    0 1px 4px rgba(0, 0, 0, 0.3);
-}
-
 .btn--ghost:active:not(:disabled):not(.btn--loading) {
-  background: var(--olive-700);
-  border-color: var(--olive-500);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+  background: var(--paper-3);
+  border-color: var(--ink);
+  transform: translate(var(--press-offset), var(--press-offset));
+  box-shadow: none;
 }
 
-/* ---------- OUTLINE — Etched into the panel ---------- */
+/* ---------- OUTLINE — ink frame, red label ---------- */
 
 .btn--outline {
   background: transparent;
-  color: var(--amber-400);
-  border-color: var(--accent-border);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.04),
-    0 0 0 1px rgba(0, 0, 0, 0.3);
+  color: var(--accent-text);
+  border-color: var(--ink);
+  box-shadow: var(--shadow);
 }
 
 .btn--outline:hover:not(:disabled):not(.btn--loading) {
-  background: var(--accent-muted);
-  border-color: var(--amber-400);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 0 12px var(--accent-glow),
-    0 0 0 1px rgba(0, 0, 0, 0.3);
-  transform: translateY(-1px);
+  background: var(--accent-soft);
+  border-color: var(--ink);
+  color: var(--accent-text);
 }
 
 .btn--outline:active:not(:disabled):not(.btn--loading) {
-  background: color-mix(in srgb, var(--accent-muted) 150%, transparent);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.35);
-  transform: translateY(1px) scale(0.985);
+  background: var(--accent-soft);
+  transform: translate(var(--press-offset), var(--press-offset));
+  box-shadow: none;
 }
 
 /* ---------- ICON — Bare control, no frame ---------- */
 
 .btn--icon {
   background: transparent;
-  color: var(--bone-300);
+  color: var(--text-2);
   padding: 0;
   width: 44px;
   height: 44px;
@@ -246,70 +174,41 @@
   box-shadow: none;
 }
 
-.btn--icon::after {
+.btn--icon:hover:not(:disabled):not(.btn--loading) {
+  background: var(--paper-2);
+  color: var(--text);
+  border-color: var(--ink);
   box-shadow: none;
 }
 
-.btn--icon:hover:not(:disabled):not(.btn--loading) {
-  background: var(--bg-3);
-  color: var(--bone-100);
-  border-color: var(--olive-700);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-}
-
 .btn--icon:active:not(:disabled):not(.btn--loading) {
-  background: var(--olive-700);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
-  transform: scale(0.9);
-}
-
-/* ---------- DANGER-LEVEL REACTIVE — btn--primary responds to dl ---------- */
-
-[data-danger="yellow"] .btn--primary,
-[data-danger="orange"] .btn--primary,
-[data-danger="red"] .btn--primary {
-  animation: var(--dl-accent-pulse);
-}
-
-[data-danger="red"] .btn--primary:hover:not(:disabled) {
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.12),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.3),
-    0 4px 14px rgba(0, 0, 0, 0.55),
-    0 0 24px var(--accent-glow);
+  background: var(--paper-3);
+  border-color: var(--ink);
+  transform: translate(var(--press-offset), var(--press-offset));
+  box-shadow: none;
 }
 
 /* ---------- STATES ---------- */
 
 .btn:disabled,
 .btn--disabled {
-  opacity: 0.55;
   cursor: not-allowed;
   pointer-events: none;
-  filter: grayscale(0.3);
+  background: var(--paper-2);
+  color: var(--text-muted);
+  border: var(--border-width) dashed var(--ink);
+  box-shadow: none;
 }
 
 /* Purpose-built disabled state for the primary CTA: reads as a locked
-   tile rather than a washed-out accent. Flat dark surface, amber-bone
-   label, subtle inset border. */
+   tile rather than a washed-out accent. Flat paper well, muted ink
+   label, dashed ink outline so the state never rests on hue alone. */
 .btn--primary:disabled,
 .btn--primary.btn--disabled {
-  opacity: 1;
-  filter: none;
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--bg-3) 85%, black) 0%,
-      color-mix(in srgb, var(--bg-2) 85%, black) 100%
-    );
-  color: color-mix(in srgb, var(--amber-400) 55%, var(--bone-300));
-  border-color: color-mix(in srgb, var(--amber-400) 25%, black);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.04),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.5),
-    0 1px 3px rgba(0, 0, 0, 0.4),
-    0 0 0 1px rgba(0, 0, 0, 0.45);
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
+  background: var(--paper-3);
+  color: var(--text-muted);
+  border: var(--border-width-heavy) dashed var(--ink);
+  box-shadow: none;
 }
 
 .btn--loading {
@@ -322,11 +221,6 @@
 .btn--loading .btn__kbd,
 .btn--loading .btn__cost {
   visibility: hidden;
-}
-
-.btn--loading::before {
-  /* suppress grain during loading */
-  opacity: 0;
 }
 
 .btn--loading::after {
@@ -346,13 +240,10 @@
 
 .btn--selected,
 .btn[aria-pressed="true"] {
-  background: var(--accent-muted);
-  border-color: var(--accent-border);
-  color: var(--amber-200);
-  box-shadow:
-    inset 0 2px 4px rgba(0, 0, 0, 0.4),
-    inset 0 0 0 1px var(--accent-border),
-    0 0 10px var(--accent-glow);
+  background: var(--highlight);
+  border-color: var(--ink);
+  color: var(--ink);
+  box-shadow: var(--shadow);
 }
 
 /* ---------- Full width ---------- */
@@ -364,11 +255,11 @@
 /* ---------- Focus ---------- */
 
 .btn:focus-visible {
-  outline: 2px solid var(--amber-400);
+  outline: 2px solid var(--highlight);
   outline-offset: 3px;
 }
 
-/* ---------- Button Group — riveted panel controls ---------- */
+/* ---------- Button Group — ganged plates ---------- */
 
 .btn-group {
   display: flex;
@@ -389,20 +280,8 @@
 }
 
 .btn-group .btn + .btn {
-  border-left: var(--border-thin) solid rgba(0, 0, 0, 0.5);
+  border-left: var(--border-width) solid var(--ink);
   margin-left: -1px;
-}
-
-.btn-group .btn + .btn::before {
-  /* rivet separator line */
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 20%;
-  height: 60%;
-  width: 1px;
-  background: rgba(255, 255, 255, 0.05);
-  pointer-events: none;
 }
 
 /* ---------- Sub-elements ---------- */
@@ -419,22 +298,19 @@
   z-index: 3;
 }
 
-/* KBD hint — stamped or etched into the button face */
+/* KBD hint — paper well with ink text */
 .btn__kbd {
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
-  font-weight: var(--font-normal);
-  color: var(--text-muted);
-  background: rgba(0, 0, 0, 0.35);
-  border: var(--border-thin) solid rgba(255, 255, 255, 0.08);
-  border-bottom: var(--border-thin) solid rgba(0, 0, 0, 0.5);
+  color: var(--text);
+  background: var(--paper-3);
+  border: var(--border-width) solid var(--ink);
   border-radius: var(--radius-sm);
   padding: 1px 4px;
   margin-left: var(--space-1);
   letter-spacing: 0;
   text-transform: none;
   line-height: 1.6;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
   position: relative;
   z-index: 3;
 }
@@ -443,9 +319,9 @@
 
 /*
  * .action-btn — the main HUD action panel buttons.
- * These are heavy switches. Metal toggle plates. Stamped labels.
- * Each has: icon area, label (all-caps), kbd hint, cost pill.
- * Layout: column (icon top, label mid, footer row bottom).
+ * Paper plates with an ink outline and a coloured left edge that carries
+ * the state (available / free / selected / end-turn).
+ * Layout: row (icon, label, spacer, kbd, cost).
  */
 
 .action-btn {
@@ -460,131 +336,84 @@
   cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
-  border: var(--border-thin) solid var(--olive-700);
-  background:
-    linear-gradient(
-      170deg,
-      rgba(255, 255, 255, 0.03) 0%,
-      transparent 40%
-    ),
-    var(--bg-2);
+  border: var(--border-width) solid var(--ink);
+  background: var(--paper);
   transition:
-    background var(--duration-fast) var(--ease-military),
-    border-color var(--duration-fast) var(--ease-military),
-    box-shadow var(--duration-fast) var(--ease-military),
-    transform var(--duration-fast) var(--ease-military);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.4),
-    0 2px 6px rgba(0, 0, 0, 0.5),
-    0 0 0 1px rgba(0, 0, 0, 0.3);
+    background-color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+  box-shadow: var(--shadow);
   isolation: isolate;
   /* Left-edge accent indicator */
-  border-left-width: var(--border-thick);
-  border-left-color: var(--olive-500);
+  border-left-width: var(--border-width);
+  border-left-color: var(--ink);
 }
 
-/* Action buttons intentionally skip grain (followup #08) — chamfer edges
-   stay crisp without an overlay. */
-
-/* Corner-clip bevel effect (top-right) */
-.action-btn::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.5);
-  pointer-events: none;
-  z-index: 2;
+.action-btn:hover:not(.action-btn--disabled):not(:disabled) {
+  background: var(--paper-2);
+  border-color: var(--ink);
+  border-left-color: var(--accent);
+  box-shadow: var(--shadow);
 }
 
-.action-btn:hover:not(.action-btn--disabled):not(.action-btn--unavailable) {
-  background:
-    linear-gradient(
-      170deg,
-      rgba(255, 255, 255, 0.05) 0%,
-      transparent 40%
-    ),
-    var(--bg-3);
-  border-color: var(--olive-500);
-  border-left-color: var(--accent-border);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.35),
-    0 4px 12px rgba(0, 0, 0, 0.55),
-    0 0 0 1px rgba(0, 0, 0, 0.3),
-    0 0 14px rgba(0, 0, 0, 0.2);
-  transform: translateY(-1px);
+.action-btn:active:not(.action-btn--disabled):not(:disabled) {
+  background: var(--paper-2);
+  border-left-color: var(--accent);
+  transform: translate(var(--press-offset), var(--press-offset));
+  box-shadow: none;
 }
 
-.action-btn:active:not(.action-btn--disabled):not(.action-btn--unavailable) {
-  background:
-    linear-gradient(180deg, var(--bg-1) 0%, var(--bg-2) 100%);
-  box-shadow:
-    inset 0 2px 5px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(0, 0, 0, 0.3),
-    0 1px 3px rgba(0, 0, 0, 0.5);
-  transform: translateY(1px) scale(0.97);
-  border-left-color: var(--amber-400);
+/* Highlight state — an action is available right here (e.g. an objective in
+   this zone). A yellow left edge only: available is not pressed, so it must
+   stay visually distinct from --selected and carry no aria-pressed. */
+.action-btn--highlight {
+  border-left-width: var(--border-width-heavy);
+  border-left-color: var(--highlight);
 }
 
-/* Available state — glowing accent left edge + active indicator dot */
-.action-btn--available {
-  border-left-color: color-mix(in srgb, var(--amber-400) 60%, transparent);
-  /* Active status indicator — riveted LED */
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.4),
-    0 2px 6px rgba(0, 0, 0, 0.5),
-    0 0 0 1px rgba(0, 0, 0, 0.3),
-    -1px 0 4px var(--accent-glow);
-}
-
-.action-btn--available:hover:not(.action-btn--disabled) {
-  border-left-color: var(--amber-400);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.35),
-    0 4px 12px rgba(0, 0, 0, 0.55),
-    0 0 0 1px rgba(0, 0, 0, 0.3),
-    -2px 0 8px var(--accent-glow);
+.action-btn--highlight:hover:not(.action-btn--disabled):not(:disabled) {
+  border-left-color: var(--highlight);
 }
 
 /* Selected / active action */
 .action-btn--selected,
 .action-btn[aria-pressed="true"] {
-  background:
-    linear-gradient(170deg, var(--accent-muted) 0%, rgba(0, 0, 0, 0.1) 100%),
-    var(--bg-2);
-  border-color: var(--accent-border);
-  border-left-color: var(--amber-400);
-  box-shadow:
-    inset 0 2px 5px rgba(0, 0, 0, 0.4),
-    inset 0 0 0 1px var(--accent-muted),
-    0 0 12px var(--accent-glow),
-    -2px 0 10px var(--accent-glow);
+  background: var(--highlight);
+  border-color: var(--ink);
+  border-left-color: var(--ink);
+  box-shadow: var(--shadow);
 }
 
 /* Free action state — success green left edge */
 .action-btn--free {
-  border-left-color: var(--success-border);
+  border-left-color: var(--success);
 }
 
 .action-btn--free .action-btn__cost {
-  background: var(--success-muted);
-  border-color: var(--success-border);
-  color: var(--success-bright);
+  background: var(--paper-3);
+  border-color: var(--ink);
+  color: var(--text);
 }
 
-/* Disabled / unavailable — powered down */
+/* Disabled — dashed ink outline plus muted ink text, so the state never
+   rests on hue alone and the label keeps 4.5:1 (--text-muted on --paper-2). */
 .action-btn--disabled,
-.action-btn--unavailable {
-  opacity: 0.3;
+.action-btn:disabled {
   cursor: not-allowed;
-  filter: saturate(0.25) brightness(0.7);
+  background: var(--paper-2);
+  border-style: dashed;
+  border-color: var(--ink);
+  border-left-color: var(--ink);
+  box-shadow: none;
   pointer-events: none;
+}
+
+.action-btn--disabled .action-btn__label,
+.action-btn:disabled .action-btn__label,
+.action-btn--disabled .action-btn__icon,
+.action-btn:disabled .action-btn__icon {
+  color: var(--text-muted);
 }
 
 /* Icon area */
@@ -595,42 +424,41 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: var(--bone-300);
-  transition: color var(--duration-fast) var(--ease-military);
+  color: var(--text-2);
+  transition: color var(--duration-fast) var(--ease-out);
 }
 
-.action-btn:hover:not(.action-btn--disabled):not(.action-btn--unavailable) .action-btn__icon {
-  color: var(--bone-100);
+.action-btn:hover:not(.action-btn--disabled):not(:disabled) .action-btn__icon {
+  color: var(--text);
 }
 
-.action-btn--available .action-btn__icon,
+.action-btn--highlight .action-btn__icon,
 .action-btn--selected .action-btn__icon {
-  color: var(--amber-400);
+  color: var(--ink);
 }
 
-/* Label — stencilled military stamp */
+/* Label — display stamp */
 .action-btn__label {
   position: relative;
   z-index: 3;
   font-family: var(--font-display);
-  font-weight: var(--font-bold);
   font-size: var(--text-2xs);
   letter-spacing: var(--letter-spacing-widest);
   text-transform: uppercase;
-  color: var(--bone-300);
+  color: var(--text-2);
   text-align: left;
   line-height: 1.1;
   white-space: nowrap;
-  transition: color var(--duration-fast) var(--ease-military);
+  transition: color var(--duration-fast) var(--ease-out);
 }
 
-.action-btn:hover:not(.action-btn--disabled):not(.action-btn--unavailable) .action-btn__label {
-  color: var(--bone-100);
+.action-btn:hover:not(.action-btn--disabled):not(:disabled) .action-btn__label {
+  color: var(--text);
 }
 
-.action-btn--available .action-btn__label,
+.action-btn--highlight .action-btn__label,
 .action-btn--selected .action-btn__label {
-  color: var(--bone-100);
+  color: var(--ink);
 }
 
 /* Spacer pushes cost/kbd to the right */
@@ -638,107 +466,91 @@
   flex: 1;
 }
 
-/* KBD hint on action button — looks etched into metal */
+/* KBD hint on action button — paper well with ink text */
 .action-btn__kbd {
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
-  font-weight: var(--font-normal);
-  color: var(--text-muted);
-  background: rgba(0, 0, 0, 0.4);
-  border: var(--border-thin) solid rgba(255, 255, 255, 0.07);
-  border-bottom-color: rgba(0, 0, 0, 0.6);
+  color: var(--text);
+  background: var(--paper-3);
+  border: var(--border-width) solid var(--ink);
   border-radius: var(--radius-sm);
   padding: 0 3px;
   line-height: 1.65;
   letter-spacing: 0;
   text-transform: none;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
-/* Cost pill — AP / FREE readout. This is a critical information element. */
+.action-btn--selected .action-btn__kbd,
+.action-btn[aria-pressed="true"] .action-btn__kbd {
+  background: var(--highlight);
+  color: var(--ink);
+}
+
+/* Cost pip — AP / FREE readout. This is a critical information element. */
 .action-btn__cost {
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
-  font-weight: var(--font-medium);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   padding: 1px 4px;
   border-radius: var(--radius-sm);
-  border: var(--border-thin) solid var(--olive-500);
-  background: rgba(0, 0, 0, 0.45);
-  color: var(--text-muted);
+  border: var(--border-width) solid var(--ink);
+  background: var(--paper-3);
+  color: var(--text);
   line-height: 1.6;
   white-space: nowrap;
 }
 
-/* FREE indicator — green, glowing, it's a gift */
+/* FREE indicator — it's a gift */
 .action-btn__cost--free {
-  background: var(--success-muted);
-  border-color: var(--success-border);
-  color: var(--success-bright);
-  box-shadow: 0 0 6px rgba(72, 128, 58, 0.2);
-  font-weight: var(--font-semibold);
+  background: var(--highlight);
+  border-color: var(--ink);
+  color: var(--ink);
   letter-spacing: var(--letter-spacing-wider);
 }
 
-/* AP cost — amber readout, tactical */
+/* AP cost — active readout */
 .action-btn__cost--ap {
-  background: var(--accent-muted);
-  border-color: var(--accent-border);
-  color: var(--amber-200);
+  background: var(--highlight);
+  border-color: var(--ink);
+  color: var(--ink);
 }
 
 /* Zero AP remaining — you can't afford this */
 .action-btn__cost--expensive {
-  background: var(--danger-muted);
-  border-color: var(--danger-border);
-  color: var(--text-danger-red);
+  background: var(--accent);
+  border-color: var(--ink);
+  color: var(--paper);
 }
 
 /* ---------- END TURN — Special large CTA button ---------- */
 
 .action-btn--end-turn {
-  background:
-    linear-gradient(
-      170deg,
-      rgba(184, 112, 48, 0.06) 0%,
-      transparent 50%
-    ),
-    var(--bg-2);
-  border-color: var(--accent-border);
-  border-left-color: var(--amber-400);
+  background: var(--paper);
+  border-color: var(--ink);
+  border-left-color: var(--accent);
   min-width: 80px;
 }
 
 .action-btn--end-turn .action-btn__icon {
-  color: var(--amber-400);
+  color: var(--accent-text);
 }
 
 .action-btn--end-turn .action-btn__label {
-  color: var(--amber-400);
+  color: var(--accent-text);
 }
 
 .action-btn--end-turn:hover:not(.action-btn--disabled) {
-  background:
-    linear-gradient(
-      170deg,
-      var(--accent-muted) 0%,
-      rgba(0, 0, 0, 0.1) 100%
-    ),
-    var(--bg-2);
-  border-color: var(--amber-400);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.3),
-    0 4px 14px rgba(0, 0, 0, 0.55),
-    0 0 20px var(--accent-glow),
-    -3px 0 12px var(--accent-glow);
+  background: var(--accent-soft);
+  border-color: var(--ink);
+  border-left-color: var(--accent);
+  box-shadow: var(--shadow);
 }
 
 /* ---------- SKILL ACTION BUTTONS — distinct from standard actions ---------- */
 
 .action-btn--skill {
-  border-left-color: var(--success-border);
+  border-left-color: var(--success);
   min-width: 62px;
 }
 
@@ -752,22 +564,20 @@
 
 .action-btn--skill:hover:not(.action-btn--disabled) .action-btn__icon,
 .action-btn--skill:hover:not(.action-btn--disabled) .action-btn__label {
-  color: var(--success-bright);
+  color: var(--success);
 }
 
 .action-btn--skill:hover:not(.action-btn--disabled) {
-  border-left-color: var(--success-border);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.07),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.35),
-    0 4px 12px rgba(0, 0, 0, 0.5),
-    -2px 0 8px rgba(72, 128, 58, 0.25);
+  background: var(--success-soft);
+  border-left-color: var(--success);
+  box-shadow: var(--shadow);
 }
 
 /* Used skill — exhausted, spent */
 .action-btn--skill-used {
-  opacity: 0.42;
-  filter: saturate(0.2);
+  opacity: 0.55;
+  border-style: dashed;
+  border-color: var(--ink);
   cursor: default;
 }
 
@@ -799,40 +609,32 @@
   height: 40px;
   min-width: 40px;
   padding: 0;
-  background: var(--hud-panel-bg);
-  border: var(--border-thin) solid var(--hud-border);
+  background: var(--paper);
+  border: var(--border-width) solid var(--ink);
   border-radius: var(--radius-sm);
-  color: var(--hud-phosphor-dim);
+  color: var(--text);
   cursor: pointer;
   transition:
-    background var(--duration-fast) var(--ease-military),
-    border-color var(--duration-fast) var(--ease-military),
-    color var(--duration-fast) var(--ease-military),
-    box-shadow var(--duration-fast) var(--ease-military);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.04),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.4);
+    background-color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+  box-shadow: var(--shadow);
 }
 
 .btn--hud-control:hover {
-  background: var(--bg-3);
-  border-color: var(--dl-hud-border);
-  color: var(--hud-phosphor);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
-    0 0 8px var(--dl-glow);
+  background: var(--paper-2);
+  border-color: var(--ink);
+  color: var(--text);
 }
 
 .btn--hud-control:active {
-  background: var(--bg-1);
-  box-shadow:
-    inset 0 2px 4px rgba(0, 0, 0, 0.45),
-    0 0 4px var(--dl-glow);
-  transform: scale(0.93);
+  background: var(--paper-2);
+  transform: translate(var(--press-offset), var(--press-offset));
+  box-shadow: none;
 }
 
-/* ---------- WOUND ALERT BUTTON — pulsing critical warning ---------- */
+/* ---------- WOUND ALERT BUTTON — critical warning ---------- */
 
 .btn--wound-alert {
   position: relative;
@@ -841,81 +643,57 @@
   gap: var(--space-2);
   padding: var(--space-1) var(--space-3);
   height: 36px;
-  background: var(--danger-muted);
-  border: var(--border-thick) solid var(--danger-border);
+  background: var(--accent-soft);
+  border: var(--border-width-heavy) solid var(--accent);
   border-radius: var(--radius-sm);
-  color: var(--text-danger-red);
+  color: var(--accent-text);
   font-family: var(--font-display);
-  font-weight: var(--font-bold);
   font-size: var(--text-xs);
   letter-spacing: var(--letter-spacing-wider);
   text-transform: uppercase;
   cursor: pointer;
-  animation: wound-alert-pulse 1.4s ease-in-out infinite;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 0 16px var(--danger-muted),
-    0 2px 6px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow);
 }
 
 .btn--wound-alert:hover {
-  background: color-mix(in srgb, var(--danger-muted) 180%, transparent);
-  border-color: var(--danger-bright);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 0 24px var(--danger-muted),
-    0 2px 8px rgba(0, 0, 0, 0.55);
+  background: var(--accent);
+  border-color: var(--ink);
+  color: var(--paper);
 }
 
-@keyframes wound-alert-pulse {
-  0%, 100% { box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 0 10px var(--danger-muted), 0 2px 6px rgba(0,0,0,0.5); }
-  50%       { box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 0 22px rgba(168, 48, 40, 0.4), 0 2px 6px rgba(0,0,0,0.5); }
+.btn--wound-alert:active {
+  transform: translate(var(--press-offset), var(--press-offset));
+  box-shadow: none;
 }
 
 /* ---------- READY BUTTON (lobby) — confirm / locked in ---------- */
 
 .btn--ready {
-  background:
-    linear-gradient(180deg, var(--success-bright) 0%, var(--success) 60%, color-mix(in srgb, var(--success) 70%, black) 100%);
-  color: rgba(0, 0, 0, 0.85);
-  border-color: color-mix(in srgb, var(--success) 50%, black);
+  background: var(--success);
+  color: var(--paper);
+  border: var(--border-heavy);
   font-family: var(--font-display);
-  font-weight: var(--font-bold);
   letter-spacing: var(--letter-spacing-wider);
   text-transform: uppercase;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.2),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.3),
-    0 2px 8px rgba(0, 0, 0, 0.5),
-    0 0 16px var(--success-muted);
+  box-shadow: var(--shadow);
 }
 
 .btn--ready:hover:not(:disabled) {
-  filter: brightness(1.1);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.25),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.25),
-    0 4px 14px rgba(0, 0, 0, 0.55),
-    0 0 24px rgba(72, 128, 58, 0.35);
-  transform: translateY(-1px);
+  background: var(--success);
+  border-color: var(--ink);
+  color: var(--paper);
 }
 
 .btn--ready:active:not(:disabled) {
-  filter: brightness(0.92);
-  box-shadow:
-    inset 0 2px 5px rgba(0, 0, 0, 0.35),
-    0 0 12px rgba(72, 128, 58, 0.25);
-  transform: translateY(1px) scale(0.985);
+  transform: translate(var(--press-offset), var(--press-offset));
+  box-shadow: none;
 }
 
 .btn--ready--confirmed {
-  background:
-    linear-gradient(180deg, rgba(72, 128, 58, 0.35) 0%, rgba(72, 128, 58, 0.2) 100%);
-  border-color: var(--success-border);
-  color: var(--success-bright);
-  box-shadow:
-    inset 0 2px 4px rgba(0, 0, 0, 0.35),
-    0 0 12px var(--success-muted);
+  background: var(--success-soft);
+  border: var(--border-heavy);
+  color: var(--success);
+  box-shadow: none;
   cursor: default;
 }
 
@@ -927,8 +705,8 @@
 }
 
 /* ==========================================================================
-   Field Manual Button System — `.fm-btn`
-   Chamfered corners, stencil typography, amber/rust gradient surfaces.
+   Pulp Button System — `.fm-btn`
+   Paper plates, display typography, solid ink outlines, hard ink shadow.
    Emitted by renderButton() alongside legacy `.btn` classes.
    ========================================================================== */
 
@@ -944,11 +722,11 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   border: 0;
+  border-radius: var(--radius);
   cursor: pointer;
   transition:
-    filter 120ms ease,
     transform 120ms ease,
-    background 120ms ease,
+    background-color 120ms ease,
     border-color 120ms ease,
     color 120ms ease,
     box-shadow 120ms ease;
@@ -960,104 +738,84 @@
 }
 
 .fm-btn:focus-visible {
-  outline: 2px solid var(--amber-400);
+  outline: 2px solid var(--highlight);
   outline-offset: 2px;
 }
 
-/* ---------- Primary — amber gradient, chamfered ---------- */
+/* ---------- Primary — comic red ---------- */
 
 .fm-btn--primary {
-  background: linear-gradient(180deg, var(--amber-400), var(--amber-500));
-  color: #1a1a0a;
-  clip-path: polygon(
-    10px 0,
-    100% 0,
-    100% calc(100% - 10px),
-    calc(100% - 10px) 100%,
-    0 100%,
-    0 10px
-  );
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.2),
-    0 2px 6px rgba(0, 0, 0, 0.5);
+  background: var(--accent);
+  color: var(--paper);
+  border: var(--border-heavy);
+  box-shadow: var(--shadow);
 }
 
 .fm-btn--primary:hover:not(:disabled) {
-  filter: brightness(1.08);
+  background: var(--accent-text);
+  color: var(--paper);
 }
 
 .fm-btn--primary:active:not(:disabled) {
-  transform: translateY(1px);
-  box-shadow:
-    inset 0 2px 4px rgba(0, 0, 0, 0.35),
-    0 1px 2px rgba(0, 0, 0, 0.4);
+  transform: translate(var(--press-offset), var(--press-offset));
+  box-shadow: none;
 }
 
-/* ---------- Secondary — olive outline, bone text, chamfered ---------- */
+/* ---------- Secondary — paper plate, ink outline ---------- */
 
 .fm-btn--secondary {
-  background: transparent;
-  color: var(--bone-100);
-  border: 1px solid var(--olive-500);
-  clip-path: polygon(
-    10px 0,
-    100% 0,
-    100% calc(100% - 10px),
-    calc(100% - 10px) 100%,
-    0 100%,
-    0 10px
-  );
+  background: var(--paper);
+  color: var(--text);
+  border: var(--border);
+  box-shadow: var(--shadow);
 }
 
 .fm-btn--secondary:hover:not(:disabled) {
-  border-color: var(--olive-300);
-  background: rgba(138, 149, 96, 0.06);
+  border-color: var(--ink);
+  background: var(--paper-2);
 }
 
 .fm-btn--secondary:active:not(:disabled) {
-  transform: translateY(1px);
+  transform: translate(var(--press-offset), var(--press-offset));
+  box-shadow: none;
 }
 
-/* ---------- Destructive — rust gradient ---------- */
+/* ---------- Destructive — comic red ---------- */
 
 .fm-btn--destructive {
-  background: linear-gradient(180deg, var(--rust-400), var(--rust-500));
-  color: var(--bone-100);
-  clip-path: polygon(
-    10px 0,
-    100% 0,
-    100% calc(100% - 10px),
-    calc(100% - 10px) 100%,
-    0 100%,
-    0 10px
-  );
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.15),
-    0 2px 6px rgba(0, 0, 0, 0.5);
+  background: var(--accent);
+  color: var(--paper);
+  border: var(--border-heavy);
+  box-shadow: var(--shadow);
 }
 
 .fm-btn--destructive:hover:not(:disabled) {
-  filter: brightness(1.08);
+  background: var(--accent-text);
+  color: var(--paper);
 }
 
 .fm-btn--destructive:active:not(:disabled) {
-  transform: translateY(1px);
-  box-shadow:
-    inset 0 2px 4px rgba(0, 0, 0, 0.35),
-    0 1px 2px rgba(0, 0, 0, 0.4);
+  transform: translate(var(--press-offset), var(--press-offset));
+  box-shadow: none;
 }
 
-/* ---------- Ghost — minimal, no chamfer ---------- */
+/* ---------- Ghost — minimal, no frame ---------- */
 
 .fm-btn--ghost {
   background: transparent;
-  color: var(--bone-300);
+  color: var(--text);
   border: 0;
-  clip-path: none;
+  box-shadow: none;
 }
 
 .fm-btn--ghost:hover:not(:disabled) {
-  color: var(--bone-100);
+  background: var(--paper-2);
+  color: var(--text);
+}
+
+.fm-btn--ghost:active:not(:disabled) {
+  transform: translate(var(--press-offset), var(--press-offset));
+  box-shadow: none;
 }
 
 /* ---------- Icon — square, compact (unchanged behaviour) ---------- */
@@ -1066,14 +824,21 @@
   min-height: 40px;
   min-width: 40px;
   padding: 8px;
-  background: transparent;
-  color: var(--bone-300);
-  border: 1px solid var(--olive-500);
+  background: var(--paper);
+  color: var(--text);
+  border: var(--border);
+  box-shadow: var(--shadow);
 }
 
 .fm-btn--icon:hover:not(:disabled) {
-  color: var(--bone-100);
-  border-color: var(--olive-300);
+  background: var(--paper-2);
+  color: var(--text);
+  border-color: var(--ink);
+}
+
+.fm-btn--icon:active:not(:disabled) {
+  transform: translate(var(--press-offset), var(--press-offset));
+  box-shadow: none;
 }
 
 /* ---------- Size & layout modifiers ---------- */
@@ -1084,6 +849,14 @@
   padding: 8px 12px;
 }
 
+/* Trade and pickup confirms are the smallest buttons in the game; on a touch
+   screen they still owe the 44px minimum. */
+@media (pointer: coarse) {
+  .fm-btn--small {
+    min-height: 44px;
+  }
+}
+
 .fm-btn--full {
   width: 100%;
   min-height: 48px;
@@ -1091,9 +864,14 @@
 
 /* ---------- Disabled ---------- */
 
+/* Same treatment as .btn:disabled — the dashed ink outline carries the state;
+   opacity dragged --text-muted on --paper-2 from 5.68:1 to about 2.8:1. */
 .fm-btn:disabled {
-  opacity: 0.45;
   cursor: not-allowed;
+  background: var(--paper-2);
+  color: var(--text-muted);
+  border: var(--border-width) dashed var(--ink);
+  box-shadow: none;
 }
 
 .fm-btn__icon {
@@ -1127,25 +905,23 @@
   .fm-btn--shake { animation: none; }
 }
 
-/* ---------- fm-btn--reconnect — outline rust button for the
+/* ---------- fm-btn--reconnect — outline red button for the
    connection-lost scrim. Promoted from
    design/states/connection-lost.html. ---------- */
 .fm-btn--reconnect {
-  background: transparent;
-  color: var(--rust-300);
-  border: 1px solid var(--rust-500);
-  clip-path: polygon(
-    10px 0,
-    100% 0,
-    100% calc(100% - 10px),
-    calc(100% - 10px) 100%,
-    0 100%,
-    0 10px
-  );
+  background: var(--paper);
+  color: var(--accent-text);
+  border: var(--border);
+  box-shadow: var(--shadow);
 }
 
 .fm-btn--reconnect:hover:not(:disabled) {
-  border-color: var(--rust-400);
-  color: var(--rust-300);
-  background: rgba(196, 90, 44, 0.1);
+  border-color: var(--ink);
+  color: var(--accent-text);
+  background: var(--accent-soft);
+}
+
+.fm-btn--reconnect:active:not(:disabled) {
+  transform: translate(var(--press-offset), var(--press-offset));
+  box-shadow: none;
 }

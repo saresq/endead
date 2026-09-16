@@ -4,7 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "trap 'kill 0' INT TERM EXIT; tsx src/server/server.ts & vite",
+    "front": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "server": "tsx src/server/server.ts",

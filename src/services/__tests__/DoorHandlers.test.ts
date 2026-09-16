@@ -6,6 +6,7 @@ import { ActionRequest, ActionType } from '../../types/Action';
 import { seedFromString } from '../Rng';
 import { makeGridState, makeZombie, edgeKey } from './gridFixture';
 import { makeSurvivor } from './winConditionHelpers';
+import { es } from '../../strings/es';
 
 function makeZone(overrides: Partial<Zone> & { id: string }): Zone {
   return {
@@ -110,7 +111,7 @@ describe('handleOpenDoor — building spawn (Rule 302)', () => {
     const next = openDoor(state, 'roomA');
     expect(next.zones.roomA.hasBeenSpawned).toBe(true);
     expect(next.zones.roomB.hasBeenSpawned).toBe(true);
-    expect(next.lastAction?.description).toContain('zombies spawned');
+    expect(next.lastAction?.description).toBe(es.log.doorOpened(true));
   });
 
   it('spawns only in dark zones of a mixed lit/dark closed building (Rule 294)', () => {
@@ -184,7 +185,7 @@ describe('handleOpenDoor — building spawn (Rule 302)', () => {
     state.survivors.s1.actionsRemaining = 3;
 
     const next = openDoor(state, 'roomB');
-    expect(next.lastAction?.description).not.toContain('zombies spawned');
+    expect(next.lastAction?.description).toBe(es.log.doorOpened(false));
   });
 });
 
@@ -269,6 +270,6 @@ describe('handleOpenDoor — standard spawn rules (C6)', () => {
       playerId: 'p1', survivorId: 's1', type: ActionType.MOVE, payload: { targetZoneId: 'w' },
     });
     expect(blocked.success).toBe(false);
-    expect(blocked.error?.message).toContain('Resolve pending wounds');
+    expect(blocked.error?.message).toBe(es.errors.pendingWounds);
   });
 });

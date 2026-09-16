@@ -1,7 +1,8 @@
 /* ==========================================================================
    ItemCard — Universal item rendering (slots, backpack, weapons, trade)
-   Military field-kit aesthetic: worn metal casing, stencilled data,
-   tactical readout formatting. Each card reads like a gear manifest entry.
+   Pulp comic: cream paper card, solid ink outline, hard offset ink shadow.
+   Item type reads from an ink-outlined colour strip and the icon tint —
+   never from a fully retinted card.
    ========================================================================== */
 
 .item-card {
@@ -9,26 +10,23 @@
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
-  background: var(--dl-surface-2);
-  border: var(--border-thin) solid var(--dl-border);
-  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--text);
+  border: var(--border);
+  border-radius: var(--radius);
   position: relative;
   min-width: 0;
   user-select: none;
   overflow: visible;
+  box-shadow: var(--card-shadow);
   transition:
-    background var(--duration-fast) var(--ease-military),
-    border-color var(--duration-fast) var(--ease-military),
+    background-color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
     box-shadow var(--duration-normal) var(--ease-out);
-
-  /* Worn-metal inset sheen */
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.04),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.45),
-    0 2px 6px rgba(0, 0, 0, 0.5);
 }
 
-/* Danger-tinted left edge stripe */
+/* Type strip on the left edge — sits inside the ink outline */
 .item-card::after {
   content: '';
   position: absolute;
@@ -36,10 +34,10 @@
   top: 0;
   bottom: 0;
   width: 2px;
-  background: var(--dl-card-edge, transparent);
+  background: transparent;
   border-radius: var(--radius-none);
   pointer-events: none;
-  transition: background var(--duration-slow) var(--ease-out);
+  transition: background-color var(--duration-normal) var(--ease-out);
 }
 
 /* ---------- Tappable ---------- */
@@ -49,21 +47,35 @@
 }
 
 .item-card--tappable:hover {
-  background: var(--dl-surface-2);
-  border-color: var(--dl-panel-border);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.5),
-    0 2px 10px rgba(0, 0, 0, 0.6),
-    0 0 0 1px var(--dl-card-edge);
+  background: var(--paper-2);
+  border-color: var(--ink);
+  box-shadow: var(--card-shadow-hover);
 }
 
 .item-card--tappable:active {
-  transform: scale(0.97) translateY(1px);
-  transition: transform var(--duration-instant) var(--ease-military);
-  box-shadow:
-    inset 0 2px 4px rgba(0, 0, 0, 0.55),
-    0 1px 3px rgba(0, 0, 0, 0.4);
+  transform: translate(var(--press-offset), var(--press-offset));
+  transition: transform var(--duration-instant) var(--ease-out);
+  box-shadow: none;
+}
+
+/* ---------- Equipped / selected ---------- */
+
+.item-card--selected,
+.item-card[aria-selected='true'] {
+  background: var(--highlight-soft);
+  color: var(--ink);
+  outline: var(--border-width-heavy) solid var(--highlight);
+  outline-offset: 2px;
+}
+
+.item-card--selected .item-card__name,
+.item-card[aria-selected='true'] .item-card__name {
+  color: var(--ink);
+}
+
+.item-card--selected::after,
+.item-card[aria-selected='true']::after {
+  background: var(--highlight);
 }
 
 /* ---------- Icon ---------- */
@@ -74,32 +86,17 @@
   justify-content: center;
   width: 32px;
   height: 32px;
-  background: var(--dl-surface-1, var(--bg-1));
+  background: var(--paper-2);
   border-radius: var(--radius-sm);
-  border: var(--border-thin) solid var(--dl-border);
+  border: var(--border);
   color: var(--text-muted);
   flex-shrink: 0;
   position: relative;
   overflow: hidden;
-
-  /* Inset recess */
-  box-shadow: var(--shadow-cutout);
   transition:
-    background var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out),
     color var(--duration-fast) var(--ease-out),
     border-color var(--duration-fast) var(--ease-out);
-}
-
-/* Subtle inner gloss line */
-.item-card__icon::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: rgba(255, 255, 255, 0.06);
-  pointer-events: none;
 }
 
 /* ---------- Body ---------- */
@@ -115,8 +112,7 @@
 .item-card__name {
   font-family: var(--font-display);
   font-size: var(--text-sm);
-  font-weight: var(--font-bold);
-  color: var(--bone-100);
+  color: var(--text);
   letter-spacing: var(--letter-spacing-wide);
   text-transform: uppercase;
   white-space: nowrap;
@@ -128,13 +124,12 @@
 .item-card__stats {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
-  color: var(--dl-text-readout, var(--text-hud));
+  color: var(--text-2);
   letter-spacing: var(--letter-spacing-normal);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   line-height: 1.3;
-  opacity: 0.9;
 }
 
 /* Secondary line: type · slot */
@@ -148,7 +143,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   line-height: 1.3;
-  opacity: 0.75;
 }
 
 /* ---------- Badge (floating corner) ---------- */
@@ -156,23 +150,20 @@
 .item-card__badge {
   position: absolute;
   top: -5px;
-  right: 10px;       /* offset from corner clip */
+  right: 10px;
   font-family: var(--font-display);
   font-size: var(--text-2xs);
-  font-weight: var(--font-black);
-  color: var(--text-inverse);
+  color: var(--ink);
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-wider);
-  background: var(--amber-400);
+  background: var(--highlight);
+  border: var(--border-width) solid var(--ink);
   padding: 1px 6px 2px;
-  border-radius: var(--radius-none);
+  border-radius: var(--radius-sm);
   z-index: 3;
   pointer-events: none;
   line-height: 1.5;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
-
-  /* Stencil-cut bottom edge */
-  clip-path: polygon(0 0, 100% 0, 100% 70%, 92% 100%, 0 100%);
+  box-shadow: none;
 }
 
 /* ---------- Empty placeholder ---------- */
@@ -187,7 +178,6 @@
   text-align: center;
   width: 100%;
   padding: var(--space-2) 0;
-  opacity: 0.5;
 }
 
 /* Dashed slot outline for empty state */
@@ -202,7 +192,7 @@
 
 .item-card--slots-counter {
   border-style: dashed;
-  border-color: var(--dl-panel-border, var(--dl-border));
+  border-color: var(--ink);
   background: transparent;
   box-shadow: none;
   opacity: 0.7;
@@ -217,12 +207,12 @@
   font-weight: var(--font-bold);
   color: var(--text-muted);
   letter-spacing: var(--letter-spacing-wider);
+  white-space: normal;
 }
 
 .item-card__icon--plus {
   font-family: var(--font-display);
   font-size: var(--text-lg);
-  font-weight: var(--font-black);
   color: var(--text-muted);
   line-height: 1;
   background: transparent;
@@ -237,147 +227,139 @@
 /* ---------- Variant: ghost (incoming item) ---------- */
 
 .item-card--ghost {
-  background: var(--success-muted);
-  border: var(--border-thin) dashed var(--success);
-  box-shadow:
-    inset 0 1px 0 rgba(72, 128, 58, 0.08),
-    0 0 12px var(--success-muted);
+  background: var(--success-soft);
+  border: var(--border-width) dashed var(--success);
+  box-shadow: none;
 }
 
 .item-card--ghost::after {
-  background: var(--success-border);
+  background: var(--success);
 }
 
 .item-card--ghost .item-card__icon {
-  background: rgba(72, 128, 58, 0.25);
-  border-color: var(--success-border);
-  color: var(--success-bright);
+  background: var(--paper);
+  border-color: var(--success);
+  color: var(--success);
 }
 
 .item-card--ghost .item-card__badge {
   background: var(--success);
+  color: var(--paper);
 }
 
 /* ---------- Variant: featured (prominent new item) ---------- */
 
 .item-card--featured {
-  background: var(--accent-muted);
-  border: var(--border-thick) solid var(--accent-border);
+  background: var(--highlight-soft);
+  color: var(--ink);
+  border: var(--border-heavy);
   padding: var(--space-3) var(--space-3);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.4),
-    0 0 20px var(--accent-glow),
-    0 4px 16px rgba(0, 0, 0, 0.7);
+  box-shadow: var(--shadow);
 }
 
 .item-card--featured::after {
-  background: var(--amber-400);
+  background: var(--highlight);
   width: 3px;
 }
 
 .item-card--featured .item-card__icon {
   width: 40px;
   height: 40px;
-  background: var(--accent-muted);
-  border-color: var(--accent-border);
-  color: var(--amber-200);
+  background: var(--highlight);
+  border-color: var(--ink);
+  color: var(--ink);
   border-radius: var(--radius-md);
-  box-shadow:
-    var(--shadow-cutout),
-    0 0 10px var(--accent-glow);
+  box-shadow: none;
 }
 
 .item-card--featured .item-card__name {
   font-size: var(--text-base);
-  color: var(--bone-100);
+  color: var(--ink);
 }
 
 .item-card--featured .item-card__stats {
-  color: var(--amber-200);
-  font-weight: var(--font-medium);
+  color: var(--text-2);
 }
 
 /* ---------- Placed (dragged into a slot — ghosted original) ---------- */
 
 .item-card--placed {
   border-style: dashed;
-  border-color: var(--olive-700);
+  border-color: var(--ink);
   opacity: 0.35;
-  filter: grayscale(0.7) brightness(0.7);
+  filter: grayscale(0.7);
   pointer-events: none;
+  box-shadow: none;
 }
 
 .item-card--placed::after {
   display: none;
 }
 
-/* ---------- Discarded (red tint — item destroyed / used up) ---------- */
+/* ---------- Discarded (item destroyed / used up) ---------- */
 
 .item-card--discarded {
-  background: var(--danger-muted);
-  border-color: rgba(168, 64, 48, 0.28);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.02),
-    0 0 12px rgba(168, 48, 40, 0.15);
+  background: var(--accent-soft);
+  border-color: var(--ink);
+  box-shadow: none;
 }
 
 .item-card--discarded::after {
-  background: var(--danger-border);
+  background: var(--accent);
 }
 
 .item-card--discarded .item-card__icon {
-  background: rgba(168, 64, 48, 0.18);
-  border-color: rgba(168, 64, 48, 0.3);
-  color: var(--danger);
+  background: var(--paper);
+  border-color: var(--accent);
+  color: var(--accent-text);
 }
 
 .item-card--discarded .item-card__name {
-  color: var(--bone-300);
+  color: var(--text-2);
   text-decoration: line-through;
-  text-decoration-color: rgba(168, 64, 48, 0.5);
+  text-decoration-color: var(--accent);
 }
 
 /* ---------- Variant: weapon (HUD weapon slot) ---------- */
 
 .item-card--weapon {
   cursor: pointer;
-  border-color: transparent;
-  background: var(--dl-surface-2);
+}
+
+.item-card--weapon::after {
+  background: var(--accent);
 }
 
 .item-card--weapon .item-card__icon {
-  color: var(--danger);
-  border-color: var(--danger-border);
-  background: var(--danger-muted);
+  color: var(--accent-text);
+  border-color: var(--ink);
+  background: var(--paper-2);
 }
 
 .item-card--weapon:hover:not(:disabled):not([disabled]) {
-  background: var(--dl-surface-2);
-  border-color: transparent;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 0 14px rgba(168, 48, 40, 0.18),
-    0 3px 10px rgba(0, 0, 0, 0.6);
+  background: var(--paper-2);
+  border-color: var(--ink);
+  box-shadow: var(--card-shadow-hover);
 }
 
 .item-card--weapon:hover:not(:disabled):not([disabled]) .item-card__icon {
-  color: var(--danger-bright);
-  background: rgba(168, 48, 40, 0.22);
+  color: var(--accent);
+  background: var(--paper);
 }
 
 .item-card--weapon:disabled,
 .item-card--weapon[disabled] {
-  opacity: 0.42;
+  opacity: 0.55;
   cursor: not-allowed;
+  border-style: dashed;
   filter: grayscale(0.4);
   box-shadow: none;
 }
 
-/* ---------- Boosted stats (skill bonuses — field-tuned gear) ---------- */
+/* ---------- Boosted stats (skill bonuses) ---------- */
 
 .item-card__boosted {
-  color: var(--success-bright);
+  color: var(--success);
   font-weight: var(--font-bold);
   font-family: var(--font-mono);
 }
@@ -387,38 +369,12 @@
   content: '▲ ';
   font-size: 0.7em;
   vertical-align: middle;
-  opacity: 0.8;
-}
-
-/* ---------- Danger-level reactive: edge glow intensifies with threat ---------- */
-
-[data-danger="yellow"] .item-card--weapon .item-card__icon {
-  color: var(--hud-amber);
-  border-color: var(--hud-amber-dim);
-  background: rgba(200, 160, 64, 0.1);
-}
-
-[data-danger="orange"] .item-card:not(.item-card--weapon),
-[data-danger="red"] .item-card:not(.item-card--weapon) {
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.03),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.5),
-    0 2px 8px rgba(0, 0, 0, 0.6),
-    0 0 0 1px rgba(0, 0, 0, 0.2);
-}
-
-[data-danger="red"] .item-card--featured {
-  animation: var(--dl-accent-pulse);
-}
-
-[data-danger="red"] .item-card__name {
-  color: var(--bone-100);
 }
 
 /* ==========================================================================
-   Food slot — wraps an item-card with a tactical "consume" affordance.
+   Food slot — wraps an item-card with a "consume" affordance.
    The item-card stays informational; the eat action lives as a compact
-   inset chip on the card's right edge so the slot reads at a glance.
+   chip on the card's right edge so the slot reads at a glance.
    ========================================================================== */
 
 .food-slot {
@@ -440,25 +396,21 @@
   align-items: center;
   gap: 6px;
   padding: 6px 10px;
-  background: linear-gradient(180deg, var(--amber-400) 0%, #d4892a 100%);
-  color: #1a1208;
-  border: 1px solid rgba(0, 0, 0, 0.45);
+  background: var(--highlight);
+  color: var(--ink);
+  border: var(--border);
   border-radius: var(--radius-sm);
-  font-family: var(--font-mono);
+  font-family: var(--font-display);
   font-size: var(--text-2xs);
-  font-weight: var(--font-bold);
   letter-spacing: var(--letter-spacing-wider);
   text-transform: uppercase;
   cursor: pointer;
   z-index: 2;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.35),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
-    0 2px 6px rgba(0, 0, 0, 0.55);
+  box-shadow: var(--shadow-sm);
   transition:
     transform var(--duration-fast) var(--ease-out),
-    box-shadow var(--duration-fast) var(--ease-out),
-    filter var(--duration-fast) var(--ease-out);
+    background-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
 }
 
 .food-slot__eat .icon {
@@ -471,22 +423,22 @@
 }
 
 .food-slot__eat:hover {
-  filter: brightness(1.08);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.4),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
-    0 4px 10px rgba(0, 0, 0, 0.6),
-    0 0 0 1px rgba(240, 169, 74, 0.45);
+  background: var(--highlight-soft);
+  box-shadow: var(--shadow);
 }
 
 .food-slot__eat:active {
-  transform: translateY(calc(-50% + 1px));
-  box-shadow:
-    inset 0 2px 4px rgba(0, 0, 0, 0.5),
-    0 1px 3px rgba(0, 0, 0, 0.4);
+  transform: translate(var(--press-offset), calc(-50% + var(--press-offset)));
+  box-shadow: none;
 }
 
 .food-slot__eat:focus-visible {
-  outline: 2px solid var(--amber-200, var(--amber-400));
+  outline: var(--border-width) solid var(--ink);
   outline-offset: 2px;
+}
+
+@media (pointer: coarse) {
+  .food-slot__eat {
+    min-height: 44px;
+  }
 }

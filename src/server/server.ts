@@ -13,9 +13,19 @@ import { TILE_DEFINITIONS, registerTileDefinitions } from '../config/TileDefinit
 import { repairExternalEdges } from '../services/TileDefinitionService';
 import { TileDefinition } from '../types/TileDefinition';
 import { generateDiff } from '../utils/StateDiff';
+import { es } from '../strings/es';
+import { requireEditorSecret } from './editorAuth';
+import { validateMapPlayability } from '../services/MapPlayability';
+import { ScenarioMap } from '../types/Map';
 
 const app = express();
-app.use(express.json({ limit: '50mb' }));
+// 5mb covers the largest legitimate payload (a full tile-definition import is
+// 2.2mb) and bounds what an unauthenticated caller can make the server parse.
+app.use(express.json({ limit: '5mb' }));
+
+if (!process.env.EDITOR_SECRET) {
+  console.warn('EDITOR_SECRET is not set — every map and tile-definition write will be rejected with 401.');
+}
 const server = createServer(app);
 const PORT = process.env.PORT || 8080;
 const wss = new WebSocketServer({ server });
@@ -25,9 +35,27 @@ const ROOM_IDLE_CLEANUP_MS = 5 * 60 * 1000;
 // A player disconnected mid-game for this long has abandoned it: the game ends.
 const ABANDON_TIMEOUT_MS = 10 * 60 * 1000;
 
+// Compiling a map to judge playability costs ~50ms, on the same thread that
+// serves live games, and the answer only changes when a map is written. Cached
+// by map id; the write routes below evict.
+const playableCache = new Map<string, boolean>();
+
+function isPlayable(map: ScenarioMap): boolean {
+  const cached = playableCache.get(map.id);
+  if (cached !== undefined) return cached;
+  const playable = validateMapPlayability(map).length === 0;
+  playableCache.set(map.id, playable);
+  return playable;
+}
+
 app.get('/api/maps', async (_req, res) => {
   try {
-    const maps = persistenceService.loadAllMaps();
+    // Computed here, once, so the lobby never compiles maps in the browser and
+    // the rules live in exactly one place.
+    const maps = persistenceService.loadAllMaps().map(map => ({
+      ...map,
+      playable: isPlayable(map),
+    }));
     res.json(maps);
   } catch (error) {
     console.error('Error fetching maps:', error);
@@ -35,11 +63,17 @@ app.get('/api/maps', async (_req, res) => {
   }
 });
 
-app.post('/api/maps', async (req, res) => {
+app.post('/api/maps', requireEditorSecret, async (req, res) => {
   try {
     const mapData = req.body;
     if (!mapData || !mapData.name || !mapData.tiles) {
       res.status(400).json({ error: 'Invalid map data' });
+      return;
+    }
+
+    const reasons = validateMapPlayability(mapData);
+    if (reasons.length > 0) {
+      res.status(400).json({ error: 'Map is not playable', reasons });
       return;
     }
 
@@ -48,6 +82,8 @@ app.post('/api/maps', async (req, res) => {
     }
 
     persistenceService.saveMap(mapData);
+    // It passed the check just above, so the cache can skip a recompile.
+    playableCache.set(mapData.id, true);
     log(`Map saved: ${mapData.name} (${mapData.id})`);
     res.json({ success: true, id: mapData.id });
   } catch (error) {
@@ -56,9 +92,10 @@ app.post('/api/maps', async (req, res) => {
   }
 });
 
-app.delete('/api/maps/:id', (req, res) => {
+app.delete('/api/maps/:id', requireEditorSecret, (req, res) => {
   try {
-    persistenceService.deleteMap(req.params.id);
+    persistenceService.deleteMap(String(req.params.id));
+    playableCache.delete(String(req.params.id));
     res.json({ success: true });
   } catch (error) {
     console.error('Error deleting map:', error);
@@ -90,6 +127,12 @@ if (process.env.VITEST !== 'true') {
   }
 }
 
+// Lets the editor check a secret before mounting, so a wrong password fails
+// at the door instead of on the first save.
+app.get('/api/editor-auth', requireEditorSecret, (_req, res) => {
+  res.json({ ok: true });
+});
+
 app.get('/api/tile-definitions', (_req, res) => {
   try {
     res.json(persistenceService.loadAllTileDefinitions());
@@ -99,9 +142,11 @@ app.get('/api/tile-definitions', (_req, res) => {
   }
 });
 
-app.delete('/api/tile-definitions', (_req, res) => {
+app.delete('/api/tile-definitions', requireEditorSecret, (_req, res) => {
   try {
     persistenceService.deleteAllTileDefinitions();
+    // Maps compile against the tile registry, so their verdicts are now stale.
+    playableCache.clear();
     res.json({ success: true });
   } catch (error) {
     console.error('Error wiping tile definitions:', error);
@@ -109,7 +154,7 @@ app.delete('/api/tile-definitions', (_req, res) => {
   }
 });
 
-app.post('/api/tile-definitions', (req, res) => {
+app.post('/api/tile-definitions', requireEditorSecret, (req, res) => {
   try {
     const def = req.body;
     if (!def || !def.id || !def.cells || !def.edges) {
@@ -117,6 +162,7 @@ app.post('/api/tile-definitions', (req, res) => {
       return;
     }
     persistenceService.saveTileDefinition(def.id, def);
+    playableCache.clear();
     res.json({ success: true, id: def.id });
   } catch (error) {
     console.error('Error saving tile definition:', error);
@@ -124,7 +170,7 @@ app.post('/api/tile-definitions', (req, res) => {
   }
 });
 
-app.post('/api/tile-definitions/import', (req, res) => {
+app.post('/api/tile-definitions/import', requireEditorSecret, (req, res) => {
   try {
     const defs = req.body;
     if (!Array.isArray(defs)) {
@@ -142,6 +188,7 @@ app.post('/api/tile-definitions/import', (req, res) => {
     const dbDefs = persistenceService.loadAllTileDefinitions() as TileDefinition[];
     for (const d of dbDefs) repairExternalEdges(d);
     registerTileDefinitions(dbDefs);
+    playableCache.clear();
     res.json({ success: true, imported });
   } catch (error) {
     console.error('Error importing tile definitions:', error);
@@ -553,7 +600,7 @@ function handleAction(ws: WebSocket, request: ActionRequest) {
   const session = socketSessions.get(ws);
 
   if (!session) {
-    sendError(ws, { code: 'UNAUTHORIZED', message: 'You must JOIN before sending actions.' });
+    sendError(ws, { code: 'UNAUTHORIZED', message: es.serverErrors.unauthorized });
     return;
   }
 
@@ -576,31 +623,31 @@ function handleAction(ws: WebSocket, request: ActionRequest) {
   if (request.playerId !== session.playerId) {
     sendError(ws, {
       code: 'IDENTITY_MISMATCH',
-      message: `You are connected as ${session.playerId} but tried to act as ${request.playerId}.`
+      message: es.serverErrors.identityMismatch,
     });
     return;
   }
 
   // Block spectators from sending game actions
   if (room.gameState.spectators.includes(session.playerId)) {
-    sendError(ws, { code: 'SPECTATOR', message: 'Spectators cannot perform actions.' });
+    sendError(ws, { code: 'SPECTATOR', message: es.serverErrors.spectator });
     return;
   }
 
   // Handle KICK_PLAYER at server level (requires socket management)
   if (request.type === ActionType.KICK_PLAYER) {
     if (room.gameState.phase !== GamePhase.Lobby) {
-      sendError(ws, { code: 'INVALID_PHASE', message: 'Can only kick during lobby.' });
+      sendError(ws, { code: 'INVALID_PHASE', message: es.serverErrors.kickOnlyInLobby });
       return;
     }
     // Only host (first player) can kick
     if (room.gameState.lobby.players.length === 0 || room.gameState.lobby.players[0].id !== session.playerId) {
-      sendError(ws, { code: 'NOT_HOST', message: 'Only the host can kick players.' });
+      sendError(ws, { code: 'NOT_HOST', message: es.serverErrors.notHost });
       return;
     }
     const targetPlayerId = request.payload?.targetPlayerId as string;
     if (!targetPlayerId || targetPlayerId === session.playerId) {
-      sendError(ws, { code: 'INVALID_TARGET', message: 'Invalid kick target.' });
+      sendError(ws, { code: 'INVALID_TARGET', message: es.serverErrors.invalidKickTarget });
       return;
     }
     // Clone state before mutating
@@ -641,7 +688,7 @@ function handleAction(ws: WebSocket, request: ActionRequest) {
     return;
   }
 
-  const error = response.error || { code: 'UNKNOWN_ERROR', message: 'Action failed unexpectedly.' };
+  const error = response.error || { code: 'UNKNOWN_ERROR', message: es.serverErrors.unknownError };
   sendError(ws, error);
   // Resync client state after rejection to prevent drift
   if (ws.readyState === WebSocket.OPEN) {

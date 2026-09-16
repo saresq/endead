@@ -6,12 +6,18 @@ import { TILE_SIZE, TILE_CELLS_PER_SIDE, TILE_PIXEL_SIZE, ENTITY_RADIUS, ENTITY_
 import { tileService } from '../services/TileService';
 import { TileInstance } from '../types/Map';
 import { getPlayerColorNumeric } from './config/PlayerIdentities';
-import { getZoneLayout, setZoneGeometry } from './utils/zoneLayout';
+import { getZoneLayout, getZoneAtCell, setZoneGeometry } from './utils/zoneLayout';
+import {
+  type Bounds, type Rect, type CameraPose,
+  MIN_ZOOM, MAX_ZOOM, FALLTHROUGH_FOCUS_SCALE,
+  computeFit, fitScale, centerOn, clampPose, coverPose, shouldFallThrough, isWorldRectVisible, isTap, isDoubleTap,
+} from './camera';
 import { AnimationController } from './AnimationController';
 import { AssetManager } from './AssetManager';
 import { BOARD_THEME } from './config/BoardTheme';
 import { getZombieTypeDisplay } from './config/ZombieTypeConfig';
 import { tooltip } from './ui/components/Tooltip';
+import { es, equipmentName, zombieLabel } from '../strings/es';
 // Zone indicator icons loaded as static assets from /images/icons/
 
 export interface RenderOptions {
@@ -42,6 +48,19 @@ export class PixiBoardRenderer {
   private suppressTapUntil = 0;
   private _spacebarDown = false;
   private _abortController = new AbortController();
+  private _touchStartTime = 0;
+  private _lastTap: { t: number; x: number; y: number } | null = null;
+
+  // Camera model — viewport is the on-screen area not covered by HUD chrome.
+  // `null` means the full canvas (editor never sets one).
+  private viewport: Rect | null = null;
+  private boardBounds: Bounds | null = null;
+  private cameraMode: 'fitted' | 'user' = 'fitted';
+  /** Framing, clamping and min-zoom only apply to game renders, never the editor. */
+  private cameraEnabled = false;
+  private hasFitted = false;
+  private cameraTween: (() => void) | null = null;
+  private _lastOptions: RenderOptions = {};
 
   // Animation
   private _animationController: AnimationController | null = null;
@@ -65,6 +84,8 @@ export class PixiBoardRenderer {
   private iconContainer: PIXI.Container; // Lucide icon sprites (cleared each frame)
   private layerEntities: PIXI.Container;
   private layerBadges: PIXI.Container;
+  /** Transient board text (cues); above everything, inside the camera transform. */
+  private layerFx: PIXI.Container;
 
   // Empty-state blueprint placeholder (HUD-D1) — shown when no real map is
   // loaded. Lives on the stage (outside the camera-transformed container) so
@@ -93,6 +114,9 @@ export class PixiBoardRenderer {
     this.container.addChild(this.layerBoard);
     this.container.addChild(this.layerEntities);
     this.container.addChild(this.layerBadges);
+    this.layerFx = new PIXI.Container();
+    this.layerFx.eventMode = 'none';
+    this.container.addChild(this.layerFx);
 
     // Placeholder layer sits directly on the stage so it ignores camera pan/zoom.
     this.placeholderLayer = new PIXI.Container();
@@ -105,6 +129,7 @@ export class PixiBoardRenderer {
       if (this._lastState?.tiles) {
         this._lastTileHash = '';  // force redraw
         this.renderTiles(this._lastState.tiles);
+        if (this.cameraEnabled && this.cameraMode === 'fitted') this.fitBoard();
       }
     });
 
@@ -164,11 +189,13 @@ export class PixiBoardRenderer {
 
     this.app.stage.on('pointerdown', (e) => {
       this._wasDragging = false;
+      this.stopCameraTween();
 
       if (e.pointerType === 'touch') {
         this.activeTouchPoints.set(e.pointerId, { x: e.global.x, y: e.global.y });
 
         if (this.activeTouchPoints.size === 1) {
+          this._touchStartTime = performance.now();
           this._pointerStartPos = { x: e.global.x, y: e.global.y };
           this._pointerIsDown = true;
           this.lastDragPos = { x: e.global.x, y: e.global.y };
@@ -221,6 +248,8 @@ export class PixiBoardRenderer {
         if (this.isDragging || this.pinchCenter) {
           this._wasDragging = true;
           this.suppressTapUntil = Date.now() + 150;
+        } else if (this._pointerStartPos) {
+          this.handleTouchTap(e.global.x, e.global.y);
         }
         this.endPointerGesture();
         return;
@@ -281,11 +310,14 @@ export class PixiBoardRenderer {
           const dy = pinch.center.y - this.pinchCenter.y;
           this.container.x += dx;
           this.container.y += dy;
+          this.cameraMode = 'user';
 
           if (this.pinchDistance > 0 && pinch.distance > 0) {
             const scaleDelta = pinch.distance / this.pinchDistance;
             const targetScale = this.container.scale.x * scaleDelta;
             this.applyZoom(targetScale, pinch.center.x, pinch.center.y);
+          } else {
+            this.clampPan();
           }
 
           this.pinchCenter = pinch.center;
@@ -299,7 +331,7 @@ export class PixiBoardRenderer {
         if (this._pointerIsDown && this._pointerStartPos) {
           const dx = e.global.x - this._pointerStartPos.x;
           const dy = e.global.y - this._pointerStartPos.y;
-          if (!this.isDragging && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) {
+          if (!this.isDragging && Math.hypot(dx, dy) >= 12) {
             this.isDragging = true;
             this.lastDragPos = { x: e.global.x, y: e.global.y };
           }
@@ -310,6 +342,8 @@ export class PixiBoardRenderer {
           const dy = e.global.y - this.lastDragPos.y;
           this.container.x += dx;
           this.container.y += dy;
+          this.cameraMode = 'user';
+          this.clampPan();
           this.lastDragPos = { x: e.global.x, y: e.global.y };
           this._wasDragging = true;
           this.suppressTapUntil = Date.now() + 150;
@@ -334,7 +368,9 @@ export class PixiBoardRenderer {
         
         this.container.x += dx;
         this.container.y += dy;
-        
+        this.cameraMode = 'user';
+        this.clampPan();
+
         this.lastDragPos = { x: e.global.x, y: e.global.y };
       }
     });
@@ -343,6 +379,8 @@ export class PixiBoardRenderer {
     const canvas = this.app.canvas;
     canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
+      this.stopCameraTween();
+      this.cameraMode = 'user';
       const scaleFactor = 1.1;
       const zoomIn = e.deltaY < 0;
       
@@ -390,8 +428,43 @@ export class PixiBoardRenderer {
     };
   }
 
+  /**
+   * Touch tap that passed the pan threshold. Long presses are suppressed;
+   * a second tap within 300ms / 24px toggles zoom-on-zone vs fit.
+   */
+  private handleTouchTap(x: number, y: number): void {
+    const start = this._pointerStartPos!;
+    const now = performance.now();
+    if (!isTap(now - this._touchStartTime, x - start.x, y - start.y)) {
+      this.suppressTapUntil = Date.now() + 150;
+      this._lastTap = null;
+      return;
+    }
+    if (!this.cameraEnabled) return;
+
+    if (!isDoubleTap(this._lastTap, now, x, y)) {
+      this._lastTap = { t: now, x, y };
+      return;
+    }
+    this._lastTap = null;
+
+    const world = this.screenToWorld(x, y);
+    const zoneId = getZoneAtCell(Math.floor(world.x / TILE_SIZE), Math.floor(world.y / TILE_SIZE));
+    // A second tap on the pending move zone is a move confirmation, not a zoom.
+    if (zoneId && zoneId === this._lastOptions.pendingMoveZoneId) return;
+
+    this.suppressTapUntil = Date.now() + 150;
+    if (this.container.scale.x < 1) {
+      if (zoneId) this.focusZone(zoneId, { scale: 1, animate: true });
+      else if (this.boardBounds) this.moveCamera(coverPose(centerOn(world.x, world.y, 1, this.getViewport()), this.boardBounds, this.getViewport()), true);
+      this.cameraMode = 'user';
+    } else {
+      this.fitBoard();
+    }
+  }
+
   private applyZoom(targetScale: number, screenX: number, screenY: number): void {
-    const newScale = Math.max(0.2, Math.min(targetScale, 3.0));
+    const newScale = Math.max(this.minZoom(), Math.min(targetScale, MAX_ZOOM));
     const worldPos = {
       x: (screenX - this.container.x) / this.container.scale.x,
       y: (screenY - this.container.y) / this.container.scale.y
@@ -402,6 +475,136 @@ export class PixiBoardRenderer {
       screenX - worldPos.x * newScale,
       screenY - worldPos.y * newScale,
     );
+    this.clampPan();
+  }
+
+  // ─── Camera ────────────────────────────────────────────────
+
+  private getViewport(): Rect {
+    return this.viewport ?? { x: 0, y: 0, w: this.app.screen.width, h: this.app.screen.height };
+  }
+
+  private minZoom(): number {
+    if (!this.cameraEnabled || !this.boardBounds) return MIN_ZOOM;
+    return fitScale(this.boardBounds, this.getViewport());
+  }
+
+  private clampPan(): void {
+    if (!this.cameraEnabled || !this.boardBounds) return;
+    const pose = clampPose({ x: this.container.x, y: this.container.y, scale: this.container.scale.x }, this.boardBounds, this.getViewport());
+    this.container.position.set(pose.x, pose.y);
+  }
+
+  private stopCameraTween(): void {
+    if (this.cameraTween) {
+      this.app.ticker.remove(this.cameraTween);
+      this.cameraTween = null;
+    }
+  }
+
+  /** Move the camera to a pose, eased over 300ms unless reduced motion is requested. */
+  private moveCamera(target: CameraPose, animate: boolean): void {
+    this.stopCameraTween();
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!animate || reduced) {
+      this.container.scale.set(target.scale);
+      this.container.position.set(target.x, target.y);
+      return;
+    }
+
+    const from: CameraPose = { x: this.container.x, y: this.container.y, scale: this.container.scale.x };
+    const duration = 300;
+    const startTime = performance.now();
+    const tick = () => {
+      if (this.container.destroyed) {
+        this.stopCameraTween();
+        return;
+      }
+      const t = Math.min((performance.now() - startTime) / duration, 1);
+      const ease = 1 - (1 - t) * (1 - t);
+      this.container.scale.set(from.scale + (target.scale - from.scale) * ease);
+      this.container.position.set(
+        from.x + (target.x - from.x) * ease,
+        from.y + (target.y - from.y) * ease,
+      );
+      if (t >= 1) this.stopCameraTween();
+    };
+    this.cameraTween = tick;
+    this.app.ticker.add(tick);
+  }
+
+  /**
+   * Set the on-screen area not covered by HUD chrome (CSS px, canvas space).
+   * Re-fits when the camera is still framed, otherwise only re-clamps.
+   */
+  public setViewport(rect: Rect): void {
+    const prev = this.viewport;
+    if (prev && prev.x === rect.x && prev.y === rect.y && prev.w === rect.w && prev.h === rect.h) return;
+    this.viewport = rect;
+    if (!this.cameraEnabled || !this.boardBounds) return;
+    if (this.cameraMode === 'fitted') {
+      this.fitBoard(false);
+    } else {
+      const minScale = this.minZoom();
+      if (this.container.scale.x < minScale) {
+        const vp = this.getViewport();
+        this.applyZoom(minScale, vp.x + vp.w / 2, vp.y + vp.h / 2);
+      } else {
+        this.clampPan();
+      }
+    }
+  }
+
+  /**
+   * Frame the whole board in the viewport. On small screens where the board
+   * would be unreadable, centre the local survivor's zone instead.
+   */
+  public fitBoard(animate = false): void {
+    if (!this.boardBounds) return;
+    const vp = this.getViewport();
+    let pose = computeFit(this.boardBounds, vp);
+    const focusId = this._lastOptions.activeSurvivorId;
+    const zoneId = focusId ? this._lastState?.survivors[focusId]?.position.zoneId : undefined;
+    if (shouldFallThrough(pose.scale) && zoneId) {
+      const c = this.zoneCenter(zoneId);
+      pose = coverPose(centerOn(c.x, c.y, FALLTHROUGH_FOCUS_SCALE, vp), this.boardBounds, vp);
+    }
+    this.moveCamera(pose, animate);
+    this.cameraMode = 'fitted';
+  }
+
+  /** Centre a zone in the viewport. With `onlyIfOffscreen`, does nothing when it is already fully visible. */
+  public focusZone(zoneId: ZoneId, opts: { scale?: number; onlyIfOffscreen?: boolean; animate?: boolean } = {}): void {
+    if (!this.cameraEnabled) return;
+    const vp = this.getViewport();
+    const current: CameraPose = { x: this.container.x, y: this.container.y, scale: this.container.scale.x };
+    const layout = getZoneLayout(zoneId);
+    const zoneRect: Rect = { x: layout.col * TILE_SIZE, y: layout.row * TILE_SIZE, w: layout.w * TILE_SIZE, h: layout.h * TILE_SIZE };
+    if (opts.onlyIfOffscreen && isWorldRectVisible(zoneRect, current, vp)) return;
+
+    const scale = Math.max(this.minZoom(), Math.min(opts.scale ?? current.scale, MAX_ZOOM));
+    const c = this.zoneCenter(zoneId);
+    const target = centerOn(c.x, c.y, scale, vp);
+    this.moveCamera(this.boardBounds ? coverPose(target, this.boardBounds, vp) : target, opts.animate ?? true);
+    this.cameraMode = 'user';
+  }
+
+  /** Top layer for transient text, in world coordinates. */
+  public get fxLayer(): PIXI.Container {
+    return this.layerFx;
+  }
+
+  /** Current camera zoom, to size world-space text in screen pixels. */
+  public get cameraScale(): number {
+    return this.container.scale.x;
+  }
+
+  public zoneCenter(zoneId: ZoneId): { x: number; y: number } {
+    const layout = getZoneLayout(zoneId);
+    return {
+      x: (layout.col + layout.w / 2) * TILE_SIZE,
+      y: (layout.row + layout.h / 2) * TILE_SIZE,
+    };
   }
 
   public setAnimationController(controller: AnimationController): void {
@@ -472,6 +675,8 @@ export class PixiBoardRenderer {
   public render(state: GameState, options: RenderOptions = {}): void {
     // 0. Update zone geometry for layout resolver
     setZoneGeometry(state.zoneGeometry ?? null);
+    this._lastOptions = options;
+    if (!options.editorMode) this.cameraEnabled = true;
 
     // Empty-state blueprint: show a stylized placeholder when there is no
     // real map data to render (initial state, between operations, dev review).
@@ -495,9 +700,22 @@ export class PixiBoardRenderer {
     // 3. Entities (Survivors & Zombies)
     this._lastState = state;
     this.reconcileEntities(state, options.activeSurvivorId);
+
+    // 4. Frame the board once it has tiles
+    if (this.cameraEnabled && !this.hasFitted && this.boardBounds) {
+      this.hasFitted = true;
+      this.fitBoard();
+    }
   }
 
   private renderTiles(tiles: TileInstance[]): void {
+     this.boardBounds = tiles.length > 0 ? {
+       minX: Math.min(...tiles.map(t => t.x)) * TILE_PIXEL_SIZE,
+       minY: Math.min(...tiles.map(t => t.y)) * TILE_PIXEL_SIZE,
+       maxX: (Math.max(...tiles.map(t => t.x)) + 1) * TILE_PIXEL_SIZE,
+       maxY: (Math.max(...tiles.map(t => t.y)) + 1) * TILE_PIXEL_SIZE,
+     } : null;
+
      if (!tileService.isReady) return;
 
      // Dirty check: compare a hash of tile data to detect replacements
@@ -535,6 +753,20 @@ export class PixiBoardRenderer {
    * Single-pass board overlay: draws zone fills, edges, and indicators
    * on one PIXI.Graphics object. Matches the proven MapEditor overlay pattern.
    */
+  /** Trace the outer boundary of a zone's cells (no per-cell edges). Caller applies the stroke. */
+  private strokeZoneBoundary(cells: { x: number; y: number }[]): void {
+    const g = this.boardGraphics;
+    const cellSet = new Set(cells.map(c => `${c.x},${c.y}`));
+    for (const c of cells) {
+      const px = c.x * TILE_SIZE;
+      const py = c.y * TILE_SIZE;
+      if (!cellSet.has(`${c.x},${c.y - 1}`)) { g.moveTo(px, py); g.lineTo(px + TILE_SIZE, py); }
+      if (!cellSet.has(`${c.x},${c.y + 1}`)) { g.moveTo(px, py + TILE_SIZE); g.lineTo(px + TILE_SIZE, py + TILE_SIZE); }
+      if (!cellSet.has(`${c.x - 1},${c.y}`)) { g.moveTo(px, py); g.lineTo(px, py + TILE_SIZE); }
+      if (!cellSet.has(`${c.x + 1},${c.y}`)) { g.moveTo(px + TILE_SIZE, py); g.lineTo(px + TILE_SIZE, py + TILE_SIZE); }
+    }
+  }
+
   private drawBoard(state: GameState, validZones: ZoneId[], pendingMoveZoneId?: ZoneId, editorMode?: boolean, doorHighlightZones: ZoneId[] = [], moveCostByZone?: Record<ZoneId, number>, sprintZones: ZoneId[] = [], attackZones: ZoneId[] = []): void {
     const g = this.boardGraphics;
     g.clear();
@@ -568,24 +800,17 @@ export class PixiBoardRenderer {
         if (isValidMove) {
           for (const c of cells) {
             g.rect(c.x * TILE_SIZE, c.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-            g.fill({ color: BOARD_THEME.zone.validMoveHighlight, alpha: 0.3 });
+            g.fill({ color: BOARD_THEME.zone.validMove, alpha: BOARD_THEME.zone.validMoveAlpha });
           }
+          this.strokeZoneBoundary(cells);
+          g.stroke({ width: 2, color: BOARD_THEME.zone.validMoveHighlight, alpha: 0.7 });
         }
         if (isPendingMove) {
-          const cellSet = new Set(cells.map(c => `${c.x},${c.y}`));
           for (const c of cells) {
             g.rect(c.x * TILE_SIZE, c.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-            g.fill({ color: BOARD_THEME.zone.pendingMoveHighlight, alpha: 0.5 });
+            g.fill({ color: BOARD_THEME.zone.pendingMove, alpha: BOARD_THEME.zone.pendingMoveAlpha });
           }
-          // Zone-boundary outline only (no per-cell stroke)
-          for (const c of cells) {
-            const px = c.x * TILE_SIZE;
-            const py = c.y * TILE_SIZE;
-            if (!cellSet.has(`${c.x},${c.y - 1}`)) { g.moveTo(px, py); g.lineTo(px + TILE_SIZE, py); }
-            if (!cellSet.has(`${c.x},${c.y + 1}`)) { g.moveTo(px, py + TILE_SIZE); g.lineTo(px + TILE_SIZE, py + TILE_SIZE); }
-            if (!cellSet.has(`${c.x - 1},${c.y}`)) { g.moveTo(px, py); g.lineTo(px, py + TILE_SIZE); }
-            if (!cellSet.has(`${c.x + 1},${c.y}`)) { g.moveTo(px + TILE_SIZE, py); g.lineTo(px + TILE_SIZE, py + TILE_SIZE); }
-          }
+          this.strokeZoneBoundary(cells);
           g.stroke({ width: 2, color: BOARD_THEME.zone.pendingMoveStroke, alpha: 0.9 });
         }
       } else {
@@ -616,13 +841,12 @@ export class PixiBoardRenderer {
         cy = (cy / cells.length) * TILE_SIZE + TILE_SIZE / 2;
 
         const label = new PIXI.Text({
-          text: `${cost} AP`,
+          text: es.board.moveCost(cost),
           style: {
-            fontFamily: 'Arial',
-            fontSize: 14,
-            fontWeight: 'bold',
-            fill: 0xffffff,
-            stroke: { color: 0x000000, width: 3 },
+            fontFamily: BOARD_THEME.font.display,
+            fontSize: BOARD_THEME.label.fontSize,
+            fill: BOARD_THEME.label.fill,
+            stroke: { color: BOARD_THEME.label.stroke, width: BOARD_THEME.label.strokeWidth },
           },
         });
         label.anchor.set(0.5);
@@ -640,7 +864,7 @@ export class PixiBoardRenderer {
       if (hasTiles) {
         for (const c of cells) {
           g.rect(c.x * TILE_SIZE, c.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-          g.fill({ color: 0x87CEEB, alpha: 0.3 });
+          g.fill({ color: BOARD_THEME.zone.sprintFill, alpha: BOARD_THEME.zone.sprintAlpha });
         }
       }
 
@@ -900,9 +1124,8 @@ export class PixiBoardRenderer {
         const numText = new PIXI.Text({
           text: String(zone.noiseTokens),
           style: {
-            fontFamily: 'Arial',
+            fontFamily: BOARD_THEME.font.display,
             fontSize: 11,
-            fontWeight: 'bold',
             fill: BOARD_THEME.noise.markColor,
             stroke: { color: BOARD_THEME.noise.triangleFill, width: 2 },
           },
@@ -943,11 +1166,11 @@ export class PixiBoardRenderer {
         let bgColor: number = sp.bgColor;
         let strokeColor: number = sp.strokeColor;
         if (zone.spawnColor === ObjectiveColor.Blue) {
-          bgColor = 0x1A3A6B;
-          strokeColor = 0x3D8BFD;
+          bgColor = sp.blueBg;
+          strokeColor = sp.blueStroke;
         } else if (zone.spawnColor === ObjectiveColor.Green) {
-          bgColor = 0x1A4A2E;
-          strokeColor = 0x33C16C;
+          bgColor = sp.greenBg;
+          strokeColor = sp.greenStroke;
         }
 
         g.roundRect(cx - halfW, cy - halfH, sp.bgWidth, sp.bgHeight, sp.bgRadius);
@@ -963,7 +1186,7 @@ export class PixiBoardRenderer {
         if (spawnNum !== undefined) {
           const numText = new PIXI.Text({
             text: String(spawnNum),
-            style: { fontFamily: 'Arial', fontSize: sp.numberFontSize, fontWeight: 'bold', fill: sp.numberColor, stroke: { color: sp.numberStroke, width: 2 } },
+            style: { fontFamily: BOARD_THEME.font.display, fontSize: sp.numberFontSize, fill: sp.numberColor, stroke: { color: sp.numberStroke, width: 2 } },
           });
           numText.anchor.set(0.5);
           numText.position.set(cx + halfW - 8, cy);
@@ -980,8 +1203,8 @@ export class PixiBoardRenderer {
       if (zone.isExit) {
         // Green rectangle background
         g.rect(cx - 14, cy - 14, 28, 28);
-        g.fill({ color: 0x22AA44, alpha: 0.85 });
-        g.stroke({ width: 2, color: 0x44DD66 });
+        g.fill({ color: BOARD_THEME.exit.fillColor, alpha: BOARD_THEME.exit.fillAlpha });
+        g.stroke({ width: BOARD_THEME.exit.strokeWidth, color: BOARD_THEME.exit.strokeColor });
         // Lucide DoorOpen icon, white
         addIcon('/images/icons/door-open-white.svg', cx - 12, cy - 12);
       }
@@ -994,11 +1217,11 @@ export class PixiBoardRenderer {
         let fillColor: number = BOARD_THEME.objective.fillColor;
         let dotColor: number = BOARD_THEME.objective.dotColor;
         if (zone.objectiveColor === ObjectiveColor.Blue) {
-          fillColor = 0x3D8BFD;
-          dotColor = 0xFFFFFF;
+          fillColor = BOARD_THEME.objective.blueFill;
+          dotColor = BOARD_THEME.objective.blueDot;
         } else if (zone.objectiveColor === ObjectiveColor.Green) {
-          fillColor = 0x33C16C;
-          dotColor = 0xFFFFFF;
+          fillColor = BOARD_THEME.objective.greenFill;
+          dotColor = BOARD_THEME.objective.greenDot;
         }
         g.circle(ox, oy, 10);
         g.fill({ color: fillColor });
@@ -1013,14 +1236,14 @@ export class PixiBoardRenderer {
         const ox = cx + TILE_SIZE / 2 - 25;
         const oy = cy + TILE_SIZE / 2 - 25;
         g.rect(ox - 10, oy - 10, 20, 20);
-        g.fill({ color: 0xCC2222, alpha: 0.9 });
-        g.stroke({ width: 2, color: 0xFFCC00 });
+        g.fill({ color: BOARD_THEME.epicCrate.fillColor, alpha: BOARD_THEME.epicCrate.fillAlpha });
+        g.stroke({ width: BOARD_THEME.epicCrate.strokeWidth, color: BOARD_THEME.epicCrate.strokeColor });
         // Yellow "E" glyph
         g.rect(ox - 5, oy - 6, 2, 12);
         g.rect(ox - 5, oy - 6, 8, 2);
         g.rect(ox - 5, oy - 1, 6, 2);
         g.rect(ox - 5, oy + 4, 8, 2);
-        g.fill({ color: 0xFFCC00 });
+        g.fill({ color: BOARD_THEME.epicCrate.glyphColor });
       }
     }
   }
@@ -1278,9 +1501,8 @@ export class PixiBoardRenderer {
           const text = new PIXI.Text({
             text: `\u00d7${count}`,
             style: {
-              fontFamily: 'Arial',
+              fontFamily: BOARD_THEME.font.display,
               fontSize: BOARD_THEME.groupBadge.fontSize,
-              fontWeight: 'bold',
               fill: BOARD_THEME.groupBadge.textColor,
             },
           });
@@ -1366,15 +1588,15 @@ export class PixiBoardRenderer {
     if (survivor) {
       const hand1 = survivor.inventory.find(c => c.slot === 'HAND_1');
       const hand2 = survivor.inventory.find(c => c.slot === 'HAND_2');
-      const hand1Name = hand1 ? hand1.name : 'Empty';
-      const hand2Name = hand2 ? hand2.name : 'Empty';
+      const hand1Name = hand1 ? equipmentName(hand1) : es.common.empty;
+      const hand2Name = hand2 ? equipmentName(hand2) : es.common.empty;
       const hp = survivor.maxHealth - survivor.wounds;
       const xpColor = PixiBoardRenderer.DANGER_LEVEL_COLORS[survivor.dangerLevel];
       return `<div class="tooltip-title">${survivor.name} <span class="tooltip-count">${survivor.characterClass}</span></div>`
-        + `<div class="tooltip-row"><span>Health</span><span class="tooltip-value">${hp}/${survivor.maxHealth}</span></div>`
-        + `<div class="tooltip-row"><span>XP</span><span class="tooltip-value" style="color:${xpColor}">${survivor.experience}</span></div>`
-        + `<div class="tooltip-row"><span>Hand 1</span><span class="tooltip-value">${hand1Name}</span></div>`
-        + `<div class="tooltip-row"><span>Hand 2</span><span class="tooltip-value">${hand2Name}</span></div>`;
+        + `<div class="tooltip-row"><span>${es.board.health}</span><span class="tooltip-value">${hp}/${survivor.maxHealth}</span></div>`
+        + `<div class="tooltip-row"><span>${es.common.xp}</span><span class="tooltip-value" style="color:${xpColor}">${survivor.experience}</span></div>`
+        + `<div class="tooltip-row"><span>${es.slots.HAND_1}</span><span class="tooltip-value">${hand1Name}</span></div>`
+        + `<div class="tooltip-row"><span>${es.slots.HAND_2}</span><span class="tooltip-value">${hand2Name}</span></div>`;
     }
 
     const zombie = state.zombies[entityId];
@@ -1424,7 +1646,7 @@ export class PixiBoardRenderer {
     const display = getZombieTypeDisplay(type);
     const toughness = PixiBoardRenderer.ZOMBIE_TOUGHNESS[type];
 
-    let html = `<div class="tooltip-title" style="color:${display.colorHex}">${display.label} <span class="tooltip-count">\u00d7${zombies.length}</span></div>`;
+    let html = `<div class="tooltip-title" style="color:${display.colorHex}">${zombieLabel(type, zombies.length)} <span class="tooltip-count">\u00d7${zombies.length}</span></div>`;
     for (const z of zombies) {
       const remaining = toughness - z.wounds;
       html += this.buildHealthBar(remaining, toughness, display.colorHex);
@@ -1452,7 +1674,7 @@ export class PixiBoardRenderer {
         sprite.height = ENTITY_RADIUS * 2 * entityScale;
         container.addChild(sprite);
         graphics.circle(0, 0, ENTITY_RADIUS * entityScale);
-        graphics.stroke({ width: 2, color: 0x000000 });
+        graphics.stroke({ width: BOARD_THEME.entity.strokeWidth, color: BOARD_THEME.entity.strokeColor });
       } else {
         const display = getZombieTypeDisplay(entity.type);
         const r = ENTITY_RADIUS * display.boardScale * entityScale;
@@ -1466,12 +1688,12 @@ export class PixiBoardRenderer {
         }
         graphics.closePath();
         graphics.fill({ color: display.colorNumeric });
-        graphics.stroke({ width: 2, color: 0x111111 });
+        graphics.stroke({ width: BOARD_THEME.entity.strokeWidth, color: BOARD_THEME.entity.strokeColor });
 
         // Draw initial letter
         const text = new PIXI.Text({
           text: display.initial,
-          style: { fontFamily: 'Arial', fontSize: BOARD_THEME.zombie.initialFontSize * display.boardScale * entityScale, fontWeight: 'bold', fill: BOARD_THEME.zombie.initialColor },
+          style: { fontFamily: BOARD_THEME.font.display, fontSize: BOARD_THEME.zombie.initialFontSize * display.boardScale * entityScale, fill: BOARD_THEME.zombie.initialColor },
         });
         text.anchor.set(0.5);
         container.addChild(text);
@@ -1488,13 +1710,13 @@ export class PixiBoardRenderer {
       // 1. Selection Highlight (Local Player Selection)
       if (isSelected) {
         graphics.circle(0, 0, ENTITY_RADIUS + 6);
-        graphics.fill({ color: 0xFFFFFF, alpha: 0.5 }); // White Glow
+        graphics.fill({ color: BOARD_THEME.entity.selectionGlow, alpha: BOARD_THEME.entity.selectionAlpha });
       }
 
       // 2. Active Player Highlight (Turn Indicator)
       if (isActiveTurn) {
         graphics.circle(0, 0, ENTITY_RADIUS + 4);
-        graphics.stroke({ width: 3, color: 0xFFD700 }); // Gold Border
+        graphics.stroke({ width: BOARD_THEME.entity.activeTurnWidth, color: BOARD_THEME.entity.activeTurnRing });
       }
 
       // 3. Survivor Body — portrait sprite masked to a circle, or fallback colored circle
@@ -1516,7 +1738,7 @@ export class PixiBoardRenderer {
 
         const spriteMask = new PIXI.Graphics();
         spriteMask.circle(0, 0, r);
-        spriteMask.fill({ color: 0xFFFFFF });
+        spriteMask.fill({ color: BOARD_THEME.entity.maskFill });
         container.addChild(spriteMask);
         sprite.mask = spriteMask;
         container.addChild(sprite);
@@ -1532,10 +1754,10 @@ export class PixiBoardRenderer {
       // 4. Wound Indicator
       if (survivor.wounds > 0) {
         graphics.circle(0, 0, ENTITY_RADIUS);
-        graphics.stroke({ width: 3, color: 0xFF0000 }); // Red Outline if wounded
+        graphics.stroke({ width: BOARD_THEME.entity.woundStrokeWidth, color: BOARD_THEME.entity.woundStroke });
       } else if (!survivorTex) {
         // Standard Outline only for placeholder circles
-        graphics.stroke({ width: 2, color: 0x000000 });
+        graphics.stroke({ width: BOARD_THEME.entity.strokeWidth, color: BOARD_THEME.entity.strokeColor });
       }
     }
   }
@@ -1754,7 +1976,7 @@ export class PixiBoardRenderer {
     const compassLabel = new PIXI.Text({
       text: 'N',
       style: {
-        fontFamily: 'JetBrains Mono, monospace',
+        fontFamily: BOARD_THEME.font.body,
         fontSize: 9,
         fontWeight: '600',
         fill: t.compass,
@@ -1769,9 +1991,9 @@ export class PixiBoardRenderer {
     // Mono preview label — top-center of the tile region so reviewers can't
     // mistake the blueprint for live game state.
     const label = new PIXI.Text({
-      text: '// PREVIEW · NO ACTIVE MAP',
+      text: es.board.preview.toUpperCase(),
       style: {
-        fontFamily: 'JetBrains Mono, monospace',
+        fontFamily: BOARD_THEME.font.body,
         fontSize: isSmall ? 11 : 12,
         fontWeight: '600',
         fill: t.label,
@@ -1795,6 +2017,7 @@ export class PixiBoardRenderer {
   public destroy(): void {
     // Remove window/DOM event listeners via AbortController
     this._abortController.abort();
+    this.stopCameraTween();
 
     // Remove all PIXI stage event listeners added by setupCameraControls
     this.app.stage.removeAllListeners();

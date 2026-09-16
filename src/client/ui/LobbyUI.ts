@@ -2,6 +2,7 @@
 import { GameState, PlayerId } from '../../types/GameState';
 import { ActionType } from '../../types/Action';
 import { networkManager } from '../NetworkManager';
+import { leaveRoom } from '../roomExit';
 import { CHARACTER_DEFINITIONS } from '../../config/CharacterRegistry';
 import { renderButton } from './components/Button';
 import { renderPhotoSlot } from './components/PhotoSlot';
@@ -9,26 +10,14 @@ import { renderLobbyDossier } from './components/LobbyDossier';
 import { icon } from './components/icons';
 import { notificationManager } from './NotificationManager';
 import { modalManager } from './overlays/ModalManager';
+import { es } from '../../strings/es';
+import { displayName } from '../utils/displayName';
 
-// ─── Static design data ──────────────────────────────────────────
-// Role label under each character portrait in the roster. Pure
-// presentation: derived once from CHARACTER_DEFINITIONS keys to give
-// each operative a deterministic field-manual sub-line.
-const CHARACTER_ROLES: Record<string, string> = {
-  Wanda: 'POINT · SCOUT',
-  Doug: 'SUPPORT · LEADER',
-  Amy: 'MEDIC · SLIPPERY',
-  Ned: 'RECON · SEARCHER',
-  Elle: 'MARKSMAN · SNIPER',
-  Josh: 'HEAVY · BRAWLER',
-};
-
-// Max operatives per squad — mirrors `MAX_PLAYERS` in server.ts.
+// Max players per room — mirrors `MAX_PLAYERS` in server.ts.
 const MAX_SQUAD = 6;
 
-// ROE rules shown in the Rules of Engagement panel. Each entry
-// must be wired to actual game config — presentation-only mocks
-// were removed once they started misleading hosts.
+// Options shown in the Opciones panel. Each entry must be wired to
+// actual game config (presentation-only mocks mislead hosts).
 type RoeRule = {
   id: string;
   title: string;
@@ -41,13 +30,17 @@ type RoeRule = {
 const ROE_RULES: RoeRule[] = [
   {
     id: 'endless-horde',
-    title: 'ABOMINATION SURGE',
-    description: 'POOL CAP LIFTED. ABOMINATIONS KEEP SPAWNING. EXPECT CASUALTIES.',
+    title: es.lobby.options.abominationFest,
+    description: es.lobby.options.abominationFestDesc,
     defaultOn: false,
-    riskLabel: 'HIGH RISK',
+    riskLabel: es.lobby.options.hard,
     riskVariant: 'rust',
   },
 ];
+
+function roleFor(charClass: string): string {
+  return es.roles[charClass] ?? es.common.survivor;
+}
 
 function characterImageUrl(charClass: string): string {
   return `/images/characters/${charClass.toLowerCase()}.webp`;
@@ -62,7 +55,10 @@ export class LobbyUI {
   private localPlayerId: PlayerId;
   private roomId: string;
   private state: GameState | null = null;
+  // Only playable maps ever land here — the server computes the flag.
   private availableMaps: { id: string; name: string; width: number; height: number }[] = [];
+  /** True once /api/maps has answered, so "no maps" isn't confused with "still loading". */
+  private mapsLoaded = false;
   private selectedMapId: string | null = null;
   private abominationFest = false;
   private nameDebounceTimer: number | null = null;
@@ -189,7 +185,7 @@ export class LobbyUI {
       // Capture the disconnect-baseline on the first onReconnecting
       // tick after a previously-connected state. NetworkManager calls
       // this just before each setTimeout, so the very first call is
-      // the right anchor for our "DROPPED mm:ss" timer.
+      // the right anchor for the "offline for mm:ss" timer.
       if (wasConnected || this.disconnectedAt === null) {
         this.disconnectedAt = Date.now();
       }
@@ -218,12 +214,12 @@ export class LobbyUI {
 
     networkManager.onDisconnected = () => {
       // Hard disconnect (max retries hit). Keep the scrim up so the
-      // RECONNECT button stays available.
+      // reconnect button stays available.
       this.connectionLost = true;
       this.nextRetryAt = null;
       if (this.disconnectedAt === null) this.disconnectedAt = Date.now();
       this.startConnectionMetaTimer();
-      this.refreshConnectionMeta('CONNECTION DROPPED');
+      this.refreshConnectionMeta(es.connection.dropped);
       this.render();
       if (this.prevOnDisconnected) this.prevOnDisconnected();
     };
@@ -248,7 +244,7 @@ export class LobbyUI {
    * Compose the scrim meta line and patch it in place (no full
    * re-render). Pieces: attempt count · time-since-disconnect mm:ss ·
    * next-retry countdown. Falls back to a status-only line when
-   * `headlineOverride` is provided (e.g. hard-drop "CONNECTION DROPPED").
+   * `headlineOverride` is provided (hard drop).
    */
   private refreshConnectionMeta(headlineOverride?: string): void {
     const parts: string[] = [];
@@ -256,21 +252,21 @@ export class LobbyUI {
     if (headlineOverride) {
       parts.push(headlineOverride);
     } else if (this.maxAttempts > 0) {
-      parts.push(`RETRYING HANDSHAKE · ${this.currentAttempt}/${this.maxAttempts}`);
+      parts.push(es.connection.retryingAttempt(this.currentAttempt, this.maxAttempts));
     } else {
-      parts.push('RETRYING HANDSHAKE');
+      parts.push(es.connection.retrying);
     }
 
     if (this.disconnectedAt !== null) {
       const elapsedSec = Math.max(0, Math.floor((Date.now() - this.disconnectedAt) / 1000));
       const mm = Math.floor(elapsedSec / 60).toString().padStart(2, '0');
       const ss = (elapsedSec % 60).toString().padStart(2, '0');
-      parts.push(`DROPPED ${mm}:${ss}`);
+      parts.push(es.connection.offlineFor(`${mm}:${ss}`));
     }
 
     if (this.nextRetryAt !== null) {
       const remaining = Math.max(0, Math.ceil((this.nextRetryAt - Date.now()) / 1000));
-      parts.push(remaining > 0 ? `NEXT ${remaining}s` : 'RECONNECTING…');
+      parts.push(remaining > 0 ? es.connection.nextRetry(remaining) : es.connection.reconnectingNow);
     }
 
     this.reconnectMeta = parts.join(' · ');
@@ -288,7 +284,10 @@ export class LobbyUI {
     try {
       const res = await fetch('/api/maps');
       if (res.ok) {
-        this.availableMaps = await res.json();
+        const maps = await res.json() as ({ playable?: boolean } & typeof this.availableMaps[number])[];
+        // An unplayable map never spawns zombies, so it is not offered at all.
+        this.availableMaps = maps.filter(m => m.playable !== false);
+        this.mapsLoaded = true;
         if (this.availableMaps.length > 0 && !this.selectedMapId) {
           this.selectedMapId = this.availableMaps[0].id;
         }
@@ -334,19 +333,20 @@ export class LobbyUI {
       this.container.innerHTML = `
         <div class="lobby__stack">
           <div class="fm-panel lobby-panel lobby-panel--waiting">
-            <div class="lobby__waiting">CONNECTING TO LOBBY</div>
+            <div class="lobby__waiting">${this.escHtml(es.lobby.connecting)}</div>
           </div>
         </div>`;
       this.panelCache = {};
       return;
     }
 
-    const isHost = this.state.lobby.players.length > 0 && this.state.lobby.players[0].id === this.localPlayerId;
-    const myPlayer = this.state.lobby.players.find(p => p.id === this.localPlayerId);
+    const players = this.state.lobby.players;
+    const isHost = players.length > 0 && players[0].id === this.localPlayerId;
+    const myPlayer = players.find(p => p.id === this.localPlayerId);
 
     const takenClasses = new Map<string, string>();
-    this.state.lobby.players.forEach(p => {
-      if (p.characterClass) takenClasses.set(p.characterClass, p.name);
+    players.forEach(p => {
+      if (p.characterClass) takenClasses.set(p.characterClass, displayName(p.name, p.characterClass));
     });
 
     const abomFest = !!(this.state.config?.abominationFest ?? this.abominationFest);
@@ -354,24 +354,24 @@ export class LobbyUI {
 
     const selectedMap = this.availableMaps.find(m => m.id === this.selectedMapId) ?? null;
     const myChar = myPlayer?.characterClass || null;
-    const allReady = this.state.lobby.players.length > 0 && this.state.lobby.players.every(p => !!p.characterClass);
+    const allReady = players.length > 0 && players.every(p => !!p.characterClass);
 
     // Build the list of panels for this render pass. Each entry is a
     // stable key + its HTML output; we only swap DOM for keys whose
-    // HTML actually changed since the last render.
+    // HTML actually changed since the last render. Order is the
+    // portrait order; the landscape grid places panels via grid-area.
     const panels: Array<{ key: string; html: string }> = [];
-    const hostId = this.state.lobby.players[0]?.id ?? null;
+    const hostId = players[0]?.id ?? null;
     if (this.hostLeftActive) panels.push({ key: 'hostLeftBanner', html: this.renderHostLeftBanner() });
-    panels.push({ key: 'briefing', html: this.renderBriefingPanel() });
-    if (myPlayer) panels.push({ key: 'playerPlate', html: this.renderPlayerPlatePanel(myPlayer) });
-    panels.push({ key: 'squad', html: this.renderSquadPanel(this.state.lobby.players, hostId) });
-    panels.push({ key: 'roster', html: this.renderRosterPanel(myChar, takenClasses) });
-    panels.push({ key: 'area', html: this.renderAreaPanel(selectedMap, isHost) });
-    panels.push({ key: 'roe', html: this.renderRoePanel(abomFest, isHost) });
+    panels.push({ key: 'invite', html: this.renderInvitePanel() });
+    panels.push({ key: 'you', html: this.renderYouPanel(myPlayer ?? null, myChar, takenClasses) });
+    panels.push({ key: 'players', html: this.renderPlayersPanel(players, hostId) });
+    panels.push({ key: 'map', html: this.renderMapPanel(selectedMap, isHost) });
+    panels.push({ key: 'options', html: this.renderOptionsPanel(abomFest, isHost) });
     panels.push({ key: 'footer', html: this.renderFooterPanel(isHost, allReady) });
 
     let stack = this.container.querySelector('.lobby__stack') as HTMLElement | null;
-    if (!stack) {
+    if (!stack || stack.querySelector(':scope > .lobby-panel--waiting')) {
       stack = document.createElement('div');
       stack.className = 'lobby__stack';
       this.container.innerHTML = '';
@@ -379,12 +379,13 @@ export class LobbyUI {
       this.panelCache = {};
     }
 
-    // Capture focus on callsign input so we can restore it if (and
-    // only if) the callsign panel is actually replaced.
+    // Capture focus + typed value on the name input so we can restore
+    // them if (and only if) the `you` panel is actually replaced.
     const activeEl = document.activeElement;
     const nicknameBefore = stack.querySelector('#lobby-nickname') as HTMLInputElement | null;
-    const hadFocus = activeEl === nicknameBefore;
+    const hadFocus = !!nicknameBefore && activeEl === nicknameBefore;
     const prevCursor = nicknameBefore?.selectionStart ?? null;
+    const prevValue = nicknameBefore?.value ?? null;
 
     const liveKeys = new Set(panels.map(p => p.key));
     Array.from(stack.children).forEach(child => {
@@ -440,19 +441,22 @@ export class LobbyUI {
       prevEl = existing;
     }
 
-    if (hadFocus && rerendered.has('playerPlate')) {
+    if (hadFocus && rerendered.has('you')) {
       const nextInput = stack.querySelector('#lobby-nickname') as HTMLInputElement | null;
       if (nextInput) {
+        // The panel may re-render because someone picked a character
+        // while this player is typing; keep what they typed.
+        if (prevValue !== null) nextInput.value = prevValue;
         nextInput.focus();
         if (prevCursor !== null) nextInput.setSelectionRange(prevCursor, prevCursor);
       }
     }
 
-    if (rerendered.has('area')) {
+    if (rerendered.has('map')) {
       const mapSelect = stack.querySelector('#lobby-map-select') as HTMLSelectElement | null;
       if (mapSelect && this.selectedMapId) mapSelect.value = this.selectedMapId;
     }
-    if (rerendered.has('roe')) {
+    if (rerendered.has('options')) {
       const abomCheck = stack.querySelector('#lobby-abom-fest') as HTMLInputElement | null;
       if (abomCheck) abomCheck.checked = this.abominationFest;
     }
@@ -480,7 +484,7 @@ export class LobbyUI {
         // Refresh the meta line in place so the scrim's entry
         // animation doesn't replay every reconnect attempt.
         const metaEl = scrimEl.querySelector('.lobby-scrim__meta') as HTMLElement | null;
-        if (metaEl) metaEl.textContent = this.reconnectMeta ?? 'RETRYING HANDSHAKE';
+        if (metaEl) metaEl.textContent = this.reconnectMeta ?? es.connection.retrying;
       }
     } else if (scrimEl) {
       scrimEl.remove();
@@ -489,51 +493,47 @@ export class LobbyUI {
 
   // ─── Panel renderers ─────────────────────────────────────────
 
-  private renderBriefingPanel(): string {
+  /**
+   * Invite block: room code in large text, `Copiar enlace` button and a
+   * one-line hint. Pulses while the local player is alone in the room.
+   */
+  private renderInvitePanel(): string {
+    const t = es.lobby;
     const copied = this.roomPillCopied;
-    const copyGlyph = copied ? icon('Check', 'sm') : icon('Copy', 'sm');
-    const copiedClass = copied ? ' lobby-room-chip--copied' : '';
-    const label = copied ? '// COPIED' : 'ROOM';
+    const isSolo = (this.state?.lobby.players.length ?? 0) === 1;
 
-    // Solo-waiting state — single operative in the lobby. The room
-    // chip pulses rust to read as "share this code" and the kicker
-    // swaps to a count-aware WAITING line.
-    const squadSize = this.state?.lobby.players.length ?? 0;
-    const isSolo = squadSize === 1;
-    const pulseClass = isSolo ? ' lobby-room-chip--pulse' : '';
-    const kicker = isSolo
-      ? `// WAITING FOR OPERATIVES · ${squadSize}/${MAX_SQUAD}`
-      : '// MISSION BRIEFING';
+    const btnClass = [
+      'fm-btn',
+      'fm-btn--secondary',
+      'btn',
+      'btn--secondary',
+      'lobby-invite__copy',
+      copied ? 'lobby-invite__copy--copied' : '',
+    ].filter(Boolean).join(' ');
 
     return `
-      <section class="fm-panel lobby-panel lobby-panel--briefing">
-        <span class="fm-panel-dot fm-panel-dot--tl"></span>
-        <span class="fm-panel-dot fm-panel-dot--br"></span>
-        <div class="fm-brackets fm-brackets--amber lobby-briefing__body">
-          <span class="fm-bracket-tr"></span>
-          <span class="fm-bracket-bl"></span>
-          <div class="fm-kicker">${kicker}</div>
-          <h1 class="fm-stencil lobby-briefing__title">LOBBY</h1>
+      <section class="fm-panel lobby-panel lobby-panel--invite${isSolo ? ' lobby-invite--pulse' : ''}">
+        <h2 class="fm-kicker lobby-invite__title">${this.escHtml(t.inviteTitle)}</h2>
+        <div class="lobby-invite__row">
+          <div class="lobby-invite__code fm-mono" aria-label="${this.escHtml(`${t.roomCode}: ${this.roomId}`)}">${this.escHtml(this.roomId)}</div>
           <button
             type="button"
-            id="room-pill"
-            class="lobby-room-chip${copiedClass}${pulseClass}"
-            title="Copy join link"
-            aria-label="Copy join link to clipboard"
+            class="${btnClass}"
+            data-action="copy-link"
+            aria-label="${this.escHtml(copied ? t.copied : t.copyLinkAria)}"
           >
-            <span class="lobby-room-chip__label">${label}</span>
-            <span class="lobby-room-chip__id">${this.escHtml(this.roomId)}</span>
-            <span class="lobby-room-chip__glyph">${copyGlyph}</span>
+            <span class="btn__icon fm-btn__icon" aria-hidden="true">${icon(copied ? 'Check' : 'Copy', 'sm')}</span>
+            <span class="btn__label fm-btn__label" aria-live="polite">${this.escHtml(copied ? t.copied : t.copyLink)}</span>
           </button>
         </div>
+        <p class="lobby-invite__hint">${this.escHtml(t.inviteHint)}</p>
       </section>
     `;
   }
 
   /**
    * Host-left banner. Sits at the very top of .lobby__stack while the
-   * server promotes a new host. role=status + aria-live=polite per
-   * design/states/host-left.html.
+   * server promotes a new host. role=status + aria-live=polite.
    */
   private renderHostLeftBanner(): string {
     const seconds = Math.max(0, this.hostLeftSecondsRemaining);
@@ -541,10 +541,10 @@ export class LobbyUI {
       <div class="lobby-banner" role="status" aria-live="polite">
         <span class="lobby-banner__icon" aria-hidden="true"></span>
         <div class="lobby-banner__text">
-          <span class="lobby-banner__title">HOST DISCONNECTED · PROMOTING…</span>
-          <span class="lobby-banner__sub">Selecting next operative as host.</span>
+          <span class="lobby-banner__title">${this.escHtml(es.lobby.hostLeftTitle)}</span>
+          <span class="lobby-banner__sub">${this.escHtml(es.lobby.hostLeftBody)}</span>
         </div>
-        <span class="lobby-banner__countdown" aria-label="${seconds} seconds remaining">
+        <span class="lobby-banner__countdown" aria-label="${this.escHtml(es.lobby.secondsLeft(seconds))}">
           <span class="lobby-banner__countdown-num">${seconds}</span>
           <span aria-hidden="true">s</span>
         </span>
@@ -554,11 +554,11 @@ export class LobbyUI {
 
   /**
    * Connection-lost scrim. Full-viewport alertdialog over the dimmed
-   * lobby; reuses the existing modal-backdrop + grain treatment. The
-   * reconnect button drives NetworkManager.connect().
+   * lobby. The reconnect button drives NetworkManager.connect().
    */
   private renderConnectionLostScrim(): string {
-    const meta = this.escHtml(this.reconnectMeta ?? 'RETRYING HANDSHAKE');
+    const t = es.connection;
+    const meta = this.escHtml(this.reconnectMeta ?? t.retrying);
     return `
       <div
         class="lobby-scrim"
@@ -567,22 +567,17 @@ export class LobbyUI {
         aria-labelledby="lobby-scrim-title"
         data-scrim="connection-lost"
       >
-        <div class="fm-panel fm-brackets fm-brackets--rust fm-brackets--lg lobby-scrim__card">
+        <div class="fm-panel lobby-scrim__card">
           <span class="fm-panel-dot fm-panel-dot--tl" aria-hidden="true"></span>
           <span class="fm-panel-dot fm-panel-dot--br" aria-hidden="true"></span>
-          <span class="fm-bracket-tr" aria-hidden="true"></span>
-          <span class="fm-bracket-bl" aria-hidden="true"></span>
 
-          <div class="fm-kicker">// SIGNAL DEGRADED</div>
-          <h2 id="lobby-scrim-title" class="lobby-scrim__title">// CONNECTION LOST</h2>
-          <p class="lobby-scrim__sub">
-            Server contact dropped. Mission state held locally.
-          </p>
+          <h2 id="lobby-scrim-title" class="lobby-scrim__title">${this.escHtml(t.lostTitle)}</h2>
+          <p class="lobby-scrim__sub">${this.escHtml(t.lostBody)}</p>
           <div class="lobby-scrim__meta">${meta}</div>
 
           <div class="lobby-scrim__actions">
             <button type="button" class="fm-btn fm-btn--reconnect" data-action="reconnect">
-              <span class="fm-btn__label">Reconnect</span>
+              <span class="fm-btn__label">${this.escHtml(t.reconnect)}</span>
             </button>
           </div>
         </div>
@@ -590,83 +585,57 @@ export class LobbyUI {
     `;
   }
 
-  private renderSquadPanel(
+  private renderPlayersPanel(
     players: { id: PlayerId; name: string; ready: boolean; characterClass: string }[],
     hostId: PlayerId | null,
   ): string {
+    const t = es.lobby;
     const rows = players.map(p => {
       const ready = !!p.characterClass;
-      const statusClass = ready ? 'lobby-status--ready' : 'lobby-status--standby';
-      const statusLabel = ready ? '● READY' : '● STANDBY';
       const isMe = p.id === this.localPlayerId;
       const isHost = p.id === hostId;
-      const charLabel = p.characterClass ? p.characterClass.toUpperCase() : 'NO CLASS';
+      const status = ready
+        ? `<span class="lobby-squad__class fm-mono">${this.escHtml(p.characterClass)}</span>
+           <span class="lobby-squad__dot" aria-hidden="true">·</span>
+           <span class="lobby-status lobby-status--ready">● ${this.escHtml(t.ready)}</span>`
+        : `<span class="lobby-status lobby-status--standby">● ${this.escHtml(t.choosing)}</span>`;
 
       return `
         <li class="lobby-squad__row">
           <div class="lobby-squad__head">
-            <span class="fm-stencil lobby-squad__name">${this.escHtml(p.name || 'OPERATIVE')}</span>
-            ${isMe ? '<span class="lobby-pill lobby-pill--amber">YOU</span>' : ''}
-            ${isHost ? '<span class="lobby-pill lobby-pill--amber">HOST</span>' : ''}
+            <span class="fm-stencil lobby-squad__name">${this.escHtml(displayName(p.name, p.characterClass) || t.playerFallback)}</span>
+            ${isMe ? `<span class="lobby-squad__you">${this.escHtml(t.you)}</span>` : ''}
+            ${isHost ? `<span class="lobby-pill lobby-pill--amber">${this.escHtml(t.host)}</span>` : ''}
           </div>
-          <div class="lobby-squad__sub">
-            <span class="lobby-squad__class fm-mono">${this.escHtml(charLabel)}</span>
-            <span class="lobby-squad__dot" aria-hidden="true">·</span>
-            <span class="lobby-status ${statusClass}">${statusLabel}</span>
-          </div>
+          <div class="lobby-squad__sub">${status}</div>
         </li>
       `;
     }).join('');
 
     return `
-      <section class="fm-panel lobby-panel lobby-panel--squad">
+      <section class="fm-panel lobby-panel lobby-panel--players">
         <div class="lobby-squad__header">
-          <div class="fm-kicker fm-kicker--secondary">SQUAD</div>
+          <h2 class="fm-kicker fm-kicker--secondary" id="lobby-players-title">${this.escHtml(t.players)}</h2>
           <div class="lobby-squad__count fm-mono">${players.length}/${MAX_SQUAD}</div>
         </div>
-        <ul class="lobby-squad">${rows}</ul>
+        <ul class="lobby-squad" aria-labelledby="lobby-players-title">${rows}</ul>
       </section>
     `;
   }
 
-  private renderPlayerPlatePanel(
-    myPlayer: { id: PlayerId; name: string; ready: boolean; characterClass: string },
+  /** Name input + character grid. */
+  private renderYouPanel(
+    myPlayer: { id: PlayerId; name: string } | null,
+    myChar: string | null,
+    takenClasses: Map<string, string>,
   ): string {
-    const ready = !!myPlayer.characterClass;
-    const statusClass = ready ? 'lobby-status--ready' : 'lobby-status--standby';
-    const statusLabel = ready ? '● READY' : '● STANDBY';
-    const avatarInner = myPlayer.characterClass
-      ? `<img class="lobby-player__img" src="${this.escHtml(characterImageUrl(myPlayer.characterClass))}" alt="${this.escHtml(myPlayer.characterClass)}" />`
-      : `<span class="lobby-player__img lobby-player__img--empty" aria-hidden="true"></span>`;
-
-    return `
-      <section class="fm-panel lobby-panel lobby-panel--player">
-        <div class="lobby-player">
-          <div class="lobby-player__avatar">${avatarInner}</div>
-          <input
-            id="lobby-nickname"
-            class="fm-input lobby-player__name"
-            type="text"
-            value="${this.escHtml(myPlayer.name)}"
-            placeholder="ENTER CALL SIGN"
-            maxlength="24"
-            aria-label="Your call sign"
-            autocomplete="off"
-          />
-          <span class="lobby-status ${statusClass} lobby-player__status">${statusLabel}</span>
-        </div>
-      </section>
-    `;
-  }
-
-  private renderRosterPanel(myChar: string | null, takenClasses: Map<string, string>): string {
+    const t = es.lobby;
     const characterKeys = Object.keys(CHARACTER_DEFINITIONS);
 
     const cells = characterKeys.map(name => {
       const isSelected = myChar === name;
       const takenByOther = takenClasses.has(name) && !isSelected;
-      const takenByName = takenClasses.get(name);
-      const role = CHARACTER_ROLES[name] ?? 'OPERATIVE';
+      const takenByName = takenClasses.get(name) ?? '';
 
       const cellClass = [
         'lobby-roster__cell',
@@ -675,8 +644,9 @@ export class LobbyUI {
       ].filter(Boolean).join(' ');
 
       const takenOverlay = takenByOther
-        ? `<div class="lobby-roster__taken-label">${this.escHtml(takenByName ?? 'TAKEN')}</div>`
+        ? `<div class="lobby-roster__taken-label" aria-hidden="true">${this.escHtml(takenByName)}</div>`
         : '';
+      const aria = takenByOther ? t.takenBy(name, takenByName) : t.pickAria(name);
 
       return `
         <button
@@ -687,12 +657,12 @@ export class LobbyUI {
           ${takenByOther ? 'disabled' : ''}
           role="radio"
           aria-checked="${isSelected}"
-          aria-label="Select ${this.escHtml(name)}${takenByOther ? ` (taken by ${this.escHtml(takenByName ?? '')})` : ''}"
+          aria-label="${this.escHtml(aria)}"
         >
           ${renderPhotoSlot({
             size: 'md',
-            name: name.toUpperCase(),
-            role,
+            name,
+            role: roleFor(name),
             selected: isSelected,
             imageUrl: characterImageUrl(name),
           })}
@@ -701,52 +671,72 @@ export class LobbyUI {
       `;
     }).join('');
 
+    const nameField = myPlayer
+      ? `
+        <div class="lobby-you__field">
+          <label class="fm-kicker fm-kicker--secondary" for="lobby-nickname">${this.escHtml(t.nameLabel)}</label>
+          <input
+            id="lobby-nickname"
+            class="fm-input lobby-you__name"
+            type="text"
+            value="${this.escHtml(myPlayer.name)}"
+            placeholder="${this.escHtml(t.namePlaceholder)}"
+            maxlength="24"
+            autocomplete="off"
+          />
+        </div>
+      `
+      : '';
+
     return `
-      <section class="fm-panel lobby-panel lobby-panel--roster">
-        <div class="fm-kicker fm-kicker--secondary">OPERATIVE ROSTER</div>
-        <div class="lobby-roster" role="radiogroup" aria-label="Select operative">
+      <section class="fm-panel lobby-panel lobby-panel--you">
+        ${nameField}
+        <h2 class="fm-kicker fm-kicker--secondary lobby-you__pick" id="lobby-pick-title">${this.escHtml(t.pickSurvivor)}</h2>
+        <div class="lobby-roster" role="radiogroup" aria-labelledby="lobby-pick-title">
           ${cells}
         </div>
       </section>
     `;
   }
 
-  private renderAreaPanel(
+  private renderMapPanel(
     selectedMap: { id: string; name: string; width: number; height: number } | null,
     isHost: boolean,
   ): string {
-    const name = selectedMap?.name ?? 'LOADING MAP';
-    const size = selectedMap ? `${selectedMap.width}×${selectedMap.height}` : '—';
-
+    const t = es.lobby;
+    const emptyLabel = this.mapsLoaded ? t.noPlayableMaps : t.loadingMaps;
     const options = this.availableMaps.length > 0
       ? this.availableMaps.map(m =>
-          `<option value="${this.escHtml(m.id)}" ${m.id === this.selectedMapId ? 'selected' : ''}>${this.escHtml(m.name)}</option>`
+          `<option value="${this.escHtml(m.id)}" ${m.id === this.selectedMapId ? 'selected' : ''}>${this.escHtml(m.name)} · ${m.width}×${m.height}</option>`
         ).join('')
-      : '<option>Loading maps...</option>';
+      : `<option>${this.escHtml(emptyLabel)}</option>`;
 
-    const selectHtml = isHost
-      ? `<select class="lobby-area__select fm-mono" id="lobby-map-select" aria-label="Select map">${options}</select>`
-      : `<div class="lobby-area__readonly fm-mono">HOST SELECTS</div>`;
+    const body = isHost
+      ? `
+        <div class="lobby-area__select-wrap">
+          <select class="lobby-area__select fm-mono" id="lobby-map-select" aria-labelledby="lobby-map-title">${options}</select>
+          <span class="lobby-area__caret" aria-hidden="true">${icon('ChevronDown', 'xs')}</span>
+        </div>
+      `
+      : `
+        <div class="lobby-area__text">
+          <div class="fm-stencil lobby-area__name">${this.escHtml(selectedMap?.name ?? emptyLabel)}</div>
+          <div class="lobby-area__readonly fm-mono">${this.escHtml(t.mapHostPicks)}</div>
+        </div>
+      `;
 
     return `
-      <section class="fm-panel lobby-panel lobby-panel--area">
+      <section class="fm-panel lobby-panel lobby-panel--map">
+        <h2 class="fm-kicker fm-kicker--secondary" id="lobby-map-title">${this.escHtml(t.map)}</h2>
         <div class="lobby-area">
           <div class="lobby-area__bar" aria-hidden="true"></div>
-          <div class="lobby-area__text">
-            <div class="fm-kicker fm-kicker--secondary">AREA OF OPERATION</div>
-            <div class="fm-stencil lobby-area__name">${this.escHtml(name.toUpperCase())} · ${size}</div>
-            <div class="lobby-area__sub fm-mono">HOSTILE DENSITY: MEDIUM</div>
-          </div>
-          <div class="lobby-area__select-wrap">
-            ${selectHtml}
-            <span class="lobby-area__caret" aria-hidden="true">${icon('ChevronDown', 'xs')}</span>
-          </div>
+          ${body}
         </div>
       </section>
     `;
   }
 
-  private renderRoePanel(abomFest: boolean, isHost: boolean): string {
+  private renderOptionsPanel(abomFest: boolean, isHost: boolean): string {
     const disabledAttr = isHost ? '' : 'disabled';
     const readonlyClass = isHost ? '' : ' lobby-roe--readonly';
 
@@ -757,13 +747,13 @@ export class LobbyUI {
     const rows = ROE_RULES.map(rule => {
       const on = !!this.roeRuleStates[rule.id];
       const checkboxId = `lobby-roe-${rule.id}`;
-      const ariaInputId = rule.id === 'endless-horde' ? 'lobby-abom-fest' : checkboxId;
+      const inputId = rule.id === 'endless-horde' ? 'lobby-abom-fest' : checkboxId;
       const chipVariant = rule.riskVariant === 'rust' ? 'lobby-chip lobby-chip--rust' : 'lobby-chip';
       return `
         <label class="lobby-roe">
           <input
             type="checkbox"
-            id="${ariaInputId}"
+            id="${inputId}"
             class="lobby-roe__check"
             data-roe-id="${rule.id}"
             ${on ? 'checked' : ''}
@@ -779,9 +769,9 @@ export class LobbyUI {
     }).join('');
 
     return `
-      <section class="fm-panel lobby-panel lobby-panel--roe${readonlyClass}">
-        <div class="fm-kicker fm-kicker--secondary">RULES OF ENGAGEMENT</div>
-        <div class="lobby-roe-list" role="group" aria-label="Rules of engagement">
+      <section class="fm-panel lobby-panel lobby-panel--options${readonlyClass}">
+        <h2 class="fm-kicker fm-kicker--secondary" id="lobby-options-title">${this.escHtml(es.lobby.options.title)}</h2>
+        <div class="lobby-roe-list" role="group" aria-labelledby="lobby-options-title">
           ${rows}
         </div>
       </section>
@@ -789,24 +779,41 @@ export class LobbyUI {
   }
 
   private renderFooterPanel(isHost: boolean, allReady: boolean): string {
+    const t = es.lobby;
     const players = this.state?.lobby.players ?? [];
     const totalCount = players.length;
     const readyCount = players.filter(p => !!p.characterClass).length;
+    const missingNames = players
+      .filter(p => !p.characterClass)
+      .map(p => displayName(p.name, p.characterClass) || t.playerFallback)
+      .join(', ');
 
-    const primaryBtn = isHost
-      ? renderButton({
-          label: `BEGIN OPERATION · ${readyCount}/${totalCount} READY`,
-          icon: 'Play',
-          variant: 'primary',
-          size: 'lg',
-          fullWidth: true,
-          disabled: !allReady,
-          dataAction: 'start-game',
-        })
-      : `<div class="lobby__waiting">AWAITING HOST DEPLOYMENT</div>`;
+    let primary: string;
+    if (isHost) {
+      const noPlayableMap = this.mapsLoaded && this.availableMaps.length === 0;
+      const btn = renderButton({
+        label: this.escHtml(t.startGame(readyCount, totalCount)),
+        icon: 'Play',
+        variant: 'primary',
+        size: 'lg',
+        fullWidth: true,
+        disabled: !allReady || noPlayableMap,
+        dataAction: 'start-game',
+      });
+      const missing = !allReady && missingNames
+        ? `<div class="lobby-footer__missing" role="status">${this.escHtml(t.missing(missingNames))}</div>`
+        : '';
+      const noMap = noPlayableMap
+        ? `<div class="lobby-footer__missing" role="status">${this.escHtml(t.noPlayableMaps)}</div>`
+        : '';
+      primary = `${noMap}${missing}${btn}`;
+    } else {
+      const hostName = displayName(players[0]?.name, players[0]?.characterClass) || t.host;
+      primary = `<div class="lobby__waiting">${this.escHtml(t.waitingFor(hostName))}</div>`;
+    }
 
     const leaveBtn = renderButton({
-      label: 'LEAVE ROOM',
+      label: this.escHtml(t.leave),
       icon: 'ArrowLeft',
       variant: 'ghost',
       fullWidth: true,
@@ -815,8 +822,8 @@ export class LobbyUI {
 
     return `
       <section class="fm-panel lobby-panel lobby-panel--footer">
-        <div class="lobby-footer">
-          ${primaryBtn}
+        <div class="lobby-footer${isHost ? ' lobby-footer--host' : ''}">
+          ${primary}
           ${leaveBtn}
         </div>
       </section>
@@ -854,14 +861,13 @@ export class LobbyUI {
       const target = e.target as HTMLElement;
       const actionEl = target.closest('[data-action]') as HTMLElement | null;
 
-      // Room pill (handled by id).
-      if (target.closest('#room-pill')) {
+      if (!actionEl) return;
+      const action = actionEl.dataset.action;
+
+      if (action === 'copy-link') {
         this.handleRoomPillCopy();
         return;
       }
-
-      if (!actionEl) return;
-      const action = actionEl.dataset.action;
 
       if (action === 'select-class') {
         const charClass = actionEl.dataset.id;
@@ -881,12 +887,12 @@ export class LobbyUI {
         const targetId = actionEl.dataset.id;
         if (targetId) {
           modalManager.open({
-            title: 'Kick Player?',
+            title: es.lobby.kickTitle,
             size: 'sm',
-            renderBody: () => '<p class="text-secondary">This player will be removed from the lobby.</p>',
+            renderBody: () => `<p class="text-secondary">${this.escHtml(es.lobby.kickBody)}</p>`,
             renderFooter: () => `
-              ${renderButton({ label: 'Cancel', variant: 'secondary', dataAction: 'modal-close' })}
-              ${renderButton({ label: 'Kick', variant: 'destructive', dataAction: 'confirm-kick' })}
+              ${renderButton({ label: this.escHtml(es.common.cancel), variant: 'secondary', dataAction: 'modal-close' })}
+              ${renderButton({ label: this.escHtml(es.lobby.kick), variant: 'destructive', dataAction: 'confirm-kick' })}
             `,
             onOpen: (el) => {
               el.addEventListener('click', (ev) => {
@@ -907,6 +913,7 @@ export class LobbyUI {
 
       if (action === 'start-game') {
         const map = this.availableMaps.find(m => m.id === this.selectedMapId);
+        if (!map) return;
         networkManager.sendAction({
           playerId: this.localPlayerId,
           type: ActionType.START_GAME,
@@ -916,9 +923,7 @@ export class LobbyUI {
       }
 
       if (action === 'leave-room') {
-        networkManager.disconnect();
-        window.history.pushState({}, '', '/');
-        window.location.reload();
+        leaveRoom();
         return;
       }
     });
@@ -1000,14 +1005,15 @@ export class LobbyUI {
       // fall through to notification
     }
 
-    notificationManager.show({ variant: 'warning', message: 'Could not copy. Join link: ' + joinUrl });
+    notificationManager.show({ variant: 'warning', message: es.lobby.copyFailed(joinUrl), duration: 10000 });
   }
 
   // ─── Dossier drawer ──────────────────────────────────────────
 
   private openDossier(charClass: string): void {
     if (!CHARACTER_DEFINITIONS[charClass]) return;
-    const role = CHARACTER_ROLES[charClass] ?? 'OPERATIVE';
+    const role = roleFor(charClass);
+    const title = es.lobby.dossierTitle(charClass);
     const body = renderLobbyDossier(charClass, role);
 
     if (this.dossierModalId && modalManager.isOpen(this.dossierModalId)) {
@@ -1015,7 +1021,7 @@ export class LobbyUI {
       modalManager.updateBody(this.dossierModalId, body);
       const el = modalManager.getElement(this.dossierModalId);
       const titleEl = el?.querySelector('.modal__title') as HTMLElement | null;
-      if (titleEl) titleEl.textContent = `OPERATIVE · ${charClass.toUpperCase()}`;
+      if (titleEl) titleEl.textContent = title;
       const subEl = el?.querySelector('.modal__subtitle') as HTMLElement | null;
       if (subEl) subEl.textContent = role;
       else if (this.dossierModalId) modalManager.updateSubtitle(this.dossierModalId, role);
@@ -1024,7 +1030,7 @@ export class LobbyUI {
 
     this.selectedSurvivorId = charClass;
     this.dossierModalId = modalManager.open({
-      title: `OPERATIVE · ${charClass.toUpperCase()}`,
+      title,
       subtitle: role,
       size: 'sm',
       className: 'lobby-dossier-modal',

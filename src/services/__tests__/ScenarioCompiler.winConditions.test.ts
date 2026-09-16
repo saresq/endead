@@ -8,19 +8,10 @@ import {
   ZombieType,
   Objective,
 } from '../../types/GameState';
+import { makeScenarioMap } from './winConditionHelpers';
 
 function buildMap(winConditions: WinConditionConfig[], extras: Partial<ScenarioMap> = {}): ScenarioMap {
-  return {
-    id: 'm',
-    name: 'wc-test',
-    width: 1,
-    height: 1,
-    schemaVersion: 2,
-    tiles: [],
-    markers: [],
-    winConditions,
-    ...extras,
-  };
+  return makeScenarioMap({ winConditions, ...extras });
 }
 
 describe('ScenarioCompiler — winConditions → Objective[] round-trip', () => {

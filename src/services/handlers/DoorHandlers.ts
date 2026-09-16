@@ -3,6 +3,7 @@ import { GameState, EquipmentCard, ZoneId } from '../../types/GameState';
 import { ActionRequest, ActionType } from '../../types/Action';
 import { ZombiePhaseManager } from '../ZombiePhaseManager';
 import { getConnection, openDoorEdge } from './handlerUtils';
+import { es } from '../../strings/es';
 
 export function handleOpenDoor(state: GameState, intent: ActionRequest): GameState {
   const newState = structuredClone(state);
@@ -16,12 +17,12 @@ export function handleOpenDoor(state: GameState, intent: ActionRequest): GameSta
 
   if (!targetZone) throw new Error('Target zone invalid');
   const conn = getConnection(currentZone, targetZoneId);
-  if (!conn) throw new Error('Target zone not connected');
-  if (!conn.hasDoor) throw new Error('No door on this edge');
-  if (conn.doorOpen) throw new Error('Door is already open');
+  if (!conn) throw new Error(es.errors.zonesNotConnected);
+  if (!conn.hasDoor) throw new Error(es.errors.noDoor);
+  if (conn.doorOpen) throw new Error(es.errors.doorAlreadyOpen);
 
   const hasOpener = survivor.inventory.some((c: EquipmentCard) => c.inHand && c.canOpenDoor);
-  if (!hasOpener) throw new Error('Requires equipment to open doors (in hand)');
+  if (!hasOpener) throw new Error(es.errors.needDoorOpener);
 
   // Open door on both sides of the edge
   openDoorEdge(newState, survivor.position.zoneId, targetZoneId);
@@ -95,7 +96,7 @@ export function handleOpenDoor(state: GameState, intent: ActionRequest): GameSta
     playerId: intent.playerId,
     survivorId: intent.survivorId,
     timestamp: Date.now(),
-    description: `Opened door to ${targetZoneId}${spawned ? ' — zombies spawned!' : ''}`,
+    description: es.log.doorOpened(spawned),
   };
 
   return newState;

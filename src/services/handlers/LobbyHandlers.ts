@@ -8,36 +8,37 @@ import { SURVIVOR_CLASSES } from '../../config/SkillRegistry';
 import { DEFAULT_MAP } from '../../config/DefaultMap';
 import { buildStartingEquipment } from '../../config/CharacterRegistry';
 import { seedFromString } from '../Rng';
+import { es } from '../../strings/es';
 
 export function handleJoinLobby(state: GameState, intent: ActionRequest): GameState {
     return state;
 }
 
 export function handleUpdateNickname(state: GameState, intent: ActionRequest): GameState {
-    if (state.phase !== GamePhase.Lobby) throw new Error('Game already started');
+    if (state.phase !== GamePhase.Lobby) throw new Error(es.errors.gameStarted);
 
     const rawName = intent.payload?.name;
     const normalizedName = typeof rawName === 'string' ? rawName.replace(/<[^>]*>/g, '').trim() : '';
     const nextName = normalizedName.slice(0, 24);
 
-    if (!nextName) throw new Error('Nickname is required');
+    if (!nextName) throw new Error(es.errors.nameRequired);
 
     const newState = structuredClone(state);
     const player = newState.lobby.players.find((p: any) => p.id === intent.playerId);
 
-    if (!player) throw new Error('Player not in lobby');
+    if (!player) throw new Error(es.errors.notInLobby);
 
     player.name = nextName;
     return newState;
 }
 
 export function handleSelectCharacter(state: GameState, intent: ActionRequest): GameState {
-    if (state.phase !== GamePhase.Lobby) throw new Error('Game already started');
+    if (state.phase !== GamePhase.Lobby) throw new Error(es.errors.gameStarted);
 
     const newState = structuredClone(state);
     const playerIndex = newState.lobby.players.findIndex((p: any) => p.id === intent.playerId);
 
-    if (playerIndex === -1) throw new Error('Player not in lobby');
+    if (playerIndex === -1) throw new Error(es.errors.notInLobby);
 
     const charClass = intent.payload?.characterClass;
     if (!charClass) throw new Error('Character class required');
@@ -51,7 +52,7 @@ export function handleSelectCharacter(state: GameState, intent: ActionRequest): 
     const taken = newState.lobby.players.some((p: any) =>
         p.characterClass === charClass && p.id !== intent.playerId
     );
-    if (taken) throw new Error('Character class already taken');
+    if (taken) throw new Error(es.errors.characterTaken);
 
     newState.lobby.players[playerIndex].characterClass = charClass;
     newState.lobby.players[playerIndex].ready = true; // Auto-ready on select
@@ -60,8 +61,8 @@ export function handleSelectCharacter(state: GameState, intent: ActionRequest): 
 }
 
 export function handleStartGame(state: GameState, intent: ActionRequest): GameState {
-    if (state.phase !== GamePhase.Lobby) throw new Error('Game already started');
-    if (state.lobby.players[0].id !== intent.playerId) throw new Error('Only host can start game');
+    if (state.phase !== GamePhase.Lobby) throw new Error(es.errors.gameStarted);
+    if (state.lobby.players[0].id !== intent.playerId) throw new Error(es.errors.hostOnlyStart);
 
     const newState = structuredClone(state);
 
@@ -160,7 +161,7 @@ export function handleStartGame(state: GameState, intent: ActionRequest): GameSt
 export function handleEndGame(state: GameState, intent: ActionRequest): GameState {
     const hostId = state.lobby.players[0]?.id || state.players[0];
     if (!hostId) throw new Error('Cannot end game without a host');
-    if (intent.playerId !== hostId) throw new Error('Only host can end game');
+    if (intent.playerId !== hostId) throw new Error(es.errors.hostOnlyEnd);
 
     const resetState = structuredClone(initialGameState) as GameState;
     resetState.lobby.players = state.lobby.players.map((player: any) => ({

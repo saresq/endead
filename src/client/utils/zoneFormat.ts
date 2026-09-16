@@ -3,6 +3,7 @@
 // Converts raw zone IDs (z_x_y, sz_x_y, bz_x_y) into human-readable labels.
 
 import { ZoneId, GameState } from '../../types/GameState';
+import { es } from '../../strings/es';
 
 /** Cached spawn number map — rebuilt whenever game state changes. */
 let _cachedSpawnMap: Map<string, number> | null = null;
@@ -42,7 +43,7 @@ export function formatZoneId(zoneId: ZoneId, state?: GameState): string {
     const spawnMap = getSpawnMap(state);
     const spawnNum = spawnMap.get(zoneId);
     if (spawnNum !== undefined) {
-      return `Spawner ${spawnNum}`;
+      return es.zones.spawn(spawnNum);
     }
   }
 
@@ -55,11 +56,11 @@ export function formatZoneId(zoneId: ZoneId, state?: GameState): string {
 
     switch (prefix) {
       case 'z':
-        return `Cell (${x}, ${y})`;
+        return es.zones.cell(x, y);
       case 'sz':
-        return `Street Zone (${x}, ${y})`;
+        return es.zones.street(x, y);
       case 'bz':
-        return `Building Zone (${x}, ${y})`;
+        return es.zones.building(x, y);
       default:
         return zoneId;
     }
@@ -69,15 +70,12 @@ export function formatZoneId(zoneId: ZoneId, state?: GameState): string {
 }
 
 /**
- * Format an action type enum value into readable text.
- *
- * Examples:
- *   "MOVE"          -> "Move"
- *   "OPEN_DOOR"     -> "Open Door"
- *   "TRADE_START"   -> "Trade Start"
- *   "END_TURN"      -> "End Turn"
+ * Format an action type enum value into readable text via `es.actions`.
+ * Unmapped types fall back to title case ("SOME_TYPE" -> "Some Type").
  */
 export function formatActionType(actionType: string): string {
+  const label = es.actions[actionType];
+  if (label) return label;
   return actionType
     .split('_')
     .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())

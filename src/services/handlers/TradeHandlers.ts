@@ -1,13 +1,14 @@
 
 import { GameState, EquipmentCard } from '../../types/GameState';
 import { ActionRequest, ActionType } from '../../types/Action';
+import { es } from '../../strings/es';
 
 export function handleTradeStart(state: GameState, intent: ActionRequest): GameState {
   const survivorId = intent.survivorId!;
   const targetSurvivorId = intent.payload?.targetSurvivorId;
 
-  if (!targetSurvivorId) throw new Error('Target survivor required');
-  if (state.activeTrade) throw new Error('Trade already active');
+  if (!targetSurvivorId) throw new Error(es.errors.chooseSurvivor);
+  if (state.activeTrade) throw new Error(es.errors.tradeActive);
 
   const newState = structuredClone(state);
   const active = newState.survivors[survivorId];
@@ -15,8 +16,8 @@ export function handleTradeStart(state: GameState, intent: ActionRequest): GameS
 
   // Validation
   if (!target) throw new Error('Target not found');
-  if (active.position.zoneId !== target.position.zoneId) throw new Error('Must be in same zone');
-  if (active.actionsRemaining < 1) throw new Error('Not enough actions');
+  if (active.position.zoneId !== target.position.zoneId) throw new Error(es.errors.sameZone);
+  if (active.actionsRemaining < 1) throw new Error(es.errors.noActions);
 
   // Init Session
   newState.activeTrade = {
@@ -40,7 +41,7 @@ export function handleTradeStart(state: GameState, intent: ActionRequest): GameS
 }
 
 export function handleTradeOffer(state: GameState, intent: ActionRequest): GameState {
-  if (!state.activeTrade) throw new Error('No active trade');
+  if (!state.activeTrade) throw new Error(es.errors.noTrade);
 
   const survivorId = intent.survivorId!;
   const offerIds = intent.payload?.offerCardIds as string[];
@@ -51,14 +52,14 @@ export function handleTradeOffer(state: GameState, intent: ActionRequest): GameS
   const trade = newState.activeTrade!;
 
   if (survivorId !== trade.activeSurvivorId && survivorId !== trade.targetSurvivorId) {
-    throw new Error('Not a participant in this trade');
+    throw new Error(es.errors.notInTrade);
   }
 
   const survivor = newState.survivors[survivorId];
   const inventoryIds = survivor.inventory.map((c: EquipmentCard) => c.id);
   const allOwned = offerIds.every((id: string) => inventoryIds.includes(id));
 
-  if (!allOwned) throw new Error('Cannot offer items you do not own');
+  if (!allOwned) throw new Error(es.errors.offerOwnItems);
 
   trade.offers[survivorId] = offerIds;
   trade.status[trade.activeSurvivorId] = false;
@@ -68,14 +69,14 @@ export function handleTradeOffer(state: GameState, intent: ActionRequest): GameS
 }
 
 export function handleTradeAccept(state: GameState, intent: ActionRequest): GameState {
-  if (!state.activeTrade) throw new Error('No active trade');
+  if (!state.activeTrade) throw new Error(es.errors.noTrade);
 
   const survivorId = intent.survivorId!;
   const newState = structuredClone(state);
   const trade = newState.activeTrade!;
 
   if (survivorId !== trade.activeSurvivorId && survivorId !== trade.targetSurvivorId) {
-    throw new Error('Not a participant');
+    throw new Error(es.errors.notInTrade);
   }
 
   // Check for receiveLayout in payload

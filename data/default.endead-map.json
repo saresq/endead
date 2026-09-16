@@ -4,6 +4,7 @@
   "width": 4,
   "height": 3,
   "gridSize": 30,
+  "schemaVersion": 2,
   "tiles": [
     {
       "id": "tile-1-2",
@@ -120,5 +121,9 @@
       "x": 118,
       "y": 47
     }
+  ],
+  "winConditions": [
+    { "type": "REACH_EXIT" },
+    { "type": "TAKE_OBJECTIVE", "amount": 6 }
   ]
 }

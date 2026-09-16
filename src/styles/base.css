@@ -1,9 +1,9 @@
 /* ==========================================================================
    Base — Global element styles using design tokens
 
-   Industrial decay. Every surface reads as corroded steel plate,
-   pitted concrete, rust-bleeding seams. The danger level system
-   accelerates the decay — cold fluorescent to furnace meltdown.
+   Pulp comic. The page is flat dark ink; everything that carries content
+   is cream paper with an ink outline. No grain, no scanlines, no vignette,
+   no rust — contrast and outline do the work.
    ========================================================================== */
 
 /* ---------- Root sizing ---------- */
@@ -22,156 +22,53 @@ html {
   }
 }
 
-/* ---------- Body — base surface + atmospheric layering ---------- */
+/* ---------- Body — flat ink ground ---------- */
 
 body {
-  font-family: var(--font-sans);
+  font-family: var(--font-body);
   font-weight: var(--font-normal);
-  color: var(--bone-100);
-  background-color: var(--dl-bg, var(--bg-0));
+  font-variant-numeric: tabular-nums;
+  color: var(--text-on-page);
+  background-color: var(--page);
   min-height: 100%;
-  /* Industrial grid — reinforcement mesh barely visible in concrete */
-  background-image:
-    linear-gradient(rgba(184, 112, 48, 0.015) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(184, 112, 48, 0.015) 1px, transparent 1px);
-  background-size: 40px 40px;
-  transition:
-    background-color var(--duration-slow) var(--ease-in-out),
-    color var(--duration-slow) var(--ease-in-out);
-}
-
-/* ---------- Atmospheric vignette — industrial darkness creeps from edges ---------- */
-
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: 9997;
-  pointer-events: none;
-  /* Three-layer vignette: edge void + danger tint + rust stain corners */
-  background:
-    radial-gradient(
-      ellipse at center,
-      transparent var(--dl-vignette-radius, 50%),
-      var(--dl-vignette-color, transparent) 100%
-    ),
-    radial-gradient(
-      ellipse at center,
-      transparent 35%,
-      rgba(0, 0, 0, 0.65) 100%
-    ),
-    radial-gradient(
-      ellipse at 15% 85%,
-      rgba(120, 60, 20, 0.04) 0%,
-      transparent 50%
-    );
-  opacity: var(--dl-vignette-opacity, 0);
-  transition:
-    opacity var(--duration-slow) var(--ease-in-out),
-    background var(--duration-slow) var(--ease-in-out);
-  mix-blend-mode: multiply;
-}
-
-/* ---------- Industrial grain + rust speckle — intensifies with danger ---------- */
-
-body::after {
-  content: '';
-  position: fixed;
-  inset: -50%; /* Oversized so tiling never shows seams */
-  z-index: 9999;
-  pointer-events: none;
-  opacity: var(--dl-grain-opacity, var(--grain-opacity));
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='5' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-  background-repeat: repeat;
-  background-size: 180px 180px;
-  transition: opacity var(--duration-slow) var(--ease-in-out);
-  will-change: opacity;
-}
-
-/* ---------- Scanline texture — applied to HUD panels via class ---------- */
-
-.scanlines {
   position: relative;
 }
 
-.scanlines::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    var(--hud-scanline-color, rgba(0, 0, 0, 0.18)) 2px,
-    var(--hud-scanline-color, rgba(0, 0, 0, 0.18)) 4px
-  );
-  opacity: var(--dl-scanline-opacity, 0.12);
-  transition: opacity var(--duration-normal) var(--ease-in-out);
-}
-
-/* ---------- Panel depth treatment — recessed, corroded ---------- */
-
-.panel-inset {
-  background: var(--surface-inset);
-  box-shadow:
-    inset 0 2px 4px rgba(0, 0, 0, 0.75),
-    inset 0 0 0 1px rgba(0, 0, 0, 0.5),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.02);
-}
-
-/* ---------- Corner-clipped bevel — tactical hardware aesthetic ---------- */
-
-.bevel-corner {
-  --bevel: var(--card-corner-clip, 6px);
-  clip-path: polygon(
-    var(--bevel) 0%,
-    100% 0%,
-    100% calc(100% - var(--bevel)),
-    calc(100% - var(--bevel)) 100%,
-    0% 100%,
-    0% var(--bevel)
-  );
-}
-
-/* ---------- Scrollbar styling — dark metal track ---------- */
+/* ---------- Scrollbar styling ---------- */
 
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--bg-0);
-  border-left: 1px solid var(--olive-700);
+  background: var(--paper-3);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--olive-500);
-  border-radius: var(--radius-none);
-  border-left: 1px solid rgba(255, 255, 255, 0.04);
+  background: var(--ink);
+  border-radius: var(--radius-full);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
+  background: var(--text-2);
 }
 
 ::-webkit-scrollbar-corner {
-  background: var(--bg-0);
+  background: var(--paper-3);
 }
 
 /* ---------- Text selection ---------- */
 
 ::selection {
-  background: var(--amber-400);
-  color: var(--text-inverse);
+  background: var(--highlight);
+  color: var(--ink);
 }
 
-/* ---------- Focus ring — accessible, tactical ---------- */
+/* ---------- Focus ring ---------- */
 
 :focus-visible {
-  outline: var(--border-thick) solid var(--amber-400);
+  outline: var(--border-width-heavy) solid var(--highlight);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
 }
@@ -180,7 +77,7 @@ body::after {
   outline: none;
 }
 
-/* ---------- Monospace text elements ---------- */
+/* ---------- Monospace-slot text elements ---------- */
 
 code,
 pre,
@@ -192,59 +89,33 @@ kbd {
 
 kbd {
   display: inline-block;
-  padding: 1px 5px;
-  background: var(--bg-2);
-  border: 1px solid var(--olive-500);
-  border-bottom-width: 2px;
+  padding: 0 4px;
+  background: var(--paper-3);
+  border: var(--border);
   border-radius: var(--radius-sm);
   font-size: var(--text-2xs);
-  color: var(--bone-300);
+  color: var(--text);
   letter-spacing: var(--letter-spacing-wide);
   text-transform: uppercase;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
   line-height: 1.6;
 }
 
-/* ---------- Horizontal rules — welded seam dividers ---------- */
+/* ---------- Horizontal rules ---------- */
 
 hr {
   border: none;
-  height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    var(--olive-700) 15%,
-    var(--olive-500) 50%,
-    var(--olive-700) 85%,
-    transparent
-  );
+  height: 2px;
+  background: var(--line);
   margin: var(--space-4) 0;
-  position: relative;
-}
-
-/* Rust bleed on dividers */
-hr::after {
-  content: '';
-  position: absolute;
-  inset: -1px 20% 0 20%;
-  height: 3px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(140, 60, 20, 0.06) 30%,
-    rgba(140, 60, 20, 0.04) 70%,
-    transparent
-  );
-  pointer-events: none;
 }
 
 /* ---------- Base typographic elements ---------- */
 
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display);
-  font-weight: var(--font-bold);
+  font-weight: var(--font-normal);
   letter-spacing: var(--letter-spacing-wide);
-  color: var(--bone-100);
+  color: inherit;
   line-height: 1.1;
   text-transform: uppercase;
   margin: 0;
@@ -277,70 +148,9 @@ button {
 input,
 select,
 textarea {
-  font-family: var(--font-sans);
+  font-family: var(--font-body);
   font-size: inherit;
   color: inherit;
-}
-
-/* ---------- Rust bleed overlay — corrosion spreading from edges at high danger ---------- */
-
-body {
-  position: relative;
-}
-
-/* Rust stain corners — intensify with danger level via dl-rust-bleed token */
-@supports (opacity: var(--dl-rust-bleed)) {
-  body::before {
-    /* Layer rust stains from corners at high danger */
-    background:
-      /* Corner rust stains that grow with danger */
-      radial-gradient(
-        ellipse 35% 45% at 5% 95%,
-        rgba(120, 55, 15, var(--dl-rust-bleed, 0)) 0%,
-        transparent 70%
-      ),
-      radial-gradient(
-        ellipse 40% 35% at 95% 5%,
-        rgba(100, 40, 10, var(--dl-rust-bleed, 0)) 0%,
-        transparent 60%
-      ),
-      radial-gradient(
-        ellipse at center,
-        transparent var(--dl-vignette-radius, 50%),
-        var(--dl-vignette-color, transparent) 100%
-      ),
-      radial-gradient(
-        ellipse at center,
-        transparent 35%,
-        rgba(0, 0, 0, 0.65) 100%
-      ),
-      radial-gradient(
-        ellipse at 15% 85%,
-        rgba(120, 60, 20, 0.04) 0%,
-        transparent 50%
-      );
-  }
-}
-
-/* ---------- Danger-level ambient glow helper ---------- */
-/* Applied to major panels to pick up the atmospheric color shift */
-
-.dl-glow-panel {
-  box-shadow:
-    var(--shadow-panel),
-    0 0 24px var(--dl-glow, transparent),
-    inset 0 0 0 1px var(--dl-panel-border, transparent);
-  transition:
-    box-shadow var(--duration-slow) var(--ease-in-out),
-    border-color var(--duration-slow) var(--ease-in-out);
-}
-
-/* ---------- Utility: phosphor text readout ---------- */
-
-.hud-readout {
-  font-family: var(--font-hud);
-  color: var(--dl-text-readout, var(--text-hud));
-  transition: color var(--duration-slow) var(--ease-in-out);
 }
 
 /* ---------- Reduced motion — respect OS setting ---------- */

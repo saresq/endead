@@ -12,6 +12,7 @@ import { Zone, ZoneConnection, ZoneId, Objective, ObjectiveType, ObjectiveColor,
 import { TileDefinition, TileCellDef, TileEdgeDef, EdgeSide } from '../types/TileDefinition';
 import { getRotatedTileDefinition, getCellAt, getEdgeAt, getInternalEdge } from './TileDefinitionService';
 import { TILE_CELLS_PER_SIDE } from '../config/Layout';
+import { es, equipmentName, zombieLabel } from '../strings/es';
 
 export type EdgeClass = 'open' | 'wall' | 'crosswalk' | 'door' | 'doorway';
 
@@ -582,20 +583,23 @@ const DANGER_FROM_THRESHOLD: Record<'YELLOW' | 'ORANGE' | 'RED', DangerLevel> = 
 
 function describeWinCondition(c: WinConditionConfig): string {
   switch (c.type) {
-    case 'REACH_EXIT': return 'All Survivors must reach the Exit';
-    case 'TAKE_OBJECTIVE': return `Take ${c.amount} Objective token${c.amount === 1 ? '' : 's'}`;
-    case 'TAKE_COLOR_OBJECTIVE': return `Take ${c.amount} ${c.color.toLowerCase()} Objective token${c.amount === 1 ? '' : 's'}`;
-    case 'TAKE_EPIC_CRATE': return `Take ${c.amount} Epic Weapon Crate${c.amount === 1 ? '' : 's'}`;
+    case 'REACH_EXIT': return es.objectives.reachExit;
+    case 'TAKE_OBJECTIVE': return es.objectives.takeObjective(c.amount);
+    case 'TAKE_COLOR_OBJECTIVE': return es.objectives.takeColorObjective(c.amount, c.color);
+    case 'TAKE_EPIC_CRATE': return es.objectives.takeEpicCrate(c.amount);
     case 'KILL_ZOMBIE': {
-      const label = c.zombieType === 'ANY' ? 'zombie' : c.zombieType.toLowerCase();
-      return `Kill ${c.amount} ${label}${c.amount === 1 ? '' : 's'}`;
+      const label = c.zombieType === 'ANY'
+        ? es.objectives.anyZombie(c.amount)
+        : zombieLabel(c.zombieType as ZombieType, c.amount);
+      return es.objectives.killZombie(c.amount, label);
     }
     case 'COLLECT_ITEMS': {
-      const parts = c.items.map(i => `${i.quantity}× ${i.equipmentId}`);
-      return `Collect items: ${parts.join(', ')}`;
+      const parts = c.items.map(i =>
+        es.objectives.itemQuantity(i.quantity, equipmentName({ equipmentId: i.equipmentId, name: i.equipmentId })));
+      return es.objectives.collectItems(parts);
     }
     case 'REACH_DANGER_LEVEL':
-      return `Reach ${c.threshold} danger level`;
+      return es.objectives.reachDangerLevel(es.danger[DANGER_FROM_THRESHOLD[c.threshold]]);
   }
 }
 
@@ -682,7 +686,7 @@ function compileLegacyObjectives(exitZoneIds: string[], yellowObjectiveZoneIds: 
     objectives.push({
       id: 'obj-reach-exit',
       type: ObjectiveType.ReachExit,
-      description: 'All Survivors must reach the Exit',
+      description: es.objectives.reachExit,
       exitZoneId: exitZoneIds[0],
       completed: false,
     });
@@ -692,7 +696,7 @@ function compileLegacyObjectives(exitZoneIds: string[], yellowObjectiveZoneIds: 
     objectives.push({
       id: 'obj-take-objectives',
       type: ObjectiveType.TakeObjective,
-      description: `Collect all objective tokens (${yellowObjectiveZoneIds.length})`,
+      description: es.objectives.takeAllObjectives(yellowObjectiveZoneIds.length),
       amountRequired: yellowObjectiveZoneIds.length,
       amountCurrent: 0,
       completed: false,

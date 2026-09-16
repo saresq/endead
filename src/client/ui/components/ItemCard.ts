@@ -11,14 +11,15 @@
 
 import { EquipmentCard } from '../../../types/GameState';
 import { icon } from './icons';
+import { es, equipmentName } from '../../../strings/es';
 
 export type ItemCardVariant = 'default' | 'ghost' | 'featured' | 'weapon';
 
 export interface ItemCardOptions {
   variant?: ItemCardVariant;
-  badge?: string;           // "NEW", "GET", "PLACED" — floats top-right
+  badge?: string;           // e.g. es.pickup.badgeNew — floats top-right
   tappable?: boolean;       // Adds pointer cursor for tap-to-select UIs
-  showSlot?: boolean;       // Show "WEAPON · Hand 1" line (default true)
+  showSlot?: boolean;       // Show "Arma · Mano 1" line (default true)
   showStats?: boolean;      // Show stats inline with name (default true)
   placed?: boolean;         // Grayed-out state for featured items that have been placed
   discarded?: boolean;      // Subtle red tint for items in the discard zone
@@ -53,22 +54,23 @@ export function renderItemCard(card: EquipmentCard | null | undefined, opts?: It
   const tappableClass = tappable ? ' item-card--tappable' : '';
   const typeIcon = icon(getTypeIconName(card), 'sm');
 
-  // Stats inline with name: "Shotgun 4+ · 2d6 · 2 dmg" with optional green boosts
+  // Stats inline with name: "Escopeta 4+ · 2d6 · 2 daño" with optional green boosts
   let statsInline = '';
   if (showStats && card.stats) {
     const diceStr = bonusDice > 0
       ? `${card.stats.dice}<span class="item-card__boosted">+${bonusDice}</span>d6`
       : `${card.stats.dice}d6`;
     const dmgStr = bonusDamage > 0
-      ? `${card.stats.damage}<span class="item-card__boosted">+${bonusDamage}</span> dmg`
-      : `${card.stats.damage} dmg`;
+      ? `${card.stats.damage}<span class="item-card__boosted">+${bonusDamage}</span> ${es.board.damageUnit}`
+      : `${card.stats.damage} ${es.board.damageUnit}`;
     statsInline = `<span class="item-card__stats">${card.stats.accuracy}+ · ${diceStr} · ${dmgStr}</span>`;
   }
 
-  // Secondary line: "WEAPON · Hand 1"
-  const slotLabel = card.slot || 'Backpack';
+  // Secondary line: "Arma · Mano 1"
+  const slotLabel = es.slots[card.slot ?? 'BACKPACK'] ?? card.slot;
+  const typeLabel = es.itemTypes[card.type] ?? card.type;
   const metaLine = showSlot
-    ? `<div class="item-card__meta">${card.type} · ${slotLabel}</div>`
+    ? `<div class="item-card__meta">${typeLabel} · ${slotLabel}</div>`
     : '';
 
   const badgeHtml = badge
@@ -82,7 +84,7 @@ export function renderItemCard(card: EquipmentCard | null | undefined, opts?: It
       ${badgeHtml}
       <span class="item-card__icon">${typeIcon}</span>
       <div class="item-card__body">
-        <span class="item-card__name">${card.name}</span>
+        <span class="item-card__name">${equipmentName(card)}</span>
         ${statsInline}
         ${metaLine}
       </div>
@@ -93,16 +95,16 @@ export function renderItemCard(card: EquipmentCard | null | undefined, opts?: It
  * Renders an empty slot placeholder.
  */
 export function renderEmptySlot(): string {
-  return '<span class="item-card__empty">Empty</span>';
+  return `<span class="item-card__empty">${es.common.empty}</span>`;
 }
 
 /**
  * Renders a single capacity counter for empty bag slots.
- * Replaces N identical "EMPTY" rows with one "+ N SLOTS FREE" affordance.
+ * Replaces N identical empty rows with one "+ N espacios libres" affordance.
  */
 export function renderEmptySlotsCounter(count: number): string {
   if (count <= 0) return '';
-  const label = count === 1 ? '1 SLOT FREE' : `${count} SLOTS FREE`;
+  const label = es.board.slotsFree(count);
   return `
     <div class="item-card item-card--slots-counter" aria-label="${label.toLowerCase()}">
       <span class="item-card__icon item-card__icon--plus" aria-hidden="true">+</span>

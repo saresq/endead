@@ -16,6 +16,7 @@ import {
   EquipmentType,
 } from '../../types/GameState';
 import { seedFromString } from '../Rng';
+import { ScenarioMap } from '../../types/Map';
 
 export function makeZone(overrides: Partial<Zone> & { id: string }): Zone {
   return {
@@ -220,5 +221,24 @@ export function reachDangerObj(threshold: DangerLevel): Objective {
     description: `reach ${threshold}`,
     dangerThreshold: threshold,
     completed: false,
+  };
+}
+
+/**
+ * Minimal authored map. Tile-less and marker-less by default: a caller that
+ * needs real zones passes `tiles` (and `gridSize`), one that only cares about
+ * win conditions leaves them empty.
+ */
+export function makeScenarioMap(over: Partial<ScenarioMap> = {}): ScenarioMap {
+  return {
+    id: 'm',
+    name: 'test-map',
+    width: 1,
+    height: 1,
+    schemaVersion: 2,
+    tiles: [],
+    markers: [],
+    winConditions: [],
+    ...over,
   };
 }

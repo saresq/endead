@@ -3,7 +3,7 @@
  *
  * Usage:
  *   import { tooltip } from './ui/components/Tooltip';
- *   tooltip.show(screenX, screenY, '<b>Walker</b>');
+ *   tooltip.show(screenX, screenY, '<b>Caminante</b>');
  *   tooltip.hide();
  */
 

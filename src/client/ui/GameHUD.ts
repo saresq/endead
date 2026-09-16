@@ -1,7 +1,8 @@
 
-import { GameState, PlayerId, EntityId, Survivor, GameResult, EquipmentCard, ObjectiveType } from '../../types/GameState';
+import { GameState, GamePhase, PlayerId, EntityId, Survivor, GameResult, EquipmentCard, ObjectiveType } from '../../types/GameState';
 import { ActionType } from '../../types/Action';
 import { networkManager } from '../NetworkManager';
+import { leaveRoom } from '../roomExit';
 import { InputController } from '../InputController';
 import { TradeUI } from './TradeUI';
 import { PickupUI } from './PickupUI';
@@ -10,25 +11,44 @@ import { audioManager } from '../AudioManager';
 import { icon } from './components/icons';
 import { renderAvatar } from './components/PlayerAvatar';
 import { renderActionButton } from './components/ActionButton';
-import { renderLastActionEntry, renderSpawnEntry, type SpawnCardData } from './components/EventEntry';
+import { renderEventEntry } from './components/EventEntry';
+import { displayableEntries, groupByRound } from './eventLog';
 import { renderButton } from './components/Button';
 import { renderItemCard, renderEmptySlotsCounter } from './components/ItemCard';
-import { renderStatCell } from './components/StatCell';
-import { renderSquadPlate, type SquadPlateRank } from './components/SquadPlate';
 import { renderPhotoSlot } from './components/PhotoSlot';
 import { modalManager } from './overlays/ModalManager';
 import { notificationManager } from './NotificationManager';
-import { formatZoneId, formatActionType } from '../utils/zoneFormat';
+import { formatZoneId } from '../utils/zoneFormat';
+import { displayName, displayNameWithClass } from '../utils/displayName';
 import { SKILL_DEFINITIONS } from '../../config/SkillRegistry';
 import { XPManager } from '../../services/XPManager';
+import { BottomSheet, type SheetHeights } from './components/BottomSheet';
+import { DECK_LAYOUT_QUERY, LANDSCAPE_QUERY, resolveHudLayout, type HudLayout } from './layoutQueries';
+import { es, equipmentName, skillName, skillDescription } from '../../strings/es';
+
+/** Camera surface the HUD drives; optional so the HUD can run without a board. */
+export interface HudBoardCamera {
+  setViewport(rect: { x: number; y: number; w: number; h: number }): void;
+  fitBoard(animate?: boolean): void;
+}
+
+export interface GameHUDOptions {
+  renderer?: HudBoardCamera;
+}
 
 // Mirrors `FOOD_EQUIPMENT_IDS` in `services/handlers/ItemHandlers.ts`. Kept
 // in sync manually because the client has no direct dependency on handler
 // modules. If a fourth food card is ever added, update both sites.
 const FOOD_EQUIPMENT_IDS = new Set(['bag_of_rice', 'canned_food', 'water']);
 
-/** Map Zombicide danger level → SquadPlate rank color. */
-function dangerToRank(level: string): SquadPlateRank {
+/** Action button costs; ActionButton hides COST_ONE and styles COST_FREE. */
+const COST_ONE = es.common.actions(1);
+const COST_FREE = es.common.free;
+
+type RankColor = 'blue' | 'yellow' | 'orange' | 'red';
+
+/** Rank colour for the XP bar, by Zombicide danger level. */
+function dangerToRank(level: string): RankColor {
   switch ((level || '').toLowerCase()) {
     case 'yellow': return 'yellow';
     case 'orange': return 'orange';
@@ -38,7 +58,7 @@ function dangerToRank(level: string): SquadPlateRank {
 }
 
 /** Color of the rank a survivor is progressing toward; max-rank survivors stay on their current color. */
-function nextRankColor(level: string): SquadPlateRank {
+function nextRankColor(level: string): RankColor {
   switch ((level || '').toLowerCase()) {
     case 'yellow': return 'orange';
     case 'orange': return 'red';
@@ -84,12 +104,6 @@ function iconForSkill(skillId: string): string {
   return 'Star';
 }
 
-/** Short OP callsign for squad plates (e.g. "P-01"). */
-function callsignFor(_survivor: Survivor, idx: number): string {
-  const n = String(idx + 1).padStart(2, '0');
-  return `P-${n}`;
-}
-
 function escapeHtml(s: string): string {
   return String(s ?? '')
     .replace(/&/g, '&amp;')
@@ -97,8 +111,6 @@ function escapeHtml(s: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
-
-const FEED_TTL_MS = 3000;
 
 export class GameHUD {
   private container: HTMLElement;
@@ -111,32 +123,50 @@ export class GameHUD {
   private backpackModalId: string | null = null;
   private foodConfirmModalId: string | null = null;
   private endGameModalId: string | null = null;
-  private historyModalId: string | null = null;
+  private logModalId: string | null = null;
+  /** Displayable history length rendered into the open log. */
+  private logRenderedCount = 0;
+  /** Displayable entries seen when the log was last opened; null until the first state. */
+  private seenEntryCount: number | null = null;
   private woundPickerModalId: string | null = null;
   private woundPickerSelected: Set<string> = new Set();
   private woundDistModalId: string | null = null;
   private woundDistAssignments: Record<string, number> = {};
   private skillChoiceModalId: string | null = null;
   private skillChoiceSurvivorId: EntityId | null = null;
-  private dismissedFeedTimestamp: number | null = null;
-  private feedAutoDismissTimer: ReturnType<typeof setTimeout> | null = null;
-  private feedAutoDismissScheduledFor: number | null = null;
+  private dismissedEntryTs: number | null = null;
+  /** Card entry whose dice already rolled in; null until the first render. */
+  private lastRolledEntryTs: number | null = null;
   private boundDelegateHandler: (e: Event) => void;
-  private mobileActionsTrayOpen = false;
-  private laptopBreakpoint: MediaQueryList = window.matchMedia('(min-width: 1024px)');
+  private boundKeyHandler = (e: KeyboardEvent) => {
+    const body = (e.target as HTMLElement)?.closest?.('.hud-feed__body');
+    if (body && (e.key === 'Enter' || e.key === ' ')) {
+      e.preventDefault();
+      this.toggleLog();
+    }
+  };
+  private deckQuery: MediaQueryList = window.matchMedia(DECK_LAYOUT_QUERY);
+  private landscapeQuery: MediaQueryList = window.matchMedia(LANDSCAPE_QUERY);
   private boundBreakpointHandler: () => void = () => this.render();
+  private renderer: HudBoardCamera | null;
   // Stable shell elements — created once, updated per-section
   private elTopBar: HTMLDivElement | null = null;
-  private elRailLeft: HTMLElement | null = null;
-  private elRailRight: HTMLElement | null = null;
+  private elSquad: HTMLElement | null = null;
   private elFeed: HTMLDivElement | null = null;
-  private elFab: HTMLDivElement | null = null;
-  private elActions: HTMLDivElement | null = null;
+  private elMapWindow: HTMLDivElement | null = null;
+  private elSheet: HTMLElement | null = null;
+  private elSheetGrab: HTMLDivElement | null = null;
+  private elSheetHeader: HTMLDivElement | null = null;
+  private elSheetBody: HTMLDivElement | null = null;
+  private bottomSheet: BottomSheet | null = null;
+  private mapObserver: ResizeObserver | null = null;
+  private measureFrame: number | null = null;
   private shellBuilt = false;
 
-  constructor(inputController: InputController, playerId: PlayerId) {
+  constructor(inputController: InputController, playerId: PlayerId, options: GameHUDOptions = {}) {
     this.inputController = inputController;
     this.localPlayerId = playerId;
+    this.renderer = options.renderer ?? null;
 
     this.container = document.getElementById('game-hud') || document.createElement('div');
     if (!this.container.id) {
@@ -149,7 +179,9 @@ export class GameHUD {
 
     this.boundDelegateHandler = (e: Event) => this.handleDelegatedClick(e);
     this.container.addEventListener('click', this.boundDelegateHandler);
-    this.laptopBreakpoint.addEventListener('change', this.boundBreakpointHandler);
+    this.container.addEventListener('keydown', this.boundKeyHandler);
+    this.deckQuery.addEventListener('change', this.boundBreakpointHandler);
+    this.landscapeQuery.addEventListener('change', this.boundBreakpointHandler);
 
     // Add in-game class for overscroll-behavior
     document.documentElement.classList.add('in-game');
@@ -166,7 +198,8 @@ export class GameHUD {
   public update(state: GameState, selectedSurvivorId: EntityId | null): void {
     this.state = state;
     this.selectedSurvivorId = selectedSurvivorId;
-    this.scheduleFeedAutoDismiss();
+    if (this.seenEntryCount === null) this.seenEntryCount = displayableEntries(state.history).length;
+    this.refreshLog();
     this.render();
     this.refreshBackpackModal();
   }
@@ -178,41 +211,11 @@ export class GameHUD {
   public destroy(): void {
     document.documentElement.removeAttribute('data-danger');
     this.container.removeEventListener('click', this.boundDelegateHandler);
-    this.laptopBreakpoint.removeEventListener('change', this.boundBreakpointHandler);
-    if (this.feedAutoDismissTimer) {
-      clearTimeout(this.feedAutoDismissTimer);
-      this.feedAutoDismissTimer = null;
-    }
+    this.container.removeEventListener('keydown', this.boundKeyHandler);
+    this.deckQuery.removeEventListener('change', this.boundBreakpointHandler);
+    this.landscapeQuery.removeEventListener('change', this.boundBreakpointHandler);
+    this.teardownShell();
     this.container.innerHTML = '';
-    this.shellBuilt = false;
-  }
-
-  /**
-   * Event feed is short-lived — after ~6s the latest entry auto-dismisses so
-   * the map stays unobstructed. Players can reopen full history via the Turn
-   * chip.
-   */
-  private scheduleFeedAutoDismiss(): void {
-    const latest = Math.max(
-      this.state?.lastAction?.timestamp ?? 0,
-      this.state?.spawnContext?.timestamp ?? 0,
-    );
-    if (latest <= 0) return;
-    if (this.dismissedFeedTimestamp && latest <= this.dismissedFeedTimestamp) return;
-    if (this.feedAutoDismissScheduledFor === latest) return;
-
-    if (this.feedAutoDismissTimer) clearTimeout(this.feedAutoDismissTimer);
-    this.feedAutoDismissScheduledFor = latest;
-
-    const elapsed = Math.max(0, Date.now() - latest);
-    const delay = Math.max(0, FEED_TTL_MS - elapsed);
-
-    this.feedAutoDismissTimer = setTimeout(() => {
-      this.dismissedFeedTimestamp = latest;
-      this.feedAutoDismissTimer = null;
-      this.feedAutoDismissScheduledFor = null;
-      this.render();
-    }, delay);
   }
 
   // ─── Click Delegation (unchanged behavior) ──────────────────
@@ -231,20 +234,10 @@ export class GameHUD {
     const isMyTurn = this.state ? this.state.players[this.state.activePlayerIndex] === this.localPlayerId : false;
     const isOwner = activeSurvivor ? activeSurvivor.playerId === this.localPlayerId : false;
 
-    // --- Mobile actions tray toggle / dismiss ---
-    if (action === 'toggle-actions-tray') {
-      this.setMobileActionsTrayOpen(!this.mobileActionsTrayOpen);
+    // --- Map recentre ---
+    if (action === 'recenter') {
+      this.renderer?.fitBoard(true);
       return;
-    }
-    if (this.mobileActionsTrayOpen) {
-      const insideTray = !!target.closest('.hud-actions__tray');
-      const onMore = !!target.closest('.hud-actions__more');
-      if (!onMore) {
-        // Close after any other click — selection inside the tray closes it,
-        // taps outside also close it. Action handlers below still run.
-        this.setMobileActionsTrayOpen(false);
-        if (!insideTray && !closestButton) return;
-      }
     }
 
     // --- Top bar ---
@@ -257,15 +250,15 @@ export class GameHUD {
       this.openPauseMenu();
       return;
     }
-    if (action === 'open-history') {
-      this.openHistoryModal();
+    if (action === 'open-log') {
+      this.toggleLog();
       return;
     }
 
-    // --- Feed dismiss ---
+    // --- Latest-event card dismiss ---
     if (action === 'dismiss-feed') {
-      const ts = this.state?.lastAction?.timestamp || this.state?.spawnContext?.timestamp || Date.now();
-      this.dismissedFeedTimestamp = ts;
+      const latest = this.latestEntry();
+      if (latest) this.dismissedEntryTs = latest.timestamp;
       this.render();
       return;
     }
@@ -310,6 +303,10 @@ export class GameHUD {
       this.openEndGameConfirm();
       return;
     }
+    if (action === 'leave-room') {
+      leaveRoom();
+      return;
+    }
 
     // --- Wound picker (not turn-gated — can resolve during any phase) ---
     if (action === 'resolve-wounds' && activeSurvivor) {
@@ -334,15 +331,15 @@ export class GameHUD {
         || activeSurvivor.freeMeleeRemaining > 0
         || activeSurvivor.freeRangedRemaining > 0;
       if (!isMyTurn) {
-        notificationManager.show({ variant: 'warning', message: 'Not your turn.', duration: 2500 });
+        notificationManager.show({ variant: 'warning', message: es.hud.toast.notYourTurn, duration: 2500 });
         return;
       }
       if (noAPNow && !freeCombatAvailNow) {
-        notificationManager.show({ variant: 'warning', message: 'No actions remaining.', duration: 2500 });
+        notificationManager.show({ variant: 'warning', message: es.hud.toast.noActions, duration: 2500 });
         return;
       }
       this.inputController.setMode('ATTACK', weaponId);
-      notificationManager.show({ variant: 'info', message: 'Select a Zone to Attack!', duration: 5000 });
+      notificationManager.show({ variant: 'info', message: es.hud.toast.pickAttackZone, duration: 5000 });
       return;
     }
 
@@ -362,7 +359,7 @@ export class GameHUD {
     if (id === 'btn-door') {
       audioManager.playSFX('button_click');
       this.inputController.setMode('OPEN_DOOR');
-      notificationManager.show({ variant: 'info', message: 'Select a CLOSED DOOR zone to open it.', duration: 5000 });
+      notificationManager.show({ variant: 'info', message: es.hud.toast.pickDoor, duration: 5000 });
       return;
     }
     if (id === 'btn-objective') {
@@ -382,12 +379,12 @@ export class GameHUD {
     // --- Skill action buttons ---
     if (id === 'btn-sprint') {
       this.inputController.setMode('SPRINT');
-      notificationManager.show({ variant: 'info', message: 'Select a zone to Sprint to (up to 3 zones).', duration: 5000 });
+      notificationManager.show({ variant: 'info', message: es.hud.toast.pickSprint, duration: 5000 });
       return;
     }
     if (id === 'btn-charge') {
       this.inputController.setMode('CHARGE');
-      notificationManager.show({ variant: 'info', message: 'Select a zone with zombies to Charge into (up to 2 zones).', duration: 5000 });
+      notificationManager.show({ variant: 'info', message: es.hud.toast.pickCharge, duration: 5000 });
       return;
     }
     if (id === 'btn-born-leader') {
@@ -396,12 +393,12 @@ export class GameHUD {
     }
     if (id === 'btn-bloodlust') {
       this.inputController.setMode('BLOODLUST_MELEE');
-      notificationManager.show({ variant: 'info', message: 'Select a zone with zombies (up to 2 zones away).', duration: 5000 });
+      notificationManager.show({ variant: 'info', message: es.hud.toast.pickBloodlust, duration: 5000 });
       return;
     }
     if (id === 'btn-lifesaver') {
       this.inputController.setMode('LIFESAVER');
-      notificationManager.show({ variant: 'info', message: 'Select a zone at Range 1 with zombies and survivors.', duration: 5000 });
+      notificationManager.show({ variant: 'info', message: es.hud.toast.pickLifesaver, duration: 5000 });
       return;
     }
 
@@ -411,16 +408,18 @@ export class GameHUD {
 
   private buildShell(): void {
     if (this.shellBuilt) return;
+    this.teardownShell();
     this.container.innerHTML = '';
 
     this.elTopBar = document.createElement('div');
     this.elTopBar.className = 'hud-topbar';
 
-    this.elRailLeft = document.createElement('aside');
-    this.elRailLeft.className = 'hud-rail hud-rail--left';
+    this.elSquad = document.createElement('aside');
+    this.elSquad.className = 'hud-squad';
 
-    // Center column holds: feed overlay + action row at the bottom.
-    // The map "window" inside it is transparent so the PIXI canvas (mounted in #app) shows through.
+    // Center column holds the feed overlay and the map window. The map
+    // "window" is transparent so the PIXI canvas (mounted in #app) shows
+    // through; its rect is the camera viewport.
     const center = document.createElement('div');
     center.className = 'hud-center';
 
@@ -428,29 +427,124 @@ export class GameHUD {
     this.elFeed.className = 'hud-feed-slot';
 
     const mapWindow = document.createElement('div');
-    mapWindow.className = 'hud-map-window fm-brackets';
-    mapWindow.innerHTML = '<span class="fm-bracket-tr"></span><span class="fm-bracket-bl"></span>';
+    mapWindow.className = 'hud-map-window';
+    this.elMapWindow = mapWindow;
 
     center.append(this.elFeed, mapWindow);
 
-    this.elRailRight = document.createElement('aside');
-    this.elRailRight.className = 'hud-rail hud-rail--right fm-brackets fm-brackets--amber';
+    // Operative panel — bottom deck on desktop and tablet, bottom sheet in
+    // phone portrait, side panel in phone landscape. One element and one
+    // renderer for all three; `data-layout` on #game-hud picks the
+    // arrangement. Created once; render() only replaces header and body.
+    this.elSheet = document.createElement('section');
+    this.elSheet.className = 'hud-sheet';
+    this.elSheet.setAttribute('aria-label', es.hud.sheetLabel);
+    this.elSheetGrab = document.createElement('div');
+    this.elSheetGrab.className = 'hud-sheet__grab';
+    this.elSheetHeader = document.createElement('div');
+    this.elSheetHeader.className = 'hud-sheet__header';
+    this.elSheetGrab.innerHTML = '<div class="hud-sheet__handle" aria-hidden="true"></div>';
+    this.elSheetGrab.append(this.elSheetHeader);
+    this.elSheetBody = document.createElement('div');
+    this.elSheetBody.className = 'hud-sheet__body';
+    this.elSheet.append(this.elSheetGrab, this.elSheetBody);
 
-    this.elFab = document.createElement('div');
-    this.elFab.className = 'hud-fab-slot';
-
-    this.elActions = document.createElement('div');
-    this.elActions.className = 'hud-actions';
+    // The recentre button floats over the board but sits after the deck in
+    // DOM order, so tabbing runs top bar → squad → deck → map overlay.
+    const recenter = document.createElement('button');
+    recenter.className = 'hud-recenter';
+    recenter.dataset.action = 'recenter';
+    recenter.title = es.hud.recenterTitle;
+    recenter.setAttribute('aria-label', es.hud.recenter);
+    recenter.innerHTML = icon('LocateFixed', 'sm');
 
     this.container.append(
       this.elTopBar,
-      this.elRailLeft,
+      this.elSquad,
       center,
-      this.elRailRight,
-      this.elActions,
-      this.elFab,
+      this.elSheet,
+      recenter,
     );
+
+    if (typeof ResizeObserver !== 'undefined') {
+      this.mapObserver = new ResizeObserver(() => this.scheduleViewportMeasure());
+      this.mapObserver.observe(mapWindow);
+    }
     this.shellBuilt = true;
+  }
+
+  private teardownShell(): void {
+    this.mapObserver?.disconnect();
+    this.mapObserver = null;
+    this.bottomSheet?.destroy();
+    this.bottomSheet = null;
+    if (this.measureFrame !== null) {
+      cancelAnimationFrame(this.measureFrame);
+      this.measureFrame = null;
+    }
+    this.shellBuilt = false;
+  }
+
+  private currentLayout(): HudLayout {
+    return resolveHudLayout(this.deckQuery.matches, this.landscapeQuery.matches);
+  }
+
+  /** Attach the drag helper only in phone portrait; the landscape panel does not snap. */
+  private syncBottomSheet(layout: HudLayout): void {
+    const wantSheet = layout === 'sheet' && !this.elSheet!.hidden;
+    if (wantSheet && !this.bottomSheet) {
+      this.bottomSheet = new BottomSheet(this.elSheet!, this.elSheetGrab!, () => this.measureSheet());
+      this.bottomSheet.onSnap(() => this.scheduleViewportMeasure());
+      this.scheduleViewportMeasure();
+    } else if (!wantSheet && this.bottomSheet) {
+      this.bottomSheet.destroy();
+      this.bottomSheet = null;
+      this.scheduleViewportMeasure();
+    } else {
+      this.bottomSheet?.refresh();
+    }
+  }
+
+  private measureSheet(): SheetHeights {
+    const sheet = this.elSheet!;
+    const full = sheet.offsetHeight;
+    const safeBottom = parseFloat(getComputedStyle(sheet).paddingBottom) || 0;
+    const peek = Math.min(full, this.elSheetGrab!.offsetHeight + safeBottom);
+    const halfEnd = this.elSheetBody!.querySelector('.hud-sheet__half') as HTMLElement | null;
+    const half = halfEnd
+      ? Math.min(full, halfEnd.offsetTop + halfEnd.offsetHeight + 8 + safeBottom)
+      : peek;
+    return { peek, half: Math.max(peek, half), full };
+  }
+
+  private scheduleViewportMeasure(): void {
+    if (this.measureFrame !== null) return;
+    this.measureFrame = requestAnimationFrame(() => {
+      this.measureFrame = null;
+      this.measureViewport();
+    });
+  }
+
+  /** Report the visible map area (map window minus the deck or snapped sheet) to the camera. */
+  private measureViewport(): void {
+    if (!this.elMapWindow || !this.elMapWindow.isConnected) return;
+    let sheetOffset = 0;
+    if (this.bottomSheet) {
+      // At full the board stays framed above the half point; the user asked to cover it.
+      sheetOffset = Math.min(this.bottomSheet.currentHeight(), this.measureSheet().half);
+    } else if (this.container.dataset.layout === 'deck' && !this.elSheet!.hidden) {
+      // The deck is pinned over the bottom of the map window, so the camera's
+      // viewport ends where the deck starts — same subtraction the sheet makes.
+      sheetOffset = this.elSheet!.offsetHeight;
+    }
+    this.container.style.setProperty('--hud-sheet-offset', `${sheetOffset}px`);
+
+    if (!this.renderer) return;
+    const rect = this.elMapWindow.getBoundingClientRect();
+    const bottom = Math.min(rect.bottom, this.container.getBoundingClientRect().bottom - sheetOffset);
+    const h = Math.max(0, bottom - rect.top);
+    if (rect.width <= 0 || h <= 0) return;
+    this.renderer.setViewport({ x: rect.left, y: rect.top, w: rect.width, h });
   }
 
   private render(): void {
@@ -472,20 +566,22 @@ export class GameHUD {
 
     const isMyTurn = this.state.players[this.state.activePlayerIndex] === this.localPlayerId;
     const activeSurvivor = this.selectedSurvivorId ? this.state.survivors[this.selectedSurvivorId] : null;
-    const isLaptopOrLarger = this.laptopBreakpoint.matches;
+    const layout = this.currentLayout();
+    if (this.container.dataset.layout !== layout) {
+      this.container.dataset.layout = layout;
+      this.scheduleViewportMeasure();
+    }
 
     this.elTopBar!.innerHTML = this.renderTopBar(isMyTurn);
-    this.elRailLeft!.innerHTML = this.renderSquadRail();
-    const showActiveOp = activeSurvivor && activeSurvivor.playerId === this.localPlayerId;
-    this.elRailRight!.innerHTML = showActiveOp
-      ? this.renderRightPanel(activeSurvivor, isMyTurn, isLaptopOrLarger)
-      : '<span class="fm-bracket-tr"></span><span class="fm-bracket-bl"></span>';
-    this.elActions!.innerHTML = showActiveOp && !isLaptopOrLarger
-      ? this.renderActionRow(activeSurvivor, isMyTurn)
-      : '';
+    this.elSquad!.innerHTML = this.renderSquadChips();
+    const showActiveOp = !!activeSurvivor && activeSurvivor.playerId === this.localPlayerId;
+    this.elSheet!.hidden = !showActiveOp;
+    this.elSheetHeader!.innerHTML = showActiveOp ? this.renderSheetHeader(activeSurvivor!, isMyTurn) : '';
+    this.elSheetBody!.innerHTML = showActiveOp ? this.renderSheetBody(activeSurvivor!, isMyTurn) : '';
+    this.syncBottomSheet(layout);
+    this.scheduleViewportMeasure();
 
-    this.elFeed!.innerHTML = this.renderWaitingBanner() + this.renderFeed();
-    this.elFab!.innerHTML = '';
+    this.elFeed!.innerHTML = this.renderWaitingBanner() + this.renderLatestEvent();
 
     this.syncTradeAndPickup(activeSurvivor);
 
@@ -519,19 +615,20 @@ export class GameHUD {
     const lines: string[] = [];
 
     if (!this.isHost()) {
-      const hostName = state.lobby.players[0]?.name ?? 'Host';
+      const host = state.lobby.players[0];
+      const hostName = displayName(host?.name, host?.characterClass) || es.common.host;
       for (const entry of state.pendingZombieWounds ?? []) {
-        lines.push(`${escapeHtml(hostName)} is assigning ${entry.totalWounds} zombie wound${entry.totalWounds > 1 ? 's' : ''} in ${formatZoneId(entry.zoneId, state)}`);
+        lines.push(es.modals.waiting.hostAssigning(escapeHtml(hostName), entry.totalWounds, formatZoneId(entry.zoneId, state)));
       }
     }
 
     for (const survivor of Object.values(state.survivors)) {
       if (survivor.playerId === this.localPlayerId) continue;
       if ((survivor.pendingWounds ?? 0) > 0) {
-        lines.push(`${escapeHtml(survivor.name)} is deciding Is That All You've Got?`);
+        lines.push(es.modals.waiting.resolvingWounds(escapeHtml(displayName(survivor.name, survivor.characterClass))));
       }
       if (XPManager.getPendingSkillChoice(survivor)) {
-        lines.push(`${escapeHtml(survivor.name)} is choosing a skill`);
+        lines.push(es.modals.waiting.choosingSkill(escapeHtml(displayName(survivor.name, survivor.characterClass))));
       }
     }
 
@@ -556,14 +653,13 @@ export class GameHUD {
     const choice = XPManager.getPendingSkillChoice(pending)!;
     this.skillChoiceSurvivorId = pending.id;
     this.skillChoiceModalId = modalManager.open({
-      title: `${pending.name} reached ${choice.level}: choose a skill`,
+      title: escapeHtml(es.modals.skillChoice.title(displayName(pending.name, pending.characterClass), es.danger[choice.level] ?? choice.level)),
       size: 'md',
       persistent: true,
       renderBody: () => choice.options.map(skillId => {
-        const def = SKILL_DEFINITIONS[skillId];
         return `<div class="mb-3">
-          ${renderButton({ label: escapeHtml(def?.name ?? skillId), variant: 'primary', fullWidth: true, dataAction: 'choose-skill', dataId: skillId })}
-          <p class="text-secondary mt-1">${escapeHtml(def?.description ?? '')}</p>
+          ${renderButton({ label: escapeHtml(skillName(skillId)), variant: 'primary', fullWidth: true, dataAction: 'choose-skill', dataId: skillId })}
+          <p class="text-secondary mt-1">${escapeHtml(skillDescription(skillId))}</p>
         </div>`;
       }).join(''),
       onOpen: (el) => {
@@ -591,7 +687,7 @@ export class GameHUD {
     const state = this.state!;
     const activePid = state.players[state.activePlayerIndex];
     const activeSurvivor = Object.values(state.survivors).find(s => s.playerId === activePid);
-    const activeName = activeSurvivor?.name ?? '';
+    const activeName = displayName(activeSurvivor?.name, activeSurvivor?.characterClass);
 
     const phaseRaw = (state.phase || '').toUpperCase();
     const isPlayerPhase = phaseRaw.includes('PLAYER') || phaseRaw === 'SURVIVOR';
@@ -603,10 +699,10 @@ export class GameHUD {
     const dangerClass = ` hud-topbar--danger-${state.currentDangerLevel.toLowerCase()}`;
 
     const currentPhaseLabel = isZombiePhase
-      ? 'ZOMBIE'
+      ? es.hud.phaseZombies
       : isEndPhase
-        ? 'END'
-        : `PLAYER${activeName ? ' · ' + escapeHtml(activeName.toUpperCase()) : ''}`;
+        ? es.hud.phaseEnd
+        : es.hud.phasePlayers(escapeHtml(activeName));
 
     const tick = (active: boolean) =>
       `<span class="hud-phasetick${active ? ' hud-phasetick--current' : ''}" aria-hidden="true"></span>`;
@@ -614,11 +710,11 @@ export class GameHUD {
     return `
       <div class="hud-topbar__inner${myTurnClass}${dangerClass}">
         <div class="hud-topbar__left">
-          <button class="hud-turnchip" data-action="open-history" title="View turn history" aria-label="Turn ${state.turn} — click to view history">
-            <span class="hud-turnchip__label">TURN</span>
+          <button class="hud-turnchip" data-action="open-log" title="${es.hud.logTitle}" aria-label="${es.hud.roundChipAria(state.turn)}">
+            <span class="hud-turnchip__label">${es.hud.round}</span>
             <span class="hud-turnchip__value">${String(state.turn).padStart(2, '0')}</span>
           </button>
-          <div class="hud-phaseindicator" role="status" aria-live="polite" aria-label="Current phase: ${currentPhaseLabel}">
+          <div class="hud-phaseindicator" role="status" aria-live="polite" aria-label="${es.hud.phaseAria(currentPhaseLabel)}">
             <span class="hud-phaseindicator__bracket hud-phaseindicator__bracket--left" aria-hidden="true">[</span>
             <span class="hud-phaseindicator__label">${currentPhaseLabel}</span>
             <span class="hud-phaseindicator__bracket hud-phaseindicator__bracket--right" aria-hidden="true">]</span>
@@ -630,8 +726,9 @@ export class GameHUD {
           </div>
         </div>
         <div class="hud-topbar__right">
-          <span class="hud-channel">CH ${channel}</span>
-          <button id="btn-menu" class="hud-iconbtn" data-action="open-menu" title="Menu" aria-label="Menu">${icon('Menu', 'sm')}</button>
+          <span class="hud-channel">${es.hud.channel} ${channel}</span>
+          ${this.renderLogButton()}
+          <button id="btn-menu" class="hud-iconbtn" data-action="open-menu" title="${es.hud.menu}" aria-label="${es.hud.menu}">${icon('Menu', 'sm')}</button>
         </div>
         <div class="hud-topbar__bar"></div>
       </div>`;
@@ -653,90 +750,96 @@ export class GameHUD {
     return out;
   }
 
-  // ─── Squad rail ─────────────────────────────────────────────
+  /**
+   * Squad overlay on the board: a 36px avatar chip per survivor with HP and
+   * AP pip rows beneath it. With the plate rail gone this is the only place a
+   * player reads a teammate's state, so the pips are not decorative.
+   */
+  private renderSquadChips(): string {
+    const state = this.state!;
+    const activePid = state.players[state.activePlayerIndex];
+    const chipPips = (on: number, max: number, kind: 'hp' | 'ap') =>
+      Array.from({ length: max }, (_, i) =>
+        `<i class="hud-chip__pip hud-chip__pip--${kind}${i < on ? ' hud-chip__pip--on' : ''}"></i>`).join('');
 
-  private renderSquadRail(): string {
-    if (!this.state) return '';
-    const players = this.state.players;
-    const survivorsByPlayer: Survivor[] = [];
-    for (const pid of players) {
-      const s = Object.values(this.state.survivors).find(sv => sv.playerId === pid);
-      if (s) survivorsByPlayer.push(s);
-    }
-
-    const focusedId = this.selectedSurvivorId;
-    const plates = survivorsByPlayer.map((s, idx) => {
-      const active = s.id === focusedId;
-      const playerColor = getPlayerIdentity(this.state!, s.playerId).primary;
+    const chips = state.players.map(pid => {
+      const s = Object.values(state.survivors).find(sv => sv.playerId === pid);
+      if (!s) return '';
+      const color = getPlayerIdentity(state, s.playerId).primary;
       const isLocal = s.playerId === this.localPlayerId;
-      return renderSquadPlate({
-        name: s.name,
-        rank: dangerToRank(s.dangerLevel),
-        playerColor,
-        hp: Math.max(0, s.maxHealth - s.wounds),
-        hpMax: s.maxHealth,
-        actions: s.actionsRemaining,
-        actionsMax: s.actionsPerTurn,
-        active,
-        compact: true,
-        callsign: callsignFor(s, idx),
-        selectId: isLocal ? s.id : undefined,
-      });
+      const classes = [
+        'hud-chip',
+        s.playerId === activePid ? 'hud-chip--turn' : '',
+        s.id === this.selectedSurvivorId ? 'hud-chip--selected' : '',
+      ].filter(Boolean).join(' ');
+      const img = s.characterClass
+        ? `<img class="hud-chip__img" src="/images/characters/${escapeHtml(s.characterClass.toLowerCase())}.webp" alt="" />`
+        : `<span class="hud-chip__initial">${escapeHtml(displayName(s.name, s.characterClass).charAt(0).toUpperCase())}</span>`;
+      const hp = Math.max(0, s.maxHealth - s.wounds);
+      const ap = s.cheatMode ? s.actionsPerTurn : Math.min(s.actionsRemaining, s.actionsPerTurn);
+      const chipName = displayName(s.name, s.characterClass);
+      const label = `${es.hud.chipAria(escapeHtml(chipName), hp, s.maxHealth, s.playerId === activePid)} · ${es.hud.actionsAria(s.cheatMode ? null : s.actionsRemaining, s.actionsPerTurn)}`;
+      const chip = isLocal
+        ? `<button class="${classes}" style="--chip-color:${color}" data-action="select-survivor" data-survivor-id="${escapeHtml(s.id)}" aria-label="${label}" title="${escapeHtml(chipName)}">${img}</button>`
+        : `<span class="${classes}" style="--chip-color:${color}" role="img" aria-label="${label}" title="${escapeHtml(chipName)}">${img}</span>`;
+      // The label above already carries HP and AP, so the pips are decoration
+      // for assistive tech and must not intercept the chip's 44px hit area.
+      return `<div class="hud-chip-cell">${chip}
+        <span class="hud-chip__state" aria-hidden="true">
+          <span class="hud-chip__pips">${chipPips(hp, s.maxHealth, 'hp')}</span>
+          <span class="hud-chip__pips">${chipPips(ap, s.actionsPerTurn, 'ap')}</span>
+        </span>
+      </div>`;
     }).join('');
-
-    const kicker = `<div class="fm-kicker fm-kicker--secondary hud-rail__kicker">SQUAD · ${survivorsByPlayer.length}</div>`;
-    return `${kicker}<div class="hud-rail__list">${plates}</div>`;
+    return `<div class="hud-chips">${chips}</div>`;
   }
 
-  // ─── Feed (center overlay) ──────────────────────────────────
+  // ─── Latest-event card (center overlay) ─────────────────────
 
-  private renderFeed(): string {
-    if (!this.state) return '';
+  private latestEntry(): GameState['history'][number] | undefined {
+    const entries = displayableEntries(this.state?.history);
+    return entries[entries.length - 1];
+  }
 
-    const lastActionTs = this.state.lastAction?.timestamp ?? 0;
-    const spawnTs = this.state.spawnContext?.timestamp ?? 0;
-    const feedTimestamp = Math.max(lastActionTs, spawnTs);
-    if (feedTimestamp <= 0) return '';
-    if (this.dismissedFeedTimestamp && feedTimestamp <= this.dismissedFeedTimestamp) {
-      return '';
+  /** Newest displayable history entry; stays until replaced or dismissed. */
+  private renderLatestEvent(): string {
+    const state = this.state;
+    const entry = this.latestEntry();
+    if (!state || !entry) return '';
+    if (this.dismissedEntryTs !== null && entry.timestamp <= this.dismissedEntryTs) return '';
+
+    // Roll the dice in once per entry, and not for the entry already there on join.
+    let roll = false;
+    if (this.lastRolledEntryTs !== entry.timestamp) {
+      roll = this.lastRolledEntryTs !== null && !!entry.dice?.length;
+      this.lastRolledEntryTs = entry.timestamp;
     }
 
-    // Only the most recent event renders — once a player acts after a zombie
-    // spawn, the older spawnContext must not re-display alongside the new action.
-    const showLastAction = !!this.state.lastAction && lastActionTs >= spawnTs;
-    const showSpawn = !!this.state.spawnContext?.cards?.length && spawnTs > lastActionTs;
+    const luckyBtn = this.renderLuckyRerollButton(entry);
+    const dismissBtn = luckyBtn
+      ? ''
+      : `<button class="btn btn--icon btn--sm hud-feed__dismiss" data-action="dismiss-feed" title="${es.common.close}" aria-label="${es.common.close}">${icon('X', 'sm')}</button>`;
 
-    const lastAction = showLastAction ? renderLastActionEntry(this.state.lastAction!) : '';
-    const spawnInfo = showSpawn
-      ? renderSpawnEntry(this.state.spawnContext!.cards as SpawnCardData[])
-      : '';
-
-    if (!lastAction && !spawnInfo) return '';
-
-    const dismissBtn = `<button class="btn btn--icon btn--sm hud-feed__dismiss" data-action="dismiss-feed" title="Dismiss">${icon('X', 'sm')}</button>`;
-    const luckyBtn = this.renderLuckyRerollButton();
-
-    // Countdown bar — uses negative animation-delay so the visual is in sync
-    // with actual elapsed time across re-renders (state updates re-create the
-    // DOM, which would otherwise restart the animation).
-    const elapsed = Math.max(0, Date.now() - feedTimestamp);
-    const timerStyle = `animation-duration:${FEED_TTL_MS}ms;animation-delay:-${elapsed}ms;`;
-    const timerBar = `<div class="hud-feed__timer" aria-hidden="true"><div class="hud-feed__timer-bar" style="${timerStyle}"></div></div>`;
-
-    return `<div class="hud-feed"><div class="hud-feed__section">${dismissBtn}${lastAction}${luckyBtn}${spawnInfo}${timerBar}</div></div>`;
+    return `<div class="hud-feed"><div class="hud-feed__card${luckyBtn ? '' : ' hud-feed__card--dismissable'}">
+      ${dismissBtn}
+      <div class="hud-feed__body" role="button" tabindex="0" data-action="open-log" aria-label="${es.hud.openLog}">${renderEventEntry(entry, state, { roll })}</div>
+      ${luckyBtn}
+    </div></div>`;
   }
 
   /**
-   * Lucky reroll affordance — surfaces a button in the feed when:
+   * Lucky reroll affordance — surfaces a button in the latest-event card when:
    * - local survivor owns the last ATTACK action,
    * - Lucky skill is unspent this turn,
    * - the attack carried a rollback snapshot.
    */
-  private renderLuckyRerollButton(): string {
+  private renderLuckyRerollButton(cardEntry: GameState['history'][number]): string {
     const state = this.state;
     if (!state || !state.lastAction) return '';
     const last = state.lastAction;
     if (last.type !== ActionType.ATTACK) return '';
+    // Only offer it while the card still shows that attack.
+    if (cardEntry.actionType !== ActionType.ATTACK || cardEntry.survivorId !== last.survivorId) return '';
     if (last.playerId !== this.localPlayerId) return '';
     if (!last.survivorId) return '';
     const survivor = state.survivors[last.survivorId];
@@ -744,124 +847,87 @@ export class GameHUD {
     if (!survivor.skills.includes('lucky')) return '';
     if (survivor.luckyUsedThisTurn && !survivor.cheatMode) return '';
     if (!last.rollbackSnapshot) return '';
-    return `<button class="action-btn action-btn--lucky" data-action="reroll-lucky" title="Reroll dice (Lucky — commits to new result even if worse)">
-      ${icon('Dices', 'sm')} Reroll (Lucky)
+    return `<button class="action-btn action-btn--lucky" data-action="reroll-lucky" title="${es.hud.luckyRerollTitle}">
+      ${icon('Dices', 'sm')} ${es.hud.luckyReroll}
     </button>`;
   }
 
   // ─── Center action row ──────────────────────────────────────
 
-  private setMobileActionsTrayOpen(open: boolean): void {
-    this.mobileActionsTrayOpen = open;
-    const tray = this.container.querySelector('.hud-actions__tray') as HTMLElement | null;
-    const moreBtn = this.container.querySelector('.hud-actions__more') as HTMLElement | null;
-    if (tray) tray.dataset.open = open ? 'true' : 'false';
-    if (moreBtn) {
-      moreBtn.classList.toggle('hud-actions__more--open', open);
-      moreBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
-    }
-  }
-
-  private renderActionRow(survivor: Survivor, isMyTurn: boolean): string {
+  /**
+   * Sheet / side panel: one horizontal row of square buttons. Objective only
+   * appears when the zone has one; End Turn lives in the sheet header.
+   */
+  private renderActionStrip(survivor: Survivor, isMyTurn: boolean): string {
     const canOpenDoor = survivor.inventory.some(c => c.inHand && c.canOpenDoor);
     const currentZone = this.state?.zones[survivor.position.zoneId];
-    const canTakeObjective = currentZone?.hasObjective === true;
     const noAP = survivor.actionsRemaining < 1;
-    const skillActions = this.renderSkillActionButtons(survivor, isMyTurn, noAP);
 
-    const objectiveBtn = (idSuffix: string) => renderActionButton({
-      id: `btn-objective${idSuffix}`,
-      icon: 'Target', label: 'Objective', kbd: 'O', cost: '1 AP',
-      disabled: !isMyTurn || noAP || !canTakeObjective,
-      highlight: canTakeObjective && isMyTurn && !noAP,
-    });
-    const tradeBtn = (idSuffix: string) => renderActionButton({
-      id: `btn-trade${idSuffix}`,
-      icon: 'Handshake', label: 'Trade', kbd: 'T', cost: '1 AP',
-      disabled: !isMyTurn || noAP,
-    });
+    const buttons = [
+      renderActionButton({ id: 'btn-search', icon: 'Search', label: es.hud.search, cost: survivor.freeSearchesRemaining > 0 ? COST_FREE : COST_ONE, disabled: !isMyTurn || (survivor.hasSearched && !survivor.cheatMode) || (noAP && survivor.freeSearchesRemaining <= 0) }),
+      renderActionButton({ id: 'btn-noise', icon: 'Volume2', label: es.hud.noise, cost: COST_ONE, disabled: !isMyTurn || noAP }),
+      renderActionButton({ id: 'btn-door', icon: 'DoorOpen', label: es.hud.door, cost: COST_ONE, disabled: !isMyTurn || noAP || !canOpenDoor }),
+      renderActionButton({ id: 'btn-trade', icon: 'Handshake', label: es.hud.trade, cost: COST_ONE, disabled: !isMyTurn || noAP }),
+    ];
+    if (currentZone?.hasObjective) {
+      buttons.push(renderActionButton({ id: 'btn-objective', icon: 'Target', label: es.hud.objective, cost: COST_ONE, disabled: !isMyTurn || noAP, highlight: isMyTurn && !noAP }));
+    }
+    buttons.push(...this.renderSkillActionButtons(survivor, isMyTurn, noAP));
 
-    const trayOpen = this.mobileActionsTrayOpen;
-
-    const moreButton = `
-      <button class="action-btn hud-actions__more${trayOpen ? ' hud-actions__more--open' : ''}"
-        data-action="toggle-actions-tray"
-        aria-haspopup="menu"
-        aria-expanded="${trayOpen ? 'true' : 'false'}"
-        aria-label="More actions">
-        <span class="action-btn__icon">${icon('MoreHorizontal', 'sm')}</span>
-        <span class="action-btn__label">More</span>
-        <span class="action-btn__spacer"></span>
-      </button>`;
-
-    const tray = `
-      <div class="hud-actions__tray" data-open="${trayOpen ? 'true' : 'false'}" role="menu" aria-label="More actions">
-        ${objectiveBtn('-mobile')}
-        ${tradeBtn('-mobile')}
-      </div>`;
-
-    return `
-      <div class="hud-actions__grid">
-        ${renderActionButton({ id: 'btn-search', icon: 'Search', label: 'Search', kbd: 'S', cost: survivor.freeSearchesRemaining > 0 ? 'FREE' : '1 AP', disabled: !isMyTurn || (survivor.hasSearched && !survivor.cheatMode) || (noAP && survivor.freeSearchesRemaining <= 0) })}
-        ${renderActionButton({ id: 'btn-noise', icon: 'Volume2', label: 'Noise', kbd: 'N', cost: '1 AP', disabled: !isMyTurn || noAP })}
-        ${renderActionButton({ id: 'btn-door', icon: 'DoorOpen', label: 'Door', kbd: 'D', cost: '1 AP', disabled: !isMyTurn || noAP || !canOpenDoor })}
-        ${objectiveBtn('')}
-        ${tradeBtn('')}
-        ${renderActionButton({ id: 'btn-end-turn', icon: 'SkipForward', label: 'End Turn', kbd: 'E', disabled: !isMyTurn })}
-      </div>
-      ${moreButton}
-      ${skillActions}
-      ${tray}`;
+    return `<div class="hud-actionstrip" role="toolbar" aria-label="${es.hud.actionsToolbar}">${buttons.join('')}</div>`;
   }
 
-  // ─── Right panel — active op readout + loadout + actions/log ─
-
-  private renderRightPanel(survivor: Survivor, isMyTurn: boolean, isLaptopOrLarger: boolean): string {
-    const identity = getPlayerIdentity(this.state!, survivor.playerId);
-    const idx = Math.max(0, this.state!.players.indexOf(survivor.playerId));
-
+  /** Sheet header: avatar, name, HP/AP pips and the pinned End Turn button. */
+  private renderSheetHeader(survivor: Survivor, isMyTurn: boolean): string {
     const hp = Math.max(0, survivor.maxHealth - survivor.wounds);
-    const noAP = survivor.actionsRemaining < 1;
-    const weaponBoosts = this.getWeaponBoosts(survivor);
+    const pips = (on: number, max: number, kind: string) =>
+      Array.from({ length: max }, (_, i) => `<i class="hud-pip hud-pip--${kind}${i < on ? ' hud-pip--on' : ''}"></i>`).join('');
+    const apPips = survivor.cheatMode
+      ? '<span class="hud-pips__inf">∞</span>'
+      : pips(Math.min(survivor.actionsRemaining, survivor.actionsPerTurn), survivor.actionsPerTurn, 'ap')
+        + (survivor.actionsRemaining > survivor.actionsPerTurn ? `<span class="hud-pips__inf">+${survivor.actionsRemaining - survivor.actionsPerTurn}</span>` : '');
+    const avatarUrl = survivor.characterClass ? `/images/characters/${survivor.characterClass.toLowerCase()}.webp` : undefined;
 
-    // Active Op card — photo slot + name + callsign (rank conveyed via avatar stripe)
-    const avatarUrl = (identity as { avatarUrl?: string } | undefined)?.avatarUrl
-      ?? (survivor.characterClass ? `/images/characters/${survivor.characterClass.toLowerCase()}.webp` : undefined);
-    const photo = renderPhotoSlot({ size: 'sm', imageUrl: avatarUrl });
+    return `
+      <div class="hud-sheet__who">
+        ${renderPhotoSlot({ size: 'sm', imageUrl: avatarUrl })}
+        <div class="hud-sheet__ident">
+          <span class="hud-sheet__name">${escapeHtml(displayName(survivor.name, survivor.characterClass))}</span>
+          ${this.renderTurnLine(isMyTurn, survivor)}
+          <span class="hud-pips" aria-label="${es.hud.healthAria(hp, survivor.maxHealth)}">${icon('Heart', 'xs')}${pips(hp, survivor.maxHealth, 'hp')}</span>
+          <span class="hud-pips" aria-label="${es.hud.actionsAria(survivor.cheatMode ? null : survivor.actionsRemaining, survivor.actionsPerTurn)}">${icon('Zap', 'xs')}${apPips}</span>
+        </div>
+      </div>
+      <button id="btn-end-turn" class="action-btn hud-sheet__endturn" ${isMyTurn ? '' : 'disabled'} aria-label="${es.common.endTurn}">
+        <span class="action-btn__icon">${icon('SkipForward', 'sm')}</span>
+        <span class="action-btn__label">${es.common.endTurn}</span>
+      </button>`;
+  }
 
-    const xpBar = this.renderXpBar(survivor);
+  /** Sheet body: action row + loadout (the "half" snap), then skills and XP. */
+  private renderSheetBody(survivor: Survivor, isMyTurn: boolean): string {
     const skillBadges = this.renderSkillBadges(survivor);
     const freeActionIndicators = this.renderFreeActionIndicators(survivor);
     const tagRow = (skillBadges || freeActionIndicators)
       ? `<div class="hud-op__tags">${freeActionIndicators}${skillBadges}</div>`
       : '';
 
-    // Compact op card — single row header (photo + identity left, callsign
-    // right) then a horizontal stats row (VITALS · ACTIONS · XP) underneath.
-    const opCard = `
-      <div class="hud-op">
-        <div class="hud-op__head">
-          <div class="hud-op__head-left">
-            ${photo}
-            <div class="hud-op__ident">
-              <div class="hud-op__nameline">
-                <span class="hud-op__name">${escapeHtml(survivor.name)}</span>
-              </div>
-            </div>
-          </div>
-          <div class="hud-op__head-right">
-            <span class="hud-op__sub">POINT · ${escapeHtml(callsignFor(survivor, idx))}</span>
-          </div>
-        </div>
+    return `
+      <div class="hud-sheet__half">
+        ${this.renderWoundAlert(survivor)}
+        ${this.renderActionStrip(survivor, isMyTurn)}
+        ${this.renderLoadout(survivor, isMyTurn)}
+      </div>
+      <div class="hud-sheet__more">
+        ${this.renderXpBar(survivor)}
         ${tagRow}
-        <div class="hud-op__stats">
-          ${renderStatCell({ icon: icon('Heart', 'sm'), label: 'VITALS', value: hp, max: survivor.maxHealth, color: 'danger', size: 'sm' })}
-          ${renderStatCell({ icon: icon('Zap', 'sm'), label: 'ACTIONS', value: survivor.actionsRemaining, max: survivor.actionsPerTurn, color: 'amber', size: 'sm', infinite: !!survivor.cheatMode })}
-          ${xpBar}
-        </div>
       </div>`;
+  }
 
-    // Loadout — render by actual slot occupancy so non-weapons in hand are visible.
+  // Loadout — render by actual slot occupancy so non-weapons in hand are visible.
+  private renderLoadout(survivor: Survivor, isMyTurn: boolean): string {
+    const noAP = survivor.actionsRemaining < 1;
+    const weaponBoosts = this.getWeaponBoosts(survivor);
     const rHand = survivor.inventory.find(c => c.slot === 'HAND_1');
     const lHand = survivor.inventory.find(c => c.slot === 'HAND_2');
     const freeCombatAvail = survivor.freeCombatsRemaining > 0 || survivor.freeMeleeRemaining > 0 || survivor.freeRangedRemaining > 0;
@@ -869,8 +935,8 @@ export class GameHUD {
 
     const handSlot = (item: EquipmentCard | undefined, slotLabel: string) => {
       if (!item) {
-        return `<div class="hud-slot hud-slot--empty" aria-label="${slotLabel} empty">
-          <div class="hud-slot__empty">— EMPTY —</div>
+        return `<div class="hud-slot hud-slot--empty" aria-label="${es.hud.emptySlotAria(slotLabel)}">
+          <div class="hud-slot__empty">— ${es.common.empty} —</div>
         </div>`;
       }
       if (item.type !== 'WEAPON') {
@@ -895,94 +961,30 @@ export class GameHUD {
     const bagItems = survivor.inventory.filter(c => !c.inHand);
     const bagSlot = `
       <div class="hud-slot hud-slot--bag">
-        <button class="hud-bag-button" data-action="open-backpack" title="Open backpack" aria-label="Open backpack (${bagItems.length} item${bagItems.length === 1 ? '' : 's'})">
+        <button class="hud-bag-button" data-action="open-backpack" title="${es.hud.openBag}" aria-label="${es.hud.openBagAria(bagItems.length)}">
           <span class="hud-bag-button__icon">${icon('Backpack', 'md')}</span>
-          <span class="hud-bag-button__label">BAG</span>
+          <span class="hud-bag-button__label">${es.hud.bag}</span>
           ${bagItems.length > 0 ? `<span class="hud-bag-button__badge">${bagItems.length}</span>` : ''}
         </button>
       </div>`;
 
-    const loadout = `
+    return `
       <section class="hud-loadout">
-        <div class="fm-kicker fm-kicker--secondary hud-loadout__kicker">LOADOUT</div>
+        <div class="fm-kicker fm-kicker--secondary hud-loadout__kicker">${es.hud.loadout}</div>
         <div class="hud-loadout__grid">
-          ${handSlot(rHand, 'R.HAND')}
-          ${handSlot(lHand, 'L.HAND')}
+          ${handSlot(rHand, es.hud.rightHand)}
+          ${handSlot(lHand, es.hud.leftHand)}
           ${bagSlot}
         </div>
       </section>`;
-
-    // Skills/free actions kept as inline row above field log.
-    const woundAlert = survivor.pendingWounds && survivor.pendingWounds > 0
-      ? `<button class="hud-wound-alert" data-action="resolve-wounds">
-          ${icon('AlertTriangle', 'sm')}
-          <span>${survivor.pendingWounds} pending wound${survivor.pendingWounds > 1 ? 's' : ''} — tap to resolve</span>
-        </button>`
-      : '';
-
-    // Laptop/desktop: actions live in the right rail tail (replacing the
-     // field log, which is reachable via the TURN chip on every breakpoint).
-     // Tablet/mobile keep the field log here and render the action bar in
-     // its own bottom slot.
-    const tail = isLaptopOrLarger
-      ? `<div class="hud-rail__actions">${this.renderActionRow(survivor, isMyTurn)}</div>`
-      : this.renderFieldLog();
-
-    return `
-      <span class="fm-bracket-tr"></span><span class="fm-bracket-bl"></span>
-      <div class="hud-rail__body">
-        ${opCard}
-        ${loadout}
-        ${woundAlert}
-        ${tail}
-      </div>`;
   }
 
-  // ─── Field Log — condensed turn history for right panel ─────
-
-  private renderFieldLog(): string {
-    if (!this.state) return '';
-    const entries = [...this.state.history]
-      .filter(e =>
-        e.actionType !== 'JOIN_LOBBY' && e.actionType !== 'START_GAME'
-        && e.actionType !== 'RESOLVE_SEARCH' && e.actionType !== 'CHOOSE_SKILL'
-        && e.actionType !== 'KICK_PLAYER' && e.actionType !== 'DISCONNECT'
-      )
-      .slice(-14)
-      .reverse();
-
-    const lines = entries.map(e => {
-      const ts = this.formatTs(e.timestamp || 0);
-      const survivor = e.survivorId && e.survivorId !== 'system' ? this.state!.survivors[e.survivorId] : null;
-      const name = survivor?.name ?? 'SYSTEM';
-      const label = formatActionType(e.actionType);
-      let detail = '';
-      if (e.description) detail = e.description;
-      else if (e.payload?.targetZoneId) detail = `→ ${formatZoneId(e.payload.targetZoneId, this.state!)}`;
-      return `<div class="hud-log__line">
-        <span class="hud-log__ts">${escapeHtml(ts)}</span>
-        <span class="hud-log__actor">${escapeHtml(name)}</span>
-        <span class="hud-log__action">${escapeHtml(label)}</span>
-        ${detail ? `<span class="hud-log__detail">${escapeHtml(detail)}</span>` : ''}
-      </div>`;
-    }).join('');
-
-    const body = lines || `<div class="hud-log__empty">// AWAITING CONTACT</div>`;
-
-    return `
-      <section class="hud-log">
-        <div class="fm-kicker fm-kicker--secondary hud-log__kicker">FIELD LOG</div>
-        <div class="hud-log__body">${body}</div>
-      </section>`;
-  }
-
-  private formatTs(ts: number): string {
-    if (!ts) return '--:--';
-    const d = new Date(ts);
-    const h = String(d.getHours()).padStart(2, '0');
-    const m = String(d.getMinutes()).padStart(2, '0');
-    const s = String(d.getSeconds()).padStart(2, '0');
-    return `${h}:${m}:${s}`;
+  private renderWoundAlert(survivor: Survivor): string {
+    if (!survivor.pendingWounds || survivor.pendingWounds <= 0) return '';
+    return `<button class="hud-wound-alert" data-action="resolve-wounds">
+      ${icon('AlertTriangle', 'sm')}
+      <span>${es.hud.pendingWounds(survivor.pendingWounds)}</span>
+    </button>`;
   }
 
   // ─── Skill Visual Indicators ──────────────────────────────────
@@ -1006,7 +1008,7 @@ export class GameHUD {
       const usedClass = used ? ' skill-badge--used' : '';
       const skillIcon = icon(iconForSkill(skillId), 'sm');
 
-      return `<span class="skill-badge skill-badge--${typeClass}${usedClass}" title="${escapeHtml(def.description)}">${skillIcon}<span>${escapeHtml(def.name)}</span></span>`;
+      return `<span class="skill-badge skill-badge--${typeClass}${usedClass}" title="${escapeHtml(skillDescription(skillId))}">${skillIcon}<span>${escapeHtml(skillName(skillId))}</span></span>`;
     }).filter(Boolean).join('');
 
     return `<div class="hud-skills">${badges}</div>`;
@@ -1024,10 +1026,10 @@ export class GameHUD {
       return `
         <div class="hud-op__xp hud-op__xp--rank-${rank} hud-op__xp--max">
           <div class="hud-op__xp-head">
-            <span class="hud-op__xp-label">XP</span>
-            <span class="hud-op__xp-value">${xp} · MAX</span>
+            <span class="hud-op__xp-label">${es.hud.xp}</span>
+            <span class="hud-op__xp-value">${xp} · ${es.hud.xpMax}</span>
           </div>
-          <div class="hud-op__xp-track" role="progressbar" aria-valuenow="${xp}" aria-valuemin="0" aria-valuemax="${xp}">
+          <div class="hud-op__xp-track" role="progressbar" aria-label="${es.hud.xpAria}" aria-valuenow="${xp}" aria-valuemin="0" aria-valuemax="${xp}">
             <div class="hud-op__xp-fill hud-op__xp-fill--${fillRank}" style="width:100%"></div>
           </div>
         </div>`;
@@ -1040,10 +1042,10 @@ export class GameHUD {
     return `
       <div class="hud-op__xp hud-op__xp--rank-${rank}">
         <div class="hud-op__xp-head">
-          <span class="hud-op__xp-label">XP</span>
+          <span class="hud-op__xp-label">${es.hud.xp}</span>
           <span class="hud-op__xp-value">${xp} → ${next}</span>
         </div>
-        <div class="hud-op__xp-track" role="progressbar" aria-label="Experience" aria-valuenow="${xp}" aria-valuemin="${current}" aria-valuemax="${next}">
+        <div class="hud-op__xp-track" role="progressbar" aria-label="${es.hud.xpAria}" aria-valuenow="${xp}" aria-valuemin="${current}" aria-valuemax="${next}">
           <div class="hud-op__xp-fill hud-op__xp-fill--${fillRank}" style="width:${pct}%"></div>
         </div>
       </div>`;
@@ -1053,62 +1055,61 @@ export class GameHUD {
     const indicators: string[] = [];
 
     if (survivor.freeMovesRemaining > 0) {
-      indicators.push(`<span class="free-action-pip" title="Free Move">${icon('Footprints', 'sm')}<span class="free-action-pip__count">${survivor.freeMovesRemaining}</span></span>`);
+      indicators.push(`<span class="free-action-pip" title="${es.hud.freeMove}">${icon('Footprints', 'sm')}<span class="free-action-pip__count">${survivor.freeMovesRemaining}</span></span>`);
     }
     if (survivor.freeCombatsRemaining > 0) {
-      indicators.push(`<span class="free-action-pip" title="Free Combat">${icon('Crosshair', 'sm')}<span class="free-action-pip__count">${survivor.freeCombatsRemaining}</span></span>`);
+      indicators.push(`<span class="free-action-pip" title="${es.hud.freeCombat}">${icon('Crosshair', 'sm')}<span class="free-action-pip__count">${survivor.freeCombatsRemaining}</span></span>`);
     }
     if (survivor.freeMeleeRemaining > 0) {
-      indicators.push(`<span class="free-action-pip" title="Free Melee">${icon('Swords', 'sm')}<span class="free-action-pip__count">${survivor.freeMeleeRemaining}</span></span>`);
+      indicators.push(`<span class="free-action-pip" title="${es.hud.freeMelee}">${icon('Swords', 'sm')}<span class="free-action-pip__count">${survivor.freeMeleeRemaining}</span></span>`);
     }
     if (survivor.freeRangedRemaining > 0) {
-      indicators.push(`<span class="free-action-pip" title="Free Ranged">${icon('Crosshair', 'sm')}<span class="free-action-pip__count">${survivor.freeRangedRemaining}</span></span>`);
+      indicators.push(`<span class="free-action-pip" title="${es.hud.freeRanged}">${icon('Crosshair', 'sm')}<span class="free-action-pip__count">${survivor.freeRangedRemaining}</span></span>`);
     }
     if (survivor.freeSearchesRemaining > 0) {
-      indicators.push(`<span class="free-action-pip" title="Free Search">${icon('Search', 'sm')}<span class="free-action-pip__count">${survivor.freeSearchesRemaining}</span></span>`);
+      indicators.push(`<span class="free-action-pip" title="${es.hud.freeSearch}">${icon('Search', 'sm')}<span class="free-action-pip__count">${survivor.freeSearchesRemaining}</span></span>`);
     }
 
     if (indicators.length === 0) return '';
     return `<div class="hud-free-actions">${indicators.join('')}</div>`;
   }
 
-  private renderSkillActionButtons(survivor: Survivor, isMyTurn: boolean, noAP: boolean): string {
+  private renderSkillActionButtons(survivor: Survivor, isMyTurn: boolean, noAP: boolean): string[] {
     const buttons: string[] = [];
 
     const cheat = !!survivor.cheatMode;
     if (survivor.skills.includes('sprint')) {
       buttons.push(renderActionButton({
-        id: 'btn-sprint', icon: 'Zap', label: 'Sprint',
-        cost: '1 AP', disabled: !isMyTurn || noAP || (survivor.sprintUsedThisTurn && !cheat),
+        id: 'btn-sprint', icon: 'Zap', label: es.hud.sprint,
+        cost: COST_ONE, disabled: !isMyTurn || noAP || (survivor.sprintUsedThisTurn && !cheat),
       }));
     }
     if (survivor.skills.includes('charge')) {
       buttons.push(renderActionButton({
-        id: 'btn-charge', icon: 'Swords', label: 'Charge',
-        cost: 'FREE', disabled: !isMyTurn || (survivor.chargeUsedThisTurn && !cheat),
+        id: 'btn-charge', icon: 'Swords', label: es.hud.charge,
+        cost: COST_FREE, disabled: !isMyTurn || (survivor.chargeUsedThisTurn && !cheat),
       }));
     }
     if (survivor.skills.includes('born_leader')) {
       buttons.push(renderActionButton({
-        id: 'btn-born-leader', icon: 'Crown', label: 'Born Leader',
-        cost: 'FREE', disabled: !isMyTurn || (survivor.bornLeaderUsedThisTurn && !cheat),
+        id: 'btn-born-leader', icon: 'Crown', label: es.hud.bornLeader,
+        cost: COST_FREE, disabled: !isMyTurn || (survivor.bornLeaderUsedThisTurn && !cheat),
       }));
     }
     if (survivor.skills.includes('bloodlust_melee')) {
       buttons.push(renderActionButton({
-        id: 'btn-bloodlust', icon: 'Flame', label: 'Bloodlust',
-        cost: '1 AP', disabled: !isMyTurn || noAP || (survivor.bloodlustUsedThisTurn && !cheat),
+        id: 'btn-bloodlust', icon: 'Flame', label: es.hud.bloodlust,
+        cost: COST_ONE, disabled: !isMyTurn || noAP || (survivor.bloodlustUsedThisTurn && !cheat),
       }));
     }
     if (survivor.skills.includes('lifesaver')) {
       buttons.push(renderActionButton({
-        id: 'btn-lifesaver', icon: 'HeartHandshake', label: 'Lifesaver',
-        cost: 'FREE', disabled: !isMyTurn || (survivor.lifesaverUsedThisTurn && !cheat),
+        id: 'btn-lifesaver', icon: 'HeartHandshake', label: es.hud.lifesaver,
+        cost: COST_FREE, disabled: !isMyTurn || (survivor.lifesaverUsedThisTurn && !cheat),
       }));
     }
 
-    if (buttons.length === 0) return '';
-    return `<div class="hud-actions__skills">${buttons.join('')}</div>`;
+    return buttons;
   }
 
   private getWeaponBoosts(survivor: Survivor): Map<string, { dice: number; damage: number }> {
@@ -1150,7 +1151,7 @@ export class GameHUD {
     const pendingCount = survivor.pendingWounds;
 
     this.woundPickerModalId = modalManager.open({
-      title: `Is That All You've Got?`,
+      title: skillName('is_that_all_youve_got'),
       size: 'md',
       persistent: true,
       renderBody: () => this.renderWoundPickerBody(survivor, pendingCount),
@@ -1196,10 +1197,10 @@ export class GameHUD {
   private renderWoundPickerBody(survivor: Survivor, pendingCount: number): string {
     const negated = Math.min(this.woundPickerSelected.size, pendingCount);
     const remaining = pendingCount - negated;
-    const desc = `<p class="text-secondary mb-3">You have <strong>${pendingCount}</strong> incoming wound${pendingCount > 1 ? 's' : ''}. Discard equipment to negate wounds (1 card = 1 wound negated).</p>`;
+    const desc = `<p class="text-secondary mb-3">${es.modals.woundPicker.incoming(`<strong>${pendingCount}</strong>`, pendingCount)}</p>`;
     const summary = `<div class="wound-picker__summary">
-      <span>Negated: <strong class="text-success">${negated}</strong></span>
-      <span>Wounds taken: <strong class="${remaining > 0 ? 'text-danger' : 'text-success'}">${remaining}</strong></span>
+      <span>${es.modals.woundPicker.negated} <strong class="text-success">${negated}</strong></span>
+      <span>${es.modals.woundPicker.taken} <strong class="${remaining > 0 ? 'text-danger' : 'text-success'}">${remaining}</strong></span>
     </div>`;
 
     const cards = survivor.inventory.map(card => {
@@ -1215,7 +1216,7 @@ export class GameHUD {
   private renderWoundPickerFooter(pendingCount: number): string {
     const negated = Math.min(this.woundPickerSelected.size, pendingCount);
     const remaining = pendingCount - negated;
-    return renderButton({ label: `Take ${remaining} Wound${remaining !== 1 ? 's' : ''}`, variant: remaining > 0 ? 'destructive' : 'primary', dataAction: 'confirm-wounds' });
+    return renderButton({ label: es.modals.woundPicker.confirm(remaining), variant: remaining > 0 ? 'destructive' : 'primary', dataAction: 'confirm-wounds' });
   }
 
   // ─── Wound Distribution Modal ─────────────────────────────────
@@ -1231,7 +1232,7 @@ export class GameHUD {
     this.woundDistAssignments[entry.survivorIds[0]] = entry.totalWounds;
 
     this.woundDistModalId = modalManager.open({
-      title: 'Distribute Zombie Wounds',
+      title: es.modals.woundDist.title,
       size: 'md',
       persistent: true,
       renderBody: () => this.renderWoundDistBody(entry),
@@ -1283,10 +1284,10 @@ export class GameHUD {
     const assigned = Object.values(this.woundDistAssignments).reduce((s, n) => s + n, 0);
     const remaining = entry.totalWounds - assigned;
 
-    const desc = `<p class="text-secondary mb-3"><strong>${entry.totalWounds}</strong> zombie wound${entry.totalWounds > 1 ? 's' : ''} in ${formatZoneId(entry.zoneId, this.state!)}. Distribute among survivors.</p>`;
+    const desc = `<p class="text-secondary mb-3">${es.modals.woundDist.desc(`<strong>${entry.totalWounds}</strong>`, entry.totalWounds, formatZoneId(entry.zoneId, this.state!))}</p>`;
     const summary = `<div class="wound-picker__summary mb-3">
-      <span>Assigned: <strong>${assigned}</strong> / ${entry.totalWounds}</span>
-      <span>Remaining: <strong class="${remaining > 0 ? 'text-warning' : 'text-success'}">${remaining}</strong></span>
+      <span>${es.modals.woundDist.assigned} <strong>${assigned}</strong> / ${entry.totalWounds}</span>
+      <span>${es.modals.woundDist.remaining} <strong class="${remaining > 0 ? 'text-warning' : 'text-success'}">${remaining}</strong></span>
     </div>`;
 
     const rows = entry.survivorIds.map(sid => {
@@ -1295,13 +1296,13 @@ export class GameHUD {
       const count = this.woundDistAssignments[sid] || 0;
       const hp = survivor.maxHealth - survivor.wounds;
       const identity = getPlayerIdentity(this.state!, survivor.playerId);
-      const avatar = renderAvatar(survivor.name, identity, 'sm', undefined, survivor.characterClass);
+      const avatar = renderAvatar(displayName(survivor.name, survivor.characterClass), identity, 'sm', undefined, survivor.characterClass);
 
       return `<div class="wound-dist__row">
         ${avatar}
         <div class="wound-dist__info">
-          <span class="wound-dist__name">${survivor.name}</span>
-          <span class="wound-dist__hp">${hp} HP</span>
+          <span class="wound-dist__name">${escapeHtml(displayName(survivor.name, survivor.characterClass))}</span>
+          <span class="wound-dist__hp">${es.modals.woundDist.hp(hp)}</span>
         </div>
         <div class="wound-dist__controls">
           <button class="btn btn--sm btn--icon" data-action="wound-dist-minus" data-survivor-id="${sid}" ${count <= 0 ? 'disabled' : ''}>${icon('Minus', 'sm')}</button>
@@ -1318,7 +1319,7 @@ export class GameHUD {
     const assigned = Object.values(this.woundDistAssignments).reduce((s, n) => s + n, 0);
     const isValid = assigned === entry.totalWounds;
     return renderButton({
-      label: `Confirm Distribution`,
+      label: es.modals.woundDist.confirm,
       variant: isValid ? 'primary' : 'secondary',
       dataAction: 'confirm-wound-dist',
       disabled: !isValid,
@@ -1335,7 +1336,7 @@ export class GameHUD {
     );
 
     if (others.length === 0) {
-      notificationManager.show({ variant: 'warning', message: 'No one else here to give an action to.', duration: 3000 });
+      notificationManager.show({ variant: 'warning', message: es.hud.toast.noBornLeaderTarget, duration: 3000 });
       return;
     }
 
@@ -1348,17 +1349,17 @@ export class GameHUD {
     }
 
     modalManager.open({
-      title: 'Born Leader — Give Free Action',
+      title: es.modals.bornLeader.title,
       size: 'sm',
       renderBody: () => `
         <div class="stack stack--sm">
           ${others.map(t => {
             const identity = getPlayerIdentity(this.state!, t.playerId);
-            const avatar = renderAvatar(t.name, identity, 'md', undefined, t.characterClass);
+            const avatar = renderAvatar(displayName(t.name, t.characterClass), identity, 'md', undefined, t.characterClass);
             return `
               <button class="action-btn" data-action="select-bl-target" data-id="${t.id}" style="width:100%">
                 ${avatar}
-                <span class="action-btn__label">${t.name} (${t.characterClass})</span>
+                <span class="action-btn__label">${escapeHtml(displayNameWithClass(t.name, t.characterClass))}</span>
               </button>`;
           }).join('')}
         </div>`,
@@ -1389,16 +1390,19 @@ export class GameHUD {
 
     const resultIcon = isVictory ? 'Trophy' : 'Skull';
     const resultClass = isVictory ? 'victory' : 'defeat';
-    const resultText = isVictory ? 'Victory!' : abandonedBy ? 'Game Abandoned' : 'Defeat';
+    const resultText = isVictory ? es.gameOver.victory : abandonedBy ? es.gameOver.abandoned : es.gameOver.defeat;
     const desc = isVictory
-      ? 'All survivors have escaped!'
+      ? es.gameOver.victoryDesc
       : abandonedBy
-        ? `${escapeHtml(abandonedBy)} left the game.`
-        : 'The zombies have overwhelmed you...';
+        ? es.gameOver.abandonedDesc(escapeHtml(abandonedBy))
+        : es.gameOver.defeatDesc;
 
+    // Leaving is offered to everyone: without it a non-host whose host closed
+    // their tab has no way out but closing their own.
+    const leaveBtn = renderButton({ label: es.gameOver.leave, icon: 'ArrowLeft', variant: 'ghost', dataAction: 'leave-room' });
     const actions = isHost
-      ? renderButton({ label: 'Play Again', icon: 'Play', variant: 'primary', size: 'lg', dataAction: 'play-again' })
-      : '<span class="text-secondary-sm">Waiting for host...</span>';
+      ? `${renderButton({ label: es.gameOver.playAgain, icon: 'Play', variant: 'primary', size: 'lg', dataAction: 'play-again' })}${leaveBtn}`
+      : `<span class="text-secondary-sm">${es.gameOver.waitingHost}</span>${leaveBtn}`;
 
     this.container.innerHTML = `
       <div class="hud-game-over">
@@ -1432,7 +1436,7 @@ export class GameHUD {
         const current = this.currentBackpackSurvivor() ?? survivor;
         return this.renderBackpackBody(current);
       },
-      renderFooter: () => renderButton({ label: 'Close', variant: 'secondary', dataAction: 'modal-close' }),
+      renderFooter: () => renderButton({ label: es.common.close, variant: 'secondary', dataAction: 'modal-close' }),
       onOpen: (el) => {
         el.addEventListener('click', (e) => {
           const btn = (e.target as HTMLElement).closest('[data-action="use-food"]') as HTMLElement | null;
@@ -1460,7 +1464,7 @@ export class GameHUD {
       ${bagItems.map(item => {
         const card = renderItemCard(item);
         if (!FOOD_EQUIPMENT_IDS.has(item.equipmentId)) return card;
-        const safeName = escapeHtml(item.name);
+        const eatTitle = escapeHtml(es.modals.food.eatTitle(equipmentName(item)));
         return `
           <div class="food-slot">
             ${card}
@@ -1468,10 +1472,10 @@ export class GameHUD {
                     class="food-slot__eat"
                     data-action="use-food"
                     data-id="${item.id}"
-                    title="Consume ${safeName} for +1 AP"
-                    aria-label="Consume ${safeName} for +1 AP">
+                    title="${eatTitle}"
+                    aria-label="${eatTitle}">
               ${icon('Utensils', 'sm')}
-              <span class="food-slot__eat-label">+1 AP</span>
+              <span class="food-slot__eat-label">${es.modals.food.eatLabel}</span>
             </button>
           </div>`;
       }).join('')}
@@ -1480,7 +1484,7 @@ export class GameHUD {
   }
 
   private backpackTitle(survivor: Survivor): string {
-    return `Backpack (${survivor.inventory.filter(c => !c.inHand).length}/${GameHUD.BAG_CAPACITY})`;
+    return es.modals.backpack.title(survivor.inventory.filter(c => !c.inHand).length, GameHUD.BAG_CAPACITY);
   }
 
   private refreshBackpackModal(): void {
@@ -1531,7 +1535,7 @@ export class GameHUD {
         }
         // After consume the count drops by 1 — would the requirement still hold?
         if (total - 1 < req.quantity) {
-          return obj.description || `Collect ${req.quantity}× ${req.equipmentId}`;
+          return obj.description || es.modals.food.collectFallback(req.quantity, equipmentName({ equipmentId: req.equipmentId, name: req.equipmentId }));
         }
       }
     }
@@ -1541,29 +1545,29 @@ export class GameHUD {
   private openFoodConsumeConfirm(card: EquipmentCard, objectiveDescription: string | null): void {
     if (this.foodConfirmModalId && modalManager.isOpen(this.foodConfirmModalId)) return;
 
-    const safeName = escapeHtml(card.name);
+    const safeName = `<strong>${escapeHtml(equipmentName(card))}</strong>`;
     const body = objectiveDescription
       ? `
         <div class="stack stack--sm">
-          <p class="text-secondary">Eating <strong>${safeName}</strong> will break your objective:</p>
+          <p class="text-secondary">${es.modals.food.breaksObjective(safeName)}</p>
           <p><em>${escapeHtml(objectiveDescription)}</em></p>
-          <p class="text-secondary">You'll need to find another copy to satisfy it again.</p>
+          <p class="text-secondary">${es.modals.food.findAnother}</p>
         </div>`
       : `
         <div class="stack stack--sm">
-          <p class="text-secondary">Consume <strong>${safeName}</strong> to gain <strong>+1 AP</strong> this turn?</p>
-          <p class="text-secondary">The card will be discarded.</p>
+          <p class="text-secondary">${es.modals.food.consume(safeName, `<strong>${es.modals.food.bonus}</strong>`)}</p>
+          <p class="text-secondary">${es.modals.food.discarded}</p>
         </div>`;
 
-    const confirmLabel = objectiveDescription ? 'Eat anyway (+1 AP)' : 'Eat (+1 AP)';
+    const confirmLabel = objectiveDescription ? es.modals.food.confirmAnyway : es.modals.food.confirm;
     const confirmVariant: 'destructive' | 'primary' = objectiveDescription ? 'destructive' : 'primary';
 
     this.foodConfirmModalId = modalManager.open({
-      title: 'Eat this food?',
+      title: es.modals.food.title,
       size: 'sm',
       renderBody: () => body,
       renderFooter: () => `
-        ${renderButton({ label: 'Cancel', variant: 'secondary', dataAction: 'modal-close' })}
+        ${renderButton({ label: es.common.cancel, variant: 'secondary', dataAction: 'modal-close' })}
         ${renderButton({ label: confirmLabel, variant: confirmVariant, dataAction: 'confirm-eat-food' })}
       `,
       onOpen: (el) => {
@@ -1595,12 +1599,12 @@ export class GameHUD {
     if (this.endGameModalId && modalManager.isOpen(this.endGameModalId)) return;
 
     this.endGameModalId = modalManager.open({
-      title: 'End current game?',
+      title: es.modals.endGame.title,
       size: 'sm',
-      renderBody: () => '<p class="text-secondary">This will return everyone to the lobby.</p>',
+      renderBody: () => `<p class="text-secondary">${es.modals.endGame.body}</p>`,
       renderFooter: () => `
-        ${renderButton({ label: 'Cancel', variant: 'secondary', dataAction: 'modal-close' })}
-        ${renderButton({ label: 'Yes, End Game', variant: 'destructive', dataAction: 'confirm-end-game' })}
+        ${renderButton({ label: es.common.cancel, variant: 'secondary', dataAction: 'modal-close' })}
+        ${renderButton({ label: es.modals.endGame.confirm, variant: 'destructive', dataAction: 'confirm-end-game' })}
       `,
       onOpen: (el) => {
         el.addEventListener('click', (e) => {
@@ -1617,18 +1621,18 @@ export class GameHUD {
 
   private openPauseMenu(): void {
     const isHost = this.isHost();
-    const muteLabel = audioManager.muted ? 'Unmute' : 'Mute';
+    const muteLabel = audioManager.muted ? es.modals.pause.unmute : es.modals.pause.mute;
     const muteIcon = audioManager.muted ? 'VolumeX' : 'Volume2';
 
     modalManager.open({
       size: 'sm',
-      title: 'Paused',
+      title: es.modals.pause.title,
       renderBody: () => `
         <div class="stack stack--sm">
-          ${renderButton({ label: 'Resume Game', icon: 'Play', variant: 'ghost', fullWidth: true, dataAction: 'modal-close' })}
+          ${renderButton({ label: es.modals.pause.resume, icon: 'Play', variant: 'ghost', fullWidth: true, dataAction: 'modal-close' })}
           ${renderButton({ label: muteLabel, icon: muteIcon, variant: 'ghost', fullWidth: true, dataAction: 'toggle-mute' })}
-          ${isHost ? renderButton({ label: 'End Game', icon: 'Power', variant: 'destructive', fullWidth: true, dataAction: 'pause-end-game' }) : ''}
-          ${renderButton({ label: 'Leave Game', icon: 'LogOut', variant: 'ghost', fullWidth: true, dataAction: 'pause-leave' })}
+          ${isHost ? renderButton({ label: es.modals.pause.endGame, icon: 'Power', variant: 'destructive', fullWidth: true, dataAction: 'pause-end-game' }) : ''}
+          ${renderButton({ label: es.modals.pause.leave, icon: 'LogOut', variant: 'ghost', fullWidth: true, dataAction: 'pause-leave' })}
         </div>`,
       onOpen: (el) => {
         el.addEventListener('click', (e) => {
@@ -1645,212 +1649,92 @@ export class GameHUD {
           }
           if (t.dataset.action === 'pause-leave') {
             modalManager.closeAll();
-            networkManager.disconnect();
-            window.history.pushState({}, '', '/');
-            window.location.reload();
+            leaveRoom();
           }
         });
       },
     });
   }
 
-  // ─── History Modal ───────────────────────────────────────────
+  // ─── Event Log ───────────────────────────────────────────────
 
-  private openHistoryModal(): void {
-    if (this.historyModalId && modalManager.isOpen(this.historyModalId)) {
-      modalManager.close(this.historyModalId);
-      this.historyModalId = null;
+  public toggleLog(): void {
+    if (this.logModalId && modalManager.isOpen(this.logModalId)) {
+      modalManager.close(this.logModalId);
+      this.logModalId = null;
       return;
     }
+    if (!this.state) return;
 
-    this.historyModalId = modalManager.open({
-      title: 'Turn History',
-      size: 'md',
-      renderBody: () => {
-        if (!this.state || this.state.history.length === 0) {
-          return '<div class="text-center-muted">No actions yet.</div>';
-        }
-
-        const entries = [...this.state.history];
-
-        const displayEntries = entries.filter(e =>
-          e.actionType !== 'JOIN_LOBBY' && e.actionType !== 'START_GAME'
-          && e.actionType !== 'RESOLVE_SEARCH' && e.actionType !== 'CHOOSE_SKILL'
-          && e.actionType !== 'KICK_PLAYER' && e.actionType !== 'DISCONNECT'
-        );
-
-        const turnGroups: { turn: number; actions: typeof displayEntries }[] = [];
-        let currentTurn = 1;
-        let currentGroup: typeof displayEntries = [];
-
-        for (const entry of displayEntries) {
-          currentGroup.push(entry);
-          if (entry.actionType === 'END_TURN') {
-            turnGroups.push({ turn: entry.turn || currentTurn, actions: currentGroup });
-            currentGroup = [];
-            currentTurn = (entry.turn || currentTurn) + 1;
-          }
-        }
-        if (currentGroup.length > 0) {
-          turnGroups.push({ turn: currentGroup[0]?.turn || currentTurn, actions: currentGroup });
-        }
-
-        const reversed = [...turnGroups].reverse();
-
-        return `<div class="history-list">${reversed.map(group => {
-          const isCurrentTurn = group === reversed[0];
-          const header = isCurrentTurn
-            ? `<div class="history-turn-header">Turn ${group.turn} (current)</div>`
-            : `<div class="history-turn-header">Turn ${group.turn}</div>`;
-
-          const actionRows = group.actions.map(entry => {
-            return this.renderHistoryEntry(entry);
-          }).join('');
-
-          return `${header}${actionRows}`;
-        }).join('')}</div>`;
-      },
-      renderFooter: () => renderButton({ label: 'Close', variant: 'secondary', dataAction: 'modal-close' }),
-      onClose: () => { this.historyModalId = null; },
+    this.markLogSeen();
+    this.logModalId = modalManager.open({
+      title: es.modals.log.title,
+      size: 'lg',
+      renderBody: () => this.renderLogBody(),
+      renderFooter: () => renderButton({ label: es.common.close, variant: 'secondary', dataAction: 'modal-close' }),
+      onClose: () => { this.logModalId = null; },
     });
+    this.render();
   }
 
-  private renderHistoryEntry(entry: GameState['history'][0]): string {
-    const survivor = entry.survivorId && entry.survivorId !== 'system' && this.state
-      ? this.state.survivors[entry.survivorId]
-      : null;
-    const survivorName = survivor?.name ?? '';
-    const actionLabel = formatActionType(entry.actionType);
+  private markLogSeen(): void {
+    const count = displayableEntries(this.state?.history).length;
+    this.seenEntryCount = count;
+    this.logRenderedCount = count;
+  }
 
-    const freeLabel = entry.usedFreeAction
-      ? `<span class="history-entry__free">${entry.freeActionType || 'FREE'}</span> `
-      : '';
+  /** Re-render the open log when entries arrive; the modal body keeps its scroll position. */
+  private refreshLog(): void {
+    if (!this.logModalId || !modalManager.isOpen(this.logModalId)) return;
+    if (displayableEntries(this.state?.history).length === this.logRenderedCount) return;
+    this.markLogSeen();
+    modalManager.updateBody(this.logModalId, this.renderLogBody());
+  }
 
-    let detail = '';
-    let subDetail = '';
+  private renderLogBody(): string {
+    const state = this.state;
+    const rounds = groupByRound(displayableEntries(state?.history), state?.turn);
+    if (!state || rounds.length === 0) return `<div class="text-center-muted">${es.modals.log.empty}</div>`;
 
-    switch (entry.actionType) {
-      case 'ATTACK': {
-        const targetZone = entry.payload?.targetZoneId
-          ? formatZoneId(entry.payload.targetZoneId, this.state!)
-          : '';
-        detail = entry.description || (targetZone ? `→ ${targetZone}` : '');
+    const playerName = (pid: string) => {
+      const survivor = Object.values(state.survivors).find(s => s.playerId === pid);
+      const cls = survivor?.characterClass;
+      const lobbyName = state.lobby.players.find(p => p.id === pid)?.name;
+      return displayName(lobbyName, cls) || displayName(survivor?.name, cls) || pid;
+    };
 
-        if (entry.dice && entry.dice.length > 0) {
-          const diceStr = entry.dice.map(d =>
-            `<span class="history-die ${d >= 4 ? 'history-die--hit' : ''}">${d}</span>`
-          ).join('');
-          const hitsStr = entry.hits !== undefined ? `${entry.hits} hit${entry.hits !== 1 ? 's' : ''}` : '';
-          const dmgStr = entry.damagePerHit && entry.damagePerHit > 1 ? ` (${entry.damagePerHit} dmg each)` : '';
-          subDetail = `<div class="history-entry__dice">${diceStr} <span class="history-entry__hits">${hitsStr}${dmgStr}</span></div>`;
-        }
+    return `<div class="event-log">${rounds.map(round => `
+      <div class="event-log__round">${es.modals.log.round(round.round)}${round.current ? `<span class="event-log__round-current">${es.modals.log.current}</span>` : ''}</div>
+      ${round.turns.map(turn => `
+        <div class="event-log__player">${escapeHtml(playerName(turn.playerId))}</div>
+        ${turn.entries.map(entry => renderEventEntry(entry, state)).join('')}
+      `).join('')}
+    `).join('')}</div>`;
+  }
 
-        if (entry.rerolledFrom && entry.rerolledFrom.length > 0) {
-          const origDice = entry.rerolledFrom.map(d =>
-            `<span class="history-die history-die--discarded">${d}</span>`
-          ).join('');
-          const label = entry.rerollSource === 'lucky'
-            ? 'Lucky rerolled'
-            : entry.rerollSource === 'plenty_of_bullets'
-              ? 'Plenty of Bullets rerolled'
-              : entry.rerollSource === 'plenty_of_shells'
-                ? 'Plenty of Shells rerolled'
-                : 'Rerolled';
-          subDetail = `<div class="history-entry__lucky">${label}: ${origDice}</div>${subDetail}`;
-        }
+  private renderLogButton(): string {
+    const count = displayableEntries(this.state?.history).length;
+    const unread = this.seenEntryCount !== null && count > this.seenEntryCount;
+    return `<button class="hud-iconbtn hud-logbtn" data-action="open-log" title="${es.hud.logTitle}" aria-label="${unread ? es.hud.logAriaUnread : es.hud.logAria}">
+      ${icon('ScrollText', 'sm')}${unread ? '<span class="hud-iconbtn__dot" aria-hidden="true"></span>' : ''}
+    </button>`;
+  }
 
-        const boosts: string[] = [];
-        if (entry.bonusDice && entry.bonusDice > 0) boosts.push(`+${entry.bonusDice} dice`);
-        if (entry.bonusDamage && entry.bonusDamage > 0) boosts.push(`+${entry.bonusDamage} dmg`);
-        if (boosts.length > 0) {
-          subDetail = `<div class="history-entry__boosts">${boosts.join(', ')}</div>${subDetail}`;
-        }
-        break;
-      }
-      case 'MOVE':
-      case 'SPRINT':
-      case 'CHARGE': {
-        if (entry.description) {
-          detail = entry.description;
-        } else if (entry.payload?.targetZoneId) {
-          detail = `→ ${formatZoneId(entry.payload.targetZoneId, this.state!)}`;
-        } else if (entry.payload?.path) {
-          const path = entry.payload.path as string[];
-          detail = `→ ${path.map(id => formatZoneId(id, this.state!)).join(' → ')}`;
-        }
-        break;
-      }
-      case 'SEARCH': {
-        detail = entry.description || '';
-        break;
-      }
-      case 'OPEN_DOOR': {
-        if (entry.description) {
-          detail = entry.description;
-        } else if (entry.payload?.targetZoneId) {
-          detail = `→ ${formatZoneId(entry.payload.targetZoneId, this.state!)}`;
-        }
-        break;
-      }
-      case 'TRADE_START': {
-        if (entry.payload?.targetSurvivorId && this.state) {
-          const target = this.state.survivors[entry.payload.targetSurvivorId];
-          detail = target ? `with ${target.name}` : '';
-        }
-        break;
-      }
-      case 'END_TURN': {
-        detail = '';
-        if (entry.spawnContext?.cards?.length) {
-          const spawnSummary = entry.spawnContext.cards.map((c: any) => {
-            if (c.detail.extraActivation) return `Extra ${c.detail.extraActivation} activation`;
-            if (c.detail.zombies) {
-              const zombieList = Object.entries(c.detail.zombies)
-                .filter(([, n]) => n && (n as number) > 0)
-                .map(([type, n]) => `${n} ${type}`)
-                .join(', ');
-              return `${formatZoneId(c.zoneId, this.state!)}: ${zombieList}`;
-            }
-            return '';
-          }).filter(Boolean);
-          if (spawnSummary.length > 0) {
-            subDetail = `<div class="history-entry__spawn">${spawnSummary.map(s => `<div>${s}</div>`).join('')}</div>`;
-          }
-        }
-        break;
-      }
-      case 'DISTRIBUTE_ZOMBIE_WOUNDS': {
-        if (entry.payload?.zoneId) {
-          const assignments = entry.payload.assignments as Record<string, number>;
-          const parts = Object.entries(assignments || {})
-            .filter(([, n]) => n > 0)
-            .map(([sid, n]) => {
-              const s = this.state?.survivors[sid];
-              return s ? `${s.name}: ${n}` : `${n}`;
-            });
-          detail = `${formatZoneId(entry.payload.zoneId, this.state!)}`;
-          if (parts.length > 0) {
-            subDetail = `<div class="history-entry__detail">${parts.join(', ')}</div>`;
-          }
-        }
-        break;
-      }
-      default: {
-        if (entry.description) {
-          detail = entry.description;
-        } else if (entry.payload?.targetZoneId) {
-          detail = `→ ${formatZoneId(entry.payload.targetZoneId, this.state!)}`;
-        }
-      }
+  // ─── Turn signal ─────────────────────────────────────────────
+
+  /** `Es tu turno · N acciones`, `Esperando a <nombre>` or `Fase de zombis`. */
+  private renderTurnLine(isMyTurn: boolean, survivor: Survivor): string {
+    const state = this.state!;
+    if (state.phase === GamePhase.Zombies) {
+      return `<span class="hud-turnline">${es.common.zombiePhase}</span>`;
     }
-
-    return `<div class="history-entry">
-      <span class="history-entry__actor">${survivorName}</span>
-      <div class="history-entry__content">
-        <span class="history-entry__action">${freeLabel}${actionLabel}${detail ? ` ${detail}` : ''}</span>
-        ${subDetail}
-      </div>
-    </div>`;
+    if (isMyTurn) {
+      const ap = survivor.cheatMode ? null : survivor.actionsRemaining;
+      return `<span class="hud-turnline hud-turnline--mine">${es.hud.yourTurn(ap)}</span>`;
+    }
+    const activePid = state.players[state.activePlayerIndex];
+    const active = Object.values(state.survivors).find(s => s.playerId === activePid);
+    return `<span class="hud-turnline">${es.hud.waitingFor(escapeHtml(displayName(active?.name, active?.characterClass) || '…'))}</span>`;
   }
 
   // ─── Trade Logic ─────────────────────────────────────────────
@@ -1863,7 +1747,7 @@ export class GameHUD {
     );
 
     if (others.length === 0) {
-      notificationManager.show({ variant: 'warning', message: 'No one else here to trade with.', duration: 3000 });
+      notificationManager.show({ variant: 'warning', message: es.hud.toast.noTradeTarget, duration: 3000 });
     } else if (others.length === 1) {
       networkManager.sendAction({
         playerId: this.localPlayerId, survivorId: activeSurvivor.id,
@@ -1876,17 +1760,17 @@ export class GameHUD {
 
   private openPlayerSelectModal(initiator: Survivor, targets: Survivor[]): void {
     modalManager.open({
-      title: 'Select Trade Partner',
+      title: es.modals.trade.title,
       size: 'sm',
       renderBody: () => `
         <div class="stack stack--sm">
           ${targets.map(t => {
             const identity = getPlayerIdentity(this.state!, t.playerId);
-            const avatar = renderAvatar(t.name, identity, 'md', undefined, t.characterClass);
+            const avatar = renderAvatar(displayName(t.name, t.characterClass), identity, 'md', undefined, t.characterClass);
             return `
               <button class="action-btn" data-action="select-trade-target" data-id="${t.id}" style="width:100%">
                 ${avatar}
-                <span class="action-btn__label">${t.name} (${t.characterClass})</span>
+                <span class="action-btn__label">${escapeHtml(displayNameWithClass(t.name, t.characterClass))}</span>
               </button>`;
           }).join('')}
         </div>`,

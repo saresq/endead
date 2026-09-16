@@ -2,6 +2,7 @@
 import { GameState, ObjectiveType, Objective, ObjectiveColor } from '../../types/GameState';
 import { ActionRequest, ActionType } from '../../types/Action';
 import { XPManager } from '../XPManager';
+import { es } from '../../strings/es';
 
 export function handleTakeObjective(state: GameState, intent: ActionRequest): GameState {
   const newState = structuredClone(state);
@@ -9,7 +10,7 @@ export function handleTakeObjective(state: GameState, intent: ActionRequest): Ga
   const zone = newState.zones[survivor.position.zoneId];
 
   if (!zone.hasObjective) {
-    throw new Error('No objective in this zone');
+    throw new Error(es.errors.noObjective);
   }
 
   // Color of the token being taken. Default to Yellow for legacy compatibility
@@ -71,7 +72,7 @@ export function handleTakeObjective(state: GameState, intent: ActionRequest): Ga
     playerId: intent.playerId,
     survivorId: intent.survivorId,
     timestamp: Date.now(),
-    description: `Took ${color.toLowerCase()} Objective (+${xpReward} XP)`,
+    description: es.log.tookObjective(color, xpReward),
     ...(colorActivated ? { colorActivated } : {}),
   };
 

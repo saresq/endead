@@ -19,6 +19,7 @@ import {
   makeCard,
   collectItemsObj,
 } from './winConditionHelpers';
+import { es, equipmentName } from '../../strings/es';
 
 function useItemIntent(survivorId: string, itemId: string): ActionRequest {
   return {
@@ -82,7 +83,7 @@ describe('Food consumption (Bag of Rice / Canned Food / Water)', () => {
     const state = makeState({ survivors: { s1: survivor } });
 
     expect(() => handleUseItem(state, useItemIntent('s1', flashlight.id)))
-      .toThrow(/cannot be used/i);
+      .toThrow(es.errors.notConsumable(equipmentName(flashlight)));
   });
 
   it('does not require survivor to be wounded (rules: no item heals wounds)', () => {
