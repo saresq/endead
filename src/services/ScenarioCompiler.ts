@@ -519,6 +519,9 @@ export function compileScenario(map: ScenarioMap): CompiledScenario {
     playerStartZoneId = sorted[0] || 'z_0_0';
   }
 
+  // 11b. Group building zones into buildings and settle which can ever spawn.
+  assignBuildings(zones, playerStartZoneId);
+
   // 12. Build objectives from authored winConditions (or fall back to legacy
   // marker-derived defaults for v1 maps that don't carry a winConditions block).
   const authored = map.winConditions ?? [];
@@ -571,6 +574,51 @@ export function compileScenario(map: ScenarioMap): CompiledScenario {
     doorPositions: doorPosRecord,
     cellTypes: cellTypeRecord,
   };
+}
+
+/**
+ * Labels every building zone with the building it belongs to — the rooms reached
+ * through doorways, never through a door — and marks the buildings that can
+ * never spawn as already spawned.
+ *
+ * Two of them per rules/09-player-phase.md#spawning-in-buildings: a building with a doorway straight to the street
+ * is open from the start (Rule 302), and so is the one the survivors start in,
+ * which would otherwise drop a Zombie card on top of them the first time they
+ * opened its door.
+ */
+export function assignBuildings(zones: Record<ZoneId, Zone>, playerStartZoneId: ZoneId): void {
+  const seen = new Set<ZoneId>();
+  let nextBuilding = 0;
+
+  for (const zone of Object.values(zones)) {
+    if (!zone.isBuilding || seen.has(zone.id)) continue;
+
+    const buildingId = `building-${nextBuilding++}`;
+    const members: ZoneId[] = [];
+    const queue: ZoneId[] = [zone.id];
+    seen.add(zone.id);
+    let openAtStart = false;
+
+    while (queue.length > 0) {
+      const zid = queue.shift()!;
+      members.push(zid);
+      for (const conn of zones[zid].connections) {
+        if (conn.hasDoor) continue;
+        const neighbor = zones[conn.toZoneId];
+        if (!neighbor) continue;
+        if (!neighbor.isBuilding) { openAtStart = true; continue; }
+        if (seen.has(neighbor.id)) continue;
+        seen.add(neighbor.id);
+        queue.push(neighbor.id);
+      }
+    }
+
+    const startsSpawned = openAtStart || members.includes(playerStartZoneId);
+    for (const zid of members) {
+      zones[zid].buildingId = buildingId;
+      if (startsSpawned) zones[zid].hasBeenSpawned = true;
+    }
+  }
 }
 
 // --- Win-condition compilation helpers ---

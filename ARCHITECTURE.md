@@ -35,10 +35,13 @@ src/
 │       ├── components/
 │       │   ├── Button.ts        # Reusable button component
 │       │   ├── ActionButton.ts  # Game action button with icon + label
-│       │   ├── StatBar.ts       # Health/XP/AP progress bar
 │       │   ├── ItemCard.ts      # Equipment card display
 │       │   ├── PlayerAvatar.ts  # Color+shape player identifier
-│       │   ├── ZombieBadge.ts   # Zombie type indicator
+│       │   ├── PhotoSlot.ts     # Portrait / placeholder frame
+│       │   ├── StatCell.ts      # Labelled stat readout (vitals, actions)
+│       │   ├── LobbyDossier.ts  # Character dossier card in the lobby
+│       │   ├── BottomSheet.ts   # Phone-portrait sheet drag + snap
+│       │   ├── Tooltip.ts       # Board entity inspection chit
 │       │   ├── EventEntry.ts    # History/event log entry
 │       │   └── icons.ts         # Lucide icon helper
 │       └── overlays/

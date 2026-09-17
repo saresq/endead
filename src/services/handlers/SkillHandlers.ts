@@ -1,9 +1,9 @@
 
 import { GameState, Survivor } from '../../types/GameState';
-import { ActionRequest } from '../../types/Action';
+import { ActionRequest, ActionType } from '../../types/Action';
 import { XPManager } from '../XPManager';
 import { visibleZones } from '../LineOfSight';
-import { getConnection, isDoorBlocked } from './handlerUtils';
+import { walkMovePath, walkSurvivorMove, zoneHasZombies, zombiesInZone } from './handlerUtils';
 import { es, skillName } from '../../strings/es';
 
 export function handleChooseSkill(state: GameState, intent: ActionRequest): GameState {
@@ -19,7 +19,7 @@ export function handleChooseSkill(state: GameState, intent: ActionRequest): Game
     throw new Error(es.errors.cannotChooseSkill);
   }
 
-  newState.survivors[intent.survivorId!] = XPManager.unlockSkill(survivor, skillId);
+  newState.survivors[intent.survivorId!] = XPManager.chooseSkill(survivor, skillId);
   return newState;
 }
 
@@ -39,25 +39,12 @@ export function handleCharge(state: GameState, intent: ActionRequest): GameState
     throw new Error(es.errors.pathLength(skillName('charge'), 1, 2));
   }
 
-  // Validate path
-  let currentZoneId = survivor.position.zoneId;
-  for (const nextZoneId of path) {
-    const currentZone = newState.zones[currentZoneId];
-    if (!currentZone) throw new Error(`Zone ${currentZoneId} invalid`);
-    if (!getConnection(currentZone, nextZoneId)) {
-      throw new Error(es.errors.zonesNotConnected);
-    }
-    if (isDoorBlocked(currentZone, nextZoneId)) {
-      throw new Error(es.errors.doorClosedOnPath);
-    }
-    currentZoneId = nextZoneId;
-  }
+  // Normal movement rules apply (rules/14-skills.md#charge), so a middle zone holding
+  // zombies is where the charge ends.
+  const { zoneId: currentZoneId } = walkSurvivorMove(newState, survivor, path);
 
   // Destination must have at least 1 zombie
-  const destZombies = Object.values(newState.zombies).filter(
-    (z: any) => z.position.zoneId === currentZoneId
-  );
-  if (destZombies.length === 0) {
+  if (!zoneHasZombies(newState, currentZoneId)) {
     throw new Error(es.errors.needZombieAtDestination(skillName('charge')));
   }
 
@@ -65,6 +52,14 @@ export function handleCharge(state: GameState, intent: ActionRequest): GameState
   survivor.chargeUsedThisTurn = true;
 
   return newState;
+}
+
+/** Where a player sits in this round's order; the first player token holder is 0. */
+function roundPosition(state: GameState, playerId: string): number {
+  const count = state.players.length;
+  const index = state.players.indexOf(playerId);
+  if (count === 0 || index < 0) return 0;
+  return (index - state.firstPlayerTokenIndex + count) % count;
 }
 
 export function handleBornLeader(state: GameState, intent: ActionRequest): GameState {
@@ -83,11 +78,14 @@ export function handleBornLeader(state: GameState, intent: ActionRequest): GameS
   const target = newState.survivors[targetSurvivorId];
   if (!target) throw new Error('Target survivor not found');
   if (target.wounds >= target.maxHealth) throw new Error(es.errors.targetDead);
-  if (target.position.zoneId !== survivor.position.zoneId) {
-    throw new Error(es.errors.sameZone);
-  }
   if (target.id === survivor.id) {
     throw new Error(es.errors.giveActionSelf);
+  }
+  // The card grants the Action "used immediately" (rules/14-skills.md#born-leader) — no zone
+  // restriction, but a player whose turn already passed this round can never
+  // spend it, so refuse instead of losing it silently.
+  if (roundPosition(newState, target.playerId) < roundPosition(newState, survivor.playerId)) {
+    throw new Error(es.errors.targetTurnOver);
   }
 
   target.actionsRemaining += 1;
@@ -112,25 +110,11 @@ export function handleBloodlustMelee(state: GameState, intent: ActionRequest): G
     throw new Error(es.errors.pathLength(skillName('bloodlust_melee'), 1, 2));
   }
 
-  // Validate path
-  let currentZoneId = survivor.position.zoneId;
-  for (const nextZoneId of path) {
-    const currentZone = newState.zones[currentZoneId];
-    if (!currentZone) throw new Error(`Zone ${currentZoneId} invalid`);
-    if (!getConnection(currentZone, nextZoneId)) {
-      throw new Error(es.errors.zonesNotConnected);
-    }
-    if (isDoorBlocked(currentZone, nextZoneId)) {
-      throw new Error(es.errors.doorClosedOnPath);
-    }
-    currentZoneId = nextZoneId;
-  }
+  // Same movement as Charge: a middle zone holding zombies ends the move.
+  const { zoneId: currentZoneId } = walkSurvivorMove(newState, survivor, path);
 
   // Destination must have at least 1 zombie
-  const destZombies = Object.values(newState.zombies).filter(
-    (z: any) => z.position.zoneId === currentZoneId
-  );
-  if (destZombies.length === 0) {
+  if (!zoneHasZombies(newState, currentZoneId)) {
     throw new Error(es.errors.needZombieAtDestination(skillName('bloodlust_melee')));
   }
 
@@ -162,10 +146,7 @@ export function handleLifesaver(state: GameState, intent: ActionRequest): GameSt
   }
 
   // Target zone must have at least 1 zombie AND at least 1 survivor
-  const zombiesInTarget = Object.values(newState.zombies).filter(
-    (z: any) => z.position.zoneId === targetZoneId
-  );
-  if (zombiesInTarget.length === 0) {
+  if (!zoneHasZombies(newState, targetZoneId)) {
     throw new Error(es.errors.lifesaverNeedsZombie);
   }
 
@@ -189,6 +170,87 @@ export function handleLifesaver(state: GameState, intent: ActionRequest): GameSt
   }
 
   survivor.lifesaverUsedThisTurn = true;
+
+  return newState;
+}
+
+/**
+ * Jump (rules/14-skills.md#jump): once per Turn, 1 Action, move exactly 2 Zones and
+ * ignore everything in the Zone crossed — zombies there neither stop the move
+ * nor charge for being left. Walls and closed doors still block, and the
+ * zombies in the Zone jumped *from* are still paid for.
+ */
+export function handleJump(state: GameState, intent: ActionRequest): GameState {
+  const newState = structuredClone(state);
+  const survivor = newState.survivors[intent.survivorId!];
+
+  if (!survivor.skills.includes('jump')) {
+    throw new Error(es.errors.noSkill(skillName('jump')));
+  }
+  if (survivor.jumpUsedThisTurn && !survivor.cheatMode) {
+    throw new Error(es.errors.skillUsed(skillName('jump')));
+  }
+
+  const path: string[] = intent.payload?.path;
+  if (!path || !Array.isArray(path) || path.length !== 2) {
+    throw new Error(es.errors.pathLength(skillName('jump'), 2, 2));
+  }
+
+  // Movement Skills are ignored, so the walk never stops short; only the
+  // zone left behind costs extra Actions.
+  const { zoneId: landingZoneId } = walkMovePath(newState, survivor.position.zoneId, path, true);
+  const extraAPCost = survivor.skills.includes('slippery')
+    ? 0
+    : zombiesInZone(newState, survivor.position.zoneId).length;
+  if (extraAPCost > 0) newState._extraAPCost = extraAPCost;
+
+  survivor.position.zoneId = landingZoneId;
+  survivor.hasMoved = true;
+  survivor.jumpUsedThisTurn = true;
+
+  return newState;
+}
+
+/**
+ * Shove (rules/14-skills.md#shove): once per Turn, free, push every zombie in the
+ * survivor's Zone into a Zone at Range 1 with a clear path. Not a Movement, so
+ * the survivor stays put and pays nothing for the zombies they were sharing a
+ * Zone with.
+ */
+export function handleShove(state: GameState, intent: ActionRequest): GameState {
+  const newState = structuredClone(state);
+  const survivor = newState.survivors[intent.survivorId!];
+  const targetZoneId = intent.payload?.targetZoneId;
+
+  if (!survivor.skills.includes('shove')) {
+    throw new Error(es.errors.noSkill(skillName('shove')));
+  }
+  if (survivor.shoveUsedThisTurn && !survivor.cheatMode) {
+    throw new Error(es.errors.skillUsed(skillName('shove')));
+  }
+  if (!targetZoneId) throw new Error('Target zone required');
+
+  // Range 1 with a clear path is exactly what line of sight gives at distance 1.
+  if (visibleZones(newState, survivor.position.zoneId).get(targetZoneId) !== 1) {
+    throw new Error(es.errors.shoveRange);
+  }
+
+  const pushed = zombiesInZone(newState, survivor.position.zoneId);
+  if (pushed.length === 0) throw new Error(es.errors.shoveNeedsZombie);
+
+  for (const zombie of pushed) {
+    zombie.position.zoneId = targetZoneId;
+  }
+
+  survivor.shoveUsedThisTurn = true;
+
+  newState.lastAction = {
+    type: ActionType.SHOVE,
+    playerId: intent.playerId,
+    survivorId: intent.survivorId,
+    timestamp: Date.now(),
+    description: es.log.shoved(pushed.length),
+  };
 
   return newState;
 }

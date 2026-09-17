@@ -15,7 +15,8 @@ export const hud = {
   phaseZombies: 'Zombis',
   phaseEnd: 'Fin de ronda',
   phasePlayers: (name: string) => (name ? `Jugadores · ${name}` : 'Jugadores'),
-  channel: 'Canal',
+  danger: 'Peligro',
+  dangerAria: (level: string) => `Nivel de peligro: ${level}`,
   menu: 'Menú',
   logTitle: 'Registro de eventos (L)',
   logAria: 'Registro de eventos',
@@ -57,14 +58,19 @@ export const hud = {
   search: 'Buscar',
   noise: 'Ruido',
   door: 'Puerta',
+  reload: 'Recargar',
   objective: 'Objetivo',
   // Soft hyphen lets the 56px strip buttons break it as INTER- / CAMBIAR.
   trade: 'Inter\u00adcambiar',
+  // Soft hyphen: ORGA- / NIZAR in the 56px strip buttons.
+  organize: 'Orga\u00adnizar',
   sprint: 'Esprintar',
   charge: 'Carga',
   bornLeader: 'Líder nato',
   bloodlust: 'Sed de sangre',
   lifesaver: 'Salvavidas',
+  jump: 'Salto',
+  shove: 'Empujón',
 
   // Free action pips
   freeMove: 'Acción gratuita: Moverse',
@@ -81,6 +87,7 @@ export const hud = {
   bag: 'Mochila',
   openBag: 'Abrir mochila',
   openBagAria: (n: number) => `Abrir mochila (${n} ${plural(n, 'objeto', 'objetos')})`,
+  discardItem: (item: string) => `Descartar ${item} (gratis)`,
 
   // Toasts
   toast: {
@@ -92,6 +99,8 @@ export const hud = {
     pickCharge: 'Elegí una zona con zombis para cargar (hasta 2 zonas).',
     pickBloodlust: 'Elegí una zona con zombis (hasta 2 zonas).',
     pickLifesaver: 'Elegí una zona a alcance 1 con zombis y supervivientes.',
+    pickJump: 'Elegí una zona a 2 de distancia: saltás por encima de lo que haya en el medio.',
+    pickShove: 'Elegí la zona contigua a la que empujás a los zombis.',
     noBornLeaderTarget: 'No hay nadie más acá para darle una acción.',
     noTradeTarget: 'No hay nadie más acá para intercambiar.',
   },

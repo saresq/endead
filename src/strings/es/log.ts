@@ -6,13 +6,14 @@ import { colorWord } from './objectives';
 
 export const log = {
   // --- Server-authored descriptions ---
-  molotov: (killed: number, wounded: number) =>
-    `Tiró una Molotov: eliminó ${killed} ${plural(killed, 'zombi', 'zombis')} e hirió a ${wounded} ${plural(wounded, 'superviviente', 'supervivientes')}`,
+  molotov: (killed: number, burned: number) =>
+    `Tiró una Molotov: eliminó ${killed} ${plural(killed, 'zombi', 'zombis')} y quemó a ${burned} ${plural(burned, 'superviviente', 'supervivientes')}`,
   attack: (weapon: string, dual: boolean, threshold: number) =>
     `Atacó con ${weapon}${dual ? ' (ambidiestro)' : ''} (necesita ${threshold}+)`,
   doorOpened: (spawned: boolean) => (spawned ? 'Abrió una puerta: ¡aparecieron zombis!' : 'Abrió una puerta'),
   doorOpenedShort: 'Abrió una puerta',
   moved: 'Se movió',
+  shoved: (count: number) => `Empujó a ${count} ${plural(count, 'zombi', 'zombis')} a la zona de al lado`,
   consumed: (item: string) => `Consumió ${item} (+1 PX)`,
   found: (items: string[], traps: number) => `Encontró: ${items.join(', ')}${traps > 0 ? ` (${traps} Aaahh!!)` : ''}`,
   searchTrap: 'Aaahh!!: ¡apareció un zombi!',
@@ -26,6 +27,9 @@ export const log = {
   freeMelee: 'Cuerpo a cuerpo gratis',
   freeRanged: 'A distancia gratis',
   freeCombat: 'Combate gratis',
+  reloaded: (weapon: string) => `Recargó ${weapon}`,
+  reloadedFree: (count: number) =>
+    `Recargó ${count} ${plural(count, 'arma', 'armas')} en la Fase Final`,
 
   // --- Event entry (client) ---
   dieLabel: (value: number, state: 'hit' | 'miss' | 'discarded') =>

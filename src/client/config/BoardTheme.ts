@@ -11,9 +11,9 @@
  * entry below. The "matches --foo" comments are the contract.
  *
  * Palette anchors:
- *   --page / --ink  0x1a1614   --paper    0xf4ead2   --paper-2 0xe9dbb9
- *   --paper-3       0xdccaa0   --accent   0xc7241c   --highlight 0xffcc1a
- *   --success       0x256a31   --info     0x1f5fa8   --danger-orange 0xd8661c
+ *   --page / --ink  0x1a1614   --paper    0xdcd2b9   --paper-2 0xcdc1a1
+ *   --paper-3       0xbdb08d   --accent   0xc7241c   --highlight 0xffcc1a
+ *   --success       0x1f5a29   --info     0x1a5490   --danger-orange 0xd8661c
  *
  * Two deliberate departures from the change's design note (D6):
  *   - `exit` uses --success rather than --highlight; its icon asset is white
@@ -46,7 +46,7 @@ export const BOARD_THEME = {
     validMoveHighlight: 0x1a1614, // matches --ink (outline on the wash)
     pendingMoveHighlight: 0x1a1614,
     pendingMoveStroke: 0x1a1614,
-    sprintFill: 0x1f5fa8,         // matches --info
+    sprintFill: 0x1a5490,         // matches --info
     sprintAlpha: 0.3,
   },
 
@@ -57,7 +57,7 @@ export const BOARD_THEME = {
     width: 3,
   },
   door: {
-    open: 0x256a31,              // matches --success
+    open: 0x1f5a29,              // matches --success
     openAlpha: 1,
     closed: 0xd8661c,            // matches --danger-orange
     closedAlpha: 1,
@@ -75,11 +75,11 @@ export const BOARD_THEME = {
     fillAlpha: 0.35,
   },
   doorway: {
-    color: 0x256a31,             // matches --success
+    color: 0x1f5a29,             // matches --success
     alpha: 0.6,
   },
   crosswalk: {
-    color: 0xf4ead2,             // matches --paper
+    color: 0xdcd2b9,             // matches --paper
     alpha: 0.7,
   },
 
@@ -104,21 +104,21 @@ export const BOARD_THEME = {
     strokeColor: 0x1a1614,      // matches --ink
     strokeWidth: 2,
     skullSize: 28,
-    numberColor: 0xf4ead2,      // matches --paper
+    numberColor: 0xdcd2b9,      // matches --paper
     numberStroke: 0x1a1614,     // matches --ink
     numberFontSize: 14,
     // Objective-colour variants for coloured spawn zones
-    blueBg: 0x1f5fa8,           // matches --info
+    blueBg: 0x1a5490,           // matches --info
     blueStroke: 0x1a1614,       // matches --ink
-    greenBg: 0x256a31,          // matches --success
+    greenBg: 0x1f5a29,          // matches --success
     greenStroke: 0x1a1614,      // matches --ink
   },
   exit: {
-    fillColor: 0x256a31,        // matches --success
+    fillColor: 0x1f5a29,        // matches --success
     fillAlpha: 0.85,
     strokeColor: 0x1a1614,      // matches --ink
     strokeWidth: 2,
-    arrowColor: 0xf4ead2,       // matches --paper
+    arrowColor: 0xdcd2b9,       // matches --paper
     arrowWidth: 3,
   },
   objective: {
@@ -127,10 +127,10 @@ export const BOARD_THEME = {
     strokeWidth: 2,
     dotColor: 0x1a1614,         // matches --ink
     // Marker variants
-    blueFill: 0x1f5fa8,         // matches --info
-    blueDot: 0xf4ead2,          // matches --paper
-    greenFill: 0x256a31,        // matches --success
-    greenDot: 0xf4ead2,         // matches --paper
+    blueFill: 0x1a5490,         // matches --info
+    blueDot: 0xdcd2b9,          // matches --paper
+    greenFill: 0x1f5a29,        // matches --success
+    greenDot: 0xdcd2b9,         // matches --paper
   },
   epicCrate: {
     fillColor: 0xc7241c,        // matches --accent
@@ -144,7 +144,7 @@ export const BOARD_THEME = {
   entity: {
     strokeColor: 0x1a1614,      // matches --ink
     strokeWidth: 3,
-    selectionGlow: 0xf4ead2,    // matches --paper
+    selectionGlow: 0xdcd2b9,    // matches --paper
     selectionAlpha: 0.5,
     activeTurnRing: 0xffcc1a,   // matches --highlight
     activeTurnWidth: 3,
@@ -159,13 +159,13 @@ export const BOARD_THEME = {
     runner: 0xd8661c,           // matches --zombie-runner
     brute: 0x6b3d8f,            // matches --zombie-brute
     abomination: 0x8f1611,      // matches --zombie-abom
-    initialColor: 0xf4ead2,     // matches --paper
+    initialColor: 0xdcd2b9,     // matches --paper
     initialFontSize: 14,
   },
 
   // ─── Group badge (zombie overflow) ────────────────
   groupBadge: {
-    bgColor: 0xf4ead2,          // matches --paper
+    bgColor: 0xdcd2b9,          // matches --paper
     bgAlpha: 1,
     textColor: 0x1a1614,        // matches --ink
     fontSize: 12,
@@ -175,7 +175,7 @@ export const BOARD_THEME = {
 
   // ─── Board-overlay labels (move cost, counts) ────
   label: {
-    fill: 0xf4ead2,             // matches --paper
+    fill: 0xdcd2b9,             // matches --paper
     stroke: 0x1a1614,           // matches --ink
     strokeWidth: 3,
     fontSize: 14,
@@ -193,9 +193,9 @@ export const BOARD_THEME = {
   placeholder: {
     backdrop: 0x1a1614,         // matches --page
     backdropAlpha: 0.55,
-    tileFill: 0xdccaa0,         // matches --paper-3
+    tileFill: 0xbdb08d,         // matches --paper-3
     tileFillAlpha: 0.85,
-    tileBuilding: 0xe9dbb9,     // matches --paper-2
+    tileBuilding: 0xcdc1a1,     // matches --paper-2
     tileStroke: 0x1a1614,       // matches --ink
     tileStrokeAlpha: 0.9,
     tileStrokeWidth: 2,
@@ -216,8 +216,8 @@ export const BOARD_THEME = {
 
   // ─── Floating board cues (attack results, wounds, spawns) ─
   cue: {
-    hit: 0x256a31,              // matches --success
-    miss: 0xf4ead2,             // matches --paper
+    hit: 0x1f5a29,              // matches --success
+    miss: 0xdcd2b9,             // matches --paper
     wound: 0xc7241c,            // matches --accent
     spawn: 0xd8661c,            // matches --danger-orange
     info: 0xffcc1a,             // matches --highlight

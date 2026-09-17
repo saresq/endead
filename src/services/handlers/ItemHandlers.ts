@@ -1,13 +1,14 @@
 
-import { GameState, EquipmentCard, ZombieType } from '../../types/GameState';
+import { GameState, EquipmentCard } from '../../types/GameState';
 import { ActionRequest, ActionType } from '../../types/Action';
 import { DeckService } from '../DeckService';
 import { EquipmentManager } from '../EquipmentManager';
-import { ZombiePhaseManager } from '../ZombiePhaseManager';
+import { resolveDrawnCard } from '../CardDraw';
 import { XPManager } from '../XPManager';
+import { zoneHasZombies } from './handlerUtils';
 import { es, equipmentName } from '../../strings/es';
 
-// RULEBOOK.md:604-621 — Bag of Rice / Canned Food / Water are Food cards;
+// rules/16-card-registry.md#standard-equipment-45-cards-blue-backs — Bag of Rice / Canned Food / Water are Food cards;
 // "Consume for 1 AP". Match by registry key (equipmentId), not display name,
 // so renames don't desync game logic.
 const FOOD_EQUIPMENT_IDS = new Set(['bag_of_rice', 'canned_food', 'water']);
@@ -28,7 +29,7 @@ export function handleUseItem(state: GameState, intent: ActionRequest): GameStat
     // Discard the card and award 1 AP. XPManager handles auto-promotion
     // (Yellow grants +1 Action immediately).
     survivor.inventory.splice(itemIndex, 1);
-    newState.equipmentDiscard.push(item);
+    DeckService.discard(newState, item);
     newState.survivors[intent.survivorId!] = XPManager.addXP(survivor, 1);
 
     newState.lastAction = {
@@ -56,7 +57,7 @@ export function handleSearch(state: GameState, intent: ActionRequest): GameState
   if (!preZone.searchable && !preSurvivor.skills.includes('search_anywhere')) {
     throw new Error(es.errors.searchOnlyInBuildings);
   }
-  if (Object.values(state.zombies).some((z: any) => z.position.zoneId === preZone.id)) {
+  if (zoneHasZombies(state, preZone.id)) {
     throw new Error(es.errors.searchWithZombies);
   }
 
@@ -77,69 +78,51 @@ export function handleSearch(state: GameState, intent: ActionRequest): GameState
   const hasSearchPlus1 = newState.survivors[intent.survivorId!].skills.includes('search_plus_1');
   const cardsToDraw = (hasFlashlight || hasSearchPlus1) ? 2 : 1;
 
-  const drawnCards: EquipmentCard[] = [];
-  for (let i = 0; i < cardsToDraw; i++) {
+  // Draw one card at a time: an Aaahh!! stops the search, so any remaining
+  // cards are never drawn, and every card that is drawn is resolved before the
+  // next one — nothing can be left in neither inventory nor discard.
+  const found: EquipmentCard[] = [];
+  let drawnCount = 0;
+  let trapped = false;
+
+  for (let i = 0; i < cardsToDraw && !trapped; i++) {
     const drawResult = DeckService.drawCard(newState);
     newState = drawResult.newState;
-    if (drawResult.card) drawnCards.push(drawResult.card);
-  }
+    const card = drawResult.card;
+    if (!card) break;
+    drawnCount++;
 
-  if (drawnCards.length === 0) throw new Error(es.errors.deckEmpty);
-
-  const survivor = newState.survivors[intent.survivorId!];
-  const zone = newState.zones[survivor.position.zoneId];
-
-  // Process drawn cards — check for Aaahh!! trap cards
-  const equipCards: EquipmentCard[] = [];
-  for (const card of drawnCards) {
-    if (card.keywords?.includes('aaahh')) {
-      // Aaahh!! card: spawn a Walker in the searcher's zone, discard card
-      ZombiePhaseManager.spawnZombie(newState, zone.id, ZombieType.Walker);
-      newState.equipmentDiscard.push(card);
-    } else {
-      equipCards.push(card);
-    }
-  }
-
-  // Matching Set: if drawn card is a Dual weapon, auto-take second copy from deck
-  if (survivor.skills.includes('matching_set')) {
-    const matchingCards: EquipmentCard[] = [];
-    for (const card of equipCards) {
-      if (card.stats?.dualWield) {
-        // Find another copy by name in equipment deck
-        const deckIndex = newState.equipmentDeck.findIndex(
-          (d: EquipmentCard) => d.equipmentId === card.equipmentId
-        );
-        if (deckIndex >= 0) {
-          const [matchCard] = newState.equipmentDeck.splice(deckIndex, 1);
-          matchingCards.push(matchCard);
-        }
-      }
-    }
-    equipCards.push(...matchingCards);
-  }
-
-  // Give non-trap cards to survivor
-  for (const card of equipCards) {
-    const handFull = EquipmentManager.isHandFull(survivor);
-    const hasSpace = EquipmentManager.hasSpace(survivor);
-
-    if (!handFull && hasSpace) {
-      newState.survivors[intent.survivorId!] = EquipmentManager.addCard(
-        newState.survivors[intent.survivorId!], card
-      );
-    } else {
-      // Hand Full or Inventory Full -> Trigger Modal with first overflow card
-      newState.survivors[intent.survivorId!].drawnCard = card;
-      // Remaining cards go to discard if we can't hold them
+    if (resolveDrawnCard(newState, intent.survivorId!, card) === 'AAAHH') {
+      trapped = true;
       break;
     }
+    found.push(card);
+
+    // Matching Set: a drawn Dual weapon pulls its second copy from the deck.
+    const searcher = newState.survivors[intent.survivorId!];
+    if (searcher.skills.includes('matching_set') && card.stats?.dualWield) {
+      const deckIndex = newState.equipmentDeck.findIndex(
+        (d: EquipmentCard) => d.equipmentId === card.equipmentId
+      );
+      if (deckIndex >= 0) {
+        const [matchCard] = newState.equipmentDeck.splice(deckIndex, 1);
+        resolveDrawnCard(newState, intent.survivorId!, matchCard);
+        found.push(matchCard);
+        // "Shuffle deck after" (rules/14-skills.md#matching-set) — pulling a card from the
+        // middle would otherwise leak where the rest of the deck sits.
+        const shuffle = DeckService.shuffleDeck(newState.equipmentDeck, newState.seed);
+        newState.equipmentDeck = shuffle.deck;
+        newState.seed = shuffle.newSeed;
+      }
+    }
   }
+
+  if (drawnCount === 0) throw new Error(es.errors.deckEmpty);
 
   newState.survivors[intent.survivorId!].hasSearched = true;
 
-  const foundNames = equipCards.map(c => equipmentName(c));
-  const trapCount = drawnCards.length - equipCards.length;
+  const foundNames = found.map(c => equipmentName(c));
+  const trapCount = trapped ? 1 : 0;
   newState.lastAction = {
     type: ActionType.SEARCH,
     playerId: intent.playerId,
@@ -159,7 +142,7 @@ export function handleResolveSearch(state: GameState, intent: ActionRequest): Ga
 
   if (action === 'DISCARD') {
     const newState = structuredClone(state);
-    newState.equipmentDiscard.push(survivor.drawnCard);
+    DeckService.discard(newState, survivor.drawnCard);
     newState.survivors[intent.survivorId!].drawnCard = undefined;
     return newState;
   } else if (action === 'EQUIP') {
@@ -192,17 +175,19 @@ export function handleResolveSearch(state: GameState, intent: ActionRequest): Ga
   throw new Error('Invalid resolve action');
 }
 
+/**
+ * Moves one card between slots. Free, because the action was already paid:
+ * either by the reorganize session, by the trade the survivor is in, or by the
+ * search / Epic crate whose card is still staged. Without one of those there is
+ * nothing to charge, so the move is refused rather than silently free.
+ */
 export function handleOrganize(state: GameState, intent: ActionRequest): GameState {
   const survivorId = intent.survivorId!;
   const cardId = intent.payload?.cardId;
   const targetSlot = intent.payload?.targetSlot;
 
   if (!cardId || !targetSlot) throw new Error('Missing cardId or targetSlot');
-
-  // Handle explicit DISCARD action via Organize
-  if (targetSlot === 'DISCARD') {
-      return EquipmentManager.discardCard(state, survivorId, cardId);
-  }
+  if (!isOrganizePaidFor(state, survivorId)) throw new Error(es.errors.organizeNeedsSession);
 
   const newState = structuredClone(state);
   const survivor = newState.survivors[survivorId];
@@ -210,4 +195,51 @@ export function handleOrganize(state: GameState, intent: ActionRequest): GameSta
   newState.survivors[survivorId] = EquipmentManager.moveCardToSlot(survivor, cardId, targetSlot);
 
   return newState;
+}
+
+/** True while some already-paid context lets this survivor rearrange freely. */
+function isOrganizePaidFor(state: GameState, survivorId: string): boolean {
+  if (state.activeReorganize?.survivorId === survivorId) return true;
+  if (state.survivors[survivorId]?.drawnCard) return true;
+  const trade = state.activeTrade;
+  return !!trade && (trade.activeSurvivorId === survivorId || trade.targetSurvivorId === survivorId);
+}
+
+/**
+ * Opens a reorganize session. This is the action the player pays for
+ * (ActionProcessor charges it); every move until ORGANIZE_END is free.
+ */
+export function handleOrganizeStart(state: GameState, intent: ActionRequest): GameState {
+  if (state.activeReorganize) throw new Error(es.errors.reorganizeActive);
+
+  const newState = structuredClone(state);
+  newState.activeReorganize = { survivorId: intent.survivorId! };
+  return newState;
+}
+
+export function handleOrganizeEnd(state: GameState, intent: ActionRequest): GameState {
+  if (!state.activeReorganize) return state;
+
+  const newState = structuredClone(state);
+  delete newState.activeReorganize;
+  return newState;
+}
+
+/**
+ * Drops a card out of the inventory (or the staging slot). Free and allowed at
+ * any time, including on another player's turn — rules/07-inventory.md#discarding, a card can
+ * be discarded whenever, and discarding grants nothing that could buy tempo.
+ * Turn validation is skipped for this action, so ownership is checked here.
+ */
+export function handleDiscardCard(state: GameState, intent: ActionRequest): GameState {
+  const survivorId = intent.survivorId!;
+  const cardId = intent.payload?.cardId;
+  if (!cardId) throw new Error('Card ID required');
+
+  const survivor = state.survivors[survivorId];
+  if (!survivor) throw new Error('Survivor not found');
+  if (survivor.playerId !== intent.playerId) throw new Error(es.errors.notYourSurvivor);
+  if (survivor.wounds >= survivor.maxHealth) throw new Error(es.errors.survivorDead(survivor.name));
+
+  return EquipmentManager.discardCard(state, survivorId, cardId);
 }

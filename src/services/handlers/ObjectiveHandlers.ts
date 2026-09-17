@@ -21,7 +21,7 @@ export function handleTakeObjective(state: GameState, intent: ActionRequest): Ga
   zone.hasObjective = false;
   zone.objectiveColor = undefined;
 
-  // Per RULEBOOK §11: all non-Epic Objective tokens (yellow, blue, green) grant
+  // Per rules/09-player-phase.md#take-or-activate-an-objective: all non-Epic Objective tokens (yellow, blue, green) grant
   // 5 XP. Honour an objective's xpValue override if one is set on a matching
   // counter; otherwise default to 5.
   let xpReward = 5;
@@ -75,14 +75,6 @@ export function handleTakeObjective(state: GameState, intent: ActionRequest): Ga
     description: es.log.tookObjective(color, xpReward),
     ...(colorActivated ? { colorActivated } : {}),
   };
-
-  newState.history.push({
-      playerId: intent.playerId,
-      survivorId: intent.survivorId || 'system',
-      actionType: ActionType.TAKE_OBJECTIVE,
-      timestamp: Date.now(),
-      payload: { zoneId: zone.id, color, ...(colorActivated ? { colorActivated } : {}) },
-  });
 
   return newState;
 }

@@ -75,6 +75,26 @@ export class DeckService {
   }
 
   /**
+   * Routes a discarded card to the pile its deck owns, by id prefix — the ids
+   * already encode which deck a card came from (`DeckService.initializeDeck`
+   * stamps `card-`, `initializeEpicDeck` stamps `epic-`, and
+   * `CharacterRegistry` stamps `card-start-`).
+   *
+   * Starting equipment leaves play: it was never part of the Equipment deck,
+   * so returning it there would inflate the deck. Epic cards go back to the
+   * Epic discard so a reshuffle can only ever refill the deck they belong to.
+   * Mutates `state` — every caller already works on a clone.
+   */
+  public static discard(state: GameState, card: EquipmentCard): void {
+    if (card.id.startsWith('card-start-')) return;
+    if (card.id.startsWith('epic-')) {
+      state.epicDiscard.push(card);
+      return;
+    }
+    state.equipmentDiscard.push(card);
+  }
+
+  /**
    * Draws a card from the deck. Reshuffles discard if empty.
    */
   public static drawCard(state: GameState): { card: EquipmentCard | null, newState: GameState } {
@@ -96,10 +116,12 @@ export class DeckService {
   }
 
   /**
-   * Draws a spawn card.
+   * Draws a spawn card, moving it to the discard. Reshuffles the discard when
+   * the deck runs out. Only the three spawn fields change, so it works on them
+   * rather than cloning the whole game state.
    */
   public static drawSpawnCard(state: GameState): { card: SpawnCard | null, newState: GameState } {
-    const newState = structuredClone(state);
+    const newState = { ...state, spawnDeck: [...state.spawnDeck], spawnDiscard: [...state.spawnDiscard] };
 
     if (newState.spawnDeck.length === 0) {
       if (newState.spawnDiscard.length === 0) {
@@ -117,6 +139,12 @@ export class DeckService {
       newState.spawnDiscard.push(card);
     }
     return { card: card || null, newState };
+  }
+
+  /** Reshuffles a deck in place in the game's RNG sequence. */
+  public static shuffleDeck<T>(deck: T[], seed: RngState): { deck: T[], newSeed: RngState } {
+    const rng = Rng.from(seed);
+    return { deck: this.shuffle(deck, rng), newSeed: rng.snapshot() };
   }
 
   /**

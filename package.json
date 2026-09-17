@@ -4,12 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "trap 'kill 0' INT TERM EXIT; tsx src/server/server.ts & vite",
+    "dev": "trap 'kill 0' INT TERM EXIT; tsx --env-file-if-exists=.env src/server/server.ts & vite",
     "front": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "server": "tsx src/server/server.ts",
-    "start": "NODE_ENV=production tsx src/server/server.ts",
+    "server": "tsx --env-file-if-exists=.env src/server/server.ts",
+    "start": "NODE_ENV=production tsx --env-file-if-exists=.env src/server/server.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },

@@ -1,14 +1,13 @@
 /**
  * LobbyDossier — pure presentational renderer for a survivor's dossier
- * (name + role, starting weapon, skills per danger level). Produces an
+ * (name + role, type and health, skills per danger level). Produces an
  * HTML string suitable for mounting inside a modal body.
  */
 
 import { CHARACTER_DEFINITIONS } from '../../../config/CharacterRegistry';
 import { SURVIVOR_CLASSES, SKILL_DEFINITIONS } from '../../../config/SkillRegistry';
-import { EQUIPMENT_CARDS } from '../../../config/EquipmentRegistry';
 import { DangerLevel } from '../../../types/GameState';
-import { es, equipmentName, skillName, skillDescription } from '../../../strings/es';
+import { es, skillName, skillDescription } from '../../../strings/es';
 import { icon } from './icons';
 
 interface RankRow {
@@ -41,28 +40,26 @@ function renderDossierSection(charClass: string, role: string): string {
   `;
 }
 
-function renderLoadoutSection(charClass: string): string {
+function renderProfileSection(charClass: string): string {
   const charDef = CHARACTER_DEFINITIONS[charClass];
   if (!charDef) return '';
-  const template = EQUIPMENT_CARDS[charDef.startingEquipmentKey];
-  if (!template) return '';
 
-  const stats = template.stats;
-  const statLine = stats
-    ? es.lobby.weaponStats(stats.accuracy, stats.dice, stats.damage)
-    : '—';
-  const weaponName = equipmentName({ equipmentId: charDef.startingEquipmentKey, name: template.name });
+  const typeLabel = es.lobby.survivorType[charDef.type] ?? charDef.type;
+  const note = charDef.type === 'Kid'
+    ? `<div class="lobby-loadout__stats fm-mono">${escHtml(es.lobby.kidNote)}</div>`
+    : '';
 
   return `
     <div class="lobby-operative__section">
       <div class="lobby-loadout">
         <div class="lobby-loadout__icon-slot">
-          <span class="lobby-loadout__icon">${icon('Swords', 'md')}</span>
+          <span class="lobby-loadout__icon">${icon('Heart', 'md')}</span>
         </div>
         <div class="lobby-loadout__text">
-          <div class="fm-kicker fm-kicker--secondary">${escHtml(es.lobby.startingWeapon)}</div>
-          <div class="fm-stencil lobby-loadout__name">${escHtml(weaponName)}</div>
-          <div class="lobby-loadout__stats fm-mono">${escHtml(statLine)}</div>
+          <div class="fm-kicker fm-kicker--secondary">${escHtml(es.lobby.profile)}</div>
+          <div class="fm-stencil lobby-loadout__name">${escHtml(typeLabel)}</div>
+          <div class="lobby-loadout__stats fm-mono">${escHtml(es.lobby.health(charDef.maxHealth))}</div>
+          ${note}
         </div>
       </div>
     </div>
@@ -109,7 +106,7 @@ export function renderLobbyDossier(charClass: string, role: string): string {
 
   const parts = [
     renderDossierSection(charClass, role),
-    renderLoadoutSection(charClass),
+    renderProfileSection(charClass),
     renderProgressionSection(charClass),
   ].filter(Boolean);
 

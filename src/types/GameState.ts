@@ -40,6 +40,8 @@ export interface WeaponStats {
   dualWield: boolean;
   ammo?: 'bullets' | 'shells'; // Drives Plenty of Bullets / Plenty of Shells re-rolls
   special?: 'molotov'; // Special weapon handler flag
+  /** Usable in melee as well as at range (e.g. Gunblade). The attack carries the chosen mode. */
+  melee?: boolean;
 }
 
 export interface EquipmentCard {
@@ -58,6 +60,8 @@ export interface EquipmentCard {
   canOpenDoor?: boolean;
   openDoorNoise?: boolean;
   keywords?: string[]; // e.g. ['sniper'], ['reload']
+  /** `reload` weapons only: false once fired, until a Reload action or the End Phase. */
+  loaded?: boolean;
 }
 
 export enum ZombieType {
@@ -100,6 +104,8 @@ export interface Survivor extends Entity {
   playerId: PlayerId;
   name: string;
   characterClass: string; // e.g. "Wanda", "Doug", "Amy", "Ned", "Elle", "Josh"
+  /** Classic or Kid, from the character definition (rules/15-characters.md#core-box-survivors). */
+  survivorType: 'Classic' | 'Kid';
   
   // Stats
   actionsPerTurn: number;
@@ -110,6 +116,10 @@ export interface Survivor extends Entity {
   experience: number;
   dangerLevel: DangerLevel;
   skills: string[]; // Unlocked skills
+  /** Which option was taken at each choice level. A card can offer a skill the
+   *  survivor already owns (Odin's Red repeats his Blue), so the choice is
+   *  recorded per level rather than inferred from `skills`. */
+  skillChoices: Partial<Record<DangerLevel, string>>;
   
   // Inventory
   inventory: EquipmentCard[];
@@ -125,9 +135,10 @@ export interface Survivor extends Entity {
   freeSearchesRemaining: number;
   freeCombatsRemaining: number;
 
-  // Tough skill tracking (per-source: zombie attacks vs friendly fire are independent)
-  toughUsedZombieAttack: boolean;
-  toughUsedFriendlyFire: boolean;
+  // Tough skill tracking: the wound context Tough was last spent on. Tough
+  // ignores one wound per zombie attack step and per ranged action's friendly
+  // fire, so it is keyed by instance rather than reset per turn.
+  toughUsedContext?: string;
 
   // Free melee/ranged action tracking (reset each turn in endRound)
   freeMeleeRemaining: number;
@@ -139,8 +150,13 @@ export interface Survivor extends Entity {
   bornLeaderUsedThisTurn: boolean;
   bloodlustUsedThisTurn: boolean;
   lifesaverUsedThisTurn: boolean;
+  jumpUsedThisTurn: boolean;
+  shoveUsedThisTurn: boolean;
   hitAndRunFreeMove: boolean;
-  luckyUsedThisTurn: boolean;
+  /** Kids get Slippery once per Turn, on a single Move (rules/03-setup.md#survivor-types). */
+  kidSlipperyUsedThisTurn: boolean;
+  /** Lucky is one reroll per attack action; cleared at the start of each attack. */
+  luckyUsedThisAction: boolean;
 
   // Pending wounds for "Is That All You've Got?" resolution
   pendingWounds?: number;
@@ -181,6 +197,9 @@ export interface Zone {
   spawnColor?: ObjectiveColor.Blue | ObjectiveColor.Green;
   /** Present iff a red Epic Weapon Crate token sits in this zone. */
   hasEpicCrate?: boolean;
+  /** Building this zone belongs to — rooms joined by doorways, not by doors.
+   *  Absent on street zones. Assigned by `ScenarioCompiler`. */
+  buildingId?: string;
   searchable: boolean;
   isDark: boolean;
   hasBeenSpawned: boolean;
@@ -303,6 +322,12 @@ export interface GameState {
 
   // Active Trade Session (if any)
   activeTrade?: TradeSession;
+  /**
+   * Open reorganize session. Opening it costs the survivor one action; every
+   * move inside it is free, which is how "1 Action to rearrange, however many
+   * cards you move" is expressed without counting moves.
+   */
+  activeReorganize?: { survivorId: EntityId };
 
   // Danger Level (highest survivor XP determines this usually)
   currentDangerLevel: DangerLevel;
@@ -348,7 +373,7 @@ export interface GameState {
    * Objective is taken, activation flips to true and `activatedOnTurn`
    * stamps the turn number.
    *
-   * Spawn gate (per RULEBOOK §9): a colored zone spawns on a Zombie Phase
+   * Spawn gate (per rules/10-zombie-phase.md#colored-spawn-zones): a colored zone spawns on a Zombie Phase
    * iff `activation.activated && currentTurn > activation.activatedOnTurn`.
    * `state.turn` increments in `endRound()` AFTER spawning, so during
    * turn N's Zombie Phase `state.turn === N`, which `>` correctly skips —
@@ -425,6 +450,8 @@ export interface GameState {
     damagePerHit?: number;           // Effective damage per hit
     usedFreeAction?: boolean;        // Whether a free action was consumed
     freeActionType?: string;         // Which free action type was used
+    /** ATTACK only: which mode the attack resolved in, for free melee/ranged deduction. */
+    isMelee?: boolean;
     /** Set when a colored Objective was taken — flips dormant spawns of that color. */
     colorActivated?: ObjectiveColor;
     /** Set when an Epic Weapon Crate was taken — equipmentId of the drawn epic weapon. */
@@ -465,6 +492,16 @@ export interface GameState {
     zoneId: string;
     totalWounds: number;
     survivorIds: string[];
+    /** Wound context the entry belongs to — one zombie activation set, or one
+     *  attack's friendly fire. Tough spends once per context, so entries from
+     *  different instances are never merged. */
+    contextId?: string;
+    /** Where the wounds come from. Absent means a zombie attack. */
+    source?: 'FRIENDLY_FIRE';
+    /** Wounds each assigned unit is worth — friendly fire assigns misses. Default 1. */
+    damagePerWound?: number;
+    /** Who assigns them. Absent means the host, as zombie wounds always are. */
+    assignedByPlayerId?: string;
   }>;
 
   // Monotonic counter for unique zombie IDs
@@ -472,8 +509,6 @@ export interface GameState {
 
   // Transient: extra AP cost stashed by a handler for the dispatcher to consume
   _extraAPCost?: number;
-  // Transient: whether current attack is melee (for free melee/ranged action deduction)
-  _attackIsMelee?: boolean;
 }
 
 // --- Example Initial State ---

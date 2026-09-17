@@ -14,6 +14,7 @@ import { modals } from './es/modals';
 import { gameOver } from './es/gameOver';
 import { trade } from './es/trade';
 import { pickup } from './es/pickup';
+import { reorganize } from './es/reorganize';
 import { log } from './es/log';
 import { cues } from './es/cues';
 import { keys } from './es/keys';
@@ -32,6 +33,7 @@ export const es = {
   modals,
   trade,
   pickup,
+  reorganize,
   log,
   cues,
   keys,

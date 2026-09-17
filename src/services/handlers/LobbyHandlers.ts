@@ -6,7 +6,7 @@ import { XPManager } from '../XPManager';
 import { compileScenario } from '../ScenarioCompiler';
 import { SURVIVOR_CLASSES } from '../../config/SkillRegistry';
 import { DEFAULT_MAP } from '../../config/DefaultMap';
-import { buildStartingEquipment } from '../../config/CharacterRegistry';
+import { CHARACTER_DEFINITIONS, dealStartingEquipment, FIRST_PLAYER_EQUIPMENT_ID } from '../../config/CharacterRegistry';
 import { seedFromString } from '../Rng';
 import { es } from '../../strings/es';
 
@@ -42,6 +42,9 @@ export function handleSelectCharacter(state: GameState, intent: ActionRequest): 
 
     const charClass = intent.payload?.characterClass;
     if (!charClass) throw new Error('Character class required');
+    // A character the server doesn't know is a client bug. Substituting one
+    // hides it and hands the player a survivor they never picked.
+    if (!CHARACTER_DEFINITIONS[charClass]) throw new Error(es.errors.unknownCharacter);
 
     // Optional: Update Nickname
     if (intent.payload?.name) {
@@ -110,14 +113,22 @@ export function handleStartGame(state: GameState, intent: ActionRequest): GameSt
 
     const startZoneId = compiled.playerStartZoneId;
 
-    // Initialize Survivors at Start Zone with per-character starting equipment
+    // Starting Equipment is dealt, not assigned: one card each from the shuffled
+    // grey-back deck (rules/16-card-registry.md#starting-equipment-6-cards-grey-backs).
+    const deal = dealStartingEquipment(newState.lobby.players.length, newState.seed);
+    newState.seed = deal.newSeed;
+
+    // Initialize Survivors at Start Zone with their dealt starting equipment
     newState.lobby.players.forEach((p: any, index: number) => {
         const survivorId = `survivor-${p.id}`;
-        const classProgression = SURVIVOR_CLASSES[p.characterClass] || SURVIVOR_CLASSES['Wanda'];
+        const definition = CHARACTER_DEFINITIONS[p.characterClass];
+        if (!definition) throw new Error(es.errors.unknownCharacter);
+
+        const classProgression = SURVIVOR_CLASSES[p.characterClass];
         const startingSkills = [...classProgression[DangerLevel.Blue]];
         const startingActionsPerTurn = startingSkills.includes('plus_1_action') ? 4 : 3;
 
-        const startingCard = buildStartingEquipment(p.characterClass, index);
+        const startingCard = deal.cards[index];
         const inventory: EquipmentCard[] = startingCard ? [startingCard] : [];
 
         const survivor: Survivor = {
@@ -125,13 +136,15 @@ export function handleStartGame(state: GameState, intent: ActionRequest): GameSt
             playerId: p.id,
             name: p.name,
             characterClass: p.characterClass,
+            survivorType: definition.type,
             position: { x: 0, y: 0, zoneId: startZoneId },
             actionsPerTurn: startingActionsPerTurn,
-            maxHealth: 3,
+            maxHealth: definition.maxHealth,
             wounds: 0,
             experience: 0,
             dangerLevel: DangerLevel.Blue,
             skills: startingSkills,
+            skillChoices: {},
             inventory,
             actionsRemaining: startingActionsPerTurn,
             hasMoved: false,
@@ -146,14 +159,20 @@ export function handleStartGame(state: GameState, intent: ActionRequest): GameSt
             bornLeaderUsedThisTurn: false,
             bloodlustUsedThisTurn: false,
             lifesaverUsedThisTurn: false,
+            jumpUsedThisTurn: false,
+            shoveUsedThisTurn: false,
             hitAndRunFreeMove: false,
-            luckyUsedThisTurn: false,
-            toughUsedZombieAttack: false,
-            toughUsedFriendlyFire: false,
+            kidSlipperyUsedThisTurn: false,
+            luckyUsedThisAction: false,
         } as Survivor;
         XPManager.resetSurvivorTurn(survivor);
         newState.survivors[survivorId] = survivor;
     });
+
+    // The Fire Axe holder takes the first player token (rules/03-setup.md#first-player).
+    const axeIndex = deal.cards.findIndex(c => c.equipmentId === FIRST_PLAYER_EQUIPMENT_ID);
+    newState.firstPlayerTokenIndex = axeIndex >= 0 ? axeIndex : 0;
+    newState.activePlayerIndex = newState.firstPlayerTokenIndex;
 
     return newState;
 }

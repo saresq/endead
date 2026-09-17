@@ -1,10 +1,7 @@
 
 import { GameState } from '../../types/GameState';
 import { ActionRequest } from '../../types/Action';
-
-export function handleNothing(state: GameState, intent: ActionRequest): GameState {
-  return state;
-}
+import { DeckService } from '../DeckService';
 
 export function handleEndTurn(state: GameState, intent: ActionRequest): GameState {
   const newState = structuredClone(state);
@@ -22,13 +19,16 @@ export function handleEndTurn(state: GameState, intent: ActionRequest): GameStat
     survivor.freeRangedRemaining = 0;
     survivor.hitAndRunFreeMove = false;
     if (survivor.drawnCard) {
-      newState.equipmentDiscard.push(survivor.drawnCard);
+      DeckService.discard(newState, survivor.drawnCard);
       survivor.drawnCard = undefined;
     }
   }
 
   if (newState.activeTrade) {
     delete newState.activeTrade;
+  }
+  if (newState.activeReorganize) {
+    delete newState.activeReorganize;
   }
 
   return newState;

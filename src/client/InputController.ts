@@ -1,6 +1,6 @@
 
 import * as PIXI from 'pixi.js';
-import { GameState, EntityId, ZoneId, PlayerId, Zombie, EquipmentCard } from '../types/GameState';
+import { GameState, EntityId, ZoneId, PlayerId, Zombie, ZombieType, EquipmentCard, Survivor } from '../types/GameState';
 import { ActionType } from '../types/Action';
 import { visibleZones } from '../services/LineOfSight';
 import { TILE_SIZE, ENTITY_RADIUS } from '../config/Layout';
@@ -12,8 +12,10 @@ import { RenderOptions } from './PixiBoardRenderer';
 import { modalManager } from './ui/overlays/ModalManager';
 import { getZombieTypeDisplay } from './config/ZombieTypeConfig';
 import { icon } from './ui/components/icons';
+import { renderButton } from './ui/components/Button';
 import { notificationManager } from './ui/NotificationManager';
 import { es, equipmentName } from '../strings/es';
+import { displayName } from './utils/displayName';
 
 export class InputController {
   private app: PIXI.Application;
@@ -21,7 +23,7 @@ export class InputController {
   private selectedSurvivorId: EntityId | null = null;
   private pendingMoveZoneId: ZoneId | null = null;
   private localPlayerId: PlayerId;
-  private interactionMode: 'DEFAULT' | 'ATTACK' | 'OPEN_DOOR' | 'SPRINT' | 'CHARGE' | 'BLOODLUST_MELEE' | 'LIFESAVER' = 'DEFAULT';
+  private interactionMode: 'DEFAULT' | 'ATTACK' | 'OPEN_DOOR' | 'SPRINT' | 'CHARGE' | 'BLOODLUST_MELEE' | 'LIFESAVER' | 'JUMP' | 'SHOVE' = 'DEFAULT';
   private selectedWeaponId: EntityId | null = null;
   
   // Callback for when selection changes (so the Renderer can highlight)
@@ -50,7 +52,7 @@ export class InputController {
     return this.selectedWeaponId;
   }
 
-  public setMode(mode: 'DEFAULT' | 'ATTACK' | 'OPEN_DOOR' | 'SPRINT' | 'CHARGE' | 'BLOODLUST_MELEE' | 'LIFESAVER', weaponId?: EntityId): void {
+  public setMode(mode: 'DEFAULT' | 'ATTACK' | 'OPEN_DOOR' | 'SPRINT' | 'CHARGE' | 'BLOODLUST_MELEE' | 'LIFESAVER' | 'JUMP' | 'SHOVE', weaponId?: EntityId): void {
     const nextWeaponId = weaponId || null;
     // Toggle off when re-selecting the same mode (and same weapon, for ATTACK)
     if (mode !== 'DEFAULT' && mode === this.interactionMode && nextWeaponId === this.selectedWeaponId) {
@@ -192,6 +194,25 @@ export class InputController {
           this.setMode('DEFAULT');
         } else if (this.interactionMode === 'LIFESAVER') {
           this.sendLifesaverAction(clickedZoneId, currentState);
+          this.setMode('DEFAULT');
+        } else if (this.interactionMode === 'JUMP') {
+          const jumpPath = this.findJumpPath(currentState, survivor.position.zoneId, clickedZoneId);
+          if (jumpPath) {
+            networkManager.sendAction({
+              playerId: this.localPlayerId,
+              survivorId: this.selectedSurvivorId!,
+              type: ActionType.JUMP,
+              payload: { path: jumpPath },
+            });
+          }
+          this.setMode('DEFAULT');
+        } else if (this.interactionMode === 'SHOVE') {
+          networkManager.sendAction({
+            playerId: this.localPlayerId,
+            survivorId: this.selectedSurvivorId!,
+            type: ActionType.SHOVE,
+            payload: { targetZoneId: clickedZoneId },
+          });
           this.setMode('DEFAULT');
         } else {
           // DEFAULT = MOVE (tap once to preview, tap again to confirm)
@@ -416,6 +437,26 @@ export class InputController {
     return null;
   }
 
+  /**
+   * Jump lands exactly 2 zones away, crossing whatever is in between; only
+   * walls and closed doors block it (rules/14-skills.md#jump).
+   */
+  private findJumpPath(state: GameState, fromZoneId: ZoneId, targetZoneId: ZoneId): ZoneId[] | null {
+    const start = state.zones[fromZoneId];
+    if (!start) return null;
+
+    for (const first of start.connections) {
+      if (first.hasDoor && !first.doorOpen) continue;
+      const middle = state.zones[first.toZoneId];
+      if (!middle) continue;
+      for (const second of middle.connections) {
+        if (second.hasDoor && !second.doorOpen) continue;
+        if (second.toZoneId === targetZoneId) return [first.toZoneId, targetZoneId];
+      }
+    }
+    return null;
+  }
+
   private getValidAttackZones(state: GameState): ZoneId[] {
     if (!this.selectedSurvivorId) return [];
 
@@ -545,8 +586,19 @@ export class InputController {
     return null;
   }
 
-  private sendAttackAction(targetZoneId: ZoneId, targetZombieIds?: EntityId[], weaponId?: EntityId | null): void {
+  private sendAttackAction(
+    targetZoneId: ZoneId,
+    weaponId?: EntityId | null,
+    choices: {
+      targetZombieIds?: EntityId[];
+      attackMode?: 'MELEE' | 'RANGED';
+      protectedSurvivorIds?: EntityId[];
+      useBarbarian?: boolean;
+    } = {},
+  ): void {
     if (!this.selectedSurvivorId) return;
+
+    const { targetZombieIds, attackMode, protectedSurvivorIds, useBarbarian } = choices;
 
     networkManager.sendAction({
       playerId: this.localPlayerId,
@@ -556,16 +608,21 @@ export class InputController {
         targetZoneId,
         weaponId: weaponId !== undefined ? weaponId : this.selectedWeaponId,
         ...(targetZombieIds && targetZombieIds.length > 0 ? { targetZombieIds } : {}),
+        ...(attackMode ? { attackMode } : {}),
+        ...(protectedSurvivorIds && protectedSurvivorIds.length > 0 ? { protectedSurvivorIds } : {}),
+        ...(useBarbarian ? { useBarbarian } : {}),
       },
     });
   }
 
   /**
-   * Resolves a melee weapon's target selection. Per Zombicide 2E rules, melee attacks let the
-   * player freely pick which zombies to kill. When the target zone has multiple killable zombies,
-   * open a picker modal; otherwise dispatch directly.
+   * Resolves the choices the rules give the attacker before the action is sent:
+   * which zombies the hits go to (melee, Sniper, Point-blank, or a Brute-versus-
+   * Abomination priority tie), which mode a weapon usable both ways attacks in,
+   * who Steady Hand protects from Friendly Fire, and whether Barbarian is used.
+   * With nothing to decide, the attack goes straight out.
    */
-  private handleAttackClick(state: GameState, targetZoneId: ZoneId, survivor: any): void {
+  private handleAttackClick(state: GameState, targetZoneId: ZoneId, survivor: Survivor): void {
     const weapon: EquipmentCard | undefined = this.selectedWeaponId
       ? survivor.inventory.find((c: EquipmentCard) => c.id === this.selectedWeaponId && c.inHand)
       : survivor.inventory.find((c: EquipmentCard) => c.type === 'WEAPON' && c.inHand);
@@ -574,29 +631,163 @@ export class InputController {
       return;
     }
 
-    const isMelee = weapon.stats.range[1] === 0;
+    const ownZone = survivor.position.zoneId === targetZoneId;
+    const distance = ownZone ? 0 : (visibleZones(state, survivor.position.zoneId).get(targetZoneId) ?? 0);
     const zombiesInZone = Object.values(state.zombies).filter(
-      (z: any) => z.position.zoneId === targetZoneId
+      (z: Zombie) => z.position.zoneId === targetZoneId
     ) as Zombie[];
 
-    if (!isMelee || zombiesInZone.length <= 1) {
-      this.sendAttackAction(targetZoneId, undefined, weapon.id);
+    // A Molotov kills every actor in the zone and has no targets to pick, so
+    // the only thing to decide is whether to burn the survivors standing in it.
+    if (weapon.stats.special === 'molotov') {
+      const caught = (Object.values(state.survivors) as Survivor[]).filter(
+        s => s.position.zoneId === targetZoneId && s.wounds < s.maxHealth
+      );
+      if (caught.length > 0) {
+        this.confirmMolotov(targetZoneId, weapon, caught, survivor.id);
+      } else {
+        this.sendAttackAction(targetZoneId, weapon.id);
+      }
       return;
     }
 
-    this.openMeleeTargetPicker(targetZoneId, zombiesInZone, weapon);
+    const choices = this.attackChoices(state, survivor, weapon, targetZoneId, distance, zombiesInZone);
+    if (!choices.needsPicker) {
+      this.sendAttackAction(targetZoneId, weapon.id);
+      return;
+    }
+
+    this.openAttackPicker(state, survivor, weapon, targetZoneId, distance, zombiesInZone);
   }
 
-  private openMeleeTargetPicker(targetZoneId: ZoneId, zombies: Zombie[], weapon: EquipmentCard): void {
-    const maxPicks = Math.min(zombies.length, (weapon.stats?.dice ?? 1) + 2);
-    const selection: EntityId[] = [];
+  /**
+   * What the attack lets the player decide, for a given mode. The melee/ranged
+   * rules mirror the server's: a melee-only weapon is always melee, a weapon
+   * usable both ways is melee in the attacker's own zone unless asked otherwise.
+   */
+  private attackChoices(
+    state: GameState,
+    survivor: Survivor,
+    weapon: EquipmentCard,
+    targetZoneId: ZoneId,
+    distance: number,
+    zombiesInZone: Zombie[],
+    mode?: 'MELEE' | 'RANGED',
+  ) {
+    const stats = weapon.stats!;
+    const ownZone = survivor.position.zoneId === targetZoneId;
+    const dualMode = stats.melee === true && stats.range[1] >= 1;
+    const canChooseMode = dualMode && ownZone;
+    const isMelee = stats.range[1] === 0 || (canChooseMode && mode !== 'RANGED');
 
-    const renderBody = () => {
+    const hasSniper = survivor.skills.includes('sniper') || !!weapon.keywords?.includes('sniper');
+    const isPointBlankShot = survivor.skills.includes('point_blank') && distance === 0;
+    const canChooseTargets = isMelee || hasSniper || isPointBlankShot;
+
+    // Without free targeting the player may still break a priority tie between
+    // a Brute and an Abomination, which share the top band.
+    const tied = zombiesInZone.filter(
+      z => z.type === ZombieType.Brute || z.type === ZombieType.Abomination
+    );
+    const hasTie = !canChooseTargets
+      && tied.some(z => z.type === ZombieType.Brute)
+      && tied.some(z => z.type === ZombieType.Abomination);
+
+    const pickable = canChooseTargets ? zombiesInZone : hasTie ? tied : [];
+
+    const friendlies = !isMelee && state.config.friendlyFire && !hasSniper && !isPointBlankShot
+      ? (Object.values(state.survivors) as Survivor[]).filter(
+          s => s.position.zoneId === targetZoneId
+            && s.id !== survivor.id
+            && s.wounds < s.maxHealth
+            && !s.skills?.includes('low_profile')
+        )
+      : [];
+
+    const canSteadyHand = survivor.skills.includes('steady_hand') && friendlies.length > 0;
+    const canBarbarian = isMelee && survivor.skills.includes('barbarian');
+
+    return {
+      isMelee, canChooseMode, canChooseTargets, hasTie, pickable, friendlies,
+      canSteadyHand, canBarbarian,
+      needsPicker: pickable.length > 1 || canChooseMode || canSteadyHand || canBarbarian,
+    };
+  }
+
+  /**
+   * Molotov kills survivors as well as zombies, and any survivor death loses
+   * the game for everyone. Never throw one over a survivor without saying so.
+   */
+  private confirmMolotov(
+    targetZoneId: ZoneId,
+    weapon: EquipmentCard,
+    caught: Survivor[],
+    attackerId: EntityId,
+  ): void {
+    const others = caught.filter(s => s.id !== attackerId);
+    const hitsSelf = caught.some(s => s.id === attackerId);
+
+    const lines = [
+      ...(others.length > 0
+        ? [es.board.molotovBodyOthers(others.map(s => displayName(s.name, s.characterClass)).join(', '))]
+        : []),
+      ...(hitsSelf ? [es.board.molotovBodySelf] : []),
+      es.board.molotovDefeat,
+    ];
+
+    const modalId = modalManager.open({
+      title: es.board.molotovTitle,
+      subtitle: equipmentName(weapon),
+      size: 'sm',
+      renderBody: () => `<div class="stack stack--sm">
+        ${lines.map(l => `<p class="text-secondary">${l}</p>`).join('')}
+      </div>`,
+      renderFooter: () => [
+        renderButton({ label: es.board.molotovCancel, variant: 'secondary', dataAction: 'molotov-cancel' }),
+        renderButton({ label: es.board.molotovConfirm, variant: 'destructive', icon: 'Flame', dataAction: 'molotov-confirm' }),
+      ].join(''),
+      onOpen: (el) => {
+        el.addEventListener('click', (e) => {
+          const target = e.target as HTMLElement;
+          if (target.closest('[data-action="molotov-cancel"]')) {
+            modalManager.close(modalId);
+            return;
+          }
+          if (target.closest('[data-action="molotov-confirm"]')) {
+            modalManager.close(modalId);
+            this.sendAttackAction(targetZoneId, weapon.id);
+          }
+        });
+      },
+    });
+  }
+
+  private openAttackPicker(
+    state: GameState,
+    survivor: Survivor,
+    weapon: EquipmentCard,
+    targetZoneId: ZoneId,
+    distance: number,
+    zombiesInZone: Zombie[],
+  ): void {
+    let mode: 'MELEE' | 'RANGED' | undefined =
+      weapon.stats!.melee && weapon.stats!.range[1] >= 1 && survivor.position.zoneId === targetZoneId
+        ? 'MELEE'
+        : undefined;
+    let selection: EntityId[] = [];
+    const protectedIds = new Set<EntityId>();
+    let useBarbarian = false;
+
+    const derive = () => this.attackChoices(state, survivor, weapon, targetZoneId, distance, zombiesInZone, mode);
+
+    const renderTargets = (c: ReturnType<typeof derive>) => {
+      if (c.pickable.length <= 1) return '';
+      const hint = c.hasTie ? es.board.pickerTieBody : es.board.pickerBody;
       return `
         <div class="stack stack--sm">
-          <p class="text-muted-sm">${es.board.pickerBody}</p>
+          <p class="text-muted-sm">${hint}</p>
           <div class="zombie-picker-grid">
-            ${zombies.map(z => {
+            ${c.pickable.map(z => {
               const display = getZombieTypeDisplay(z.type);
               const orderIdx = selection.indexOf(z.id);
               const selectedClass = orderIdx >= 0 ? ' zombie-picker-btn--selected' : '';
@@ -614,41 +805,133 @@ export class InputController {
         </div>`;
     };
 
+    const renderMode = (c: ReturnType<typeof derive>) => {
+      if (!c.canChooseMode) return '';
+      const btn = (value: 'MELEE' | 'RANGED', label: string) =>
+        `<button class="btn btn--sm${(mode ?? 'MELEE') === value ? ' btn-primary' : ''}" data-action="attack-mode" data-mode="${value}">${label}</button>`;
+      return `
+        <div class="stack stack--sm">
+          <p class="text-muted-sm">${es.board.pickerMode}</p>
+          <div class="row">
+            ${btn('MELEE', es.board.pickerModeMelee)}
+            ${btn('RANGED', es.board.pickerModeRanged)}
+          </div>
+        </div>`;
+    };
+
+    const renderSteadyHand = (c: ReturnType<typeof derive>) => {
+      if (!c.canSteadyHand) return '';
+      return `
+        <div class="stack stack--sm">
+          <p class="text-muted-sm">${es.board.pickerSteadyHand}: ${es.board.pickerSteadyHandBody}</p>
+          <div class="row">
+            ${c.friendlies.map(f => `
+              <button class="btn btn--sm${protectedIds.has(f.id) ? ' btn-primary' : ''}" data-action="toggle-protected" data-id="${f.id}">
+                ${displayName(f.name, f.characterClass)}
+              </button>`).join('')}
+          </div>
+        </div>`;
+    };
+
+    const renderBarbarian = (c: ReturnType<typeof derive>) => {
+      if (!c.canBarbarian) return '';
+      const zombieCount = zombiesInZone.length;
+      return `
+        <div class="stack stack--sm">
+          <p class="text-muted-sm">${es.board.pickerBarbarianBody}</p>
+          <button class="btn btn--sm${useBarbarian ? ' btn-primary' : ''}" data-action="toggle-barbarian">
+            ${es.board.pickerBarbarian} (${zombieCount})
+          </button>
+        </div>`;
+    };
+
+    const renderBody = () => {
+      const c = derive();
+      // A mode switch can drop targets that are no longer offered.
+      selection = selection.filter(id => c.pickable.some(z => z.id === id));
+      return `<div class="stack stack--md">
+        ${renderMode(c)}
+        ${renderTargets(c)}
+        ${renderSteadyHand(c)}
+        ${renderBarbarian(c)}
+      </div>`;
+    };
+
     const renderFooter = () => {
-      const disabled = selection.length === 0 ? 'disabled' : '';
-      const label = selection.length === 0
-        ? es.board.pickerNone
-        : es.board.pickerAttack(selection.length);
+      const c = derive();
+      // Targets are optional unless the picker is open only to choose them.
+      const mustPick = c.pickable.length > 1 && !c.canChooseMode && !c.canSteadyHand && !c.canBarbarian;
+      const disabled = mustPick && selection.length === 0 ? 'disabled' : '';
+      const label = selection.length > 0
+        ? es.board.pickerAttack(selection.length)
+        : mustPick ? es.board.pickerNone : es.board.pickerAttackPlain;
       return `<button class="btn btn-primary" data-action="confirm-attack" ${disabled}>${label}</button>`;
     };
 
+    const initial = derive();
+    const maxPicks = Math.min(zombiesInZone.length, (weapon.stats?.dice ?? 1) + 2);
+
     const modalId = modalManager.open({
-      title: es.board.pickerTitle,
-      subtitle: es.board.pickerSubtitle(equipmentName(weapon)),
+      title: initial.pickable.length > 1 ? es.board.pickerTitle : es.board.pickerTitleOptions,
+      subtitle: initial.isMelee
+        ? es.board.pickerSubtitle(equipmentName(weapon))
+        : es.board.pickerSubtitleRanged(equipmentName(weapon)),
       size: 'md',
       renderBody,
       renderFooter,
       onOpen: (el) => {
+        const refresh = () => {
+          modalManager.updateBody(modalId, renderBody());
+          modalManager.updateFooter(modalId, renderFooter());
+        };
+
         el.addEventListener('click', (e) => {
           const target = e.target as HTMLElement;
+
+          const modeBtn = target.closest('[data-action="attack-mode"]') as HTMLElement | null;
+          if (modeBtn) {
+            mode = modeBtn.dataset.mode as 'MELEE' | 'RANGED';
+            refresh();
+            return;
+          }
+
           const toggle = target.closest('[data-action="toggle-zombie"]') as HTMLElement | null;
           if (toggle) {
             const id = toggle.dataset.id;
             if (!id) return;
             const idx = selection.indexOf(id);
-            if (idx >= 0) {
-              selection.splice(idx, 1);
-            } else if (selection.length < maxPicks) {
-              selection.push(id);
-            }
-            modalManager.updateBody(modalId, renderBody());
-            modalManager.updateFooter(modalId, renderFooter());
+            if (idx >= 0) selection.splice(idx, 1);
+            else if (selection.length < maxPicks) selection.push(id);
+            refresh();
             return;
           }
+
+          const protect = target.closest('[data-action="toggle-protected"]') as HTMLElement | null;
+          if (protect) {
+            const id = protect.dataset.id;
+            if (!id) return;
+            if (protectedIds.has(id)) protectedIds.delete(id);
+            else protectedIds.add(id);
+            refresh();
+            return;
+          }
+
+          if (target.closest('[data-action="toggle-barbarian"]')) {
+            useBarbarian = !useBarbarian;
+            refresh();
+            return;
+          }
+
           const confirm = target.closest('[data-action="confirm-attack"]') as HTMLButtonElement | null;
           if (confirm && !confirm.disabled) {
+            const c = derive();
             modalManager.close(modalId);
-            this.sendAttackAction(targetZoneId, selection, weapon.id);
+            this.sendAttackAction(targetZoneId, weapon.id, {
+              targetZombieIds: selection,
+              attackMode: c.canChooseMode ? (mode ?? 'MELEE') : undefined,
+              protectedSurvivorIds: c.canSteadyHand ? [...protectedIds] : undefined,
+              useBarbarian: c.canBarbarian ? useBarbarian : undefined,
+            });
           }
         });
       },

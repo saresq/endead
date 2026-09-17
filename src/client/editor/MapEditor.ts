@@ -1877,12 +1877,20 @@ export class MapEditor {
     // --- 5. Spawn number labels ---
     // Remove old labels
     this.spawnLabelContainer.removeChildren();
-    // Count spawn markers (any variant) in placement order — this mirrors
-    // ScenarioCompiler's `spawnZoneIds` ordering, which all spawn variants
-    // share regardless of color.
-    let spawnNum = 1;
+    // Number the COMPILED spawn zones, in `spawnZoneIds` order — the same list
+    // the Zombie Phase walks, so what the author sees here is the order the
+    // game will spawn in. Numbering raw markers instead would agree most of the
+    // time and lie in two cases: a marker on a cell that compiled into no zone
+    // (the game never spawns there, so it gets no number), and two markers
+    // sharing one zone (one spawn, one card, so they share a number).
+    const spawnOrder = new Map<string, number>(
+      (this.compiledPreview?.spawnZoneIds ?? []).map((zoneId, i) => [zoneId, i + 1]),
+    );
+    const cellToZone = this.compiledPreview?.zoneGeometry.cellToZone ?? {};
     for (const marker of this.markers) {
       if (!SPAWN_CLASS_MARKERS.includes(marker.type)) continue;
+      const spawnNum = spawnOrder.get(cellToZone[`${marker.x},${marker.y}`]);
+      if (spawnNum === undefined) continue;
       const cx = marker.x * TILE_SIZE + TILE_SIZE / 2;
       const cy = marker.y * TILE_SIZE + TILE_SIZE / 2;
       const label = new PIXI.Text({
@@ -1898,7 +1906,6 @@ export class MapEditor {
       label.anchor.set(0.5, 0.5);
       label.position.set(cx, cy);
       this.spawnLabelContainer.addChild(label);
-      spawnNum++;
     }
 
     // --- 6. Room dark/lit icons (moon/sun via PIXI.Graphics) ---

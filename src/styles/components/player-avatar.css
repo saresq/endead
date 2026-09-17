@@ -15,7 +15,7 @@
   justify-content: center;
   border-radius: var(--radius-sm);
   border: var(--border);
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   letter-spacing: var(--letter-spacing-wide);
   flex-shrink: 0;
   position: relative;
@@ -171,7 +171,7 @@
 }
 
 .player-tag__name {
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: var(--text-sm);
   letter-spacing: var(--letter-spacing-wide);
   text-transform: uppercase;

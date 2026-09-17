@@ -18,10 +18,8 @@ import { KeyboardManager } from './client/KeyboardManager';
 import { assetManager } from './client/AssetManager';
 import { audioManager } from './client/AudioManager';
 import { boardCuesFor } from './client/ui/eventLog';
+import { getNickname, getOrCreatePlayerId, setNickname } from './client/identity';
 import { es } from './strings/es';
-
-const PLAYER_ID_KEY = 'endead_player_id';
-const NICKNAME_KEY = 'endead_nickname';
 
 let menuUi: MenuUI | null = null;
 let lobbyUi: LobbyUI | null = null;
@@ -32,26 +30,6 @@ let keyboardManager: KeyboardManager | null = null;
 let unsubscribeStore: (() => void) | null = null;
 let currentRoomId: string | null = null;
 let roomInitToken = 0;
-
-function getOrCreatePlayerId(): string {
-  let playerId = localStorage.getItem(PLAYER_ID_KEY);
-  if (!playerId) {
-    playerId = `player-${Math.floor(Math.random() * 1000000)}`;
-    localStorage.setItem(PLAYER_ID_KEY, playerId);
-  }
-  return playerId;
-}
-
-function getNickname(): string {
-  const stored = localStorage.getItem(NICKNAME_KEY)?.trim();
-  if (stored) return stored;
-  return getOrCreatePlayerId();
-}
-
-function setNickname(value: string): void {
-  const trimmed = value.trim().slice(0, 24);
-  localStorage.setItem(NICKNAME_KEY, trimmed || getOrCreatePlayerId());
-}
 
 function parseRoomFromPath(): string | null {
   const match = window.location.pathname.match(/^\/room\/([a-zA-Z0-9_-]+)$/);
@@ -217,6 +195,15 @@ async function startRoom(roomId: string): Promise<void> {
   );
 
   keyboardManager = new KeyboardManager(playerId, inputController, () => gameHud, renderer);
+
+  // Dev-only handle for driving the board from a browser test: a zone id is
+  // worthless to a test without the screen point it sits at. Stripped from the
+  // production bundle by the `import.meta.env.DEV` guard.
+  if (import.meta.env.DEV) {
+    (window as unknown as { __endead?: unknown }).__endead = {
+      app, renderer, inputController, gameHud: () => gameHud, playerId,
+    };
+  }
 
   unsubscribeStore = gameStore.subscribe((newState, prevState) => {
     if (!inputController) return;
@@ -441,6 +428,10 @@ async function init(): Promise<void> {
     new MapEditor(app);
     return;
   }
+
+  // Claim this tab's identity while `tab` is still readable in the URL: every
+  // pushState below drops the query, and identity.ts latches on the store.
+  getOrCreatePlayerId();
 
   window.onpopstate = () => {
     networkManager.disconnect();

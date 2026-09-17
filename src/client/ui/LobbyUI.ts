@@ -4,6 +4,7 @@ import { ActionType } from '../../types/Action';
 import { networkManager } from '../NetworkManager';
 import { leaveRoom } from '../roomExit';
 import { CHARACTER_DEFINITIONS } from '../../config/CharacterRegistry';
+import { characterImageUrl } from '../utils/characterAsset';
 import { renderButton } from './components/Button';
 import { renderPhotoSlot } from './components/PhotoSlot';
 import { renderLobbyDossier } from './components/LobbyDossier';
@@ -12,6 +13,7 @@ import { notificationManager } from './NotificationManager';
 import { modalManager } from './overlays/ModalManager';
 import { es } from '../../strings/es';
 import { displayName } from '../utils/displayName';
+import { setNickname } from '../identity';
 
 // Max players per room — mirrors `MAX_PLAYERS` in server.ts.
 const MAX_SQUAD = 6;
@@ -40,10 +42,6 @@ const ROE_RULES: RoeRule[] = [
 
 function roleFor(charClass: string): string {
   return es.roles[charClass] ?? es.common.survivor;
-}
-
-function characterImageUrl(charClass: string): string {
-  return `/images/characters/${charClass.toLowerCase()}.webp`;
 }
 
 // Host-left banner countdown duration (ms). Drives the rust banner's
@@ -836,7 +834,7 @@ export class LobbyUI {
     const nameInput = this.container.querySelector('#lobby-nickname') as HTMLInputElement | null;
     const nextName = nameInput?.value.trim();
     if (!nextName) return;
-    localStorage.setItem('endead_nickname', nextName.slice(0, 24));
+    setNickname(nextName);
     networkManager.sendAction({
       playerId: this.localPlayerId,
       type: ActionType.UPDATE_NICKNAME,

@@ -4,6 +4,7 @@
 
 import { EquipmentCard, EquipmentType, GameState, WeaponStats, Zombie, ZombieType, Zone } from '../../types/GameState';
 import { makeZone, makeState, StateOverrides } from './winConditionHelpers';
+import { assignBuildings } from '../ScenarioCompiler';
 
 type EdgeClass = 'open' | 'wall' | 'crosswalk' | 'door' | 'doorway';
 
@@ -62,6 +63,10 @@ export function makeGrid(spec: GridSpec): Pick<GameState, 'zones' | 'zoneGeometr
       connect(zoneId, other, cls);
     }
   }
+
+  // Same building grouping the compiler does, so zone-level building rules
+  // (spawn eligibility) behave in fixtures as they do in a real scenario.
+  assignBuildings(zones, '');
 
   return { zones, zoneGeometry: { zoneCells, cellToZone }, edgeClassMap };
 }

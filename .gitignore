@@ -28,3 +28,9 @@ data/history.json
 *.njsproj
 *.sln
 *.sw?
+
+# Playwright MCP session artifacts
+.playwright-mcp/
+
+# Local secrets (EDITOR_SECRET); never committed
+.env

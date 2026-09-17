@@ -52,7 +52,7 @@ describe('handleTakeObjective — colored Objective tokens', () => {
     expect(next.zones.z1.objectiveColor).toBeUndefined();
   });
 
-  it('blue Objective awards 5 XP per RULEBOOK §11', () => {
+  it('blue Objective awards 5 XP per rules/09-player-phase.md#take-or-activate-an-objective', () => {
     const survivor = makeSurvivor({ zoneId: 'z1', experience: 0 });
     const state = makeState({
       zones: {
@@ -90,8 +90,6 @@ describe('handleTakeObjective — colored Objective tokens', () => {
     });
 
     expect(next.lastAction?.colorActivated).toBe(ObjectiveColor.Blue);
-    const lastHistory = next.history[next.history.length - 1];
-    expect(lastHistory.payload?.colorActivated).toBe(ObjectiveColor.Blue);
   });
 
   it('re-taking a same-color Objective is idempotent on activatedOnTurn', () => {

@@ -195,23 +195,31 @@
   background: var(--ink);
 }
 
-/* Decorative; dropped on portrait phones so the phase label fits. */
-#game-hud[data-layout="sheet"] .hud-channel,
+/* Portrait phones: the ticks are decorative, and the level word carries the
+   pill on its own once "Peligro" is dropped — the fill already says which. */
+#game-hud[data-layout="sheet"] .hud-danger__label,
 #game-hud[data-layout="sheet"] .hud-phaseindicator__ticks { display: none; }
 
 /* Danger chip — filled with the current danger accent. */
-.hud-channel {
-  padding: 2px 6px;
+/* Danger pill — the one sizable readout of the current danger level, filled
+   with --dl-accent so the hue and the word say the same thing. */
+.hud-danger {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 2px 7px;
   background: var(--dl-accent);
   border: 1px solid var(--ink);
   border-radius: var(--radius-sm);
   color: var(--dl-accent-text);
-  font-family: var(--font-mono);
+  font-family: var(--font-ui);
   font-size: 10px;
-  letter-spacing: 0.16em;
   text-transform: uppercase;
   white-space: nowrap;
 }
+
+.hud-danger__label { font-weight: var(--font-medium); letter-spacing: 0.16em; }
+.hud-danger__level { font-weight: var(--font-bold); letter-spacing: 0.1em; }
 
 .hud-iconbtn {
   display: inline-flex;
@@ -300,6 +308,13 @@
   position: relative;
   pointer-events: none;
   min-height: 0;
+}
+
+/* The squad overlay is out of flow and starts at the same corner as the feed,
+   so a feed card would sit on top of the chips and their HP/AP pips. Only the
+   deck layout escapes it — there the feed slot is pinned above the deck. */
+#game-hud:not([data-layout="deck"]) .hud-feed-slot:has(.hud-feed) {
+  margin-top: calc(var(--hud-squad-height, 57px) + 8px);
 }
 
 /* ==========================================================================
@@ -609,7 +624,7 @@
   padding: 6px 8px;
   background: var(--paper-2);
   border-left: 2px solid var(--highlight);
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   color: var(--text);
   min-width: 0;
 }
@@ -849,7 +864,9 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
+  /* Clears the widest ring the chip can draw (--turn: 6px outside the box)
+     plus the selected outline, both of which are out of flow. */
+  gap: 9px;
 }
 
 .hud-chip__state {
@@ -877,6 +894,13 @@
 
 .hud-chip__pip--hp.hud-chip__pip--on { background: var(--accent); }
 .hud-chip__pip--ap.hud-chip__pip--on { background: var(--highlight); }
+
+/* Cheat mode: unlimited actions reads as one bar the width of a full action
+   row, instead of one pip per action (999 of them, across the whole board). */
+.hud-chip__pip--inf {
+  width: 34px;
+  background: var(--success);
+}
 
 /* Avatar chips float directly over the board — ink outline always. */
 .hud-chip {
@@ -920,7 +944,7 @@
     0 0 0 6px var(--ink);
 }
 
-.hud-chip--selected { outline: 2px solid var(--text-on-page); outline-offset: 5px; }
+.hud-chip--selected { outline: 2px solid var(--text-on-page); outline-offset: 4px; }
 
 /* Recentre button — bottom-left of the map window, above the sheet.
    Sits on the board, so it keeps a paper fill and an ink outline. */
@@ -995,10 +1019,16 @@
   min-height: var(--hud-deck-height, 128px);
   max-height: 40vh;
   z-index: 2;
-  flex-direction: row;
-  flex-wrap: wrap;
+  /* Two rows, always: identity + XP + tags on top, the things the player
+     clicks underneath. A wrapping flex row used to spill into a third row as
+     soon as the content outgrew the viewport. */
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  grid-template-areas:
+    "who  more  end"
+    "half half  half";
   align-items: center;
-  justify-content: center;
+  justify-items: stretch;
   gap: var(--hud-deck-pad);
   padding: var(--hud-deck-pad) calc(var(--hud-deck-pad) * 1.5);
   padding-bottom: calc(var(--hud-deck-pad) + env(safe-area-inset-bottom));
@@ -1010,38 +1040,49 @@
 
 /* No drag handle and no drag gesture: the deck never snaps. */
 #game-hud[data-layout="deck"] .hud-sheet__handle { display: none; }
-#game-hud[data-layout="deck"] .hud-sheet__grab {
-  touch-action: auto;
-  padding: 0;
-  display: flex;
-  align-items: center;
-}
 
+/* The grab wrapper, the header it carries and the body are pass-through here:
+   their children are what the grid places, so each section lands in its own
+   area. */
+#game-hud[data-layout="deck"] .hud-sheet__grab,
 #game-hud[data-layout="deck"] .hud-sheet__header,
-#game-hud[data-layout="deck"] .hud-sheet__body,
+#game-hud[data-layout="deck"] .hud-sheet__body { display: contents; }
+
+#game-hud[data-layout="deck"] .hud-sheet__who  { grid-area: who; }
+#game-hud[data-layout="deck"] .hud-sheet__more { grid-area: more; }
+#game-hud[data-layout="deck"] .hud-sheet__endturn { grid-area: end; }
+#game-hud[data-layout="deck"] .hud-sheet__half { grid-area: half; }
+
 #game-hud[data-layout="deck"] .hud-sheet__half,
 #game-hud[data-layout="deck"] .hud-sheet__more {
   flex-direction: row;
   align-items: center;
   justify-content: center;
-  /* Wrap, so a viewport too narrow for one row drops a section to the next
-     line instead of pushing it off the edge. */
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   min-width: 0;
   overflow: visible;
   padding: 0;
   gap: var(--hud-deck-pad);
 }
 
-/* Shrink order, most protected first: the action strip and End Turn are what
-   the player clicks, the loadout is read and clicked, the XP/tags row is only
-   read. Everything keeps min-width: 0 so flex may actually shrink it. */
-#game-hud[data-layout="deck"] .hud-sheet__grab { flex: 0 0 auto; }
-#game-hud[data-layout="deck"] .hud-sheet__body { flex: 1 1 auto; min-width: 0; }
-#game-hud[data-layout="deck"] .hud-sheet__half { flex: 1 1 auto; min-width: 0; }
-#game-hud[data-layout="deck"] .hud-actionstrip { flex: 1 1 auto; min-width: 200px; }
+/* The XP/tags row is the only part a player does not act on, so it is what
+   gives up width first inside its own row. */
+#game-hud[data-layout="deck"] .hud-sheet__more { justify-content: flex-start; }
+#game-hud[data-layout="deck"] .hud-sheet__who  { flex: 0 0 auto; }
+
+/* Identity is two lines here, not four: the name, then the turn line and both
+   pip rows beside it. That is what buys the second row its height. */
+#game-hud[data-layout="deck"] .hud-sheet__ident {
+  flex-flow: row wrap;
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 3px;
+}
+#game-hud[data-layout="deck"] .hud-sheet__name { flex: 1 0 100%; }
+/* Hugs its buttons: the action row spans the whole deck width now, and a
+   growing strip would leave a bare paper slab next to the last button. */
+#game-hud[data-layout="deck"] .hud-actionstrip { flex: 0 1 auto; min-width: 0; }
 #game-hud[data-layout="deck"] .hud-loadout { flex: 0 1 auto; min-width: 0; }
-#game-hud[data-layout="deck"] .hud-sheet__more { flex: 0 1 auto; min-width: 0; }
 
 /* Give the buttons the room the two-column rail grid never had. */
 #game-hud[data-layout="deck"] .hud-actionstrip > .action-btn {
@@ -1063,14 +1104,10 @@
    player does not act on, so it is what the collapse spends. */
 @media (max-height: 820px) {
   #game-hud[data-layout="deck"] { --hud-deck-height: 86px; }
-  #game-hud[data-layout="deck"] > .hud-sheet,
-  #game-hud[data-layout="deck"] .hud-sheet__body,
-  #game-hud[data-layout="deck"] .hud-sheet__half {
-    flex-wrap: nowrap;
-  }
   #game-hud[data-layout="deck"] > .hud-sheet {
     height: var(--hud-deck-height);
     max-height: var(--hud-deck-height);
+    grid-template-areas: "who half end";
   }
   #game-hud[data-layout="deck"] .hud-sheet__more { display: none; }
 }
@@ -1415,7 +1452,7 @@
 .hud-game-over__icon--defeat  { color: var(--accent-text); }
 
 .hud-game-over__title {
-  font-family: var(--font-stencil);
+  font-family: var(--font-display);
   font-size: 32px;
   letter-spacing: 0.14em;
   text-transform: uppercase;

@@ -11,8 +11,9 @@
    Naming convention (CANONICAL — use in new code):
      Surfaces   --page, --page-2, --paper, --paper-2, --paper-3
      Ink/text   --ink, --text, --text-2, --text-muted,
-                --text-on-page, --text-on-page-muted, --text-inverse
-     Colour     --accent, --accent-text, --highlight, --success, --info,
+                --text-on-page, --text-inverse
+     Colour     --primary, --primary-text, --accent, --accent-text,
+                --highlight, --success, --info,
                 --warning, --danger, --danger-orange, plus `*-soft` fills
      Structure  --line, --scrim, --border, --border-heavy,
                 --shadow, --shadow-lg, --radius*, --halftone
@@ -23,8 +24,7 @@
      literal (`#hex`, `rgb()`, `rgba()`, `hsl()`).
    - Coloured text (--accent-text, --success, --info) only sits on
      --paper or --paper-2. --paper-3 carries --text or --text-muted only.
-   - Text over --page or the board uses --paper, --highlight or
-     --text-on-page-muted.
+   - Text over --page or the board uses --paper or --highlight.
 
    See `src/styles/README.md` for the full design-system naming rules.
    ────────────────────────────────────────────────────────────────────── */
@@ -34,43 +34,56 @@
   --page: #1a1614;
   --page-2: #2a2320;
 
-  /* ---------- Paper (panels, modals, cards) ---------- */
-  --paper: #f4ead2;
-  --paper-2: #e9dbb9;
-  --paper-3: #dccaa0;
+  /* ---------- Paper (panels, modals, cards) ----------
+     Aged newsprint, not fresh cream: same 43° hue as the old #f4ead2 with
+     saturation halved (62% -> 33%) and lightness dropped (89% -> 79%), so a
+     full-width panel stops glaring against the dark page. */
+  --paper: #dcd2b9;
+  --paper-2: #cdc1a1;
+  --paper-3: #bdb08d;
 
   /* ---------- Ink & text ---------- */
   --ink: #1a1614;
   --text: var(--ink);
   --text-2: #3d342d;
-  --text-muted: #5c5046;
+  --text-muted: #4a3f35;
   --text-on-page: var(--paper);
-  --text-on-page-muted: #b9ab90;
-  --text-inverse: var(--paper); /* text on --accent / --ink fills */
+  --text-inverse: #f3ecda; /* text on --accent / --ink fills — kept lighter
+                              than --paper so cream on red still clears 4.5:1 */
 
-  /* ---------- Accent (comic red) ----------
+  /* ---------- Primary (petrol) ----------
+     The affirmative CTA: Create room, Start game, End turn, outline buttons.
+     Split off from --accent so a primary button and a destructive one never
+     wear the same fill. Petrol sits in the same narrow luminance band the red
+     has to hit — light enough to clear 4.5:1 under cream text (4.58), dark
+     enough to clear 3:1 as a fill on the dark page (3.30). */
+  --primary: #14757e;
+  --primary-text: #10585f; /* petrol text / hover fill, --paper / --paper-2 only */
+  --primary-soft: color-mix(in srgb, var(--primary) 12%, var(--paper));
+
+  /* ---------- Accent (comic red — danger, wounds, spawns, destructive) ----
      --accent is #c7241c rather than design D1's #c01f18 so a red fill on
      the dark page clears the 3:1 non-text ratio (3.16) while cream text
-     on red still clears 4.5:1 (4.75). */
+     on red still clears 4.5:1 (4.75). Never a primary action: see --primary. */
   --accent: #c7241c;
-  --accent-text: #a31a14; /* red text, --paper / --paper-2 only */
-  --accent-soft: #f6d3c8;
+  --accent-text: #99170f; /* red text, --paper / --paper-2 only */
+  --accent-soft: color-mix(in srgb, var(--accent) 11%, var(--paper));
 
   /* ---------- Highlight (comic yellow: selected, active, your turn) --- */
   --highlight: #ffcc1a;
-  --highlight-soft: #fff0b3;
+  --highlight-soft: color-mix(in srgb, var(--highlight) 34%, var(--paper));
 
   /* ---------- Status ---------- */
-  --success: #256a31;
-  --success-soft: #d5e8c9;
-  --info: #1f5fa8;
-  --info-soft: #cfe0f2;
+  --success: #1f5a29;
+  --success-soft: color-mix(in srgb, var(--success) 12%, var(--paper));
+  --info: #1a5490;
+  --info-soft: color-mix(in srgb, var(--info) 10%, var(--paper));
   --warning: var(--highlight);
   --warning-soft: var(--highlight-soft);
   --danger: var(--accent);
   --danger-soft: var(--accent-soft);
   --danger-orange: #d8661c; /* ink text only */
-  --danger-orange-soft: #f7d9c2;
+  --danger-orange-soft: color-mix(in srgb, var(--danger-orange) 18%, var(--paper));
 
   /* ---------- Rank / danger anchors (progression track, squad plates) - */
   --rank-blue: var(--info);
@@ -110,11 +123,21 @@
   --zombie-necromancer-soft: color-mix(in srgb, var(--zombie-necromancer) 22%, var(--paper));
 
   /* ---------- Typography ----------
-     Two web families only: Bangers (display) and Barlow Condensed (body).
-     --font-stencil, --font-sans, --font-mono and --font-hud are aliases so
-     existing call sites keep working — do not introduce a third family. */
+     Three families, three jobs — do not introduce a fourth:
+
+       --font-display  Bangers. Headlines at 18px and up ONLY: the wordmark,
+                       modal and screen titles, the room code, the game-over
+                       verdict. Its irregular comic contours smear below that.
+       --font-ui       Oswald. Every caps label, button, chip, badge and
+                       kicker (9–16px). Tall x-height and open apertures, so
+                       a 9px tracked-out label still reads.
+       --font-body     Barlow Condensed. Running text, values, inputs.
+
+     --font-stencil is an alias of --font-ui and --font-sans / --font-mono /
+     --font-hud are aliases of --font-body, so old call sites keep working. */
   --font-display: "Bangers", "Impact", "Arial Narrow", sans-serif;
-  --font-stencil: var(--font-display);
+  --font-ui: "Oswald", "Arial Narrow", system-ui, sans-serif;
+  --font-stencil: var(--font-ui);
   --font-body: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
   --font-sans: var(--font-body);
   --font-mono: var(--font-body);
@@ -194,7 +217,7 @@
 
   /* ---------- Danger level (one accent; see [data-danger] below) ------ */
   --dl-accent: var(--ink);
-  --dl-accent-text: var(--paper);
+  --dl-accent-text: var(--text-inverse);
 
   /* ---------- Motion / transitions ---------- */
   --duration-instant: 50ms;
@@ -246,10 +269,10 @@
    DANGER LEVEL — one accent token, nothing else
    ========================================================================== */
 
-[data-danger="blue"] { --dl-accent: var(--info); --dl-accent-text: var(--paper); }
+[data-danger="blue"] { --dl-accent: var(--info); --dl-accent-text: var(--text-inverse); }
 [data-danger="yellow"] { --dl-accent: var(--highlight); --dl-accent-text: var(--ink); }
 [data-danger="orange"] { --dl-accent: var(--danger-orange); --dl-accent-text: var(--ink); }
-[data-danger="red"] { --dl-accent: var(--accent); --dl-accent-text: var(--paper); }
+[data-danger="red"] { --dl-accent: var(--accent); --dl-accent-text: var(--text-inverse); }
 
 /* ==========================================================================
    KEYFRAMES — functional only (no looping skin animation)

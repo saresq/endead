@@ -1,7 +1,7 @@
 
 import { GameState } from '../../types/GameState';
 import { ActionRequest, ActionType } from '../../types/Action';
-import { getConnection, isDoorBlocked } from './handlerUtils';
+import { walkSurvivorMove } from './handlerUtils';
 import { es, skillName } from '../../strings/es';
 
 export function handleMove(state: GameState, intent: ActionRequest): GameState {
@@ -25,44 +25,7 @@ export function handleMove(state: GameState, intent: ActionRequest): GameState {
   if (movePath.length > 2) throw new Error(es.errors.tooManyZones);
   if (movePath.length > 1 && !hasExtraZone) throw new Error(es.errors.oneZoneOnly);
 
-  let currentZoneId = survivor.position.zoneId;
-  let extraAPCost = 0;
-
-  for (let i = 0; i < movePath.length; i++) {
-    const nextZoneId = movePath[i];
-    const currentZone = newState.zones[currentZoneId];
-    if (!currentZone) throw new Error('Current zone invalid');
-
-    const nextZone = newState.zones[nextZoneId];
-    if (!nextZone) throw new Error('Target zone invalid');
-
-    if (!getConnection(currentZone, nextZoneId)) {
-      throw new Error(es.errors.zonesNotConnected);
-    }
-
-    if (isDoorBlocked(currentZone, nextZoneId)) {
-      throw new Error(es.errors.doorClosed);
-    }
-
-    // Zombie zone control: leaving a zone with zombies costs +1 AP per zombie
-    if (!survivor.skills.includes('slippery')) {
-      const zombieCount = Object.values(newState.zombies)
-        .filter((z: any) => z.position.zoneId === currentZoneId).length;
-      extraAPCost += zombieCount;
-    }
-
-    currentZoneId = nextZoneId;
-
-    // Entering a zone with zombies stops movement (unless Slippery)
-    if (i < movePath.length - 1) {
-      const hasZombiesInNext = Object.values(newState.zombies)
-        .some((z: any) => z.position.zoneId === nextZoneId);
-      if (hasZombiesInNext && !survivor.skills.includes('slippery')) {
-        // Stop here — can't continue to second zone
-        break;
-      }
-    }
-  }
+  const { zoneId: currentZoneId, extraAPCost } = walkSurvivorMove(newState, survivor, movePath);
 
   if (extraAPCost > 0) {
     newState._extraAPCost = extraAPCost;
@@ -104,42 +67,9 @@ export function handleSprint(state: GameState, intent: ActionRequest): GameState
     throw new Error(es.errors.pathLength(skillName('sprint'), 2, 3));
   }
 
-  let currentZoneId = survivor.position.zoneId;
-  let extraAPCost = 0;
-
-  for (let i = 0; i < path.length; i++) {
-    const targetZoneId = path[i];
-    const currentZone = newState.zones[currentZoneId];
-    if (!currentZone) throw new Error(`Zone ${currentZoneId} invalid`);
-
-    if (!getConnection(currentZone, targetZoneId)) {
-      throw new Error(es.errors.zonesNotConnected);
-    }
-
-    if (isDoorBlocked(currentZone, targetZoneId)) {
-      throw new Error(es.errors.doorClosedOnPath);
-    }
-
-    // Leaving a zone with zombies costs +1 AP per zombie (same as regular move)
-    if (!survivor.skills.includes('slippery')) {
-      const zombieCount = Object.values(newState.zombies)
-        .filter((z: any) => z.position.zoneId === currentZoneId).length;
-      extraAPCost += zombieCount;
-    }
-
-    currentZoneId = targetZoneId;
-
-    // Entering a zone with zombies stops movement immediately
-    const hasZombiesInTarget = Object.values(newState.zombies)
-      .some((z: any) => z.position.zoneId === targetZoneId);
-    if (hasZombiesInTarget) {
-      // Must have moved at least 2 zones for a valid sprint
-      if (i + 1 < 2) {
-        throw new Error(es.errors.sprintBlocked);
-      }
-      break;
-    }
-  }
+  // Sprint is a Move Action of 2 or 3 zones (rules/14-skills.md#sprint): entering a zone
+  // with zombies ends it wherever that happens, it does not fail.
+  const { zoneId: currentZoneId, extraAPCost } = walkSurvivorMove(newState, survivor, path);
 
   if (extraAPCost > 0) {
     newState._extraAPCost = extraAPCost;

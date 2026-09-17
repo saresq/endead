@@ -110,7 +110,7 @@
 }
 
 .item-card__name {
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: var(--text-sm);
   color: var(--text);
   letter-spacing: var(--letter-spacing-wide);
@@ -151,7 +151,7 @@
   position: absolute;
   top: -5px;
   right: 10px;
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: var(--text-2xs);
   color: var(--ink);
   text-transform: uppercase;
@@ -211,7 +211,7 @@
 }
 
 .item-card__icon--plus {
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: var(--text-lg);
   color: var(--text-muted);
   line-height: 1;
@@ -244,7 +244,7 @@
 
 .item-card--ghost .item-card__badge {
   background: var(--success);
-  color: var(--paper);
+  color: var(--text-inverse);
 }
 
 /* ---------- Variant: featured (prominent new item) ---------- */
@@ -400,7 +400,7 @@
   color: var(--ink);
   border: var(--border);
   border-radius: var(--radius-sm);
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: var(--text-2xs);
   letter-spacing: var(--letter-spacing-wider);
   text-transform: uppercase;
@@ -441,4 +441,39 @@
   .food-slot__eat {
     min-height: 44px;
   }
+}
+
+/* Action chips on a bag item: eat (food only) and discard (any card, free and
+   allowed at any time). Both sit in one flex row on the card's right edge. */
+.food-slot__actions {
+  position: absolute;
+  top: 50%;
+  right: var(--space-2);
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 2;
+}
+
+.food-slot__actions .food-slot__eat {
+  position: static;
+  transform: none;
+}
+
+.food-slot__actions .food-slot__eat:active {
+  transform: translate(var(--press-offset), var(--press-offset));
+}
+
+.food-slot__eat--danger {
+  background: var(--danger-soft);
+}
+
+.food-slot__eat--danger:hover {
+  background: var(--danger);
+}
+
+/* Both chips present: keep the item name clear of them. */
+.food-slot--with-eat .item-card {
+  padding-right: 132px;
 }

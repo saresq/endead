@@ -1,0 +1,1 @@
+../../../.claude/skills/zombicide-rules/SKILL.md

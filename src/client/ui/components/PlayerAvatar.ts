@@ -9,6 +9,8 @@
 
 import { PlayerIdentity } from '../../config/PlayerIdentities';
 import { es } from '../../../strings/es';
+import { CHARACTER_DEFINITIONS } from '../../../config/CharacterRegistry';
+import { characterImageUrl } from '../../utils/characterAsset';
 
 export type AvatarSize = 'sm' | 'md';
 export type AvatarState = 'active' | 'dead' | 'disconnected' | undefined;
@@ -25,18 +27,10 @@ const SHAPE_CLIP_PATHS: Record<PlayerIdentity['shape'], string> = {
   hexagon: 'polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)',
 };
 
-const CHARACTER_AVATARS: Record<string, string> = {
-  wanda: '/images/characters/wanda.webp',
-  doug: '/images/characters/doug.webp',
-  amy: '/images/characters/amy.webp',
-  ned: '/images/characters/ned.webp',
-  elle: '/images/characters/elle.webp',
-  josh: '/images/characters/josh.webp',
-};
-
 function characterAvatarUrl(characterClass?: string): string | null {
   if (!characterClass) return null;
-  return CHARACTER_AVATARS[characterClass.toLowerCase()] ?? null;
+  if (!CHARACTER_DEFINITIONS[characterClass]) return null;
+  return characterImageUrl(characterClass);
 }
 
 export function renderAvatar(

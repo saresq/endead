@@ -7,7 +7,7 @@ import {
   EPIC_CRATE_LIMIT,
 } from '../../config/EquipmentRegistry';
 
-// RULEBOOK §14 — Standard Equipment deck (45 cards, blue backs).
+// rules/16-card-registry.md — Standard Equipment deck (45 cards, blue backs).
 // Starting Equipment (Baseball Bat, Crowbar×3, Fire Axe×3, Pistol×3) is
 // dealt at setup from a separate grey-back deck and is NOT part of this
 // deck. The Standard deck carries Crowbar×1 and Fire Axe×1 — distinct
@@ -34,7 +34,7 @@ const EXPECTED_STANDARD_COUNTS: Record<string, number> = {
   aaahh: 4,
 };
 
-// RULEBOOK §14 — Epic Weapons deck (11 cards, red backs). Aaahh!! ×2,
+// rules/16-card-registry.md — Epic Weapons deck (11 cards, red backs). Aaahh!! ×2,
 // every other card ×1.
 const EXPECTED_EPIC_COUNTS: Record<string, number> = {
   aaahh_epic: 2,
@@ -55,7 +55,7 @@ function tally(deck: readonly string[]): Record<string, number> {
   return counts;
 }
 
-describe('Equipment deck audit — RULEBOOK §14 regression guard', () => {
+describe('Equipment deck audit — rules/16-card-registry.md regression guard', () => {
   it('Standard deck has 45 cards', () => {
     expect(INITIAL_DECK_CONFIG.length).toBe(45);
   });

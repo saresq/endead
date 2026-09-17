@@ -4,18 +4,23 @@ import { ActionRequest, ActionResponse, ActionType, ActionError } from '../types
 import { validateTurn, checkEndTurn } from './TurnManager';
 import { ZombiePhaseManager } from './ZombiePhaseManager';
 import { deductAPWithFreeCheck, ActionHandler } from './handlers/handlerUtils';
+import { XPManager } from './XPManager';
+import { DANGER_VALUES } from '../config/DangerValues';
 
 // --- Handler imports ---
 import { handleJoinLobby, handleUpdateNickname, handleSelectCharacter, handleStartGame, handleEndGame } from './handlers/LobbyHandlers';
 import { handleMove, handleSprint } from './handlers/MovementHandlers';
-import { handleAttack, handleResolveWounds, handleDistributeZombieWounds, handleRerollLucky } from './handlers/CombatHandlers';
-import { handleCharge, handleBornLeader, handleBloodlustMelee, handleLifesaver, handleChooseSkill } from './handlers/SkillHandlers';
-import { handleUseItem, handleSearch, handleResolveSearch, handleOrganize } from './handlers/ItemHandlers';
+import { handleAttack, handleReload, handleResolveWounds, handleDistributeZombieWounds, handleRerollLucky } from './handlers/CombatHandlers';
+import { handleCharge, handleBornLeader, handleBloodlustMelee, handleLifesaver, handleChooseSkill, handleJump, handleShove } from './handlers/SkillHandlers';
+import {
+  handleUseItem, handleSearch, handleResolveSearch, handleOrganize,
+  handleOrganizeStart, handleOrganizeEnd, handleDiscardCard,
+} from './handlers/ItemHandlers';
 import { handleOpenDoor, handleMakeNoise } from './handlers/DoorHandlers';
 import { handleTradeStart, handleTradeOffer, handleTradeAccept, handleTradeCancel } from './handlers/TradeHandlers';
 import { handleTakeObjective } from './handlers/ObjectiveHandlers';
 import { handleTakeEpicCrate } from './handlers/EpicCrateHandlers';
-import { handleNothing, handleEndTurn } from './handlers/TurnHandlers';
+import { handleEndTurn } from './handlers/TurnHandlers';
 import { handleActivateCheat } from './handlers/CheatHandlers';
 import { es } from '../strings/es';
 
@@ -27,11 +32,15 @@ const handlers: Partial<Record<ActionType, ActionHandler>> = {
   [ActionType.END_GAME]: handleEndGame,
   [ActionType.MOVE]: handleMove,
   [ActionType.ATTACK]: handleAttack,
+  [ActionType.RELOAD]: handleReload,
   [ActionType.MAKE_NOISE]: handleMakeNoise,
   [ActionType.CHOOSE_SKILL]: handleChooseSkill,
   [ActionType.SEARCH]: handleSearch,
   [ActionType.RESOLVE_SEARCH]: handleResolveSearch,
   [ActionType.ORGANIZE]: handleOrganize,
+  [ActionType.ORGANIZE_START]: handleOrganizeStart,
+  [ActionType.ORGANIZE_END]: handleOrganizeEnd,
+  [ActionType.DISCARD_CARD]: handleDiscardCard,
   [ActionType.OPEN_DOOR]: handleOpenDoor,
   [ActionType.TAKE_OBJECTIVE]: handleTakeObjective,
   [ActionType.TAKE_EPIC_CRATE]: handleTakeEpicCrate,
@@ -41,11 +50,12 @@ const handlers: Partial<Record<ActionType, ActionHandler>> = {
   [ActionType.TRADE_CANCEL]: handleTradeCancel,
   [ActionType.SPRINT]: handleSprint,
   [ActionType.USE_ITEM]: handleUseItem,
-  [ActionType.NOTHING]: handleNothing,
   [ActionType.END_TURN]: handleEndTurn,
   [ActionType.CHARGE]: handleCharge,
   [ActionType.BORN_LEADER]: handleBornLeader,
   [ActionType.BLOODLUST_MELEE]: handleBloodlustMelee,
+  [ActionType.JUMP]: handleJump,
+  [ActionType.SHOVE]: handleShove,
   [ActionType.LIFESAVER]: handleLifesaver,
   [ActionType.RESOLVE_WOUNDS]: handleResolveWounds,
   [ActionType.DISTRIBUTE_ZOMBIE_WOUNDS]: handleDistributeZombieWounds,
@@ -54,13 +64,6 @@ const handlers: Partial<Record<ActionType, ActionHandler>> = {
 };
 
 // --- Game End Logic ---
-
-const DANGER_VALUES: Record<DangerLevel, number> = {
-  [DangerLevel.Blue]: 0,
-  [DangerLevel.Yellow]: 1,
-  [DangerLevel.Orange]: 2,
-  [DangerLevel.Red]: 3,
-};
 
 export function checkGameEndConditions(state: GameState): GameResult | undefined {
   const survivors = Object.values(state.survivors);
@@ -74,7 +77,9 @@ export function checkGameEndConditions(state: GameState): GameResult | undefined
 
   if (!state.objectives || state.objectives.length === 0) return undefined;
 
-  const livingSurvivors = survivors.filter(s => s.wounds < s.maxHealth);
+  // Every survivor is alive past the check above, so this is all of them; the
+  // name is what the win conditions below are written against.
+  const livingSurvivors = survivors;
 
   const allObjectivesMet = state.objectives.every(obj => {
       if (obj.completed) return true;
@@ -145,17 +150,60 @@ const UNBLOCKED_ACTIONS = [
   ActionType.START_GAME, ActionType.END_GAME, ActionType.ACTIVATE_CHEAT,
 ];
 
+// --- Action costs ---
+//
+// What a handled action costs its survivor. Two sets instead of a chain of
+// special cases: spending an action is the rule, and everything else is one of
+// two kinds of free.
+
+/** Spends 1 action point, plus any transient `_extraAPCost`. */
+const AP_ACTIONS = new Set<ActionType>([
+  ActionType.MOVE, ActionType.ATTACK, ActionType.RELOAD, ActionType.SEARCH, ActionType.SPRINT,
+  ActionType.OPEN_DOOR, ActionType.MAKE_NOISE, ActionType.BLOODLUST_MELEE, ActionType.JUMP,
+  ActionType.TAKE_OBJECTIVE, ActionType.TAKE_EPIC_CRATE,
+  // The reorganize session: one action buys every move until ORGANIZE_END.
+  ActionType.ORGANIZE_START,
+]);
+
+/**
+ * Costs nothing, but may have been the last thing keeping the turn open, so
+ * `checkEndTurn` still runs. Discarding and rearranging are free by rule
+ * (rules/07-inventory.md#discarding); RESOLVE_SEARCH and ORGANIZE were paid for by the search
+ * or the session that staged the card; END_TURN cleared every blocker itself.
+ */
+const FREE_ACTIONS = new Set<ActionType>([
+  ActionType.CHARGE, ActionType.BORN_LEADER, ActionType.LIFESAVER, ActionType.SHOVE, ActionType.USE_ITEM,
+  ActionType.DISCARD_CARD, ActionType.ORGANIZE, ActionType.ORGANIZE_END,
+  ActionType.RESOLVE_SEARCH, ActionType.END_TURN,
+]);
+
+// Anything in neither set costs nothing and cannot end a turn: lobby and meta
+// actions, and the trade sub-actions whose action `executeTrade` charges.
+
 export function processAction(state: GameState, intent: ActionRequest): ActionResponse {
-  // 0. Pending wounds block everything except decisions and lobby/meta actions
-  if (!UNBLOCKED_ACTIONS.includes(intent.type) && ZombiePhaseManager.hasPendingWounds(state)) {
-    return {
-      success: false,
-      error: { code: 'PENDING_WOUNDS', message: es.errors.pendingWounds },
-    };
+  // 0. Pending decisions block everything except decisions and lobby/meta actions
+  if (!UNBLOCKED_ACTIONS.includes(intent.type)) {
+    if (ZombiePhaseManager.hasPendingWounds(state)) {
+      return {
+        success: false,
+        error: { code: 'PENDING_WOUNDS', message: es.errors.pendingWounds },
+      };
+    }
+
+    // The skill is chosen on reaching the level, so the survivor who owes one
+    // stops there. Per survivor: the other players keep playing.
+    const actor = intent.survivorId ? state.survivors[intent.survivorId] : undefined;
+    if (actor && XPManager.getPendingSkillChoice(actor)) {
+      return {
+        success: false,
+        error: { code: 'PENDING_SKILL_CHOICE', message: es.errors.pendingSkillChoice },
+      };
+    }
   }
 
-  if (UNBLOCKED_ACTIONS.includes(intent.type)) {
-      // Allow through without turn checks
+  if (UNBLOCKED_ACTIONS.includes(intent.type) || intent.type === ActionType.DISCARD_CARD) {
+      // Allow through without turn checks — discarding is free at any time,
+      // so handleDiscardCard checks ownership itself.
   } else {
       // 1. Validate Turn Ownership
       let turnError: ActionError | null = validateTurn(state, intent);
@@ -163,7 +211,7 @@ export function processAction(state: GameState, intent: ActionRequest): ActionRe
       // Special Cases
       if ((intent.type === ActionType.RESOLVE_SEARCH
           || intent.type === ActionType.CHARGE || intent.type === ActionType.BORN_LEADER
-          || intent.type === ActionType.LIFESAVER
+          || intent.type === ActionType.LIFESAVER || intent.type === ActionType.SHOVE
           || intent.type === ActionType.END_TURN || intent.type === ActionType.REROLL_LUCKY)
           && turnError && turnError.code === 'NO_ACTIONS') {
         turnError = null;
@@ -186,64 +234,18 @@ export function processAction(state: GameState, intent: ActionRequest): ActionRe
   try {
     let newState = handler(state, intent);
 
-    // 4. Advance Turn State (Deduct AP) - ONLY for Game Actions
-    const gameActions = [
-        ActionType.MOVE, ActionType.ATTACK, ActionType.SEARCH, ActionType.SPRINT, ActionType.USE_ITEM,
-        ActionType.OPEN_DOOR, ActionType.MAKE_NOISE, ActionType.ORGANIZE,
-        ActionType.TAKE_OBJECTIVE, ActionType.TAKE_EPIC_CRATE,
-        ActionType.TRADE_START, ActionType.TRADE_OFFER,
-        ActionType.TRADE_ACCEPT, ActionType.TRADE_CANCEL, ActionType.END_TURN,
-        ActionType.CHARGE, ActionType.BORN_LEADER, ActionType.BLOODLUST_MELEE, ActionType.LIFESAVER
-    ];
-
-    // Food consumption is free per Zombicide 2E (cards can be discarded any
-    // time). Currently the only USE_ITEM case is food.
-    const freeActions = [
-        ActionType.CHARGE, ActionType.BORN_LEADER, ActionType.LIFESAVER, ActionType.USE_ITEM,
-    ];
-
-    if (gameActions.includes(intent.type)) {
-       // Filter out Trade Session Sub-Actions from AP Cost
-       if (intent.type === ActionType.TRADE_START ||
-           intent.type === ActionType.TRADE_OFFER ||
-           intent.type === ActionType.TRADE_ACCEPT ||
-           intent.type === ActionType.TRADE_CANCEL) {
-           // No AP cost yet
-       }
-       else if (intent.type === ActionType.ORGANIZE && newState.activeTrade) {
-           const trade = newState.activeTrade;
-           if (intent.survivorId === trade.activeSurvivorId || intent.survivorId === trade.targetSurvivorId) {
-               // Free Organize during trade
-           } else {
-               newState = deductAPWithFreeCheck(newState, intent.survivorId!, intent.type);
-           }
-       }
-       else if (intent.type === ActionType.ORGANIZE && newState.survivors[intent.survivorId!]?.drawnCard) {
-           // Free Organize during Pickup/Search Resolution
-       }
-       else if (freeActions.includes(intent.type)) {
-           // Charge, Born Leader, Lifesaver, and food consumption — no AP cost
-           newState = checkEndTurn(newState);
-       }
-       else if (intent.type === ActionType.END_TURN) {
-           // END_TURN is unconditional: handleEndTurn already cleared every blocker
-           // (actions, free counters, drawn cards, active trade) for the active
-           // player, so go straight to checkEndTurn without AP deduction or
-           // cheat-mode replenishment.
-           delete (newState as any)._extraAPCost;
-           delete (newState as any)._attackIsMelee;
-           newState = checkEndTurn(newState);
-       }
-       else {
-           // Consume transient extra AP cost (e.g. zombie zone control penalty on MOVE)
-           const extraCost = newState._extraAPCost || 0;
-           delete newState._extraAPCost;
-           newState = deductAPWithFreeCheck(newState, intent.survivorId!, intent.type, extraCost);
-           delete (newState as any)._attackIsMelee;
-       }
-    } else if (intent.type === ActionType.RESOLVE_SEARCH) {
-        // Since RESOLVE_SEARCH doesn't cost AP (cost was paid in SEARCH),
-        // we only need to check if the turn should end now that the blocking condition (drawnCard) is cleared.
+    // 4. Charge the action (see AP_ACTIONS / FREE_ACTIONS above)
+    if (AP_ACTIONS.has(intent.type)) {
+        // Consume transient extra AP cost (e.g. zombie zone control penalty on MOVE)
+        const extraCost = newState._extraAPCost || 0;
+        delete newState._extraAPCost;
+        const attackIsMelee = newState.lastAction?.type === ActionType.ATTACK
+          ? newState.lastAction.isMelee
+          : undefined;
+        newState = deductAPWithFreeCheck(newState, intent.survivorId!, intent.type, extraCost, attackIsMelee);
+    } else if (FREE_ACTIONS.has(intent.type)) {
+        delete (newState as any)._extraAPCost;
+        delete (newState as any)._attackIsMelee;
         newState = checkEndTurn(newState);
     } else if (
         (intent.type === ActionType.RESOLVE_WOUNDS || intent.type === ActionType.DISTRIBUTE_ZOMBIE_WOUNDS)

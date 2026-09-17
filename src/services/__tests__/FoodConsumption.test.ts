@@ -1,4 +1,4 @@
-// Food consumption rules per Zombicide 2nd Ed (RULEBOOK.md:604-621):
+// Food consumption rules per Zombicide 2nd Ed (rules/16-card-registry.md#standard-equipment-45-cards-blue-backs):
 // Bag of Rice / Canned Food / Water — "Consume for 1 AP". Free action; cards
 // can be discarded any time (SKILL.md:227). Match by equipmentId so renames
 // or display tweaks don't break game logic. Reaching 7 AP promotes Yellow

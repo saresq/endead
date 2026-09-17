@@ -176,7 +176,7 @@
 }
 
 .form-label {
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: var(--text-xs);
   color: var(--text-2);
   letter-spacing: var(--letter-spacing-widest);
@@ -239,7 +239,7 @@
   border: 1px solid var(--accent);
   border-radius: var(--radius-sm);
   font-size: var(--text-2xs);
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   flex-shrink: 0;
 }
 
@@ -302,7 +302,7 @@
 }
 
 .toggle__label {
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: var(--text-sm);
   letter-spacing: var(--letter-spacing-wider);
   text-transform: uppercase;

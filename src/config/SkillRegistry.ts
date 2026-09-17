@@ -87,7 +87,7 @@ export const SKILL_DEFINITIONS: Record<string, SkillDefinition> = {
   'tough': {
     id: 'tough',
     name: 'Tough',
-    description: 'The Survivor ignores the first Wound received every Turn.',
+    description: 'The Survivor ignores the first Wound of each Zombies\' attack step and of each Friendly Fire instance.',
     type: 'PASSIVE'
   },
   'sprint': {
@@ -114,6 +114,24 @@ export const SKILL_DEFINITIONS: Record<string, SkillDefinition> = {
     description: 'The Survivor adds +1 to each die result when performing a Ranged Action. Max result is always 6.',
     type: 'STAT_MOD'
   },
+  'plus_1_to_dice_roll_melee': {
+    id: 'plus_1_to_dice_roll_melee',
+    name: '+1 to Dice Roll: Melee',
+    description: 'The Survivor adds +1 to each die result when performing a Melee Action. Max result is always 6.',
+    type: 'STAT_MOD'
+  },
+  'plus_1_to_dice_roll_combat': {
+    id: 'plus_1_to_dice_roll_combat',
+    name: '+1 to Dice Roll: Combat',
+    description: 'The Survivor adds +1 to each die result when performing any Combat Action. Max result is always 6.',
+    type: 'STAT_MOD'
+  },
+  'roll_6_plus_1_die_combat': {
+    id: 'roll_6_plus_1_die_combat',
+    name: 'Roll 6: +1 Die Combat',
+    description: 'Each 6 rolled in a Combat Action grants an additional die. Keep rolling as long as 6s appear.',
+    type: 'STAT_MOD'
+  },
   'steady_hand': {
     id: 'steady_hand',
     name: 'Steady Hand',
@@ -133,6 +151,18 @@ export const SKILL_DEFINITIONS: Record<string, SkillDefinition> = {
     name: '+1 Zone per Move',
     description: 'The Survivor may move 1 or 2 Zones with a single Move Action. Entering a Zone with Zombies still ends the Move.',
     type: 'PASSIVE'
+  },
+  'jump': {
+    id: 'jump',
+    name: 'Jump',
+    description: 'Once per Turn: spend 1 Action to move exactly 2 Zones, ignoring everything in the Zone crossed. Walls and closed doors still block.',
+    type: 'ACTION'
+  },
+  'shove': {
+    id: 'shove',
+    name: 'Shove',
+    description: 'Once per Turn, free: push all Zombies in the Survivor\'s Zone to a Zone at Range 1 with a clear path. Not a Movement.',
+    type: 'ACTION'
   },
   'charge': {
     id: 'charge',
@@ -284,6 +314,20 @@ export const SKILL_DEFINITIONS: Record<string, SkillDefinition> = {
   },
 };
 
+/**
+ * How many copies of a skill a survivor holds.
+ *
+ * An ID card can grant the same skill at two levels — Odin's Red repeats his
+ * Blue `+1 Die: Melee` — and numeric bonuses stack, so the count is the
+ * multiplier. The rulebook names only two things that do not stack (damage per
+ * success, and a second Flashlight), both as explicit exceptions.
+ */
+export function skillCount(skills: string[], skillId: string): number {
+  let copies = 0;
+  for (const id of skills) if (id === skillId) copies++;
+  return copies;
+}
+
 // Class Progression Tree Definition
 export interface ClassProgression {
   [DangerLevel.Blue]: string[];   // 1 Skill (Fixed)
@@ -293,19 +337,41 @@ export interface ClassProgression {
 }
 
 export const SURVIVOR_CLASSES: Record<string, ClassProgression> = {
-  // --- Zombicide 2nd Edition Base Game Characters ---
+  // --- Zombicide 2nd Edition core box, transcribed from the official Survivor
+  // ID cards published at zombicide.com (cdn.svc.asmodee.net .../sic-Z2-<name>).
+  // Blue is fixed, Yellow is always +1 Action, Orange is 1 of 2 and Red 1 of 3
+  // (rules/15-characters.md#core-box-survivors). Six Classic survivors and six Kids.
 
+  // Classic (Health 3)
   'Wanda': {
-    [DangerLevel.Blue]: ['plus_1_zone_per_move'],
+    [DangerLevel.Blue]: ['sprint'],
     [DangerLevel.Yellow]: ['plus_1_action'],
-    [DangerLevel.Orange]: ['slippery', 'plus_1_free_combat'],
-    [DangerLevel.Red]: ['plus_1_damage_melee', 'plus_1_damage_ranged', 'sprint'],
+    [DangerLevel.Orange]: ['plus_1_to_dice_roll_melee', 'slippery'],
+    [DangerLevel.Red]: ['plus_1_die_combat', 'plus_1_free_melee', 'plus_1_free_move'],
+  },
+  'Josh': {
+    [DangerLevel.Blue]: ['slippery'],
+    [DangerLevel.Yellow]: ['plus_1_action'],
+    [DangerLevel.Orange]: ['plus_1_die_melee', 'plus_1_free_combat'],
+    [DangerLevel.Red]: ['plus_1_free_move', 'plus_1_to_dice_roll_combat', 'lucky'],
+  },
+  'Doug': {
+    [DangerLevel.Blue]: ['matching_set'],
+    [DangerLevel.Yellow]: ['plus_1_action'],
+    [DangerLevel.Orange]: ['plus_1_die_ranged', 'plus_1_free_combat'],
+    [DangerLevel.Red]: ['plus_1_to_dice_roll_combat', 'ambidextrous', 'slippery'],
+  },
+  'Amy': {
+    [DangerLevel.Blue]: ['plus_1_free_move'],
+    [DangerLevel.Yellow]: ['plus_1_action'],
+    [DangerLevel.Orange]: ['plus_1_free_melee', 'plus_1_free_ranged'],
+    [DangerLevel.Red]: ['plus_1_die_combat', 'plus_1_to_dice_roll_combat', 'medic'],
   },
   'Ned': {
-    [DangerLevel.Blue]: ['search_plus_1'],
+    [DangerLevel.Blue]: ['plus_1_free_search'],
     [DangerLevel.Yellow]: ['plus_1_action'],
-    [DangerLevel.Orange]: ['hold_your_nose', 'plus_1_free_search'],
-    [DangerLevel.Red]: ['sniper', 'lucky', 'tough'],
+    [DangerLevel.Orange]: ['plus_1_die_ranged', 'plus_1_free_combat'],
+    [DangerLevel.Red]: ['plus_1_die_combat', 'plus_1_to_dice_roll_combat', 'shove'],
   },
   'Elle': {
     [DangerLevel.Blue]: ['sniper'],
@@ -313,41 +379,44 @@ export const SURVIVOR_CLASSES: Record<string, ClassProgression> = {
     [DangerLevel.Orange]: ['plus_1_die_combat', 'plus_1_free_ranged'],
     [DangerLevel.Red]: ['plus_1_die_ranged', 'plus_1_free_combat', 'plus_1_to_dice_roll_ranged'],
   },
-  'Amy': {
-    [DangerLevel.Blue]: ['plus_1_free_move'],
+
+  // Kids (Health 2, Slippery once per Turn on a single Move)
+  'Lili': {
+    [DangerLevel.Blue]: ['plus_1_max_range'],
     [DangerLevel.Yellow]: ['plus_1_action'],
-    [DangerLevel.Orange]: ['medic', 'slippery'],
-    [DangerLevel.Red]: ['plus_1_damage_melee', 'plus_1_free_combat', 'lucky'],
+    [DangerLevel.Orange]: ['plus_1_die_ranged', 'sprint'],
+    [DangerLevel.Red]: ['plus_1_free_combat', 'plus_1_free_move', 'plus_1_to_dice_roll_combat'],
   },
-  'Josh': {
-    [DangerLevel.Blue]: ['slippery'],
+  'Odin': {
+    [DangerLevel.Blue]: ['plus_1_die_melee'],
     [DangerLevel.Yellow]: ['plus_1_action'],
-    [DangerLevel.Orange]: ['charge', 'plus_1_free_move'],
-    [DangerLevel.Red]: ['plus_1_damage_melee', 'plus_1_damage_ranged', 'tough'],
+    [DangerLevel.Orange]: ['plus_1_free_melee', 'plus_1_free_move'],
+    // The card repeats +1 Die: Melee at Red; taking it stacks with Blue for
+    // two extra melee dice. See `skillCount`.
+    [DangerLevel.Red]: ['plus_1_die_melee', 'plus_1_die_ranged', 'plus_1_free_combat'],
   },
-  'Doug': {
-    [DangerLevel.Blue]: ['matching_set'],
+  'Lou': {
+    [DangerLevel.Blue]: ['charge'],
     [DangerLevel.Yellow]: ['plus_1_action'],
-    [DangerLevel.Orange]: ['ambidextrous', 'born_leader'],
-    [DangerLevel.Red]: ['plus_1_die_ranged', 'plus_1_die_melee', 'lucky'],
+    [DangerLevel.Orange]: ['plus_1_die_combat', 'plus_1_free_melee'],
+    [DangerLevel.Red]: ['plus_1_free_move', 'plus_1_free_ranged', 'medic'],
   },
-  // // Test character — all skills unlocked at Blue level
-  // 'H4x0r': {
-  //   [DangerLevel.Blue]: [
-  //     'plus_1_action', 'slippery', 'sprint', 'charge',
-  //     'hit_and_run', 'plus_1_free_move', 'plus_1_free_search', 'plus_1_free_combat',
-  //     'plus_1_free_melee', 'plus_1_free_ranged',
-  //     'plus_1_damage_melee', 'plus_1_damage_ranged', 'plus_1_damage_combat',
-  //     'plus_1_die_melee', 'plus_1_die_ranged', 'plus_1_die_combat',
-  //     'plus_1_max_range', 'lucky', 'sniper', 'tough', 'steady_hand',
-  //     'search_anywhere', 'super_strength', 'reaper_combat', 'reaper_melee',
-  //     'point_blank', 'born_leader', 'bloodlust_melee', 'lifesaver',
-  //     'ambidextrous', 'swordmaster', 'barbarian', 'medic',
-  //     'hold_your_nose', 'matching_set', 'search_plus_1',
-  //     'can_search_more_than_once', 'low_profile', 'is_that_all_youve_got',
-  //   ],
-  //   [DangerLevel.Yellow]: [],
-  //   [DangerLevel.Orange]: [],
-  //   [DangerLevel.Red]: [],
-  // },
+  'Ostara': {
+    [DangerLevel.Blue]: ['can_search_more_than_once'],
+    [DangerLevel.Yellow]: ['plus_1_action'],
+    [DangerLevel.Orange]: ['plus_1_die_ranged', 'plus_1_free_move'],
+    [DangerLevel.Red]: ['plus_1_free_combat', 'plus_1_to_dice_roll_ranged', 'slippery'],
+  },
+  'Tiger Sam': {
+    [DangerLevel.Blue]: ['plus_1_die_ranged'],
+    [DangerLevel.Yellow]: ['plus_1_action'],
+    [DangerLevel.Orange]: ['plus_1_free_move', 'sniper'],
+    [DangerLevel.Red]: ['plus_1_damage_ranged', 'plus_1_free_combat', 'shove'],
+  },
+  'Bunny G': {
+    [DangerLevel.Blue]: ['lucky'],
+    [DangerLevel.Yellow]: ['plus_1_action'],
+    [DangerLevel.Orange]: ['plus_1_to_dice_roll_melee', 'jump'],
+    [DangerLevel.Red]: ['plus_1_damage_melee', 'plus_1_free_combat', 'roll_6_plus_1_die_combat'],
+  },
 };

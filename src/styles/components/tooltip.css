@@ -29,7 +29,7 @@
 /* --- Title --- */
 
 .board-tooltip .tooltip-title {
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: var(--text-sm);
   margin-bottom: var(--space-2);
   letter-spacing: var(--letter-spacing-wider);
@@ -54,7 +54,7 @@
 /* --- Type header (group tooltip) --- */
 
 .board-tooltip .tooltip-type-header {
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: var(--text-xs);
   letter-spacing: var(--letter-spacing-wider);
   text-transform: uppercase;

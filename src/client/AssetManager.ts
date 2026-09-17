@@ -1,5 +1,7 @@
 import * as PIXI from 'pixi.js';
 import { ZombieType } from '../types/GameState';
+import { CHARACTER_DEFINITIONS } from '../config/CharacterRegistry';
+import { characterSlug } from './utils/characterAsset';
 
 /**
  * Manages sprite assets for survivors, zombies, items, and action icons.
@@ -32,7 +34,8 @@ export class AssetManager {
   async loadAssets(): Promise<void> {
     if (this._isReady) return;
 
-    const survivorClasses = ['wanda', 'doug', 'amy', 'ned', 'elle', 'josh'];
+    // Every survivor the server knows; a missing file is skipped silently below.
+    const survivorClasses = Object.keys(CHARACTER_DEFINITIONS).map(characterSlug);
     const zombieTypes = ['walker', 'runner', 'brute', 'abomination'];
     const items = [
       'fire_axe', 'crowbar', 'chainsaw', 'katana', 'kukri', 'machete', 'baseball_bat',

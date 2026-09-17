@@ -162,7 +162,7 @@
 }
 
 .menu-message__marker {
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: 14px;
   color: var(--accent-text);
   line-height: 1;

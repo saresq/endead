@@ -14,9 +14,28 @@ import {
   ObjectiveType,
   EquipmentCard,
   EquipmentType,
+  SpawnCard,
+  SpawnDetail,
 } from '../../types/GameState';
 import { seedFromString } from '../Rng';
 import { ScenarioMap } from '../../types/Map';
+
+/**
+ * A deck of plain Walker cards, one Walker at every Danger Level. Fixtures get
+ * this instead of the real deck: its Rush and Extra Activation cards activate
+ * zombies, which needs the zone geometry a hand-built board does not have.
+ * A test about card content sets `spawnDeck` itself.
+ */
+export function plainSpawnDeck(count: number = 12): SpawnCard[] {
+  const walker: SpawnDetail = { zombies: { [ZombieType.Walker]: 1 } };
+  return Array.from({ length: count }, (_, i) => ({
+    id: `spawn-fixture-${String(i + 1).padStart(2, '0')}`,
+    [DangerLevel.Blue]: walker,
+    [DangerLevel.Yellow]: walker,
+    [DangerLevel.Orange]: walker,
+    [DangerLevel.Red]: walker,
+  }));
+}
 
 export function makeZone(overrides: Partial<Zone> & { id: string }): Zone {
   return {
@@ -34,6 +53,9 @@ export function makeZone(overrides: Partial<Zone> & { id: string }): Zone {
 export interface SurvivorOverrides {
   id?: string;
   playerId?: string;
+  characterClass?: string;
+  survivorType?: 'Classic' | 'Kid';
+  skills?: string[];
   zoneId?: string;
   inventory?: EquipmentCard[];
   drawnCard?: EquipmentCard;
@@ -51,14 +73,16 @@ export function makeSurvivor(over: SurvivorOverrides = {}): Survivor {
     id,
     playerId,
     name: id,
-    characterClass: 'Wanda',
+    characterClass: over.characterClass ?? 'Wanda',
+    survivorType: over.survivorType ?? 'Classic',
     position: { x: 0, y: 0, zoneId: over.zoneId ?? 'z1' },
     actionsPerTurn: 3,
     maxHealth: over.maxHealth ?? 3,
     wounds: over.wounds ?? 0,
     experience: over.experience ?? 0,
     dangerLevel: over.dangerLevel ?? DangerLevel.Blue,
-    skills: [],
+    skills: over.skills ?? [],
+    skillChoices: {},
     inventory: over.inventory ?? [],
     actionsRemaining: over.actionsRemaining ?? 3,
     hasMoved: false,
@@ -69,15 +93,16 @@ export function makeSurvivor(over: SurvivorOverrides = {}): Survivor {
     freeCombatsRemaining: 0,
     freeMeleeRemaining: 0,
     freeRangedRemaining: 0,
-    toughUsedZombieAttack: false,
-    toughUsedFriendlyFire: false,
     sprintUsedThisTurn: false,
     chargeUsedThisTurn: false,
     bornLeaderUsedThisTurn: false,
     bloodlustUsedThisTurn: false,
     lifesaverUsedThisTurn: false,
+    jumpUsedThisTurn: false,
+    shoveUsedThisTurn: false,
     hitAndRunFreeMove: false,
-    luckyUsedThisTurn: false,
+    kidSlipperyUsedThisTurn: false,
+    luckyUsedThisAction: false,
   } as Survivor;
 }
 
@@ -124,7 +149,7 @@ export function makeState(over: StateOverrides = {}): GameState {
     equipmentDiscard: [],
     epicDeck: over.epicDeck ?? [],
     epicDiscard: over.epicDiscard ?? [],
-    spawnDeck: [],
+    spawnDeck: plainSpawnDeck(),
     spawnDiscard: [],
     spawnZoneIds: over.spawnZoneIds,
     noiseTokens: 0,

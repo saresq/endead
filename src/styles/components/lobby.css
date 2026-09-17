@@ -228,7 +228,7 @@
   display: inline-flex;
   align-items: center;
   padding: 2px 6px;
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: 9px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -381,7 +381,7 @@
   font-size: 9px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--paper);
+  color: var(--text-inverse);
   background: var(--ink);
   padding: 2px 0;
   pointer-events: none;
@@ -436,7 +436,7 @@
 }
 
 .lobby-chip--rust {
-  color: var(--paper);
+  color: var(--text-inverse);
   border-color: var(--ink);
   background: var(--accent);
 }
@@ -1015,7 +1015,7 @@
 }
 
 .lobby-banner__title {
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: 13px;
   letter-spacing: 0.18em;
   text-transform: uppercase;

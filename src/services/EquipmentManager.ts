@@ -1,12 +1,10 @@
 // src/services/EquipmentManager.ts
 
 import { GameState, Survivor, EquipmentCard, EntityId, EquipmentType } from '../types/GameState';
+import { es } from '../strings/es';
+import { DeckService } from './DeckService';
 
 const BACKPACK_SLOTS = ['BACKPACK_0', 'BACKPACK_1', 'BACKPACK_2'] as const;
-
-export function isBackpackSlot(slot: string | undefined): boolean {
-  return slot === 'BACKPACK_0' || slot === 'BACKPACK_1' || slot === 'BACKPACK_2' || slot === 'BACKPACK';
-}
 
 export class EquipmentManager {
   private static MAX_HANDS = 2;
@@ -80,7 +78,7 @@ export class EquipmentManager {
     if (cardIndex === -1) {
       // Check if it's the pending drawn card
       if (survivor.drawnCard && survivor.drawnCard.id === cardId) {
-        newState.equipmentDiscard.push(survivor.drawnCard);
+        DeckService.discard(newState, survivor.drawnCard);
         survivor.drawnCard = undefined;
         return newState;
       }
@@ -88,7 +86,7 @@ export class EquipmentManager {
     }
 
     const [discarded] = survivor.inventory.splice(cardIndex, 1);
-    newState.equipmentDiscard.push(discarded);
+    DeckService.discard(newState, discarded);
 
     return newState;
   }
@@ -117,7 +115,7 @@ export class EquipmentManager {
     survivor.inventory.push(newCard);
 
     // Move old to discard pile
-    newState.equipmentDiscard.push(oldCard);
+    DeckService.discard(newState, oldCard);
 
     // Clear pending
     survivor.drawnCard = undefined;
@@ -137,13 +135,6 @@ export class EquipmentManager {
 
     if (!card) throw new Error('Card not found');
 
-    // Handle DISCARD slot
-    if (targetSlot === 'DISCARD') {
-        card.slot = 'DISCARD';
-        card.inHand = false;
-        return newSurvivor;
-    }
-
     // If target slot is occupied by another item, swap
     const occupant = newSurvivor.inventory.find(c => c.slot === targetSlot && c.id !== cardId);
     if (occupant) {
@@ -158,22 +149,22 @@ export class EquipmentManager {
   }
 
   /**
-   * Validates if a proposed inventory configuration is legal.
-   * Checks max slots and duplicate slots.
+   * Checks a proposed inventory against the carrying rules: at most two cards
+   * in hand, at most five in total, and never two cards in one slot. Returns
+   * null when it is legal, or the message naming the rule it breaks — a
+   * rejected trade that doesn't say which rule failed reads as a bug.
    */
-  public static validateLoadout(inventory: { slot?: string }[]): boolean {
+  public static validateLoadout(inventory: { slot?: string }[]): string | null {
     const hands = inventory.filter(c => c.slot === 'HAND_1' || c.slot === 'HAND_2');
-    const backpack = inventory.filter(c => isBackpackSlot(c.slot));
+    if (hands.length > this.MAX_HANDS) return es.errors.loadoutTooManyHands;
+    if (inventory.length > this.MAX_HANDS + this.MAX_BACKPACK) return es.errors.loadoutTooManyCards;
 
-    if (hands.length > this.MAX_HANDS) return false;
-    if (backpack.length > this.MAX_BACKPACK) return false;
+    const slots = new Set<string>();
+    for (const card of inventory) {
+      if (!card.slot || slots.has(card.slot)) return es.errors.loadoutSlotTaken;
+      slots.add(card.slot);
+    }
 
-    // Check for duplicate specific slots (e.g. two items in HAND_1)
-    const hand1 = inventory.filter(c => c.slot === 'HAND_1');
-    const hand2 = inventory.filter(c => c.slot === 'HAND_2');
-
-    if (hand1.length > 1 || hand2.length > 1) return false;
-
-    return true;
+    return null;
   }
 }

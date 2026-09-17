@@ -14,7 +14,7 @@ function edgeKey(x1: number, y1: number, x2: number, y2: number): string {
 }
 
 /**
- * Straight-line Line of Sight (RULEBOOK: orthogonal lines from any cell of the
+ * Straight-line Line of Sight (rules/04-basics.md#line-of-sight: orthogonal lines from any cell of the
  * zone). Returns every visible zone mapped to its Range (zone boundaries
  * crossed; the origin is Range 0).
  *

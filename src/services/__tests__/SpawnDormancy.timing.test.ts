@@ -22,7 +22,7 @@ function setup() {
   });
 }
 
-describe('SpawnDormancy — RULEBOOK §9 timing gate', () => {
+describe('SpawnDormancy — rules/10-zombie-phase.md#colored-spawn-zones timing gate', () => {
   it('activated on turn N → does NOT spawn during turn N’s Zombie Phase, DOES spawn on turn N+1', () => {
     let state = setup();
     expect(state.turn).toBe(1);

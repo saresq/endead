@@ -110,7 +110,7 @@
 }
 
 .toast__title {
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: var(--text-sm);
   color: var(--text);
   text-transform: uppercase;

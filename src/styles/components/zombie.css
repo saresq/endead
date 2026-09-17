@@ -160,7 +160,7 @@
 }
 
 .zombie-count-strip__value {
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: var(--text-sm);
   color: var(--text);
   line-height: 1;
@@ -199,7 +199,7 @@
   border: var(--border);
   border-left: var(--border-width-heavy) solid var(--zombie-abom);
   border-radius: var(--radius-md);
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: var(--text-sm);
   letter-spacing: var(--letter-spacing-wider);
   text-transform: uppercase;

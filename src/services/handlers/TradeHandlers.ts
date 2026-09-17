@@ -1,5 +1,7 @@
 
 import { GameState, EquipmentCard } from '../../types/GameState';
+import { DeckService } from '../DeckService';
+import { EquipmentManager } from '../EquipmentManager';
 import { ActionRequest, ActionType } from '../../types/Action';
 import { es } from '../../strings/es';
 
@@ -16,6 +18,7 @@ export function handleTradeStart(state: GameState, intent: ActionRequest): GameS
 
   // Validation
   if (!target) throw new Error('Target not found');
+  if (target.wounds >= target.maxHealth) throw new Error(es.errors.tradePartnerDead);
   if (active.position.zoneId !== target.position.zoneId) throw new Error(es.errors.sameZone);
   if (active.actionsRemaining < 1) throw new Error(es.errors.noActions);
 
@@ -114,6 +117,10 @@ export function executeTrade(state: GameState): GameState {
   const s1 = newState.survivors[id1];
   const s2 = newState.survivors[id2];
 
+  if (s1.wounds >= s1.maxHealth || s2.wounds >= s2.maxHealth) {
+    throw new Error(es.errors.tradePartnerDead);
+  }
+
   const offer1 = session.offers[id1] || [];
   const offer2 = session.offers[id2] || [];
 
@@ -126,37 +133,34 @@ export function executeTrade(state: GameState): GameState {
   const cards1 = s1.inventory.filter((c: any) => offer1.includes(c.id));
   const cards2 = s2.inventory.filter((c: any) => offer2.includes(c.id));
 
-  // Collect discarded cards from traded items going TO Survivor 2 (from S1)
-  const toS2All = cards1.map((c: any) => {
-      const targetSlot = layout2[c.id] || 'BACKPACK_0';
+  // A received card must say where it goes. Defaulting to BACKPACK_0 is how an
+  // illegal inventory got built in the first place, so a missing slot is a
+  // rejection instead.
+  const place = (cards: EquipmentCard[], layout: Record<string, string>) => cards.map((c): EquipmentCard => {
+      const targetSlot = layout[c.id];
+      if (!targetSlot) throw new Error(es.errors.tradeNoSlot);
       const inHand = targetSlot === 'HAND_1' || targetSlot === 'HAND_2';
-      return { ...c, slot: targetSlot, inHand };
+      return { ...c, slot: targetSlot as EquipmentCard['slot'], inHand };
   });
-  const toS2 = toS2All.filter((c: any) => c.slot !== 'DISCARD');
-  const discardedFromS1 = toS2All.filter((c: any) => c.slot === 'DISCARD');
 
-  // Collect discarded cards from traded items going TO Survivor 1 (from S2)
-  const toS1All = cards2.map((c: any) => {
-      const targetSlot = layout1[c.id] || 'BACKPACK_0';
-      const inHand = targetSlot === 'HAND_1' || targetSlot === 'HAND_2';
-      return { ...c, slot: targetSlot, inHand };
-  });
-  const toS1 = toS1All.filter((c: any) => c.slot !== 'DISCARD');
-  const discardedFromS2 = toS1All.filter((c: any) => c.slot === 'DISCARD');
+  const toS2All = place(cards1, layout2);
+  const toS2 = toS2All.filter(c => c.slot !== 'DISCARD');
+  const discardedFromS1 = toS2All.filter(c => c.slot === 'DISCARD');
+
+  const toS1All = place(cards2, layout1);
+  const toS1 = toS1All.filter(c => c.slot !== 'DISCARD');
+  const discardedFromS2 = toS1All.filter(c => c.slot === 'DISCARD');
 
   // Keep items but remove if they were moved to DISCARD
-  const processInventory = (inventory: EquipmentCard[], layout: Record<string, string>, discardedOut: EquipmentCard[]) => {
-      return inventory.map(c => {
-          if (layout[c.id] === 'DISCARD') {
+  const processInventory = (inventory: EquipmentCard[], layout: Record<string, string>, discardedOut: EquipmentCard[]): EquipmentCard[] => {
+      return inventory.map((c): EquipmentCard => {
+          const targetSlot = layout[c.id] as EquipmentCard['slot'] | undefined;
+          if (!targetSlot) return c;
+          if (targetSlot === 'DISCARD') {
               discardedOut.push({ ...c, slot: 'DISCARD' });
               return { ...c, slot: 'DISCARD' };
           }
-          if (layout[c.id]) {
-              const targetSlot = layout[c.id];
-              const inHand = targetSlot === 'HAND_1' || targetSlot === 'HAND_2';
-              return { ...c, slot: targetSlot, inHand };
-          }
-          return c;
+          return { ...c, slot: targetSlot, inHand: targetSlot === 'HAND_1' || targetSlot === 'HAND_2' };
       }).filter(c => c.slot !== 'DISCARD');
   };
 
@@ -164,9 +168,15 @@ export function executeTrade(state: GameState): GameState {
   s1.inventory = [...processInventory(keep1, layout1, discardedOwned), ...toS1];
   s2.inventory = [...processInventory(keep2, layout2, discardedOwned), ...toS2];
 
-  // Push all discarded items to equipmentDiscard
+  // Both sides must end up legal, or nobody trades: the thrown error leaves
+  // this clone unused and the live state untouched.
+  const illegal = EquipmentManager.validateLoadout(s1.inventory)
+    ?? EquipmentManager.validateLoadout(s2.inventory);
+  if (illegal) throw new Error(illegal);
+
+  // Route every discarded item to the pile its deck owns
   for (const card of [...discardedFromS1, ...discardedFromS2, ...discardedOwned]) {
-      newState.equipmentDiscard.push(card);
+      DeckService.discard(newState, card);
   }
 
   if (s1.actionsRemaining > 0) s1.actionsRemaining -= 1;

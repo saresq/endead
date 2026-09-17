@@ -1,7 +1,7 @@
 /* ==========================================================================
    Buttons — Pulp Comic controls
    Cream paper faces, solid ink outlines, hard offset ink shadows.
-   Red for primary/destructive, yellow for selected/active.
+   Petrol for primary, red for destructive, yellow for selected/active.
    ========================================================================== */
 
 /* ---------- Base — shared foundation ---------- */
@@ -13,7 +13,7 @@
   justify-content: center;
   gap: var(--space-2);
   border-radius: var(--radius-sm);
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: var(--text-sm);
   letter-spacing: var(--letter-spacing-wider);
   text-transform: uppercase;
@@ -61,15 +61,15 @@
 /* ---------- PRIMARY — comic red, the call to action ---------- */
 
 .btn--primary {
-  background: var(--accent);
-  color: var(--paper);
+  background: var(--primary);
+  color: var(--text-inverse);
   border: var(--border-heavy);
   box-shadow: var(--shadow);
 }
 
 .btn--primary:hover:not(:disabled):not(.btn--loading) {
-  background: var(--accent-text);
-  color: var(--paper);
+  background: var(--primary-text);
+  color: var(--text-inverse);
 }
 
 .btn--primary:active:not(:disabled):not(.btn--loading) {
@@ -101,14 +101,14 @@
 
 .btn--destructive {
   background: var(--accent);
-  color: var(--paper);
+  color: var(--text-inverse);
   border: var(--border-heavy);
   box-shadow: var(--shadow);
 }
 
 .btn--destructive:hover:not(:disabled):not(.btn--loading) {
   background: var(--accent-text);
-  color: var(--paper);
+  color: var(--text-inverse);
 }
 
 .btn--destructive:active:not(:disabled):not(.btn--loading) {
@@ -139,23 +139,23 @@
   box-shadow: none;
 }
 
-/* ---------- OUTLINE — ink frame, red label ---------- */
+/* ---------- OUTLINE — ink frame, petrol label: the ghost primary ---------- */
 
 .btn--outline {
   background: transparent;
-  color: var(--accent-text);
+  color: var(--primary-text);
   border-color: var(--ink);
   box-shadow: var(--shadow);
 }
 
 .btn--outline:hover:not(:disabled):not(.btn--loading) {
-  background: var(--accent-soft);
+  background: var(--primary-soft);
   border-color: var(--ink);
-  color: var(--accent-text);
+  color: var(--primary-text);
 }
 
 .btn--outline:active:not(:disabled):not(.btn--loading) {
-  background: var(--accent-soft);
+  background: var(--primary-soft);
   transform: translate(var(--press-offset), var(--press-offset));
   box-shadow: none;
 }
@@ -353,13 +353,13 @@
 .action-btn:hover:not(.action-btn--disabled):not(:disabled) {
   background: var(--paper-2);
   border-color: var(--ink);
-  border-left-color: var(--accent);
+  border-left-color: var(--primary);
   box-shadow: var(--shadow);
 }
 
 .action-btn:active:not(.action-btn--disabled):not(:disabled) {
   background: var(--paper-2);
-  border-left-color: var(--accent);
+  border-left-color: var(--primary);
   transform: translate(var(--press-offset), var(--press-offset));
   box-shadow: none;
 }
@@ -441,7 +441,7 @@
 .action-btn__label {
   position: relative;
   z-index: 3;
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: var(--text-2xs);
   letter-spacing: var(--letter-spacing-widest);
   text-transform: uppercase;
@@ -520,7 +520,7 @@
 .action-btn__cost--expensive {
   background: var(--accent);
   border-color: var(--ink);
-  color: var(--paper);
+  color: var(--text-inverse);
 }
 
 /* ---------- END TURN — Special large CTA button ---------- */
@@ -528,22 +528,22 @@
 .action-btn--end-turn {
   background: var(--paper);
   border-color: var(--ink);
-  border-left-color: var(--accent);
+  border-left-color: var(--primary);
   min-width: 80px;
 }
 
 .action-btn--end-turn .action-btn__icon {
-  color: var(--accent-text);
+  color: var(--primary-text);
 }
 
 .action-btn--end-turn .action-btn__label {
-  color: var(--accent-text);
+  color: var(--primary-text);
 }
 
 .action-btn--end-turn:hover:not(.action-btn--disabled) {
-  background: var(--accent-soft);
+  background: var(--primary-soft);
   border-color: var(--ink);
-  border-left-color: var(--accent);
+  border-left-color: var(--primary);
   box-shadow: var(--shadow);
 }
 
@@ -647,7 +647,7 @@
   border: var(--border-width-heavy) solid var(--accent);
   border-radius: var(--radius-sm);
   color: var(--accent-text);
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: var(--text-xs);
   letter-spacing: var(--letter-spacing-wider);
   text-transform: uppercase;
@@ -658,7 +658,7 @@
 .btn--wound-alert:hover {
   background: var(--accent);
   border-color: var(--ink);
-  color: var(--paper);
+  color: var(--text-inverse);
 }
 
 .btn--wound-alert:active {
@@ -670,9 +670,9 @@
 
 .btn--ready {
   background: var(--success);
-  color: var(--paper);
+  color: var(--text-inverse);
   border: var(--border-heavy);
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   letter-spacing: var(--letter-spacing-wider);
   text-transform: uppercase;
   box-shadow: var(--shadow);
@@ -681,7 +681,7 @@
 .btn--ready:hover:not(:disabled) {
   background: var(--success);
   border-color: var(--ink);
-  color: var(--paper);
+  color: var(--text-inverse);
 }
 
 .btn--ready:active:not(:disabled) {
@@ -742,18 +742,18 @@
   outline-offset: 2px;
 }
 
-/* ---------- Primary — comic red ---------- */
+/* ---------- Primary — petrol ---------- */
 
 .fm-btn--primary {
-  background: var(--accent);
-  color: var(--paper);
+  background: var(--primary);
+  color: var(--text-inverse);
   border: var(--border-heavy);
   box-shadow: var(--shadow);
 }
 
 .fm-btn--primary:hover:not(:disabled) {
-  background: var(--accent-text);
-  color: var(--paper);
+  background: var(--primary-text);
+  color: var(--text-inverse);
 }
 
 .fm-btn--primary:active:not(:disabled) {
@@ -784,14 +784,14 @@
 
 .fm-btn--destructive {
   background: var(--accent);
-  color: var(--paper);
+  color: var(--text-inverse);
   border: var(--border-heavy);
   box-shadow: var(--shadow);
 }
 
 .fm-btn--destructive:hover:not(:disabled) {
   background: var(--accent-text);
-  color: var(--paper);
+  color: var(--text-inverse);
 }
 
 .fm-btn--destructive:active:not(:disabled) {

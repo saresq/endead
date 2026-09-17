@@ -1,7 +1,7 @@
 // src/services/XPManager.ts
 
 import { Survivor, DangerLevel, GameState } from '../types/GameState';
-import { SURVIVOR_CLASSES } from '../config/SkillRegistry';
+import { SURVIVOR_CLASSES, skillCount } from '../config/SkillRegistry';
 
 const XP_THRESHOLDS: Record<DangerLevel, number> = {
   [DangerLevel.Blue]: 0,
@@ -36,7 +36,8 @@ export class XPManager {
       newSurvivor.dangerLevel = newLevel;
       
       // Auto-unlock skills for levels passed that have NO choice (Blue, Yellow usually)
-      const progression = SURVIVOR_CLASSES[newSurvivor.characterClass] || SURVIVOR_CLASSES['Wanda'];
+      const progression = SURVIVOR_CLASSES[newSurvivor.characterClass];
+      if (!progression) return newSurvivor;
       
       // Check Blue (0 XP) - usually set at start, but just in case
       if (!newSurvivor.skills.includes(progression[DangerLevel.Blue][0])) {
@@ -58,15 +59,16 @@ export class XPManager {
 
   /**
    * Orange/Red skill choice the survivor still has to make, derived from
-   * experience and owned skills (no stored flag). Orange comes first.
+   * experience and the choices already recorded. Orange comes first.
    */
   public static getPendingSkillChoice(survivor: Survivor): { level: DangerLevel; options: string[] } | null {
-    const progression = SURVIVOR_CLASSES[survivor.characterClass] || SURVIVOR_CLASSES['Wanda'];
+    const progression = SURVIVOR_CLASSES[survivor.characterClass];
+    if (!progression) return null;
     const levels = [DangerLevel.Orange, DangerLevel.Red];
     for (const level of levels) {
       if (survivor.experience < XP_THRESHOLDS[level]) break;
       const options = progression[level];
-      if (!options.some(skillId => survivor.skills.includes(skillId))) {
+      if (options.length > 0 && !survivor.skillChoices?.[level]) {
         return { level, options };
       }
     }
@@ -78,18 +80,40 @@ export class XPManager {
   }
 
   /**
-   * Unlocks a skill and applies immediate stat bonuses (like +1 Action).
-   * Returns a new survivor object (immutable).
+   * Takes the survivor's pending Orange/Red choice. Records which option was
+   * taken — a card may offer one the survivor already owns, and the record is
+   * what closes the level.
+   */
+  public static chooseSkill(survivor: Survivor, skillId: string): Survivor {
+    const pending = this.getPendingSkillChoice(survivor);
+    if (!pending || !pending.options.includes(skillId)) return survivor;
+
+    // Always a new copy: the option may be one the survivor already owns.
+    const updated = this.gainSkill(survivor, skillId);
+    return { ...updated, skillChoices: { ...survivor.skillChoices, [pending.level]: skillId } };
+  }
+
+  /**
+   * Unlocks a skill the survivor does not have yet. Used for the fixed Blue and
+   * Yellow levels, where re-reaching a level must not grant a second copy.
    */
   public static unlockSkill(survivor: Survivor, skillId: string): Survivor {
     if (survivor.skills.includes(skillId)) return survivor;
+    return this.gainSkill(survivor, skillId);
+  }
 
+  /**
+   * Adds one copy of a skill and applies its immediate effect — Zombicide
+   * rules: "Immediately gains the benefit". A second copy stacks with the
+   * first; `skillCount` is what reads the total.
+   * Returns a new survivor object (immutable).
+   */
+  private static gainSkill(survivor: Survivor, skillId: string): Survivor {
     const updated = {
       ...survivor,
       skills: [...survivor.skills, skillId],
     };
 
-    // Apply immediate effects — Zombicide rules: "Immediately gains the benefit".
     if (skillId === 'plus_1_action') {
       updated.actionsPerTurn = survivor.actionsPerTurn + 1;
       updated.actionsRemaining = survivor.actionsRemaining + 1;
@@ -115,17 +139,19 @@ export class XPManager {
     survivor.freeMeleeRemaining = 0;
     survivor.freeRangedRemaining = 0;
     for (const [skillId, counter] of Object.entries(FREE_ACTION_SKILLS)) {
-      if (survivor.skills.includes(skillId)) survivor[counter] = 1;
+      const copies = skillCount(survivor.skills, skillId);
+      if (copies > 0) survivor[counter] = copies;
     }
-    survivor.toughUsedZombieAttack = false;
-    survivor.toughUsedFriendlyFire = false;
     survivor.sprintUsedThisTurn = false;
     survivor.chargeUsedThisTurn = false;
     survivor.bornLeaderUsedThisTurn = false;
     survivor.bloodlustUsedThisTurn = false;
     survivor.lifesaverUsedThisTurn = false;
+    survivor.jumpUsedThisTurn = false;
+    survivor.shoveUsedThisTurn = false;
     survivor.hitAndRunFreeMove = false;
-    survivor.luckyUsedThisTurn = false;
+    survivor.kidSlipperyUsedThisTurn = false;
+    survivor.luckyUsedThisAction = false;
   }
 
   public static getDangerLevel(xp: number): DangerLevel {

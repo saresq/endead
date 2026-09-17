@@ -62,9 +62,10 @@ export const lobby = {
   // Dossier
   dossierTitle: (name: string) => `Superviviente · ${name}`,
   survivor: 'Superviviente',
-  startingWeapon: 'Arma inicial',
-  weaponStats: (accuracy: number, dice: number, damage: number) =>
-    `Precisión ${accuracy}+ · ${dice} ${dice === 1 ? 'dado' : 'dados'} · Daño ${damage}`,
+  profile: 'Ficha',
+  health: (n: number) => `${n} ${n === 1 ? 'herida' : 'heridas'} para caer`,
+  survivorType: { Classic: 'Clásico', Kid: 'Niño' } as Record<string, string>,
+  kidNote: 'Escurridizo una vez por turno en un movimiento.',
   xp: (n: number) => `${n} PX`,
   progression: 'Habilidades por nivel',
   pickOne: (n: number) => `Elegí 1 de ${n}`,

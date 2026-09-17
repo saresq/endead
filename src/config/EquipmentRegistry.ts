@@ -41,13 +41,15 @@ export const EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'inHand'
       dualWield: false,
     }
   },
+  // Accuracy 3+, not 4+ — read off the card art the rulebook prints twice
+  // (rules/16-card-registry.md, p.12 and the annotated card on p.13).
   'pistol': {
     name: 'Pistol',
     type: EquipmentType.Weapon,
     stats: {
       range: [0, 1],
       dice: 1,
-      accuracy: 4,
+      accuracy: 3,
       damage: 1,
       noise: true,
       dualWield: true,
@@ -121,14 +123,17 @@ export const EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'inHand'
       dualWield: false
     }
   },
+  // Dice 2 / Damage 1, not Dice 1 / Damage 2. The card art reads 0 | 2 | 4+ | 1,
+  // and p.27 settles it in prose: Ostara rolls two dice and "The Katana has
+  // Damage 1, so it cannot hurt the Brute" (rules/11-combat.md#melee-action).
   'katana': {
     name: 'Katana',
     type: EquipmentType.Weapon,
     stats: {
       range: [0, 0],
-      dice: 1,
+      dice: 2,
       accuracy: 4,
-      damage: 2,
+      damage: 1,
       noise: false,
       dualWield: true
     }
@@ -214,7 +219,7 @@ export const EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'inHand'
     stats: undefined
   },
   // Standard-deck Aaahh!! (×4). Distinct registry entry from `aaahh_epic`
-  // by design: per RULEBOOK §14, the Standard and Epic decks each carry
+  // by design: per rules/16-card-registry.md, the Standard and Epic decks each carry
   // their own Aaahh!! cards. The duplication is intentional, not a bug.
   'aaahh': {
     name: 'Aaahh!!',
@@ -224,11 +229,11 @@ export const EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'inHand'
   }
 };
 
-// Zombicide 2nd Edition — Epic Weapons deck (11 cards, red backs, RULEBOOK §14).
+// Zombicide 2nd Edition — Epic Weapons deck (11 cards, red backs, rules/16-card-registry.md).
 // Drawn only when a Survivor takes an Epic Weapon Crate token.
 export const EPIC_EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'inHand' | 'slot' | 'equipmentId'>> = {
   // Epic-deck Aaahh!! (×2). Mirror of `aaahh` in EQUIPMENT_CARDS — the two
-  // decks each carry their own Aaahh!! per RULEBOOK §14. Intentional.
+  // decks each carry their own Aaahh!! per rules/16-card-registry.md. Intentional.
   'aaahh_epic': {
     name: 'Aaahh!!',
     type: EquipmentType.Item,
@@ -311,6 +316,7 @@ export const EPIC_EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'in
       noise: true,
       dualWield: false,
       ammo: 'bullets',
+      melee: true,
     }
   },
   'mas_shotgun': {
@@ -353,7 +359,7 @@ export const EPIC_EQUIPMENT_CARDS: Record<string, Omit<EquipmentCard, 'id' | 'in
   },
 };
 
-// RULEBOOK §14 — Epic Weapons deck: 11 cards total. Aaahh!! x2, all others x1.
+// rules/16-card-registry.md — Epic Weapons deck: 11 cards total. Aaahh!! x2, all others x1.
 export const INITIAL_EPIC_DECK_CONFIG = [
   'aaahh_epic', 'aaahh_epic',
   'army_sniper_rifle',

@@ -6,6 +6,7 @@ import { leaveRoom } from '../roomExit';
 import { InputController } from '../InputController';
 import { TradeUI } from './TradeUI';
 import { PickupUI } from './PickupUI';
+import { ReorganizeUI, openDiscardConfirm } from './ReorganizeUI';
 import { getPlayerIdentity } from '../config/PlayerIdentities';
 import { audioManager } from '../AudioManager';
 import { icon } from './components/icons';
@@ -16,6 +17,8 @@ import { displayableEntries, groupByRound } from './eventLog';
 import { renderButton } from './components/Button';
 import { renderItemCard, renderEmptySlotsCounter } from './components/ItemCard';
 import { renderPhotoSlot } from './components/PhotoSlot';
+import { characterImageUrl } from '../utils/characterAsset';
+import { skillCount } from '../../config/SkillRegistry';
 import { modalManager } from './overlays/ModalManager';
 import { notificationManager } from './NotificationManager';
 import { formatZoneId } from '../utils/zoneFormat';
@@ -112,11 +115,15 @@ function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
+/** One entry of `pendingZombieWounds` — a zombie attack step, or one attack's friendly fire. */
+type WoundDistEntry = NonNullable<GameState['pendingZombieWounds']>[number];
+
 export class GameHUD {
   private container: HTMLElement;
   private inputController: InputController;
   private tradeUI: TradeUI;
   private pickupUI: PickupUI;
+  private reorganizeUI: ReorganizeUI;
   private localPlayerId: PlayerId;
   private state: GameState | null = null;
   private selectedSurvivorId: EntityId | null = null;
@@ -176,6 +183,7 @@ export class GameHUD {
 
     this.tradeUI = new TradeUI();
     this.pickupUI = new PickupUI();
+    this.reorganizeUI = new ReorganizeUI();
 
     this.boundDelegateHandler = (e: Event) => this.handleDelegatedClick(e);
     this.container.addEventListener('click', this.boundDelegateHandler);
@@ -356,6 +364,11 @@ export class GameHUD {
       networkManager.sendAction({ playerId: this.localPlayerId, survivorId: activeSurvivor.id, type: ActionType.MAKE_NOISE });
       return;
     }
+    if (id === 'btn-reload') {
+      audioManager.playSFX('button_click');
+      networkManager.sendAction({ playerId: this.localPlayerId, survivorId: activeSurvivor.id, type: ActionType.RELOAD });
+      return;
+    }
     if (id === 'btn-door') {
       audioManager.playSFX('button_click');
       this.inputController.setMode('OPEN_DOOR');
@@ -369,6 +382,11 @@ export class GameHUD {
     }
     if (id === 'btn-trade') {
       this.handleTrade(activeSurvivor);
+      return;
+    }
+    if (id === 'btn-organize') {
+      // One action buys the whole session; every move inside it is free.
+      networkManager.sendAction({ playerId: this.localPlayerId, survivorId: activeSurvivor.id, type: ActionType.ORGANIZE_START });
       return;
     }
     if (id === 'btn-end-turn') {
@@ -399,6 +417,16 @@ export class GameHUD {
     if (id === 'btn-lifesaver') {
       this.inputController.setMode('LIFESAVER');
       notificationManager.show({ variant: 'info', message: es.hud.toast.pickLifesaver, duration: 5000 });
+      return;
+    }
+    if (id === 'btn-jump') {
+      this.inputController.setMode('JUMP');
+      notificationManager.show({ variant: 'info', message: es.hud.toast.pickJump, duration: 5000 });
+      return;
+    }
+    if (id === 'btn-shove') {
+      this.inputController.setMode('SHOVE');
+      notificationManager.show({ variant: 'info', message: es.hud.toast.pickShove, duration: 5000 });
       return;
     }
 
@@ -585,10 +613,14 @@ export class GameHUD {
 
     this.syncTradeAndPickup(activeSurvivor);
 
-    // Auto-open wound distribution modal if there are pending zombie wounds (host only)
-    if (this.isHost() && this.state.pendingZombieWounds && this.state.pendingZombieWounds.length > 0
-        && !this.woundDistModalId) {
-      this.openWoundDistribution(this.state.pendingZombieWounds[0]);
+    // Auto-open the wound distribution modal for the player it belongs to:
+    // zombie wounds are the host's to assign, friendly fire is the shooter's.
+    const myDistribution = (this.state.pendingZombieWounds ?? []).find(entry =>
+      entry.assignedByPlayerId
+        ? entry.assignedByPlayerId === this.localPlayerId
+        : this.isHost());
+    if (myDistribution && !this.woundDistModalId) {
+      this.openWoundDistribution(myDistribution);
     }
 
     const mySurvivors = Object.values(this.state.survivors).filter(s => s.playerId === this.localPlayerId);
@@ -614,10 +646,15 @@ export class GameHUD {
     const state = this.state!;
     const lines: string[] = [];
 
-    if (!this.isHost()) {
-      const host = state.lobby.players[0];
-      const hostName = displayName(host?.name, host?.characterClass) || es.common.host;
-      for (const entry of state.pendingZombieWounds ?? []) {
+    for (const entry of state.pendingZombieWounds ?? []) {
+      if (entry.assignedByPlayerId) {
+        if (entry.assignedByPlayerId === this.localPlayerId) continue;
+        const who = state.lobby.players.find(p => p.id === entry.assignedByPlayerId);
+        const whoName = displayName(who?.name, who?.characterClass) || es.common.host;
+        lines.push(es.modals.waiting.playerAssigning(escapeHtml(whoName), entry.totalWounds, formatZoneId(entry.zoneId, state)));
+      } else if (!this.isHost()) {
+        const host = state.lobby.players[0];
+        const hostName = displayName(host?.name, host?.characterClass) || es.common.host;
         lines.push(es.modals.waiting.hostAssigning(escapeHtml(hostName), entry.totalWounds, formatZoneId(entry.zoneId, state)));
       }
     }
@@ -694,7 +731,7 @@ export class GameHUD {
     const isZombiePhase = phaseRaw.includes('ZOMBIE');
     const isEndPhase    = phaseRaw.includes('END');
 
-    const channel = this.channelTag(state);
+    const dangerLabel = es.danger[state.currentDangerLevel];
     const myTurnClass = isMyTurn ? ' hud-topbar--my-turn' : '';
     const dangerClass = ` hud-topbar--danger-${state.currentDangerLevel.toLowerCase()}`;
 
@@ -726,28 +763,15 @@ export class GameHUD {
           </div>
         </div>
         <div class="hud-topbar__right">
-          <span class="hud-channel">${es.hud.channel} ${channel}</span>
+          <span class="hud-danger" role="status" aria-live="polite" aria-label="${es.hud.dangerAria(dangerLabel)}">
+            <span class="hud-danger__label">${es.hud.danger}</span>
+            <span class="hud-danger__level">${escapeHtml(dangerLabel)}</span>
+          </span>
           ${this.renderLogButton()}
           <button id="btn-menu" class="hud-iconbtn" data-action="open-menu" title="${es.hud.menu}" aria-label="${es.hud.menu}">${icon('Menu', 'sm')}</button>
         </div>
         <div class="hud-topbar__bar"></div>
       </div>`;
-  }
-
-  private channelTag(state: GameState): string {
-    // Stable 6-char alphanumeric channel derived from turn + active player.
-    const seed = `${state.turn}-${state.players[state.activePlayerIndex] || ''}`;
-    let h = 0;
-    for (let i = 0; i < seed.length; i++) {
-      h = (h * 31 + seed.charCodeAt(i)) >>> 0;
-    }
-    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let out = '';
-    for (let i = 0; i < 6; i++) {
-      out += alphabet[h % alphabet.length];
-      h = Math.floor(h / alphabet.length) + (i * 7);
-    }
-    return out;
   }
 
   /**
@@ -773,10 +797,13 @@ export class GameHUD {
         s.id === this.selectedSurvivorId ? 'hud-chip--selected' : '',
       ].filter(Boolean).join(' ');
       const img = s.characterClass
-        ? `<img class="hud-chip__img" src="/images/characters/${escapeHtml(s.characterClass.toLowerCase())}.webp" alt="" />`
+        ? `<img class="hud-chip__img" src="${escapeHtml(characterImageUrl(s.characterClass))}" alt="" />`
         : `<span class="hud-chip__initial">${escapeHtml(displayName(s.name, s.characterClass).charAt(0).toUpperCase())}</span>`;
       const hp = Math.max(0, s.maxHealth - s.wounds);
-      const ap = s.cheatMode ? s.actionsPerTurn : Math.min(s.actionsRemaining, s.actionsPerTurn);
+      // Cheat mode sets actionsPerTurn to 999 — one bar, never 999 pips.
+      const apPips = s.cheatMode
+        ? '<i class="hud-chip__pip hud-chip__pip--inf"></i>'
+        : chipPips(Math.min(s.actionsRemaining, s.actionsPerTurn), s.actionsPerTurn, 'ap');
       const chipName = displayName(s.name, s.characterClass);
       const label = `${es.hud.chipAria(escapeHtml(chipName), hp, s.maxHealth, s.playerId === activePid)} · ${es.hud.actionsAria(s.cheatMode ? null : s.actionsRemaining, s.actionsPerTurn)}`;
       const chip = isLocal
@@ -787,7 +814,7 @@ export class GameHUD {
       return `<div class="hud-chip-cell">${chip}
         <span class="hud-chip__state" aria-hidden="true">
           <span class="hud-chip__pips">${chipPips(hp, s.maxHealth, 'hp')}</span>
-          <span class="hud-chip__pips">${chipPips(ap, s.actionsPerTurn, 'ap')}</span>
+          <span class="hud-chip__pips">${apPips}</span>
         </span>
       </div>`;
     }).join('');
@@ -845,7 +872,7 @@ export class GameHUD {
     const survivor = state.survivors[last.survivorId];
     if (!survivor) return '';
     if (!survivor.skills.includes('lucky')) return '';
-    if (survivor.luckyUsedThisTurn && !survivor.cheatMode) return '';
+    if (survivor.luckyUsedThisAction && !survivor.cheatMode) return '';
     if (!last.rollbackSnapshot) return '';
     return `<button class="action-btn action-btn--lucky" data-action="reroll-lucky" title="${es.hud.luckyRerollTitle}">
       ${icon('Dices', 'sm')} ${es.hud.luckyReroll}
@@ -868,7 +895,17 @@ export class GameHUD {
       renderActionButton({ id: 'btn-noise', icon: 'Volume2', label: es.hud.noise, cost: COST_ONE, disabled: !isMyTurn || noAP }),
       renderActionButton({ id: 'btn-door', icon: 'DoorOpen', label: es.hud.door, cost: COST_ONE, disabled: !isMyTurn || noAP || !canOpenDoor }),
       renderActionButton({ id: 'btn-trade', icon: 'Handshake', label: es.hud.trade, cost: COST_ONE, disabled: !isMyTurn || noAP }),
+      renderActionButton({ id: 'btn-organize', icon: 'Backpack', label: es.hud.organize, cost: COST_ONE, disabled: !isMyTurn || noAP }),
     ];
+    // A `reload` weapon holds one shot; reloading it costs an action.
+    const unloaded = survivor.inventory.filter(c => c.keywords?.includes('reload') && c.loaded === false);
+    if (unloaded.length > 0) {
+      buttons.push(renderActionButton({
+        id: 'btn-reload', icon: 'RotateCcw', label: es.hud.reload, cost: COST_ONE,
+        disabled: !isMyTurn || noAP || unloaded.length > 1,
+        highlight: isMyTurn && !noAP && unloaded.length === 1,
+      }));
+    }
     if (currentZone?.hasObjective) {
       buttons.push(renderActionButton({ id: 'btn-objective', icon: 'Target', label: es.hud.objective, cost: COST_ONE, disabled: !isMyTurn || noAP, highlight: isMyTurn && !noAP }));
     }
@@ -886,7 +923,7 @@ export class GameHUD {
       ? '<span class="hud-pips__inf">∞</span>'
       : pips(Math.min(survivor.actionsRemaining, survivor.actionsPerTurn), survivor.actionsPerTurn, 'ap')
         + (survivor.actionsRemaining > survivor.actionsPerTurn ? `<span class="hud-pips__inf">+${survivor.actionsRemaining - survivor.actionsPerTurn}</span>` : '');
-    const avatarUrl = survivor.characterClass ? `/images/characters/${survivor.characterClass.toLowerCase()}.webp` : undefined;
+    const avatarUrl = survivor.characterClass ? characterImageUrl(survivor.characterClass) : undefined;
 
     return `
       <div class="hud-sheet__who">
@@ -898,7 +935,7 @@ export class GameHUD {
           <span class="hud-pips" aria-label="${es.hud.actionsAria(survivor.cheatMode ? null : survivor.actionsRemaining, survivor.actionsPerTurn)}">${icon('Zap', 'xs')}${apPips}</span>
         </div>
       </div>
-      <button id="btn-end-turn" class="action-btn hud-sheet__endturn" ${isMyTurn ? '' : 'disabled'} aria-label="${es.common.endTurn}">
+      <button id="btn-end-turn" class="action-btn action-btn--end-turn hud-sheet__endturn" ${isMyTurn ? '' : 'disabled'} aria-label="${es.common.endTurn}">
         <span class="action-btn__icon">${icon('SkipForward', 'sm')}</span>
         <span class="action-btn__label">${es.common.endTurn}</span>
       </button>`;
@@ -1002,7 +1039,6 @@ export class GameHUD {
       else if (skillId === 'born_leader') used = survivor.bornLeaderUsedThisTurn;
       else if (skillId === 'bloodlust_melee') used = survivor.bloodlustUsedThisTurn;
       else if (skillId === 'lifesaver') used = survivor.lifesaverUsedThisTurn;
-      else if (skillId === 'tough') used = survivor.toughUsedZombieAttack && survivor.toughUsedFriendlyFire;
 
       const typeClass = def.type === 'PASSIVE' ? 'passive' : def.type === 'ACTION' ? 'action' : 'stat-mod';
       const usedClass = used ? ' skill-badge--used' : '';
@@ -1108,6 +1144,18 @@ export class GameHUD {
         cost: COST_FREE, disabled: !isMyTurn || (survivor.lifesaverUsedThisTurn && !cheat),
       }));
     }
+    if (survivor.skills.includes('jump')) {
+      buttons.push(renderActionButton({
+        id: 'btn-jump', icon: 'Zap', label: es.hud.jump,
+        cost: COST_ONE, disabled: !isMyTurn || noAP || (survivor.jumpUsedThisTurn && !cheat),
+      }));
+    }
+    if (survivor.skills.includes('shove')) {
+      buttons.push(renderActionButton({
+        id: 'btn-shove', icon: 'Swords', label: es.hud.shove,
+        cost: COST_FREE, disabled: !isMyTurn || (survivor.shoveUsedThisTurn && !cheat),
+      }));
+    }
 
     return buttons;
   }
@@ -1123,12 +1171,14 @@ export class GameHUD {
       let bonusDice = 0;
       let bonusDamage = 0;
 
-      if (isMelee && survivor.skills.includes('plus_1_die_melee')) bonusDice++;
-      if (isRanged && survivor.skills.includes('plus_1_die_ranged')) bonusDice++;
-      if (survivor.skills.includes('plus_1_die_combat')) bonusDice++;
-      if (isMelee && survivor.skills.includes('plus_1_damage_melee')) bonusDamage++;
-      if (isRanged && survivor.skills.includes('plus_1_damage_ranged')) bonusDamage++;
-      if (survivor.skills.includes('plus_1_damage_combat')) bonusDamage++;
+      // Copies stack — same reading as CombatHandlers, so the preview matches.
+      const copies = (skillId: string) => skillCount(survivor.skills, skillId);
+      if (isMelee) bonusDice += copies('plus_1_die_melee');
+      if (isRanged) bonusDice += copies('plus_1_die_ranged');
+      bonusDice += copies('plus_1_die_combat');
+      if (isMelee) bonusDamage += copies('plus_1_damage_melee');
+      if (isRanged) bonusDamage += copies('plus_1_damage_ranged');
+      bonusDamage += copies('plus_1_damage_combat');
       if (isMelee && survivor.skills.includes('super_strength')) {
         bonusDamage = Math.max(bonusDamage, 3 - w.stats.damage);
       }
@@ -1221,7 +1271,7 @@ export class GameHUD {
 
   // ─── Wound Distribution Modal ─────────────────────────────────
 
-  private openWoundDistribution(entry: { zoneId: string; totalWounds: number; survivorIds: string[] }): void {
+  private openWoundDistribution(entry: WoundDistEntry): void {
     if (this.woundDistModalId && modalManager.isOpen(this.woundDistModalId)) return;
     if (!this.state) return;
 
@@ -1231,8 +1281,10 @@ export class GameHUD {
     }
     this.woundDistAssignments[entry.survivorIds[0]] = entry.totalWounds;
 
+    const isFriendlyFire = entry.source === 'FRIENDLY_FIRE';
+
     this.woundDistModalId = modalManager.open({
-      title: es.modals.woundDist.title,
+      title: isFriendlyFire ? es.modals.woundDist.titleFriendlyFire : es.modals.woundDist.title,
       size: 'md',
       persistent: true,
       renderBody: () => this.renderWoundDistBody(entry),
@@ -1264,7 +1316,11 @@ export class GameHUD {
             networkManager.sendAction({
               playerId: this.localPlayerId,
               type: ActionType.DISTRIBUTE_ZOMBIE_WOUNDS,
-              payload: { zoneId: entry.zoneId, assignments: { ...this.woundDistAssignments } },
+              payload: {
+                zoneId: entry.zoneId,
+                contextId: entry.contextId,
+                assignments: { ...this.woundDistAssignments },
+              },
             });
             modalManager.close(this.woundDistModalId!);
             this.woundDistModalId = null;
@@ -1279,12 +1335,14 @@ export class GameHUD {
     });
   }
 
-  private renderWoundDistBody(entry: { zoneId: string; totalWounds: number; survivorIds: string[] }): string {
+  private renderWoundDistBody(entry: WoundDistEntry): string {
     if (!this.state) return '';
     const assigned = Object.values(this.woundDistAssignments).reduce((s, n) => s + n, 0);
     const remaining = entry.totalWounds - assigned;
 
-    const desc = `<p class="text-secondary mb-3">${es.modals.woundDist.desc(`<strong>${entry.totalWounds}</strong>`, entry.totalWounds, formatZoneId(entry.zoneId, this.state!))}</p>`;
+    const desc = `<p class="text-secondary mb-3">${entry.source === 'FRIENDLY_FIRE'
+      ? es.modals.woundDist.descFriendlyFire(`<strong>${entry.totalWounds}</strong>`, entry.totalWounds, formatZoneId(entry.zoneId, this.state!), entry.damagePerWound ?? 1)
+      : es.modals.woundDist.desc(`<strong>${entry.totalWounds}</strong>`, entry.totalWounds, formatZoneId(entry.zoneId, this.state!))}</p>`;
     const summary = `<div class="wound-picker__summary mb-3">
       <span>${es.modals.woundDist.assigned} <strong>${assigned}</strong> / ${entry.totalWounds}</span>
       <span>${es.modals.woundDist.remaining} <strong class="${remaining > 0 ? 'text-warning' : 'text-success'}">${remaining}</strong></span>
@@ -1315,7 +1373,7 @@ export class GameHUD {
     return `${desc}${summary}<div class="wound-dist__list">${rows}</div>`;
   }
 
-  private renderWoundDistFooter(entry: { zoneId: string; totalWounds: number; survivorIds: string[] }): string {
+  private renderWoundDistFooter(entry: WoundDistEntry): string {
     const assigned = Object.values(this.woundDistAssignments).reduce((s, n) => s + n, 0);
     const isValid = assigned === entry.totalWounds;
     return renderButton({
@@ -1439,11 +1497,11 @@ export class GameHUD {
       renderFooter: () => renderButton({ label: es.common.close, variant: 'secondary', dataAction: 'modal-close' }),
       onOpen: (el) => {
         el.addEventListener('click', (e) => {
-          const btn = (e.target as HTMLElement).closest('[data-action="use-food"]') as HTMLElement | null;
-          if (!btn) return;
-          const cardId = btn.dataset.id;
+          const btn = (e.target as HTMLElement).closest('[data-action]') as HTMLElement | null;
+          const cardId = btn?.dataset.id;
           if (!cardId) return;
-          this.requestFoodConsume(cardId);
+          if (btn!.dataset.action === 'use-food') this.requestFoodConsume(cardId);
+          else if (btn!.dataset.action === 'discard-item') this.requestDiscard(cardId);
         });
       },
       onClose: () => { this.backpackModalId = null; },
@@ -1462,21 +1520,34 @@ export class GameHUD {
 
     return `<div class="grid grid--2 gap-2">
       ${bagItems.map(item => {
-        const card = renderItemCard(item);
-        if (!FOOD_EQUIPMENT_IDS.has(item.equipmentId)) return card;
+        const isFood = FOOD_EQUIPMENT_IDS.has(item.equipmentId);
         const eatTitle = escapeHtml(es.modals.food.eatTitle(equipmentName(item)));
+        const discardTitle = escapeHtml(es.hud.discardItem(equipmentName(item)));
+        // Discarding is free and allowed at any time, so the chip is always
+        // there — no turn or action-point gating.
         return `
-          <div class="food-slot">
-            ${card}
-            <button type="button"
-                    class="food-slot__eat"
-                    data-action="use-food"
-                    data-id="${item.id}"
-                    title="${eatTitle}"
-                    aria-label="${eatTitle}">
-              ${icon('Utensils', 'sm')}
-              <span class="food-slot__eat-label">${es.modals.food.eatLabel}</span>
-            </button>
+          <div class="food-slot ${isFood ? 'food-slot--with-eat' : ''}">
+            ${renderItemCard(item)}
+            <div class="food-slot__actions">
+              ${isFood ? `
+                <button type="button"
+                        class="food-slot__eat"
+                        data-action="use-food"
+                        data-id="${item.id}"
+                        title="${eatTitle}"
+                        aria-label="${eatTitle}">
+                  ${icon('Utensils', 'sm')}
+                  <span class="food-slot__eat-label">${es.modals.food.eatLabel}</span>
+                </button>` : ''}
+              <button type="button"
+                      class="food-slot__eat food-slot__eat--danger"
+                      data-action="discard-item"
+                      data-id="${item.id}"
+                      title="${discardTitle}"
+                      aria-label="${discardTitle}">
+                ${icon('Trash2', 'sm')}
+              </button>
+            </div>
           </div>`;
       }).join('')}
       ${renderEmptySlotsCounter(emptyCount)}
@@ -1495,6 +1566,15 @@ export class GameHUD {
     const el = modalManager.getElement(this.backpackModalId);
     const titleEl = el?.querySelector('.modal__title');
     if (titleEl) titleEl.textContent = this.backpackTitle(survivor);
+  }
+
+  /** Free discard from the bag — allowed on anyone's turn, so no gating here. */
+  private requestDiscard(cardId: EntityId): void {
+    const survivor = this.currentBackpackSurvivor();
+    const card = survivor?.inventory.find(c => c.id === cardId);
+    if (!survivor || !card) return;
+    if (survivor.playerId !== this.localPlayerId) return;
+    openDiscardConfirm(survivor, card);
   }
 
   /**
@@ -1811,6 +1891,16 @@ export class GameHUD {
       }
     } else {
       this.tradeUI.hide();
+    }
+
+    // Reorganize session
+    const reorganizing = this.state.activeReorganize
+      ? this.state.survivors[this.state.activeReorganize.survivorId]
+      : undefined;
+    if (reorganizing && reorganizing.playerId === this.localPlayerId) {
+      this.reorganizeUI.sync(reorganizing);
+    } else {
+      this.reorganizeUI.hide();
     }
 
     // Pickup

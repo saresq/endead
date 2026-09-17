@@ -8,10 +8,15 @@ import { es } from '../../strings/es';
 
 export type HistoryEntry = GameState['history'][number];
 
-/** Lobby and bookkeeping actions that never show in the card or the log. */
+/**
+ * Lobby and bookkeeping actions that never show in the card or the log.
+ * A reorganize is one action, so only `ORGANIZE_START` is worth a line: the
+ * moves inside the session and closing it are bookkeeping.
+ */
 const HIDDEN_ACTIONS = new Set([
   'JOIN_LOBBY', 'START_GAME', 'SELECT_CHARACTER', 'UPDATE_NICKNAME', 'KICK_PLAYER',
   'DISCONNECT', 'RESOLVE_SEARCH', 'CHOOSE_SKILL', 'END_GAME', 'ABANDON',
+  'ORGANIZE', 'ORGANIZE_END',
 ]);
 
 export function displayableEntries(history: readonly HistoryEntry[] | undefined): HistoryEntry[] {

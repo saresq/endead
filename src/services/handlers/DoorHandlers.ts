@@ -34,59 +34,41 @@ export function handleOpenDoor(state: GameState, intent: ActionRequest): GameSta
     newState.noiseTokens = (newState.noiseTokens || 0) + 1;
   }
 
-  // Spawn-on-door-open (RULEBOOK §9):
-  //   - Rule 294: opening a building for the first time draws one Zombie card
-  //     per Dark Zone of that building.
-  //   - Rule 302: buildings open at start (any zone has a doorway to the outside)
-  //     are never spawned in.
-  //   - A building = all rooms connected by openings (doorways), not by physical doors.
+  // Spawn-on-door-open (rules/09-player-phase.md#spawning-in-buildings, Rule 294): opening a building for the
+  // first time draws one Zombie card per Dark Zone of that building. Which
+  // buildings can spawn at all is settled at compile time — `ScenarioCompiler`
+  // groups the rooms and marks the ones open at start, and the one the
+  // survivors start in, as already spawned (Rule 302).
   const behindDoor = newState.zones[targetZoneId];
   const zonesToSpawn: ZoneId[] = [];
-  if (behindDoor && behindDoor.isBuilding && !behindDoor.hasBeenSpawned) {
-    // BFS the whole building through doorways (non-door connections).
-    const buildingZones: ZoneId[] = [targetZoneId];
-    const visited = new Set<ZoneId>([targetZoneId]);
-    const queue = [targetZoneId];
-    let openAtStart = false;
-    while (queue.length > 0) {
-      const zid = queue.shift()!;
-      const z = newState.zones[zid];
-      if (!z) continue;
-      for (const c of z.connections) {
-        const neighbor = newState.zones[c.toZoneId];
-        if (!neighbor) continue;
-        // A doorway (non-door) connection to a non-building zone means the
-        // building is structurally open at start — Rule 302 applies.
-        if (!c.hasDoor && !neighbor.isBuilding) {
-          openAtStart = true;
-          continue;
-        }
-        if (visited.has(c.toZoneId)) continue;
-        if (!neighbor.isBuilding) continue;
-        if (c.hasDoor) continue;
-        visited.add(c.toZoneId);
-        buildingZones.push(c.toZoneId);
-        queue.push(c.toZoneId);
-      }
-    }
+  if (behindDoor?.buildingId && !behindDoor.hasBeenSpawned) {
+    const buildingZones = Object.values(newState.zones)
+      .filter(z => z.buildingId === behindDoor.buildingId);
 
     // Mark every zone in the building so later door-opens don't re-trigger spawns.
-    for (const zid of buildingZones) {
-      newState.zones[zid].hasBeenSpawned = true;
-    }
-
-    // Rule 294: one spawn per Dark Zone. Rule 302: skip entirely if open at start.
-    if (!openAtStart) {
-      for (const zid of buildingZones) {
-        if (newState.zones[zid].isDark) zonesToSpawn.push(zid);
-      }
+    for (const zone of buildingZones) {
+      zone.hasBeenSpawned = true;
+      if (zone.isDark) zonesToSpawn.push(zone.id);
     }
 
     // Same card resolution as the Spawn Step (Extra Activation, Rush, pool
     // limits, Abomination rules). Wounds from activations queue as pending.
+    // The cards go into a spawnContext of the Spawn Step's shape, so the event
+    // feed shows what was drawn instead of a bare "zombies spawned".
+    if (zonesToSpawn.length > 0) {
+      newState.spawnContext = { cards: [], zombieWounds: [], timestamp: Date.now() };
+    }
     for (const zid of zonesToSpawn) {
-      const detail = ZombiePhaseManager.drawSpawnCard(newState)?.[newState.currentDangerLevel];
-      if (detail) ZombiePhaseManager.applySpawnDetail(newState, zid, detail);
+      const card = ZombiePhaseManager.drawSpawnCard(newState);
+      const detail = card?.[newState.currentDangerLevel];
+      if (!card || !detail) continue;
+      newState.spawnContext!.cards.push({
+        zoneId: zid,
+        cardId: card.id,
+        detail,
+        dangerLevel: newState.currentDangerLevel,
+      });
+      ZombiePhaseManager.applySpawnDetail(newState, zid, detail);
     }
   }
 

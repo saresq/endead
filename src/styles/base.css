@@ -111,12 +111,22 @@ hr {
 
 /* ---------- Base typographic elements ---------- */
 
-h1, h2, h3, h4, h5, h6 {
+h1, h2 {
   font-family: var(--font-display);
   font-weight: var(--font-normal);
   letter-spacing: var(--letter-spacing-wide);
   color: inherit;
   line-height: 1.1;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+h3, h4, h5, h6 {
+  font-family: var(--font-ui);
+  font-weight: var(--font-semibold);
+  letter-spacing: var(--letter-spacing-wide);
+  color: inherit;
+  line-height: 1.2;
   text-transform: uppercase;
   margin: 0;
 }
@@ -137,7 +147,8 @@ img {
 /* ---------- Interactive base reset — no browser chrome ---------- */
 
 button {
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
+  font-weight: var(--font-semibold);
   cursor: pointer;
   border: none;
   background: none;

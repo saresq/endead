@@ -22,17 +22,22 @@ export enum ActionType {
   TRADE_ACCEPT = 'TRADE_ACCEPT',
   TRADE_CANCEL = 'TRADE_CANCEL',
   ORGANIZE = 'ORGANIZE',
+  ORGANIZE_START = 'ORGANIZE_START',
+  ORGANIZE_END = 'ORGANIZE_END',
+  DISCARD_CARD = 'DISCARD_CARD',
   CHOOSE_SKILL = 'CHOOSE_SKILL',
   RESOLVE_SEARCH = 'RESOLVE_SEARCH',
   TAKE_OBJECTIVE = 'TAKE_OBJECTIVE',
   TAKE_EPIC_CRATE = 'TAKE_EPIC_CRATE',
   SPRINT = 'SPRINT',
+  RELOAD = 'RELOAD',
   USE_ITEM = 'USE_ITEM',
-  NOTHING = 'NOTHING',
   END_TURN = 'END_TURN',
   CHARGE = 'CHARGE',
   BORN_LEADER = 'BORN_LEADER',
   BLOODLUST_MELEE = 'BLOODLUST_MELEE',
+  JUMP = 'JUMP',
+  SHOVE = 'SHOVE',
   LIFESAVER = 'LIFESAVER',
   RESOLVE_WOUNDS = 'RESOLVE_WOUNDS',
   DISTRIBUTE_ZOMBIE_WOUNDS = 'DISTRIBUTE_ZOMBIE_WOUNDS',
@@ -67,8 +72,19 @@ export interface MovePayload {
 export interface AttackPayload {
   targetZoneId: ZoneId;
   weaponId?: EntityId;
-  /** Player-specified kill priority (melee: free choice per 2E rules; ranged: Sniper/Point-Blank). */
+  /** Player-specified kill priority (melee: free choice per 2E rules; ranged: Sniper/Point-Blank).
+   *  Without free targeting it only breaks ties inside one priority band. */
   targetZombieIds?: EntityId[];
+  /** Which mode to resolve a weapon usable both ways in. Defaults to melee in the own zone. */
+  attackMode?: 'MELEE' | 'RANGED';
+  /** Steady Hand: survivors the shooter keeps out of the friendly fire pool. */
+  protectedSurvivorIds?: EntityId[];
+  /** Barbarian: substitute the weapon's dice with the zombie count in the zone. */
+  useBarbarian?: boolean;
+}
+
+export interface ReloadPayload {
+  weaponId?: EntityId;
 }
 
 export interface OpenDoorPayload {
@@ -98,6 +114,10 @@ export interface OrganizePayload {
   targetSlot: string;
 }
 
+export interface DiscardCardPayload {
+  cardId: EntityId;
+}
+
 export interface TradeStartPayload {
   targetSurvivorId: EntityId;
 }
@@ -116,7 +136,9 @@ export interface ResolveWoundsPayload {
 
 export interface DistributeZombieWoundsPayload {
   zoneId: string;
-  assignments: Record<string, number>;  // survivorId -> number of wounds assigned
+  assignments: Record<string, number>;  // survivorId -> wounds (friendly fire: misses) assigned
+  /** Which pending entry this answers, when a zone holds more than one. */
+  contextId?: string;
 }
 
 export interface KickPlayerPayload {
@@ -140,17 +162,22 @@ export interface ActionPayloadMap {
   [ActionType.TRADE_ACCEPT]: TradeAcceptPayload;
   [ActionType.TRADE_CANCEL]: undefined;
   [ActionType.ORGANIZE]: OrganizePayload;
+  [ActionType.ORGANIZE_START]: undefined;
+  [ActionType.ORGANIZE_END]: undefined;
+  [ActionType.DISCARD_CARD]: DiscardCardPayload;
   [ActionType.CHOOSE_SKILL]: ChooseSkillPayload;
   [ActionType.RESOLVE_SEARCH]: ResolveSearchPayload;
   [ActionType.TAKE_OBJECTIVE]: undefined;
   [ActionType.TAKE_EPIC_CRATE]: undefined;
   [ActionType.SPRINT]: SprintPayload;
+  [ActionType.RELOAD]: ReloadPayload;
   [ActionType.USE_ITEM]: UseItemPayload;
-  [ActionType.NOTHING]: undefined;
   [ActionType.END_TURN]: undefined;
   [ActionType.CHARGE]: undefined;
   [ActionType.BORN_LEADER]: undefined;
   [ActionType.BLOODLUST_MELEE]: undefined;
+  [ActionType.JUMP]: SprintPayload;
+  [ActionType.SHOVE]: OpenDoorPayload;
   [ActionType.LIFESAVER]: undefined;
   [ActionType.RESOLVE_WOUNDS]: ResolveWoundsPayload;
   [ActionType.DISTRIBUTE_ZOMBIE_WOUNDS]: DistributeZombieWoundsPayload;

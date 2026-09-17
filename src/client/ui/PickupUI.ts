@@ -232,7 +232,12 @@ export class PickupUI {
 
       if (target.dataset.action === 'confirm-pickup' && this.ghostSlot) {
         for (const [cardId, slot] of this.localSlots) {
-          networkManager.sendAction({ playerId: this.survivor!.playerId, survivorId: this.survivor!.id, type: ActionType.ORGANIZE, payload: { cardId, targetSlot: slot } });
+          // A card the new one displaced out of the inventory is a discard, not
+          // a move: it has no slot to go to.
+          const action = slot === 'DISCARD'
+            ? { type: ActionType.DISCARD_CARD, payload: { cardId } }
+            : { type: ActionType.ORGANIZE, payload: { cardId, targetSlot: slot } };
+          networkManager.sendAction({ playerId: this.survivor!.playerId, survivorId: this.survivor!.id, ...action });
         }
         if (this.ghostSlot === 'DISCARD') {
           networkManager.sendAction({ playerId: this.survivor!.playerId, survivorId: this.survivor!.id, type: ActionType.RESOLVE_SEARCH, payload: { action: 'DISCARD' } });

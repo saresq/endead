@@ -138,11 +138,56 @@ Tiles without definitions default to all-street (everything merges).
 2. **Place tiles** - Select from palette, click to place, R to rotate
 3. **Rooms auto-populate** - Tile definitions create rooms automatically when tiles are placed
 4. **Add doors** - Use Door tool to connect buildings to streets
-5. **Place markers** - PlayerStart, ZombieSpawn, Exit, Objective
+5. **Place markers** - PlayerStart, ZombieSpawn, Exit, Objective (spawn order matters — see below)
 6. **Verify zones** - Overlay shows merged street zones and crosswalks
 7. **Save map** - Stores to SQLite via `/api/maps`
 
 Manual room painting is only needed to override tile definitions or merge rooms across tiles.
+
+### Spawn zone order is yours to set
+
+**The order you place spawn markers is the order they spawn in.** The editor paints
+a number on each one; that number is the sequence the Zombie Phase walks, and the
+board shows the same numbers in game.
+
+It matters because every spawn zone draws from one shared deck in turn, and a Rush
+card activates its zombies the moment they are placed. Which zone gets which card
+therefore depends on the order — zombies can appear, and attack, in a different
+place entirely.
+
+The rulebook (page 25) has the mission designer decide this: the Starting Spawn
+Zone spawns first, then the rest clockwise from it. Here you are the designer, so
+place the starting spawn zone first and continue clockwise. The engine does not
+infer it from geometry and deliberately never will.
+
+To change the order there is no renumber tool yet — delete the spawn markers and
+place them again in the sequence you want.
+
+## Map playability
+
+A map must be playable or it cannot be saved. `validateMapPlayability`
+(`src/services/MapPlayability.ts`) runs on the compiled scenario, so it checks
+what the game actually receives rather than what the markers look like. Three
+rules:
+
+1. **A player start zone.**
+2. **At least one spawn zone that is active on turn 1** — meaning a spawn zone
+   with no colour.
+3. **At least one win condition.**
+
+`POST /api/maps` refuses a map that fails and names the reasons; the editor shows
+them while you work; the lobby will not offer or preselect an unplayable map.
+
+**The trap is rule 2.** A coloured spawn zone (`ZOMBIE_SPAWN_BLUE`,
+`ZOMBIE_SPAWN_GREEN`) is dormant until its matching coloured objective is taken,
+per rulebook §9. A map whose *only* spawn is coloured spawns nothing from turn 1
+— the game looks alive and never sends a zombie. Always place at least one plain
+`ZOMBIE_SPAWN`.
+
+Note that markers merge with their zone: a plain `ZOMBIE_SPAWN` placed a few cells
+from a coloured one can compile into a single zone that inherits the colour,
+leaving you with no active spawn despite having placed one. Check the reasons the
+editor reports rather than the markers you placed.
 
 ## Persistence
 
@@ -150,6 +195,11 @@ Manual room painting is only needed to override tile definitions or merge rooms 
 |------|---------|-----|
 | Tile definitions | SQLite `tile_definitions` table | `GET/POST /api/tile-definitions` |
 | Maps | SQLite `maps` table | `GET/POST /api/maps` |
+
+**Writes need the editor secret.** Every create, replace and delete on those two
+endpoints requires `EDITOR_SECRET`; with none set they all return `401`, and the
+editor will not open without it. Reads stay public because the lobby needs them.
+Set `EDITOR_SECRET` locally when authoring maps — see `AGENTS.md`.
 
 On first server start, hardcoded tile definitions from `TileDefinitions.ts` are seeded into the database. Subsequent edits via the editor override these defaults.
 

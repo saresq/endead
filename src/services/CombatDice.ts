@@ -30,7 +30,12 @@ export interface AttackOptions {
   ammoReroll?: boolean;
   /** Reroll source label to attach if ammoReroll fires. */
   ammoSource?: Exclude<RerollSource, 'lucky'>;
+  /** Roll 6: +1 Die — each 6 grants another die, rolled after any re-roll. */
+  explodeOnSix?: boolean;
 }
+
+/** Guard against a pathological chain when every die keeps showing a 6. */
+const MAX_EXPLOSIONS = 50;
 
 /** Minimum accuracy per Zombicide 2E — auto-hits on any face are never allowed. */
 const MIN_THRESHOLD = 2;
@@ -47,8 +52,8 @@ function countHits(rolls: number[], threshold: number): number {
 
 /**
  * Roll an attack with the full pipeline: accuracy clamp → initial roll → optional
- * ammo-reroll on misses. Lucky is handled separately via `applyLuckyReroll` so it
- * stays a player-initiated decision (rule-faithful: commit to the new result).
+ * ammo-reroll on misses. A Lucky reroll is a fresh call from the restored
+ * pre-attack state, so it stays a player-initiated decision.
  */
 export function rollAttack(rng: Rng, opts: AttackOptions): AttackRollResult {
   const threshold = clampThreshold(opts.accuracy);
@@ -75,39 +80,25 @@ export function rollAttack(rng: Rng, opts: AttackOptions): AttackRollResult {
     }
   }
 
+  // Roll 6: +1 Die — "keep rolling as long as 6s appear", after re-rolls
+  // (rules/14-skills.md#roll-6-1-die-action). A die that reaches 6 through `diceBonus` counts too:
+  // the skill reads the result on the table.
+  if (opts.explodeOnSix) {
+    let pending = rolls.filter(r => r === 6).length;
+    let rolled = 0;
+    while (pending > 0 && rolled < MAX_EXPLOSIONS) {
+      const extra = rng.rollD6(Math.min(pending, MAX_EXPLOSIONS - rolled), threshold, bonus);
+      rolled += extra.rolls.length;
+      rolls = rolls.concat(extra.rolls);
+      pending = extra.rolls.filter(r => r === 6).length;
+    }
+  }
+
   return {
     rolls,
     hits: countHits(rolls, threshold),
     rerolledFrom,
     rerollSource,
     effectiveThreshold: threshold,
-  };
-}
-
-/**
- * Apply a player-initiated Lucky reroll. Produces a fresh full-count roll that
- * REPLACES the prior result, even if worse. `prev.rolls` is preserved in
- * `rerolledFrom` for the combat log; any ammo reroll that happened on the prior
- * attempt is discarded along with it.
- */
-export function applyLuckyReroll(
-  rng: Rng,
-  prev: AttackRollResult,
-  opts: { accuracy: number; diceBonus?: number; ammoReroll?: boolean; ammoSource?: Exclude<RerollSource, 'lucky'> },
-): AttackRollResult {
-  const fresh = rollAttack(rng, {
-    count: prev.rolls.length,
-    accuracy: opts.accuracy,
-    diceBonus: opts.diceBonus,
-    ammoReroll: opts.ammoReroll,
-    ammoSource: opts.ammoSource,
-  });
-
-  return {
-    rolls: fresh.rolls,
-    hits: fresh.hits,
-    rerolledFrom: prev.rolls,
-    rerollSource: 'lucky',
-    effectiveThreshold: fresh.effectiveThreshold,
   };
 }

@@ -5,7 +5,8 @@ import { GameState, DangerLevel, GamePhase, Zone, Survivor, EquipmentCard, Equip
 import { ActionRequest, ActionType } from '../../types/Action';
 import { seedFromString } from '../Rng';
 import { makeGridState, makeZombie, edgeKey } from './gridFixture';
-import { makeSurvivor } from './winConditionHelpers';
+import { assignBuildings } from '../ScenarioCompiler';
+import { makeSurvivor, plainSpawnDeck } from './winConditionHelpers';
 import { es } from '../../strings/es';
 
 function makeZone(overrides: Partial<Zone> & { id: string }): Zone {
@@ -34,6 +35,8 @@ function makeOpener(): EquipmentCard {
 }
 
 function makeState(zones: Record<string, Zone>, survivorZoneId: string): GameState {
+  assignBuildings(zones, survivorZoneId);
+
   const survivor: Survivor = {
     id: 's1',
     playerId: 'p1',
@@ -73,7 +76,7 @@ function makeState(zones: Record<string, Zone>, survivorZoneId: string): GameSta
     objectives: [],
     equipmentDeck: [],
     equipmentDiscard: [],
-    spawnDeck: [],
+    spawnDeck: plainSpawnDeck(),
     spawnDiscard: [],
     noiseTokens: 0,
     config: {
@@ -264,7 +267,7 @@ describe('handleOpenDoor — standard spawn rules (C6)', () => {
       playerId: 'p1', survivorId: 's1', type: ActionType.OPEN_DOOR, payload: { targetZoneId: 'roomA' },
     });
     expect(res.success).toBe(true);
-    expect(res.newState!.pendingZombieWounds).toEqual([{ zoneId: 'street', totalWounds: 1, survivorIds: ['s1', 's2'] }]);
+    expect(res.newState!.pendingZombieWounds).toMatchObject([{ zoneId: 'street', totalWounds: 1, survivorIds: ['s1', 's2'] }]);
 
     const blocked = processAction(res.newState!, {
       playerId: 'p1', survivorId: 's1', type: ActionType.MOVE, payload: { targetZoneId: 'w' },

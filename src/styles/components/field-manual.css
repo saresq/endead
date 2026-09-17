@@ -18,7 +18,7 @@
   border-left-color: var(--highlight);
   border-radius: var(--radius-sm);
   color: var(--text);
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   min-width: 0;
 }
 
@@ -152,7 +152,7 @@
   flex-direction: column;
   gap: 6px;
   color: var(--text);
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
 }
 
 .fm-photoslot__frame {

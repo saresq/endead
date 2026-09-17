@@ -1,13 +1,14 @@
 import { GameState, ObjectiveType, Objective } from '../../types/GameState';
 import { ActionRequest, ActionType } from '../../types/Action';
-import { Rng } from '../Rng';
+import { DeckService } from '../DeckService';
+import { resolveDrawnCard } from '../CardDraw';
 import { es, equipmentName } from '../../strings/es';
 
 /**
  * TAKE_EPIC_CRATE handler. Triggered when a survivor occupies a zone with a
  * red Epic Weapon Crate token and chooses to take it.
  *
- * Per RULEBOOK §14 / plan §4.3:
+ * Per rules/16-card-registry.md / plan §4.3:
  *  1. Validate the zone has an Epic Crate.
  *  2. Draw the top card from `epicDeck` (reshuffle from `epicDiscard` if empty).
  *  3. Place it in `survivor.drawnCard` so the existing search-resolution UI
@@ -32,18 +33,10 @@ export function handleTakeEpicCrate(state: GameState, intent: ActionRequest): Ga
 
   // Draw the top epic card (reshuffle from epicDiscard if empty).
   if (newState.epicDeck.length === 0 && newState.epicDiscard.length > 0) {
-    const rng = Rng.from(newState.seed);
-    // Fisher–Yates shuffle of epicDiscard back into epicDeck.
-    const shuffled = [...newState.epicDiscard];
-    for (let m = shuffled.length - 1; m > 0; m--) {
-      const i = rng.nextInt(m + 1);
-      const t = shuffled[m];
-      shuffled[m] = shuffled[i];
-      shuffled[i] = t;
-    }
-    newState.epicDeck = shuffled;
+    const reshuffled = DeckService.shuffleDeck(newState.epicDiscard, newState.seed);
+    newState.epicDeck = reshuffled.deck;
     newState.epicDiscard = [];
-    newState.seed = rng.snapshot();
+    newState.seed = reshuffled.newSeed;
   }
 
   const card = newState.epicDeck.shift();
@@ -55,8 +48,10 @@ export function handleTakeEpicCrate(state: GameState, intent: ActionRequest): Ga
   }
 
   // Stage the new card so the existing drawnCard UI lets the player slot it
-  // and freely reorganize the rest of the inventory.
-  survivor.drawnCard = card;
+  // and freely reorganize the rest of the inventory. An Aaahh!! in the Epic
+  // deck resolves as an Aaahh!! anywhere else does — Walker, discard, no
+  // inventory — which is why this goes through the shared resolution.
+  const outcome = resolveDrawnCard(newState, intent.survivorId!, card, { alwaysOffer: true });
 
   // Remove the Epic Crate token from the zone.
   zone.hasEpicCrate = false;
@@ -76,17 +71,9 @@ export function handleTakeEpicCrate(state: GameState, intent: ActionRequest): Ga
     playerId: intent.playerId,
     survivorId: intent.survivorId,
     timestamp: Date.now(),
-    description: es.log.epicWeapon(equipmentName(card)),
-    epicWeaponDrawn: card.equipmentId,
+    description: outcome === 'AAAHH' ? es.log.searchTrap : es.log.epicWeapon(equipmentName(card)),
+    epicWeaponDrawn: outcome === 'AAAHH' ? undefined : card.equipmentId,
   };
-
-  newState.history.push({
-    playerId: intent.playerId,
-    survivorId: intent.survivorId || 'system',
-    actionType: ActionType.TAKE_EPIC_CRATE,
-    timestamp: Date.now(),
-    payload: { zoneId: zone.id, equipmentId: card.equipmentId },
-  });
 
   return newState;
 }

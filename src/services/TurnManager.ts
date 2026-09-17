@@ -72,14 +72,20 @@ export function validateTurn(state: GameState, request: ActionRequest): ActionEr
       // Exception: Resolve Search/Pickup or Organize during Pickup is allowed with 0 actions
       const isPickupException = survivor.drawnCard && (request.type === 'RESOLVE_SEARCH' || request.type === 'ORGANIZE');
 
+      // Exception: an open reorganize session already paid its action, so its
+      // moves — and closing it — must still work at 0 actions.
+      const isReorganizeException = state.activeReorganize?.survivorId === request.survivorId
+        && (request.type === 'ORGANIZE' || request.type === 'ORGANIZE_END');
+
       // Check if survivor has a free action that covers this request
       const hasFreeAction = (
-        (request.type === 'MOVE' && survivor.freeMovesRemaining > 0) ||
+        ((request.type === 'MOVE' || request.type === 'SPRINT') && survivor.freeMovesRemaining > 0) ||
         (request.type === 'SEARCH' && survivor.freeSearchesRemaining > 0) ||
         (request.type === 'ATTACK' && (survivor.freeCombatsRemaining > 0 || survivor.freeMeleeRemaining > 0 || survivor.freeRangedRemaining > 0))
       );
 
-      if (survivor.actionsRemaining <= 0 && !isTradeException && !isPickupException && !hasFreeAction && !survivor.cheatMode) {
+      if (survivor.actionsRemaining <= 0 && !isTradeException && !isPickupException
+          && !isReorganizeException && !hasFreeAction && !survivor.cheatMode) {
         return {
           code: 'NO_ACTIONS',
           message: es.errors.noActionsLeft(survivor.name),
@@ -101,13 +107,13 @@ export function checkEndTurn(state: GameState): GameState {
   const activePlayerId = newState.players[newState.activePlayerIndex];
 
   // Do NOT auto-pass if the active player has a pending drawn card to resolve
-  // or if a Trade is active. A drawn card on a non-active player's survivor is
+  // or if a Trade or a reorganize session is open. A drawn card on a non-active player's survivor is
   // not the active player's responsibility and must not block their turn end.
   const activeDrawnCard = Object.values(newState.survivors).some(
     (s) => s.playerId === activePlayerId && s.drawnCard
   );
 
-  if (activeDrawnCard || newState.activeTrade) {
+  if (activeDrawnCard || newState.activeTrade || newState.activeReorganize) {
       return newState;
   }
   
@@ -141,44 +147,4 @@ export function checkEndTurn(state: GameState): GameState {
   }
 
   return newState;
-}
-
-/**
- * Advances the turn state after a successful action.
- * Handles:
- * - Decrementing action points
- * - Auto-ending player turn if all survivors are exhausted
- * - Auto-advancing to Zombie phase if all players are done
- */
-export function advanceTurnState(state: GameState, survivorId: string): GameState {
-  // Create a shallow copy of the state to modify
-  const newState: GameState = { ...state };
-  
-  // 1. Decrement Actions
-  // Clone survivors map and the specific survivor to avoid mutation
-  const newSurvivors = { ...newState.survivors };
-  const survivor = { ...newSurvivors[survivorId] };
-  
-  // Cheat mode — never decrement; keep actions topped up.
-  if (survivor.cheatMode) {
-    survivor.actionsRemaining = Math.max(survivor.actionsRemaining, survivor.actionsPerTurn);
-  } else {
-    // Ensure we don't go below 0, though validation should prevent this
-    survivor.actionsRemaining = Math.max(0, survivor.actionsRemaining - 1);
-  }
-  newSurvivors[survivorId] = survivor;
-  newState.survivors = newSurvivors;
-
-  // 2. Check for Turn End
-  return checkEndTurn(newState);
-}
-
-/**
- * Helper to check if the current phase allows player actions
- */
-export function canAct(state: GameState, playerId: string): boolean {
-  return (
-    state.phase === GamePhase.Players &&
-    state.players[state.activePlayerIndex] === playerId
-  );
 }

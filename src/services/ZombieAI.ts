@@ -7,7 +7,8 @@ export type ZombieActionType = 'ATTACK' | 'MOVE' | 'NONE';
 export interface ZombieAction {
   type: ZombieActionType;
   targetId?: string; // For Attack (Survivor ID)
-  toZoneId?: string; // For Move
+  /** For Move: every first step tied for shortest. A group splits between them. */
+  toZoneIds?: ZoneId[];
 }
 
 export class ZombieAI {
@@ -33,14 +34,14 @@ export class ZombieAI {
 
     // 2. Find Target Zone (Move)
     const targetZoneId = this.findTargetZone(state, currentZone);
-    
+
     if (targetZoneId && targetZoneId !== currentZone.id) {
-      const nextZoneId = this.getNextStep(state, currentZone.id, targetZoneId);
+      const nextZoneIds = this.getNextSteps(state, currentZone.id, targetZoneId);
       // No open path: zombies never open doors, so they stay put.
-      if (nextZoneId) {
+      if (nextZoneIds.length > 0) {
         return {
           type: 'MOVE',
-          toZoneId: nextZoneId
+          toZoneIds: nextZoneIds
         };
       }
     }
@@ -117,38 +118,46 @@ export class ZombieAI {
   }
 
   /**
-   * Returns the next zone to move to along the shortest path.
+   * Every first step that reaches `targetZoneId` as quickly as any other.
+   *
+   * Per rules/10-zombie-phase.md#splitting: a group facing equally short routes splits between them, so
+   * the answer is the whole tie, not the first connection the search happens to
+   * walk. Sorted, so the split is deterministic for a given board.
    */
-  private static getNextStep(state: GameState, startZoneId: ZoneId, targetZoneId: ZoneId): ZoneId | null {
-    // BFS to find path
-    const queue: { id: ZoneId; path: ZoneId[] }[] = [{ id: startZoneId, path: [] }];
-    const visited = new Set<string>();
-    visited.add(startZoneId);
+  private static getNextSteps(state: GameState, startZoneId: ZoneId, targetZoneId: ZoneId): ZoneId[] {
+    const distance = new Map<ZoneId, number>([[startZoneId, 0]]);
+    // Per visited zone: the first steps out of `startZoneId` that reach it in `distance` moves.
+    const firstSteps = new Map<ZoneId, Set<ZoneId>>();
+    const queue: ZoneId[] = [startZoneId];
 
     while (queue.length > 0) {
-      const { id, path } = queue.shift()!;
-
-      if (id === targetZoneId) {
-        return path[0]; // First step
-      }
-
+      const id = queue.shift()!;
       const zone = state.zones[id];
-      // Shuffle connected zones to avoid bias if deterministic shuffle is seeded, 
-      // but for now simple iteration.
-      for (const conn of zone.connections) {
-        const neighborId = conn.toZoneId;
-        if (!visited.has(neighborId)) {
-            // Edge-level door check: if door is closed on this edge, blocked
-            if (conn.hasDoor && !conn.doorOpen) {
-                continue; // Door closed, zombies can't pass
-            }
+      if (!zone) continue;
+      const next = distance.get(id)! + 1;
+      const stepsHere = id === startZoneId ? null : firstSteps.get(id)!;
 
-            visited.add(neighborId);
-            queue.push({ id: neighborId, path: [...path, neighborId] });
+      for (const conn of zone.connections) {
+        // Edge-level door check: zombies never open doors.
+        if (conn.hasDoor && !conn.doorOpen) continue;
+
+        const neighborId = conn.toZoneId;
+        const known = distance.get(neighborId);
+        if (known !== undefined && known !== next) continue;
+
+        const inbound = stepsHere ?? new Set<ZoneId>([neighborId]);
+        if (known === undefined) {
+          distance.set(neighborId, next);
+          firstSteps.set(neighborId, new Set(inbound));
+          queue.push(neighborId);
+        } else {
+          const merged = firstSteps.get(neighborId)!;
+          for (const step of inbound) merged.add(step);
         }
       }
     }
-    return null;
+
+    return [...(firstSteps.get(targetZoneId) ?? [])].sort();
   }
 
   private static findClosestZone(state: GameState, startId: string, targetIds: string[]): ZoneId {

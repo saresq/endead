@@ -1,16 +1,14 @@
 
 import { GameState, GamePhase, DangerLevel, Zombie, ZombieType, ZoneId, SpawnCard, SpawnDetail, Survivor } from '../types/GameState';
-import { ZombieAI, ZombieAction } from './ZombieAI';
+import { ZombieAI } from './ZombieAI';
 import { DeckService } from './DeckService';
-import { Rng } from './Rng';
 import { XPManager } from './XPManager';
+import { applyWound } from './Wounds';
+import { reloadAllWeapons, getZombieToughness } from './handlers/handlerUtils';
+import { DANGER_VALUES } from '../config/DangerValues';
 
-const DANGER_VALUES: Record<DangerLevel, number> = {
-  [DangerLevel.Blue]: 0,
-  [DangerLevel.Yellow]: 1,
-  [DangerLevel.Orange]: 2,
-  [DangerLevel.Red]: 3,
-};
+/** Monotonic id per zombie activation set — the instance Tough is spent against. */
+let nextActivationId = 1;
 
 export class ZombiePhaseManager {
 
@@ -48,25 +46,29 @@ export class ZombiePhaseManager {
   }
 
   private static isZombieDead(zombie: Zombie): boolean {
-    const toughness = this.getZombieToughness(zombie.type);
-    return zombie.wounds >= toughness;
+    return zombie.wounds >= getZombieToughness(zombie.type);
   }
 
-  private static getZombieToughness(type: ZombieType): number {
-    switch (type) {
-      case ZombieType.Walker: return 1;
-      case ZombieType.Runner: return 1;
-      case ZombieType.Brute: return 2;
-      case ZombieType.Abomination: return 3;
-    }
+  /** Ids of every living zombie of one type — what an extra activation acts on. */
+  private static idsOfType(state: GameState, type: ZombieType): string[] {
+    return Object.values(state.zombies)
+      .filter(z => z.type === type && !this.isZombieDead(z))
+      .map(z => z.id);
   }
 
   /**
    * Distributes accumulated zombie attacks per zone.
    * Single-survivor zones: apply wounds directly.
    * Multi-survivor zones: defer to player via pendingZombieWounds.
+   *
+   * `contextId` is the activation set the attacks came from — Tough ignores one
+   * wound per set, so entries from different sets are never merged.
    */
-  private static distributeZoneWounds(state: GameState, zoneAttacks: Record<string, number>): void {
+  private static distributeZoneWounds(
+    state: GameState,
+    zoneAttacks: Record<string, number>,
+    contextId: string,
+  ): void {
     for (const [zoneId, attackCount] of Object.entries(zoneAttacks)) {
       if (attackCount <= 0) continue;
 
@@ -78,15 +80,15 @@ export class ZombiePhaseManager {
 
       if (survivorsInZone.length === 1) {
         // Only one survivor — apply all wounds directly (no player choice needed)
-        for (let i = 0; i < attackCount; i++) {
-          this.applyZombieAttack(state, survivorsInZone[0].id);
-        }
+        applyWound(state, survivorsInZone[0].id, attackCount, { toughKey: contextId, record: true });
       } else {
         // Multiple survivors — players choose how to distribute wounds
         if (!state.pendingZombieWounds) {
           state.pendingZombieWounds = [];
         }
-        const existing = state.pendingZombieWounds.find(p => p.zoneId === zoneId);
+        const existing = state.pendingZombieWounds.find(
+          p => p.zoneId === zoneId && p.contextId === contextId,
+        );
         if (existing) {
           existing.totalWounds += attackCount;
         } else {
@@ -94,57 +96,11 @@ export class ZombiePhaseManager {
             zoneId,
             totalWounds: attackCount,
             survivorIds: survivorsInZone.map(s => s.id),
+            contextId,
           });
         }
       }
     }
-  }
-
-  /**
-   * Applies a zombie attack to a survivor, respecting Tough skill and armor.
-   * Used by activateZombieSet via distributeZoneWounds.
-   */
-  private static applyZombieAttack(state: GameState, targetId: string): void {
-    const survivor = state.survivors[targetId];
-    if (!survivor || survivor.wounds >= survivor.maxHealth) return;
-
-    // Tough skill: ignore first wound per zombie Attack Step (independent from FF)
-    if (survivor.skills?.includes('tough') && !survivor.toughUsedZombieAttack) {
-      survivor.toughUsedZombieAttack = true;
-      return; // Wound absorbed
-    }
-
-    // "Is That All You've Got?" — survivor can discard equipment to negate wounds
-    if (survivor.skills?.includes('is_that_all_youve_got') && survivor.inventory.length > 0) {
-      survivor.pendingWounds = (survivor.pendingWounds || 0) + 1;
-      return; // Defer wound application until player resolves via UI picker
-    }
-
-    survivor.wounds += 1;
-    this.recordZombieWound(state, survivor);
-
-    // Handle death: drop equipment, zero out actions
-    if (survivor.wounds >= survivor.maxHealth) {
-      for (const card of survivor.inventory) {
-        state.equipmentDiscard.push(card);
-      }
-      survivor.inventory = [];
-      if (survivor.drawnCard) {
-        state.equipmentDiscard.push(survivor.drawnCard);
-        survivor.drawnCard = undefined;
-      }
-      survivor.actionsRemaining = 0;
-    }
-  }
-
-  /** Adds one wound to this phase's record. No-op outside a zombie phase. */
-  private static recordZombieWound(state: GameState, survivor: Survivor): void {
-    const wounds = state.spawnContext?.zombieWounds;
-    if (!wounds || state.phase !== GamePhase.Zombies) return;
-    const zoneId = survivor.position.zoneId;
-    const rec = wounds.find(w => w.survivorId === survivor.id && w.zoneId === zoneId);
-    if (rec) rec.amount += 1;
-    else wounds.push({ survivorId: survivor.id, zoneId, amount: 1 });
   }
 
   private static processSpawns(state: GameState): GameState {
@@ -160,7 +116,7 @@ export class ZombiePhaseManager {
     const spawnZones = orderedSpawnIds
       .map(id => newState.zones[id])
       .filter(z => z && z.spawnPoint)
-      // Per RULEBOOK §9: dormant colored Spawn Zones receive no spawn until the
+      // Per rules/10-zombie-phase.md#colored-spawn-zones: dormant colored Spawn Zones receive no spawn until the
       // turn AFTER their matching colored Objective is taken. The strict-greater
       // gate skips turn N (when activation happened) and lets turn N+1 spawn.
       // `state.turn` increments in `endRound()` AFTER processSpawns, so during
@@ -212,13 +168,6 @@ export class ZombiePhaseManager {
   }
 
   /**
-   * Counts living zombies of a given type currently on the board.
-   */
-  private static countZombiesOfType(state: GameState, type: ZombieType): number {
-    return Object.values(state.zombies).filter(z => z.type === type && !this.isZombieDead(z)).length;
-  }
-
-  /**
    * Activates a set of zombies per Zombicide v2 rulebook §9. Used by the
    * Activation Step, Extra Activation cards, Rush and pool exhaustion.
    * Pass 1: ALL attacks. Pass 2: moves of zombies that didn't attack.
@@ -228,6 +177,10 @@ export class ZombiePhaseManager {
    * them in pendingZombieWounds for the host to distribute.
    */
   private static activateZombieSet(state: GameState, zombieIds: string[]): void {
+    // One Tough instance per activation: the first pass and the Runners' second
+    // action are the same attack step, a later extra activation is a new one.
+    const contextId = `zombie-step-${state.turn}-${nextActivationId++}`;
+
     const getZombies = () => zombieIds
       .map(id => state.zombies[id])
       .filter(z => z && !this.isZombieDead(z))
@@ -244,32 +197,47 @@ export class ZombiePhaseManager {
         attackedSet.add(zombie.id);
       }
     }
-    this.distributeZoneWounds(state, pass1Attacks);
+    this.distributeZoneWounds(state, pass1Attacks, contextId);
 
-    // Pass 2: moves (only non-attackers)
+    // Pass 2: moves (only non-attackers). A group facing equally short routes
+    // splits between them, evenly per type (rules/10-zombie-phase.md#splitting).
+    const routeCursor = new Map<string, number>();
     for (const zombie of getZombies()) {
       if (attackedSet.has(zombie.id)) continue;
       const action = ZombieAI.getAction(state, zombie);
-      if (action.type === 'MOVE' && action.toZoneId) {
-        zombie.position.zoneId = action.toZoneId;
-      }
+      if (action.type === 'MOVE') this.stepZombie(zombie, action.toZoneIds, routeCursor);
     }
 
     // Runner second actions
     const hasRunners = getZombies().some(z => z.type === ZombieType.Runner);
     if (hasRunners) {
       const runnerAttacks: Record<string, number> = {};
+      const runnerCursor = new Map<string, number>();
       for (const zombie of getZombies()) {
         if (zombie.type !== ZombieType.Runner) continue;
         const action = ZombieAI.getAction(state, zombie);
         if (action.type === 'ATTACK') {
           runnerAttacks[zombie.position.zoneId] = (runnerAttacks[zombie.position.zoneId] || 0) + 1;
-        } else if (action.type === 'MOVE' && action.toZoneId) {
-          zombie.position.zoneId = action.toZoneId;
+        } else if (action.type === 'MOVE') {
+          this.stepZombie(zombie, action.toZoneIds, runnerCursor);
         }
       }
-      this.distributeZoneWounds(state, runnerAttacks);
+      this.distributeZoneWounds(state, runnerAttacks, contextId);
     }
+  }
+
+  /**
+   * Moves one zombie along one of its shortest routes. When several are tied,
+   * the zone's zombies of that type are dealt round-robin between them, so the
+   * group splits evenly instead of all following the same edge.
+   */
+  private static stepZombie(zombie: Zombie, options: ZoneId[] | undefined, cursor: Map<string, number>): void {
+    if (!options?.length) return;
+
+    const key = `${zombie.position.zoneId}|${zombie.type}`;
+    const taken = cursor.get(key) ?? 0;
+    cursor.set(key, taken + 1);
+    zombie.position.zoneId = options[taken % options.length];
   }
 
   public static applySpawnDetail(state: GameState, zoneId: ZoneId, detail: SpawnDetail) {
@@ -277,11 +245,7 @@ export class ZombiePhaseManager {
       // Per rulebook §9/§15: Extra Activation cards have no effect at Blue Danger Level
       if (detail.extraActivation) {
          if (state.currentDangerLevel === DangerLevel.Blue) return;
-         const targetType = detail.extraActivation;
-         const zombieIds = Object.values(state.zombies)
-           .filter(z => z.type === targetType && !this.isZombieDead(z))
-           .map(z => z.id);
-         this.activateZombieSet(state, zombieIds);
+         this.activateZombieSet(state, this.idsOfType(state, detail.extraActivation));
          return;
       }
 
@@ -296,14 +260,11 @@ export class ZombiePhaseManager {
             // activate once here, so pool exhaustion must not activate them again.
             let festActivated = false;
             if (zombieType === ZombieType.Abomination) {
-              const activeAbomCount = this.countZombiesOfType(state, ZombieType.Abomination);
+              const activeAbomCount = this.idsOfType(state, ZombieType.Abomination).length;
 
               if (activeAbomCount > 0) {
                 // Extra activation of all existing Abominations
-                const abomIds = Object.values(state.zombies)
-                  .filter(z => z.type === ZombieType.Abomination && !this.isZombieDead(z))
-                  .map(z => z.id);
-                this.activateZombieSet(state, abomIds);
+                this.activateZombieSet(state, this.idsOfType(state, ZombieType.Abomination));
 
                 // Abomination Fest: also spawn the new one after activation
                 if (!state.config.abominationFest) continue;
@@ -313,16 +274,13 @@ export class ZombiePhaseManager {
 
             // Pool exhaustion check
             const poolLimit = state.config.zombiePool?.[zombieType] ?? Infinity;
-            const currentCount = this.countZombiesOfType(state, zombieType);
+            const currentCount = this.idsOfType(state, zombieType).length;
             const available = Math.max(0, poolLimit - currentCount);
 
             if (available === 0) {
               // Pool exhausted: extra activation of all zombies of that type instead
               if (festActivated) continue;
-              const typeIds = Object.values(state.zombies)
-                .filter(z => z.type === zombieType && !this.isZombieDead(z))
-                .map(z => z.id);
-              this.activateZombieSet(state, typeIds);
+              this.activateZombieSet(state, this.idsOfType(state, zombieType));
               continue;
             }
 
@@ -335,10 +293,7 @@ export class ZombiePhaseManager {
 
             // If we couldn't place all, trigger extra activation for that type
             if (toSpawn < (count as number) && !festActivated) {
-              const typeIds = Object.values(state.zombies)
-                .filter(z => z.type === zombieType && !this.isZombieDead(z))
-                .map(z => z.id);
-              this.activateZombieSet(state, typeIds);
+              this.activateZombieSet(state, this.idsOfType(state, zombieType));
             }
          }
 
@@ -350,11 +305,6 @@ export class ZombiePhaseManager {
   }
 
   public static spawnZombie(state: GameState, zoneId: ZoneId, type: ZombieType) {
-    // Advance RNG to keep deterministic replay parity with prior implementation.
-    const rng = Rng.from(state.seed);
-    rng.nextU32();
-    state.seed = rng.snapshot();
-
     // Generate unique ID using monotonic counter
     const zombieNum = state.nextZombieId ?? 1;
     state.nextZombieId = zombieNum + 1;
@@ -404,6 +354,9 @@ export class ZombiePhaseManager {
     for (const zoneId in newState.zones) {
       newState.zones[zoneId].noiseTokens = 0;
     }
+
+    // 2a. Reload — every `reload` weapon is loaded again for free
+    reloadAllWeapons(newState);
 
     // 2b. Medic Healing — free during End Phase
     // Medic earns 1 AP per wound healed
