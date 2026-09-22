@@ -3,7 +3,8 @@
  *
  * Used in lobby character select and similar. Shows a diagonal-striped
  * placeholder (or an `<img>` when an imageUrl is provided), four corner
- * notches, optional amber "selected" dot, and an optional caption.
+ * notches, optional amber "selected" dot, and an optional caption — under
+ * the frame, or as a comic caption band across the bottom of the portrait.
  *
  * Usage:
  *   renderPhotoSlot({ size: 'md', name: 'Wanda', role: 'Exploradora', selected: true })
@@ -19,6 +20,8 @@ export interface PhotoSlotOptions {
   role?: string;
   selected?: boolean;
   imageUrl?: string;
+  /** `band` lays the caption across the bottom of the portrait. Default `below`. */
+  captionPlacement?: 'below' | 'band';
 }
 
 function escapeHtml(s: string): string {
@@ -33,10 +36,12 @@ export function renderPhotoSlot(opts: PhotoSlotOptions): string {
   const size = opts.size ?? 'md';
   const selected = opts.selected ?? false;
 
+  const inBand = opts.captionPlacement === 'band';
   const rootClass = [
     'fm-photoslot',
     `fm-photoslot--${size}`,
     selected ? 'fm-photoslot--selected' : '',
+    inBand ? 'fm-photoslot--band' : '',
   ].filter(Boolean).join(' ');
 
   const frameInner = opts.imageUrl
@@ -57,7 +62,7 @@ export function renderPhotoSlot(opts: PhotoSlotOptions): string {
   const hasCaption = !!(opts.name || opts.role);
   const captionHtml = hasCaption
     ? `
-      <div class="fm-photoslot__caption">
+      <div class="${inBand ? 'fm-photoslot__band' : 'fm-photoslot__caption'}">
         ${opts.name ? `<div class="fm-photoslot__name">${escapeHtml(opts.name)}</div>` : ''}
         ${opts.role ? `<div class="fm-photoslot__role">${escapeHtml(opts.role)}</div>` : ''}
       </div>
@@ -70,8 +75,9 @@ export function renderPhotoSlot(opts: PhotoSlotOptions): string {
         ${frameInner}
         ${cornersHtml}
         ${selectedDotHtml}
+        ${inBand ? captionHtml : ''}
       </div>
-      ${captionHtml}
+      ${inBand ? '' : captionHtml}
     </div>
   `;
 }

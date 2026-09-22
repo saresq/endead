@@ -46,6 +46,13 @@ function roleFor(charClass: string): string {
   return es.roles[charClass] ?? es.common.survivor;
 }
 
+type TakenBy = { name: string; seat: number };
+
+// Where a panel mounts. `top`/`main`/`side` sit inside the scrolling stack;
+// `dock` is pinned under it so the start button never scrolls away.
+type LobbySlot = 'top' | 'main' | 'side' | 'dock';
+const LOBBY_SLOTS: LobbySlot[] = ['top', 'main', 'side', 'dock'];
+
 // Host-left banner countdown duration (ms). Drives the rust banner's
 // 3 → 2 → 1 chip while the next operative is promoted to host.
 const HOST_LEFT_COUNTDOWN_SECONDS = 3;
@@ -344,9 +351,15 @@ export class LobbyUI {
     const isHost = players.length > 0 && players[0].id === this.localPlayerId;
     const myPlayer = players.find(p => p.id === this.localPlayerId);
 
-    const takenClasses = new Map<string, string>();
-    players.forEach(p => {
-      if (p.characterClass) takenClasses.set(p.characterClass, displayName(p.name, p.characterClass));
+    // Who holds each character, and their seat (lobby order = player colour).
+    const takenClasses = new Map<string, TakenBy>();
+    players.forEach((p, seat) => {
+      if (!p.characterClass) return;
+      // A generated id resolves to the class itself, which would just repeat
+      // the portrait's own name; fall back to "Jugador N".
+      const shown = displayName(p.name, p.characterClass);
+      const name = shown === p.characterClass ? `${es.lobby.playerFallback} ${seat + 1}` : shown;
+      takenClasses.set(p.characterClass, { name, seat });
     });
 
     const abomFest = !!(this.state.config?.abominationFest ?? this.abominationFest);
@@ -357,49 +370,48 @@ export class LobbyUI {
     const allReady = players.length > 0 && players.every(p => isLoadoutComplete(p));
 
     // Build the list of panels for this render pass. Each entry is a
-    // stable key + its HTML output; we only swap DOM for keys whose
-    // HTML actually changed since the last render. Order is the
-    // portrait order; the landscape grid places panels via grid-area.
-    const panels: Array<{ key: string; html: string }> = [];
+    // stable key, the slot it lives in, and its HTML output; we only swap
+    // DOM for keys whose HTML actually changed since the last render.
+    // Slot order below is the multi-column reading order; the portrait
+    // order comes from CSS `order` (the slots are `display: contents`).
+    const panels: Array<{ key: string; slot: LobbySlot; html: string }> = [];
     const hostId = players[0]?.id ?? null;
-    if (this.hostLeftActive) panels.push({ key: 'hostLeftBanner', html: this.renderHostLeftBanner() });
-    panels.push({ key: 'invite', html: this.renderInvitePanel() });
-    panels.push({ key: 'you', html: this.renderYouPanel(myPlayer ?? null, myChar, takenClasses, players) });
-    panels.push({ key: 'players', html: this.renderPlayersPanel(players, hostId) });
-    panels.push({ key: 'map', html: this.renderMapPanel(selectedMap, isHost) });
-    panels.push({ key: 'options', html: this.renderOptionsPanel(abomFest, isHost) });
-    panels.push({ key: 'footer', html: this.renderFooterPanel(isHost, allReady) });
+    if (this.hostLeftActive) panels.push({ key: 'hostLeftBanner', slot: 'top', html: this.renderHostLeftBanner() });
+    panels.push({ key: 'you', slot: 'main', html: this.renderYouPanel(myPlayer ?? null, myChar, takenClasses) });
+    if (myPlayer) panels.push({ key: 'loadout', slot: 'main', html: this.renderLoadoutPanel(myPlayer.id, myChar, players) });
+    panels.push({ key: 'invite', slot: 'side', html: this.renderInvitePanel() });
+    panels.push({ key: 'players', slot: 'side', html: this.renderPlayersPanel(players, hostId) });
+    panels.push({ key: 'map', slot: 'side', html: this.renderMapPanel(selectedMap, isHost) });
+    panels.push({ key: 'options', slot: 'side', html: this.renderOptionsPanel(abomFest, isHost) });
+    panels.push({ key: 'footer', slot: 'dock', html: this.renderFooterPanel(isHost, allReady) });
 
-    let stack = this.container.querySelector('.lobby__stack') as HTMLElement | null;
-    if (!stack || stack.querySelector(':scope > .lobby-panel--waiting')) {
-      stack = document.createElement('div');
-      stack.className = 'lobby__stack';
-      this.container.innerHTML = '';
-      this.container.appendChild(stack);
-      this.panelCache = {};
-    }
+    const slots = this.ensureSlots();
 
     // Capture focus + typed value on the name input so we can restore
     // them if (and only if) the `you` panel is actually replaced.
     const activeEl = document.activeElement;
-    const nicknameBefore = stack.querySelector('#lobby-nickname') as HTMLInputElement | null;
+    const nicknameBefore = this.container.querySelector('#lobby-nickname') as HTMLInputElement | null;
     const hadFocus = !!nicknameBefore && activeEl === nicknameBefore;
     const prevCursor = nicknameBefore?.selectionStart ?? null;
     const prevValue = nicknameBefore?.value ?? null;
 
-    const liveKeys = new Set(panels.map(p => p.key));
-    Array.from(stack.children).forEach(child => {
-      const k = (child as HTMLElement).dataset.panel;
-      if (!k || !liveKeys.has(k)) {
-        if (k) delete this.panelCache[k];
-        child.remove();
-      }
-    });
+    const liveKeys = new Set(panels.map(p => `${p.slot}:${p.key}`));
+    for (const [slotName, slotEl] of Object.entries(slots)) {
+      Array.from(slotEl.children).forEach(child => {
+        const k = (child as HTMLElement).dataset.panel;
+        if (!k || !liveKeys.has(`${slotName}:${k}`)) {
+          if (k) delete this.panelCache[k];
+          child.remove();
+        }
+      });
+    }
 
     const rerendered = new Set<string>();
-    let prevEl: Element | null = null;
+    const prevBySlot: Partial<Record<LobbySlot, Element>> = {};
     for (const p of panels) {
-      let existing = stack.querySelector(`:scope > [data-panel="${p.key}"]`) as HTMLElement | null;
+      const slotEl = slots[p.slot];
+      const prevEl = prevBySlot[p.slot] ?? null;
+      let existing = slotEl.querySelector(`:scope > [data-panel="${p.key}"]`) as HTMLElement | null;
       const cached = this.panelCache[p.key];
 
       if (!existing) {
@@ -411,7 +423,7 @@ export class LobbyUI {
         fresh.setAttribute('data-panel', p.key);
 
         if (prevEl) prevEl.after(fresh);
-        else stack.prepend(fresh);
+        else slotEl.prepend(fresh);
         existing = fresh;
         this.panelCache[p.key] = p.html;
         rerendered.add(p.key);
@@ -434,15 +446,15 @@ export class LobbyUI {
         existing.innerHTML = fresh.innerHTML;
         this.panelCache[p.key] = p.html;
         rerendered.add(p.key);
-      } else if (prevEl ? existing.previousElementSibling !== prevEl : existing !== stack.firstElementChild) {
+      } else if (prevEl ? existing.previousElementSibling !== prevEl : existing !== slotEl.firstElementChild) {
         if (prevEl) prevEl.after(existing);
-        else stack.prepend(existing);
+        else slotEl.prepend(existing);
       }
-      prevEl = existing;
+      prevBySlot[p.slot] = existing;
     }
 
     if (hadFocus && rerendered.has('you')) {
-      const nextInput = stack.querySelector('#lobby-nickname') as HTMLInputElement | null;
+      const nextInput = this.container.querySelector('#lobby-nickname') as HTMLInputElement | null;
       if (nextInput) {
         // The panel may re-render because someone picked a character
         // while this player is typing; keep what they typed.
@@ -453,11 +465,11 @@ export class LobbyUI {
     }
 
     if (rerendered.has('map')) {
-      const mapSelect = stack.querySelector('#lobby-map-select') as HTMLSelectElement | null;
+      const mapSelect = this.container.querySelector('#lobby-map-select') as HTMLSelectElement | null;
       if (mapSelect && this.selectedMapId) mapSelect.value = this.selectedMapId;
     }
     if (rerendered.has('options')) {
-      const abomCheck = stack.querySelector('#lobby-abom-fest') as HTMLInputElement | null;
+      const abomCheck = this.container.querySelector('#lobby-abom-fest') as HTMLInputElement | null;
       if (abomCheck) abomCheck.checked = this.abominationFest;
     }
 
@@ -489,6 +501,29 @@ export class LobbyUI {
     } else if (scrimEl) {
       scrimEl.remove();
     }
+  }
+
+  /**
+   * Mounts the stack (top, main and side columns) and the footer dock once,
+   * replacing the "connecting" placeholder, and returns the slot elements.
+   */
+  private ensureSlots(): Record<LobbySlot, HTMLElement> {
+    const find = (slot: LobbySlot) =>
+      this.container.querySelector(`[data-slot="${slot}"]`) as HTMLElement | null;
+    if (LOBBY_SLOTS.every(find)) {
+      return Object.fromEntries(LOBBY_SLOTS.map(slot => [slot, find(slot)!])) as Record<LobbySlot, HTMLElement>;
+    }
+
+    this.container.innerHTML = `
+      <div class="lobby__stack">
+        <div class="lobby__slot lobby__slot--top" data-slot="top"></div>
+        <div class="lobby__slot lobby__slot--main" data-slot="main"></div>
+        <div class="lobby__slot lobby__slot--side" data-slot="side"></div>
+      </div>
+      <div class="lobby__dock" data-slot="dock"></div>
+    `;
+    this.panelCache = {};
+    return Object.fromEntries(LOBBY_SLOTS.map(slot => [slot, find(slot)!])) as Record<LobbySlot, HTMLElement>;
   }
 
   // ─── Panel renderers ─────────────────────────────────────────
@@ -630,20 +665,20 @@ export class LobbyUI {
     `;
   }
 
-  /** Name input + character grid + starting weapon grid. */
+  /** Name input + character grid. */
   private renderYouPanel(
     myPlayer: { id: PlayerId; name: string } | null,
     myChar: string | null,
-    takenClasses: Map<string, string>,
-    players: { id: PlayerId; startingWeapon?: string }[],
+    takenClasses: Map<string, TakenBy>,
   ): string {
     const t = es.lobby;
     const characterKeys = Object.keys(CHARACTER_DEFINITIONS);
 
     const cells = characterKeys.map(name => {
       const isSelected = myChar === name;
-      const takenByOther = takenClasses.has(name) && !isSelected;
-      const takenByName = takenClasses.get(name) ?? '';
+      const taken = takenClasses.get(name);
+      const takenByOther = !!taken && !isSelected;
+      const takenByName = taken?.name ?? '';
 
       const cellClass = [
         'lobby-roster__cell',
@@ -651,6 +686,11 @@ export class LobbyUI {
         takenByOther ? 'lobby-roster__cell--taken' : '',
       ].filter(Boolean).join(' ');
 
+      // A taken portrait wears its picker's player colour (player-avatar.css
+      // uses the same seat → --player-N mapping).
+      const takerStyle = takenByOther
+        ? ` style="--taker: var(--player-${(taken!.seat % MAX_SQUAD) + 1})"`
+        : '';
       const takenOverlay = takenByOther
         ? `<div class="lobby-roster__taken-label" aria-hidden="true">${this.escHtml(takenByName)}</div>`
         : '';
@@ -659,7 +699,7 @@ export class LobbyUI {
       return `
         <button
           type="button"
-          class="${cellClass}"
+          class="${cellClass}"${takerStyle}
           data-action="select-class"
           data-id="${this.escHtml(name)}"
           ${takenByOther ? 'disabled' : ''}
@@ -673,6 +713,7 @@ export class LobbyUI {
             role: roleFor(name),
             selected: isSelected,
             imageUrl: characterImageUrl(name),
+            captionPlacement: 'band',
           })}
           ${takenOverlay}
         </button>
@@ -703,8 +744,20 @@ export class LobbyUI {
         <div class="lobby-roster" role="radiogroup" aria-labelledby="lobby-pick-title">
           ${cells}
         </div>
+      </section>
+    `;
+  }
+
+  /** Picked survivor's dossier strip + starting weapon grid. */
+  private renderLoadoutPanel(
+    myPlayerId: PlayerId,
+    myChar: string | null,
+    players: { id: PlayerId; startingWeapon?: string }[],
+  ): string {
+    return `
+      <section class="fm-panel lobby-panel lobby-panel--loadout">
         ${myChar ? renderLobbyDossierStrip(myChar, roleFor(myChar)) : ''}
-        ${this.renderArmory(myPlayer?.id ?? null, players)}
+        ${this.renderArmory(myPlayerId, players)}
       </section>
     `;
   }
@@ -715,13 +768,20 @@ export class LobbyUI {
    * (rules/16-card-registry.md#starting-equipment-6-cards-grey-backs).
    */
   private renderArmory(
-    myPlayerId: PlayerId | null,
+    myPlayerId: PlayerId,
     players: { id: PlayerId; startingWeapon?: string }[],
   ): string {
-    if (!myPlayerId) return '';
     const t = es.lobby;
 
-    const cells = weaponOptions(players, myPlayerId).map(option => {
+    // Door-opening weapons carry an extra line, so group them: in the
+    // two-column grid they then share a row and the plain cards stay short.
+    const options = weaponOptions(players, myPlayerId);
+    const ordered = [
+      ...options.filter(o => !o.card.canOpenDoor),
+      ...options.filter(o => o.card.canOpenDoor),
+    ];
+
+    const cells = ordered.map(option => {
       const name = equipmentName(option.card);
       const gone = option.remaining <= 0;
       const cellClass = [
@@ -735,9 +795,12 @@ export class LobbyUI {
       else if (gone) supply = t.weaponGone;
       else supply = t.weaponLeft(option.remaining);
 
-      const doorTag = option.card.canOpenDoor
-        ? `<span class="lobby-armory__tag">${this.escHtml(t.opensDoors)}</span>`
-        : '';
+      const opensDoor = !!option.card.canOpenDoor;
+      const noisyDoor = opensDoor && !!option.card.openDoorNoise;
+      const doorTrait = opensDoor
+        ? { icon: 'DoorOpen', label: t.opensDoors, note: noisyDoor ? t.opensDoorsNoisy : undefined }
+        : undefined;
+      const doorAria = opensDoor ? `, ${t.opensDoorsAria(noisyDoor)}` : '';
 
       return `
         <button
@@ -748,12 +811,11 @@ export class LobbyUI {
           ${gone ? 'disabled' : ''}
           role="radio"
           aria-checked="${option.mine}"
-          aria-label="${this.escHtml(gone ? t.weaponGoneAria(name) : t.pickWeaponAria(name))}"
+          aria-label="${this.escHtml((gone ? t.weaponGoneAria(name) : t.pickWeaponAria(name)) + doorAria)}"
         >
-          ${renderItemCard(option.card, { variant: 'weapon', showSlot: false })}
+          ${renderItemCard(option.card, { variant: 'weapon', showSlot: false, trait: doorTrait })}
           <div class="lobby-armory__meta">
-            ${doorTag}
-            <span class="lobby-armory__supply fm-mono">${this.escHtml(supply)}</span>
+            <span class="lobby-armory__supply">${this.escHtml(supply)}</span>
           </div>
         </button>
       `;
@@ -828,10 +890,9 @@ export class LobbyUI {
             ${disabledAttr}
           />
           <div class="lobby-roe__text">
-            <div class="fm-stencil lobby-roe__title">${this.escHtml(rule.title)}</div>
-            <div class="lobby-roe__desc fm-mono">${this.escHtml(rule.description)}</div>
+            <div class="fm-stencil lobby-roe__title"><span>${this.escHtml(rule.title)}</span><span class="${chipVariant} lobby-roe__tag">${this.escHtml(rule.riskLabel)}</span></div>
+            <div class="lobby-roe__desc">${this.escHtml(rule.description)}</div>
           </div>
-          <span class="${chipVariant} lobby-roe__tag">${this.escHtml(rule.riskLabel)}</span>
         </label>
       `;
     }).join('');

@@ -125,8 +125,8 @@
   border-radius: var(--radius-sm);
   color: var(--text);
   font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.12em;
+  font-size: 14px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
   flex-shrink: 0;
@@ -163,15 +163,15 @@
 
 .hud-phaseindicator__bracket {
   font-family: var(--font-stencil);
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1;
   color: var(--text-muted);
 }
 
 .hud-phaseindicator__label {
   font-family: var(--font-stencil);
-  font-size: 11px;
-  letter-spacing: 0.16em;
+  font-size: 14px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text);
   white-space: nowrap;
@@ -199,10 +199,37 @@
   background: var(--ink);
 }
 
+/* Compact phase readout: player-colour dot + survivor name. Hidden except on
+   very small phones (see the max-width: 380px sheet rules). */
+.hud-phaseindicator__compact {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-family: var(--font-stencil);
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hud-phaseindicator__dot {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--dot, var(--text-muted));
+  border: 2px solid var(--ink);
+}
+
 /* Portrait phones: the ticks are decorative, and the level word carries the
    pill on its own once "Peligro" is dropped — the fill already says which. */
 #game-hud[data-layout="sheet"] .hud-danger__label,
+#game-hud[data-layout="sheet"] .hud-phaseindicator__bracket,
 #game-hud[data-layout="sheet"] .hud-phaseindicator__ticks { display: none; }
+#game-hud[data-layout="sheet"] .hud-phaseindicator__label { letter-spacing: 0.02em; }
 
 /* Danger chip — filled with the current danger accent. */
 /* Danger pill — the one sizable readout of the current danger level, filled
@@ -217,13 +244,13 @@
   border-radius: var(--radius-sm);
   color: var(--dl-accent-text);
   font-family: var(--font-ui);
-  font-size: 10px;
+  font-size: 14px;
   text-transform: uppercase;
   white-space: nowrap;
 }
 
-.hud-danger__label { font-weight: var(--font-medium); letter-spacing: 0.16em; }
-.hud-danger__level { font-weight: var(--font-bold); letter-spacing: 0.1em; }
+.hud-danger__label { font-weight: var(--font-medium); letter-spacing: 0.08em; }
+.hud-danger__level { font-weight: var(--font-bold); letter-spacing: 0.08em; }
 
 .hud-iconbtn {
   display: inline-flex;
@@ -265,9 +292,9 @@
 /* Turn line under the operative name (sheet header, rail op card). */
 .hud-turnline {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 14px;
   line-height: 1.2;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-2);
   white-space: nowrap;
@@ -397,7 +424,7 @@
   padding: var(--space-2, 8px) var(--space-3, 12px);
   border-radius: var(--radius);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 14px;
   box-shadow: var(--shadow);
   position: relative;
 }
@@ -413,15 +440,15 @@
   margin-bottom: 4px;
 }
 
-.event-entry__desc { color: var(--text); font-size: 11px; letter-spacing: 0.02em; }
+.event-entry__desc { color: var(--text); font-size: 14px; letter-spacing: 0.02em; }
 
 .event-entry__dice {
   display: flex; align-items: center; gap: 4px;
   margin-top: 4px; flex-wrap: wrap;
 }
 
-.event-entry__hits { font-size: 10px; color: var(--success); margin-left: 4px; letter-spacing: 0.04em; font-weight: 700; }
-.event-entry__miss { font-size: 10px; color: var(--accent-text); margin-left: 4px; letter-spacing: 0.12em; font-weight: 700; }
+.event-entry__hits { font-size: 14px; color: var(--success); margin-left: 4px; letter-spacing: 0.04em; font-weight: 700; }
+.event-entry__miss { font-size: 14px; color: var(--accent-text); margin-left: 4px; letter-spacing: 0.08em; font-weight: 700; }
 
 /* d6 face: 3x3 pip grid, data-face picks the visible pips. */
 .die {
@@ -436,7 +463,7 @@
   background: var(--paper-3);
   border: 1px solid var(--ink);
   border-radius: calc(var(--size) * 0.18);
-  color: var(--ink);
+  color: var(--text);
 }
 .die i {
   display: block;
@@ -475,32 +502,32 @@
 
 .event-entry__zone {
   font-family: var(--font-stencil);
-  font-size: 10px; color: var(--text-2); letter-spacing: 0.1em; text-transform: uppercase;
+  font-size: 14px; color: var(--text-2); letter-spacing: 0.08em; text-transform: uppercase;
 }
 
 .event-entry__rush {
   display: inline-block; padding: 1px 5px; margin-left: 4px;
   background: var(--danger-orange-soft); color: var(--danger-orange);
   border: 1px solid var(--danger-orange); border-radius: var(--radius-sm);
-  font-family: var(--font-stencil); font-size: 9px;
-  text-transform: uppercase; letter-spacing: 0.1em; vertical-align: middle;
+  font-family: var(--font-stencil); font-size: 14px;
+  text-transform: uppercase; letter-spacing: 0.08em; vertical-align: middle;
 }
 
-.event-entry__extra { display: block; font-size: 10px; color: var(--accent-text); font-weight: 700; letter-spacing: 0.04em; }
+.event-entry__extra { display: block; font-size: 14px; color: var(--accent-text); font-weight: 700; letter-spacing: 0.04em; }
 .event-entry__badges { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
 
 .event-entry__free {
   display: inline-block; padding: 1px 5px; margin-right: 4px;
   background: var(--success-soft); color: var(--success);
   border: 1px solid var(--success); border-radius: var(--radius-sm);
-  font-family: var(--font-stencil); font-size: 9px;
-  text-transform: uppercase; letter-spacing: 0.1em; vertical-align: middle;
+  font-family: var(--font-stencil); font-size: 14px;
+  text-transform: uppercase; letter-spacing: 0.08em; vertical-align: middle;
 }
 
 .event-entry__boosts { display: flex; gap: 8px; margin-top: 2px; }
-.event-entry__boost  { font-size: 10px; color: var(--text-muted); font-weight: 600; }
+.event-entry__boost  { font-size: 14px; color: var(--text-muted); font-weight: 600; }
 .event-entry__reroll { display: flex; align-items: center; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
-.event-entry__reroll-label { font-size: 10px; color: var(--accent-text); font-weight: 700; }
+.event-entry__reroll-label { font-size: 14px; color: var(--accent-text); font-weight: 700; }
 .event-entry__reroll .die { --size: 20px; }
 
 .event-entry__actor {
@@ -509,10 +536,10 @@
 }
 .event-entry__zombies { margin-top: 4px; display: flex; flex-direction: column; gap: 2px; }
 .event-entry__subtitle {
-  font-family: var(--font-stencil); font-size: 10px; color: var(--accent-text);
-  letter-spacing: 0.12em; text-transform: uppercase;
+  font-family: var(--font-stencil); font-size: 14px; color: var(--accent-text);
+  letter-spacing: 0.08em; text-transform: uppercase;
 }
-.event-entry__line { font-size: 10px; color: var(--text-2); }
+.event-entry__line { font-size: 14px; color: var(--text-2); }
 .event-entry__wounds { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
 .event-entry__wound { color: var(--accent-text); font-weight: 700; }
 
@@ -549,7 +576,7 @@
 }
 
 .hud-actionstrip .action-btn__label {
-  font-size: 9px;
+  font-size: 14px;
   letter-spacing: 0.06em;
   max-width: 100%;
   overflow: hidden;
@@ -568,13 +595,44 @@
   top: 2px;
   right: 2px;
   z-index: 4;
-  font-size: 9px;
+  font-size: 14px;
   font-weight: 700;
   padding: 0 3px;
   max-width: calc(100% - 4px);
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* Phone portrait: six actions do not fit one row at a readable size, so the
+   strip becomes a 3-column grid of wide buttons instead of a clipped scroller. */
+#game-hud[data-layout="sheet"] .hud-actionstrip,
+#game-hud[data-layout="side"] .hud-actionstrip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  overflow: visible;
+}
+#game-hud[data-layout="sheet"] .hud-actionstrip > .action-btn,
+#game-hud[data-layout="side"] .hud-actionstrip > .action-btn {
+  width: auto;
+  min-width: 0;
+  height: 52px;
+}
+#game-hud[data-layout="sheet"] .hud-actionstrip .action-btn__label,
+#game-hud[data-layout="side"] .hud-actionstrip .action-btn__label {
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+/* The landscape panel is 300px: its columns are ~88px, so the labels drop to
+   the 12px floor with no tracking to keep "Intercambiar" whole. */
+#game-hud[data-layout="side"] .hud-actionstrip .action-btn__label {
+  font-size: 12px;
+  letter-spacing: 0;
+}
+#game-hud[data-layout="side"] .hud-actionstrip {
+  grid-template-columns: repeat(3, minmax(auto, 1fr));
+}
+#game-hud[data-layout="side"] .hud-actionstrip > .action-btn { min-width: auto; }
 
 /* ==========================================================================
    Right panel — Active Op card
@@ -625,8 +683,8 @@
 }
 
 .hud-op__sub {
-  font-family: var(--font-mono); font-size: 10px;
-  letter-spacing: 0.1em; color: var(--text-muted); text-transform: uppercase;
+  font-family: var(--font-mono); font-size: 14px;
+  letter-spacing: 0.08em; color: var(--text-muted); text-transform: uppercase;
 }
 
 .hud-op__stats {
@@ -663,8 +721,8 @@
   align-items: center;
   gap: 5px;
   font-family: var(--font-stencil);
-  font-size: 9px;
-  letter-spacing: 0.14em;
+  font-size: 14px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-muted);
 }
@@ -673,7 +731,7 @@
 
 .hud-op__xp-value {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 14px;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.04em;
   color: var(--text);
@@ -778,13 +836,13 @@
 }
 
 .hud-slot__label {
-  font-family: var(--font-mono); font-size: 9px;
-  letter-spacing: 0.2em; color: var(--text-muted); text-transform: uppercase;
+  font-family: var(--font-mono); font-size: 14px;
+  letter-spacing: 0.08em; color: var(--text-muted); text-transform: uppercase;
 }
 
 .hud-slot__empty {
-  font-family: var(--font-mono); font-size: 10px;
-  color: var(--text-muted); letter-spacing: 0.12em; text-transform: uppercase;
+  font-family: var(--font-mono); font-size: 14px;
+  color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase;
   padding: 10px 0; text-align: center;
 }
 
@@ -819,9 +877,9 @@
 .hud-bag-button__label {
   margin-left: auto;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 700;
-  letter-spacing: 0.24em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink);
 }
@@ -848,7 +906,7 @@
   background: var(--accent);
   color: var(--text-inverse);
   border-radius: var(--radius-sm);
-  font-size: 10px;
+  font-size: 14px;
   font-weight: 800;
   font-family: var(--font-mono);
   display: flex; align-items: center; justify-content: center;
@@ -1113,7 +1171,7 @@
 }
 
 #game-hud[data-layout="deck"] .hud-actionstrip .action-btn__label {
-  font-size: clamp(10px, 0.55vw, 13px);
+  font-size: clamp(12px, 0.7vw, 14px);
   white-space: nowrap;
 }
 
@@ -1223,7 +1281,7 @@
 }
 .hud-pip--hp.hud-pip--on { background: var(--accent); border-color: var(--ink); }
 .hud-pip--ap.hud-pip--on { background: var(--highlight); border-color: var(--ink); }
-.hud-pips__inf { font-family: var(--font-mono); font-size: 11px; color: var(--accent-text); }
+.hud-pips__inf { font-family: var(--font-mono); font-size: 14px; color: var(--accent-text); }
 
 .hud-sheet__endturn {
   flex: 0 1 auto;
@@ -1233,6 +1291,46 @@
 }
 .hud-sheet__endturn .action-btn__label { white-space: normal; text-align: center; }
 .hud-sheet__ident .hud-turnline { white-space: normal; }
+
+/* Phone portrait header: name on its own line, then the turn chip and both
+   pip rows share one wrapping line, so the chip never breaks mid-phrase.
+   End turn gives up width for it — its label wraps to two lines instead. */
+/* Landscape panel is too narrow for name, chip and End turn side by side:
+   End turn takes its own full-width row under the identity. */
+#game-hud[data-layout="side"] .hud-sheet__header { flex-wrap: wrap; }
+#game-hud[data-layout="side"] .hud-sheet__endturn { flex: 1 0 100%; min-height: 44px; }
+
+#game-hud[data-layout="sheet"] .hud-sheet__ident,
+#game-hud[data-layout="side"] .hud-sheet__ident {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+#game-hud[data-layout="sheet"] .hud-sheet__name,
+#game-hud[data-layout="side"] .hud-sheet__name { flex: 0 0 100%; }
+#game-hud[data-layout="sheet"] .hud-sheet__ident .hud-turnline,
+#game-hud[data-layout="side"] .hud-sheet__ident .hud-turnline {
+  white-space: nowrap;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+}
+#game-hud[data-layout="sheet"] .hud-sheet__endturn {
+  flex: 0 0 auto;
+  min-width: 0;
+  width: 104px;
+}
+@media (max-width: 380px) {
+  #game-hud[data-layout="sheet"] .hud-sheet__endturn { width: 88px; padding-inline: 6px; }
+  #game-hud[data-layout="sheet"] .hud-sheet__endturn .icon { display: none; }
+  #game-hud[data-layout="sheet"] .hud-sheet__header,
+  #game-hud[data-layout="sheet"] .hud-sheet__who { gap: 8px; }
+  #game-hud[data-layout="sheet"] .hud-sheet__ident .hud-turnline { letter-spacing: 0; }
+  /* "Turno de Wanda" does not fit here: show the player's colour dot and
+     the survivor's name instead (GameHUD renders both, CSS picks). */
+  #game-hud[data-layout="sheet"] .hud-phaseindicator__label--has-compact { display: none; }
+  #game-hud[data-layout="sheet"] .hud-phaseindicator__compact { display: inline-flex; }
+}
 
 .hud-sheet__body {
   flex: 1 1 auto;
@@ -1281,7 +1379,7 @@
 
 .hud-sheet .hud-loadout .hud-slot--empty .hud-slot__empty {
   padding: 6px 0;
-  font-size: 10px;
+  font-size: 14px;
   text-align: center;
 }
 
@@ -1376,7 +1474,7 @@
   display: inline-flex; align-items: center; gap: 4px;
   padding: 2px 8px;
   border-radius: var(--radius-sm);
-  font-family: var(--font-stencil); font-size: 10px;
+  font-family: var(--font-stencil); font-size: 14px;
   letter-spacing: 0.08em; text-transform: uppercase;
   /* Spanish skill names are long; clip rather than push the badge out of
      the wrapping row. */
@@ -1412,11 +1510,11 @@
   border: 1px solid var(--success);
   border-radius: var(--radius-sm);
   color: var(--success);
-  font-family: var(--font-stencil); font-size: 10px;
+  font-family: var(--font-stencil); font-size: 14px;
   letter-spacing: 0.08em; text-transform: uppercase;
 }
 
-.free-action-pip__count { font-family: var(--font-mono); font-size: 11px; }
+.free-action-pip__count { font-family: var(--font-mono); font-size: 14px; }
 
 .hud-wound-alert {
   display: flex; align-items: center; gap: 8px;
@@ -1427,8 +1525,8 @@
   border-left: 3px solid var(--accent);
   border-radius: var(--radius-sm);
   color: var(--accent-text);
-  font-family: var(--font-stencil); font-size: 11px;
-  letter-spacing: 0.1em; text-transform: uppercase;
+  font-family: var(--font-stencil); font-size: 14px;
+  letter-spacing: 0.08em; text-transform: uppercase;
   cursor: pointer;
   transition: background-color 160ms ease, color 160ms ease;
 }
@@ -1474,7 +1572,7 @@
 .hud-game-over__title {
   font-family: var(--font-display);
   font-size: 32px;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   margin: 0;
   line-height: 1;
@@ -1505,26 +1603,26 @@
 .event-log { display: flex; flex-direction: column; gap: 4px; }
 
 /* The log is read, not glanced at: the feed's 11px is too small in a modal. */
-.event-log .event-entry__desc { font-size: 12px; }
+.event-log .event-entry__desc { font-size: 14px; }
 
 .event-log__round {
   font-family: var(--font-stencil);
-  font-size: 12px;
+  font-size: 14px;
   color: var(--accent-text);
   padding: 4px 0;
   border-bottom: 1px solid var(--line);
   margin-top: 12px;
   text-transform: uppercase;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.08em;
 }
 .event-log__round:first-child { margin-top: 0; }
-.event-log__round-current { color: var(--text-muted); font-size: 10px; margin-left: 6px; }
+.event-log__round-current { color: var(--text-muted); font-size: 14px; margin-left: 6px; }
 
 .event-log__player {
   display: flex; align-items: center; gap: 8px;
   margin-top: 6px;
-  font-family: var(--font-mono); font-size: 10px;
-  color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.12em;
+  font-family: var(--font-mono); font-size: 14px;
+  color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em;
 }
 .event-log__player::after { content: ''; flex: 1; height: 1px; background: var(--line); }
 
@@ -1539,7 +1637,7 @@
   color: var(--text);
   border: 1px solid var(--ink);
   border-radius: var(--radius-sm);
-  font-family: var(--font-mono); font-size: 11px;
+  font-family: var(--font-mono); font-size: 14px;
 }
 
 .wound-picker__card {
@@ -1576,12 +1674,12 @@
 .wound-dist__info { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 
 .wound-dist__name {
-  font-family: var(--font-stencil); font-size: 12px;
+  font-family: var(--font-stencil); font-size: 14px;
   letter-spacing: 0.08em; text-transform: uppercase;
   color: var(--text);
 }
 
-.wound-dist__hp { font-family: var(--font-mono); font-size: 11px; color: var(--text-2); }
+.wound-dist__hp { font-family: var(--font-mono); font-size: 14px; color: var(--text-2); }
 
 .wound-dist__controls { display: flex; align-items: center; gap: 8px; }
 
@@ -1613,12 +1711,12 @@
   border: 1px solid var(--ink);
   border-bottom-width: 2px;
   border-radius: var(--radius-sm);
-  font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+  font-family: var(--font-mono); font-size: 14px; font-weight: 600;
   color: var(--text);
   flex-shrink: 0;
 }
 
 .shortcut-desc {
-  font-family: var(--font-body); font-size: 13px;
+  font-family: var(--font-body); font-size: 14px;
   color: var(--text-2);
 }

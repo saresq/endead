@@ -143,11 +143,11 @@ export class PixiBoardRenderer {
 
     // Pre-load Lucide icon textures for zone indicators
     PIXI.Assets.load([
-      '/images/icons/alert-triangle.svg',
-      '/images/icons/search-white.svg',
-      '/images/icons/skull-red.svg',
-      '/images/icons/door-open-white.svg',
-      '/images/icons/sport-shoe-lightblue.svg',
+      '/images/icons/noise-yellow.svg',
+      '/images/icons/search-ink.svg',
+      '/images/icons/skull-cream.svg',
+      '/images/icons/door-open-ink.svg',
+      '/images/icons/sport-shoe-pale.svg',
     ]);
 
     this.setupCameraControls();
@@ -895,7 +895,7 @@ export class PixiBoardRenderer {
       cy = (cy / cells.length) * TILE_SIZE + TILE_SIZE / 2;
 
       const iconSize = 20;
-      const texture = PIXI.Texture.from('/images/icons/sport-shoe-lightblue.svg');
+      const texture = PIXI.Texture.from('/images/icons/sport-shoe-pale.svg');
       const sprite = new PIXI.Sprite(texture);
       sprite.width = iconSize;
       sprite.height = iconSize;
@@ -922,7 +922,7 @@ export class PixiBoardRenderer {
       cy = (cy / cells.length) * TILE_SIZE + TILE_SIZE / 2;
 
       const iconSize = 24;
-      const texture = PIXI.Texture.from('/images/icons/swords-red.svg');
+      const texture = PIXI.Texture.from('/images/icons/swords-lift.svg');
       const sprite = new PIXI.Sprite(texture);
       sprite.width = iconSize;
       sprite.height = iconSize;
@@ -1151,14 +1151,14 @@ export class PixiBoardRenderer {
         const iconSize = 24;
         const ox = (layout.col + layout.w) * TILE_SIZE - iconSize - 2;
         const oy = layout.row * TILE_SIZE + 2;
-        addIcon('/images/icons/alert-triangle.svg', ox, oy, iconSize);
+        addIcon('/images/icons/noise-yellow.svg', ox, oy, iconSize);
 
         // Noise count text overlaid on the triangle
         const numText = new PIXI.Text({
           text: String(zone.noiseTokens),
           style: {
             fontFamily: BOARD_THEME.font.display,
-            fontSize: 11,
+            fontSize: 13,
             fill: BOARD_THEME.noise.markColor,
             stroke: { color: BOARD_THEME.noise.triangleFill, width: 2 },
           },
@@ -1177,7 +1177,7 @@ export class PixiBoardRenderer {
         g.circle(ox + iconSize / 2, oy + iconSize / 2, iconSize / 2 + 2);
         g.fill({ color: BOARD_THEME.searchable.circleColor, alpha: 0.5 });
         g.stroke({ width: 1, color: BOARD_THEME.searchable.strokeColor });
-        addIcon('/images/icons/search-white.svg', ox + 2, oy + 2, iconSize - 4);
+        addIcon('/images/icons/search-ink.svg', ox + 2, oy + 2, iconSize - 4);
       }
 
       if (zone.spawnPoint) {
@@ -1213,7 +1213,7 @@ export class PixiBoardRenderer {
         // Larger skull icon inside the rectangle
         const skullOff = sp.skullSize / 2;
         const skullX = spawnNum !== undefined ? cx - skullOff - 2 : cx - skullOff;
-        addIcon('/images/icons/skull-red.svg', skullX, cy - skullOff, sp.skullSize);
+        addIcon('/images/icons/skull-cream.svg', skullX, cy - skullOff, sp.skullSize);
 
         // Spawn number to the right of skull
         if (spawnNum !== undefined) {
@@ -1238,8 +1238,8 @@ export class PixiBoardRenderer {
         g.rect(cx - 14, cy - 14, 28, 28);
         g.fill({ color: BOARD_THEME.exit.fillColor, alpha: BOARD_THEME.exit.fillAlpha });
         g.stroke({ width: BOARD_THEME.exit.strokeWidth, color: BOARD_THEME.exit.strokeColor });
-        // Lucide DoorOpen icon, white
-        addIcon('/images/icons/door-open-white.svg', cx - 12, cy - 12);
+        // Lucide DoorOpen icon in ink: the lifted green is too light for white
+        addIcon('/images/icons/door-open-ink.svg', cx - 12, cy - 12);
       }
 
       if (zone.hasObjective) {
@@ -2030,7 +2030,7 @@ export class PixiBoardRenderer {
       text: 'N',
       style: {
         fontFamily: BOARD_THEME.font.body,
-        fontSize: 9,
+        fontSize: 11,
         fontWeight: '600',
         fill: t.compass,
         letterSpacing: 1,

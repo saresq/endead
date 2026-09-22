@@ -128,7 +128,7 @@
    and hierarchy comes from size and tracking rather than a washed-out tint. */
 .fm-kicker {
   font-family: var(--font-ui);
-  font-size: 10px;
+  font-size: 14px;
   line-height: 1;
   letter-spacing: var(--letter-spacing-wide);
   text-transform: uppercase;
@@ -145,7 +145,7 @@
    Hierarchy is preserved via smaller size, tighter tracking and a muted ink
    step. */
 .fm-kicker--secondary {
-  font-size: 9px;
+  font-size: 14px;
   letter-spacing: var(--letter-spacing-wider);
   color: var(--text-muted);
 }

@@ -46,14 +46,14 @@
 
 .fm-statcell__label {
   font-family: var(--font-stencil);
-  font-size: 10px;
-  letter-spacing: 0.14em;
+  font-size: 14px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-muted);
 }
 
 .fm-statcell--sm .fm-statcell__label {
-  font-size: 9px;
+  font-size: 14px;
 }
 
 .fm-statcell__value {
@@ -76,7 +76,7 @@
 .fm-statcell__sep,
 .fm-statcell__max {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-muted);
   font-weight: 500;
 }
@@ -212,8 +212,8 @@
   right: 6px;
   padding: 2px 5px;
   font-family: var(--font-mono);
-  font-size: 8px;
-  letter-spacing: 0.14em;
+  font-size: 14px;
+  letter-spacing: 0.08em;
   line-height: 1;
   color: var(--ink);
   background: var(--highlight);
@@ -232,7 +232,7 @@
 
 .fm-photoslot__name {
   font-family: var(--font-stencil);
-  font-size: 12px;
+  font-size: 14px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text);
@@ -240,12 +240,81 @@
 
 .fm-photoslot__role {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 14px;
   letter-spacing: 0.06em;
   color: var(--text-muted);
 }
 
-.fm-photoslot--selected .fm-photoslot__name {
+/* Caption band — a comic caption box across the bottom of the portrait.
+   The frame becomes a column: the picture takes the space above and the
+   band sits under it, so it never covers a face. The band is tilted a few
+   degrees and wider than the frame; its top edge cuts a slanted line into
+   the picture and the frame clips its ends. Paper at rest, comic yellow
+   when selected. */
+.fm-photoslot--band .fm-photoslot__frame {
+  display: flex;
+  flex-direction: column;
+}
+
+.fm-photoslot--band .fm-photoslot__img {
+  flex: 1 1 0;
+  min-height: 0;
+  height: auto;
+}
+
+.fm-photoslot__band {
+  position: relative;
+  flex: 0 0 auto;
+  /* The tilted strip is the ::before layer; the text on it stays level,
+     because rotated text rasterizes off the pixel grid and blurs. */
+  --band-bg: var(--paper-3);
+  padding: 7px 7px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  isolation: isolate;
+  pointer-events: none;
+}
+
+.fm-photoslot__band::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  /* Overlap the picture by the tilt's rise, and hang past the sides and
+     bottom of the frame so the lifted corner never shows a gap. */
+  inset: -2px -8% -8px;
+  background: var(--band-bg);
+  border-top: var(--border);
+  transform: rotate(-3deg);
+  transform-origin: center;
+}
+
+.fm-photoslot__band .fm-photoslot__name {
+  font-family: var(--font-display);
+  font-size: 19px;
+  line-height: 0.95;
+  letter-spacing: 0.03em;
+  color: var(--text);
+}
+
+.fm-photoslot__band .fm-photoslot__role {
+  font-family: var(--font-body);
+  font-size: 13px;
+  line-height: 1.15;
+  letter-spacing: 0;
+  color: var(--text-2);
+}
+
+.fm-photoslot--selected .fm-photoslot__band {
+  --band-bg: var(--highlight);
+}
+
+.fm-photoslot--selected .fm-photoslot__band .fm-photoslot__name,
+.fm-photoslot--selected .fm-photoslot__band .fm-photoslot__role {
+  color: var(--ink);
+}
+
+.fm-photoslot--selected .fm-photoslot__caption .fm-photoslot__name {
   color: var(--accent-text);
 }
 
@@ -304,8 +373,8 @@
 .fm-input__label {
   display: block;
   font-family: var(--font-stencil);
-  font-size: 10px;
-  letter-spacing: 0.14em;
+  font-size: 14px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-muted);
   margin-bottom: 6px;

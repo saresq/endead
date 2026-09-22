@@ -2,11 +2,11 @@
 
 Single source of truth: `src/styles/tokens.css`.
 
-The skin is **pulp comic**: aged-newsprint paper panels with black ink text,
-solid ink outlines and a hard, unblurred ink offset shadow, floating on a dark
-ink page. The paper is deliberately *not* fresh cream — it is the same 43° hue
-at half the saturation and ten points darker, so a full-width panel does not
-glare against the page.
+The skin is **pulp comic, dark first**: warm charcoal panels with cream text,
+solid black ink outlines and a hard, unblurred ink offset shadow, floating on
+a near-black page. The token names still say "paper" (`--paper`, `--paper-2`,
+`--paper-3`); they are the charcoal surfaces. Text is cream, never white, so
+long sessions don't halate.
 Petrol is the affirmative action, comic red is destructive and every kind of
 harm (wounds, spawns, the red danger rank), comic yellow is selected / active /
 "your turn", green and blue are success and info. Primary and destructive must
@@ -24,12 +24,14 @@ update the corresponding entry in `BoardTheme.ts`.
    `utilities.css` and everything under `components/` reference tokens only.
    `transparent`, `currentColor` and colours inside `@media (forced-colors)`
    are the only exceptions.
-2. **Coloured text only on `--paper` or `--paper-2`.** `--paper-3` (inputs,
-   wells, empty slots) carries `--text` or `--text-muted` only.
-3. **Text over `--page` or the board** uses `--paper` or `--highlight`,
-   and keeps an ink outline so it reads over tile art.
-   Text on an `--accent` or `--ink` *fill* uses `--text-inverse`, which is
-   lighter than `--paper` so cream on red still clears 4.5:1.
+2. **Text on a surface** is `--text`, `--text-2`, `--text-muted` or a
+   coloured text token (`--accent-text`, `--primary-text`, `--success`,
+   `--info`); each clears 4.5:1 on all three surfaces.
+3. **Text on a bright fill** (`--highlight`, a player colour, a `*-lift`
+   board fill) is `--ink`. Text on `--accent`, `--primary` or a `*-strong`
+   fill is `--text-inverse`. `--success` / `--info` are light: a filled
+   button or badge carrying text uses `--success-strong` / `--info-strong`.
+   Text over the board keeps an ink outline so it reads over tile art.
 4. **No decoration layers.** No grain, noise, scanlines, vignettes, rust
    stains, hazard tape, corner brackets, chamfer `clip-path`s or glow shadows.
 5. **No looping skin animation.** Functional motion only (die roll-in, board
@@ -39,24 +41,25 @@ update the corresponding entry in `BoardTheme.ts`.
 
 | Token | Role |
 |---|---|
-| `--page`, `--page-2` | dark ink ground: menu, lobby, board, scrim base |
-| `--paper`, `--paper-2`, `--paper-3` | panels/cards, raised rows and hover, inputs and wells |
-| `--ink` | outlines, shadows, text on yellow |
-| `--text`, `--text-2`, `--text-muted` | body, secondary, muted text on paper |
+| `--page`, `--page-2` | near-black ground: menu, lobby, board, scrim base |
+| `--paper`, `--paper-2`, `--paper-3` | charcoal panels/cards, raised rows and hover, inputs and wells |
+| `--ink` | outlines, shadows, text on yellow and other bright fills |
+| `--text`, `--text-2`, `--text-muted` | cream body, secondary, muted text |
 | `--text-on-page` | text over the page or the board |
-| `--text-inverse` | text on `--accent` / `--ink` fills |
-| `--primary`, `--primary-text`, `--primary-soft` | petrol fill (Create room, Start game, End turn, outline buttons), petrol text on paper, petrol tinted row |
-| `--accent`, `--accent-text`, `--accent-soft` | red fill, red text on paper, red tinted row — destructive and harm only |
-| `--highlight`, `--highlight-soft` | selected / active / your turn, and its tinted row |
-| `--success`, `--info`, `--warning`, `--danger`, `--danger-orange` (+ `-soft`) | status |
+| `--text-inverse` | text on `--accent` / `--primary` / `*-strong` fills |
+| `--primary`, `--primary-text`, `--primary-hover`, `--primary-soft` | petrol fill (Create room, Start game, End turn), petrol text, pressed fill, petrol tinted row |
+| `--accent`, `--accent-text`, `--accent-hover`, `--accent-soft` | red fill, red text, pressed fill, red tinted row — destructive and harm only |
+| `--highlight`, `--highlight-soft` | selected / active / your turn, and its tinted row (carries `--text`) |
+| `--success`, `--info` (+ `-strong`, `-soft`), `--warning`, `--danger`, `--danger-orange` | status |
 | `--line`, `--line-strong` | hairlines and dividers |
 | `--scrim` | modal and overlay backdrop |
 | `--player-1..6` (+ `-soft`) | player identity; equal to `PlayerIdentities.ts` |
 | `--zombie-*` (+ `-soft`) | zombie types; equal to `BoardTheme.ts` and `ZombieTypeConfig.ts` |
 
 Every pair the skin uses clears WCAG AA (4.5:1 for body text, 3:1 for large
-text and non-text indicators). `--accent` is `#c7241c` rather than a deeper
-red so a red fill on the dark page still clears 3:1.
+text and non-text indicators). `--accent` (`#bc392a`, a printed brick red) is
+kept light enough that a red fill on the dark page still clears 3:1. The
+reasoning behind each anchor, in OKLCH, sits beside it in `tokens.css`.
 
 ## Surfaces
 
@@ -86,17 +89,19 @@ menu and lobby page ground only.
 
 ## Type
 
-Three web families, loaded from Google Fonts in `index.html`. Each has one job:
+Three web families. Bangers and Geist load from Google Fonts in `index.html`;
+Satoshi is self-hosted (`public/fonts/Satoshi-Variable.woff2`, `@font-face` in
+`base.css`). Each has one job:
 
 - `--font-display` — **Bangers** (one weight). **18px and up only**: the
   wordmark, modal and screen titles, the room code, the game-over verdict.
   Its irregular comic contours smear into mush below that, which is why it is
   no longer the face for labels. Do not add `font-weight` to it.
-- `--font-ui` — **Oswald** (400/500/600/700). Every caps label, button, chip,
-  badge, kicker and readout heading, 9–16px. Tall x-height and open apertures,
-  so a 9px tracked-out label still reads.
-- `--font-body` — **Barlow Condensed** (400/500/600/700). Running text, item
-  stats, values, inputs.
+- `--font-ui` — **Satoshi** (variable, 300–900). Every caps label, button,
+  chip, badge, kicker and readout heading, 12–16px. Full-width letterforms,
+  so caps stay legible at 12px; tracking stays at 0.08em or less.
+- `--font-body` — **Geist** (variable, 100–900). Running text, item stats,
+  values, inputs. Built for UI at small sizes; nothing goes below 12px.
 
 `--font-stencil` is an alias of `--font-ui`; `--font-sans`, `--font-mono` and
 `--font-hud` are aliases of `--font-body`, so existing call sites keep working.

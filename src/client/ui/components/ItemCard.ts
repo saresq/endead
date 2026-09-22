@@ -26,6 +26,9 @@ export interface ItemCardOptions {
   // Skill-boosted stat modifiers (shown in green)
   bonusDice?: number;
   bonusDamage?: number;
+  // Printed ability line under the stats, e.g. the lobby's "Abre puertas".
+  // Plain text; escaped here.
+  trait?: { icon: string; label: string; note?: string };
 }
 
 function getTypeIconName(card: EquipmentCard): string {
@@ -46,6 +49,7 @@ export function renderItemCard(card: EquipmentCard | null | undefined, opts?: It
     discarded = false,
     bonusDice = 0,
     bonusDamage = 0,
+    trait,
   } = opts ?? {};
 
   const variantClass = variant !== 'default' ? ` item-card--${variant}` : '';
@@ -73,6 +77,14 @@ export function renderItemCard(card: EquipmentCard | null | undefined, opts?: It
     ? `<div class="item-card__meta">${typeLabel} · ${slotLabel}</div>`
     : '';
 
+  const traitLine = trait
+    ? `<div class="item-card__trait">
+        <span class="item-card__trait-icon" aria-hidden="true">${icon(trait.icon, 'xs')}</span>
+        <span class="item-card__trait-label">${escapeText(trait.label)}</span>
+        ${trait.note ? `<span class="item-card__trait-note">${escapeText(trait.note)}</span>` : ''}
+      </div>`
+    : '';
+
   const badgeHtml = badge
     ? `<span class="item-card__badge">${badge}</span>`
     : '';
@@ -87,8 +99,13 @@ export function renderItemCard(card: EquipmentCard | null | undefined, opts?: It
         <span class="item-card__name">${equipmentName(card)}</span>
         ${statsInline}
         ${metaLine}
+        ${traitLine}
       </div>
     </div>`;
+}
+
+function escapeText(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 /**

@@ -110,11 +110,11 @@
   top: var(--space-1);
   left: var(--space-2);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 14px;
   font-weight: var(--font-bold);
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   pointer-events: none;
   z-index: 1;
 }
@@ -153,8 +153,8 @@
   transform: translate(-50%, -50%) rotate(-8deg);
   font-family: var(--font-ui);
   font-size: var(--text-lg);
-  color: var(--ink);
-  opacity: 0.1;
+  color: var(--text);
+  opacity: 0.12;
   letter-spacing: var(--letter-spacing-widest);
   text-transform: uppercase;
   pointer-events: none;
@@ -172,20 +172,20 @@
 
 .tap-selected .item-card {
   background: var(--highlight-soft);
-  color: var(--ink);
+  color: var(--text);
 }
 
 .tap-target {
   border-color: var(--highlight) !important;
   border-style: dashed !important;
   background: var(--highlight-soft) !important;
-  color: var(--ink);
+  color: var(--text);
   cursor: pointer;
   box-shadow: var(--shadow-sm) !important;
 }
 
 .tap-target .item-card__empty {
-  color: var(--ink);
+  color: var(--text);
 }
 
 /* Discard zone as tap target reads red */
@@ -217,7 +217,7 @@
 
 .pickup-hero {
   background: var(--highlight-soft);
-  color: var(--ink);
+  color: var(--text);
   border: var(--border-heavy);
   border-radius: var(--radius);
   padding: var(--space-3);

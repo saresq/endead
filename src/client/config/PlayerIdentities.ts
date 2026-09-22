@@ -8,20 +8,34 @@ export interface PlayerIdentity {
   shape: 'circle' | 'square' | 'triangle' | 'diamond' | 'pentagon' | 'hexagon';
 }
 
+// Mirrors --player-1..6 in tokens.css (the rationale lives there). Every
+// colour carries --ink text, so onColor is ink for all of them.
+const INK = '#070504';
+
 const PLAYER_IDENTITIES: PlayerIdentity[] = [
-  { primary: '#d94444', primaryNumeric: 0xd94444, muted: 'rgba(217,68,68,0.15)', onColor: '#fff', shape: 'circle' },
-  { primary: '#4a82c8', primaryNumeric: 0x4a82c8, muted: 'rgba(74,130,200,0.15)', onColor: '#fff', shape: 'square' },
-  { primary: '#4a9e50', primaryNumeric: 0x4a9e50, muted: 'rgba(74,158,80,0.15)', onColor: '#fff', shape: 'triangle' },
-  { primary: '#c8a830', primaryNumeric: 0xc8a830, muted: 'rgba(200,168,48,0.15)', onColor: '#000', shape: 'diamond' },
-  { primary: '#9060c0', primaryNumeric: 0x9060c0, muted: 'rgba(144,96,192,0.15)', onColor: '#fff', shape: 'pentagon' },
-  { primary: '#3a9aaa', primaryNumeric: 0x3a9aaa, muted: 'rgba(58,154,170,0.15)', onColor: '#fff', shape: 'hexagon' },
+  { primary: '#d67069', primaryNumeric: 0xd67069, muted: 'rgba(214,112,105,0.15)', onColor: INK, shape: 'circle' },
+  { primary: '#6295d4', primaryNumeric: 0x6295d4, muted: 'rgba(98,149,212,0.15)', onColor: INK, shape: 'square' },
+  { primary: '#7fc581', primaryNumeric: 0x7fc581, muted: 'rgba(127,197,129,0.15)', onColor: INK, shape: 'triangle' },
+  { primary: '#d9a850', primaryNumeric: 0xd9a850, muted: 'rgba(217,168,80,0.15)', onColor: INK, shape: 'diamond' },
+  { primary: '#b97fc6', primaryNumeric: 0xb97fc6, muted: 'rgba(185,127,198,0.15)', onColor: INK, shape: 'pentagon' },
+  { primary: '#48b7bd', primaryNumeric: 0x48b7bd, muted: 'rgba(72,183,189,0.15)', onColor: INK, shape: 'hexagon' },
 ];
 
+// Cheat-mode survivors: pale ice, outside the player family on purpose.
 const CHEAT_IDENTITY: PlayerIdentity = {
-  primary: '#87CEFA',
-  primaryNumeric: 0x87CEFA,
-  muted: 'rgba(135,206,250,0.18)',
-  onColor: '#000',
+  primary: '#a9d3ec',
+  primaryNumeric: 0xa9d3ec,
+  muted: 'rgba(169,211,236,0.18)',
+  onColor: INK,
+  shape: 'circle',
+};
+
+// Unknown player: --text-muted.
+const UNKNOWN_IDENTITY: PlayerIdentity = {
+  primary: '#aba397',
+  primaryNumeric: 0xaba397,
+  muted: 'rgba(171,163,151,0.15)',
+  onColor: INK,
   shape: 'circle',
 };
 
@@ -50,7 +64,7 @@ export function getPlayerIdentity(state: GameState, playerId: PlayerId): PlayerI
   }
   const index = getStablePlayerIndex(state, playerId);
   if (index === -1) {
-    return { primary: '#CCCCCC', primaryNumeric: 0xCCCCCC, muted: 'rgba(204,204,204,0.15)', onColor: '#000', shape: 'circle' };
+    return UNKNOWN_IDENTITY;
   }
   return PLAYER_IDENTITIES[index % PLAYER_IDENTITIES.length];
 }

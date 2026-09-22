@@ -1,19 +1,22 @@
 /* ==========================================================================
-   Design Tokens — Single Source of Truth — Pulp Comic direction
+   Design Tokens — Single Source of Truth — Pulp Comic, dark first
 
-   Aesthetic: newsprint pulp comic. Cream "paper" panels with black ink
-   text, solid 2–3px ink outlines and a hard, unblurred offset ink shadow,
-   floating on a dark ink page. Comic red for primary and destructive,
-   comic yellow for selected / active / "your turn", green and blue for
-   success and info.
+   Aesthetic: a pulp comic read at night. Warm charcoal panels with cream
+   text, solid 2–3px black ink outlines and a hard, unblurred offset ink
+   shadow, floating on a near-black page. Comic yellow for selected /
+   active / "your turn", brick red for danger and destructive, petrol for
+   the affirmative action, green and blue for success and info.
 
    ──────────────────────────────────────────────────────────────────────
    Naming convention (CANONICAL — use in new code):
      Surfaces   --page, --page-2, --paper, --paper-2, --paper-3
-     Ink/text   --ink, --text, --text-2, --text-muted,
-                --text-on-page, --text-inverse
-     Colour     --primary, --primary-text, --accent, --accent-text,
-                --highlight, --success, --info,
+                (the "paper" names are kept; they are now charcoal)
+     Ink/text   --ink (outlines, shadows, and text on bright fills),
+                --text, --text-2, --text-muted, --text-on-page,
+                --text-inverse (text on red / petrol / *-strong fills)
+     Colour     --primary, --primary-text, --primary-hover,
+                --accent, --accent-text, --accent-hover, --highlight,
+                --success, --success-strong, --info, --info-strong,
                 --warning, --danger, --danger-orange, plus `*-soft` fills
      Structure  --line, --scrim, --border, --border-heavy,
                 --shadow, --shadow-lg, --radius*, --halftone
@@ -22,68 +25,88 @@
    Rules:
    - Component CSS references these tokens; it never writes a colour
      literal (`#hex`, `rgb()`, `rgba()`, `hsl()`).
-   - Coloured text (--accent-text, --success, --info) only sits on
-     --paper or --paper-2. --paper-3 carries --text or --text-muted only.
-   - Text over --page or the board uses --paper or --highlight.
+   - Text on a surface is --text / --text-2 / --text-muted, or a coloured
+     text token (--accent-text, --primary-text, --success, --info); every
+     one clears 4.5:1 on all three surfaces.
+   - Text on a bright fill (--highlight, a player colour, a *-lift fill)
+     is --ink. Text on --accent, --primary or a *-strong fill is
+     --text-inverse.
+   - --success / --info are light (text, marks, bars). A filled button or
+     badge that carries text uses --success-strong / --info-strong.
 
    See `src/styles/README.md` for the full design-system naming rules.
    ────────────────────────────────────────────────────────────────────── */
 
 :root {
-  /* ---------- Page (dark ink ground: menu, lobby, board) ---------- */
-  --page: #1a1614;
-  --page-2: #2a2320;
+  /* ---------- Page (near-black ground: menu, lobby, board) ---------- */
+  --page: #110d0b;   /* oklch 16.5% .008 50 */
+  --page-2: #221b16; /* halftone dots */
 
-  /* ---------- Paper (panels, modals, cards) ----------
-     Aged newsprint, not fresh cream: same 43° hue as the old #f4ead2 with
-     saturation halved (62% -> 33%) and lightness dropped (89% -> 79%), so a
-     full-width panel stops glaring against the dark page. */
-  --paper: #dcd2b9;
-  --paper-2: #cdc1a1;
-  --paper-3: #bdb08d;
+  /* ---------- Surfaces (panels, modals, cards) ----------
+     Warm charcoal leaning toward the ink's brown, never flat grey
+     (oklch, hue 62–70°):
+       --paper   25.5% .014   --paper-2 29.5% .016   --paper-3 34% .018
+     Each step is ~4% lightness, enough to separate a row from its panel
+     without borders. */
+  --paper: #28211c;
+  --paper-2: #322b24;
+  --paper-3: #3e362e;
 
-  /* ---------- Ink & text ---------- */
-  --ink: #1a1614;
-  --text: var(--ink);
-  --text-2: #3d342d;
-  --text-muted: #4a3f35;
-  --text-on-page: var(--paper);
-  --text-inverse: #f3ecda; /* text on --accent / --ink fills — kept lighter
-                              than --paper so cream on red still clears 4.5:1 */
+  /* ---------- Ink & text ----------
+     Text is cream, not white: #e4ddce (oklch 90% .022 86) reads at
+     11.7:1 on --paper without the halation pure white gives on black. */
+  --ink: #070504;
+  --text: #e4ddce;
+  --text-2: #c4bdae;
+  --text-muted: #aba397; /* 4.75:1 on --paper-3 */
+  --text-on-page: var(--text);
+  --text-inverse: #f1ebdc; /* text on --accent / --primary / *-strong fills */
 
   /* ---------- Primary (petrol) ----------
-     The affirmative CTA: Create room, Start game, End turn, outline buttons.
-     Split off from --accent so a primary button and a destructive one never
-     wear the same fill. Petrol sits in the same narrow luminance band the red
-     has to hit — light enough to clear 4.5:1 under cream text (4.58), dark
-     enough to clear 3:1 as a fill on the dark page (3.30). */
+     The affirmative CTA: Create room, Start game, End turn. The fill
+     stays deep so cream text clears 4.5:1 (4.60); petrol text on a
+     surface uses the lifted --primary-text. */
   --primary: #14757e;
-  --primary-text: #10585f; /* petrol text / hover fill, --paper / --paper-2 only */
-  --primary-soft: color-mix(in srgb, var(--primary) 12%, var(--paper));
+  --primary-text: #5dbbc6;  /* oklch 74% .09 205 */
+  --primary-hover: #10585f; /* pressed / hover fill, cream text 6.84 */
+  --primary-soft: color-mix(in srgb, var(--primary) 18%, var(--paper));
 
-  /* ---------- Accent (comic red — danger, wounds, spawns, destructive) ----
-     --accent is #c7241c rather than design D1's #c01f18 so a red fill on
-     the dark page clears the 3:1 non-text ratio (3.16) while cream text
-     on red still clears 4.5:1 (4.75). Never a primary action: see --primary. */
-  --accent: #c7241c;
-  --accent-text: #99170f; /* red text, --paper / --paper-2 only */
-  --accent-soft: color-mix(in srgb, var(--accent) 11%, var(--paper));
+  /* ---------- Accent (brick red — danger, wounds, spawns, destructive) --
+     Printed brick red, oklch 54% .165 29, the same fill as the light
+     theme: cream text on it 4.70. Red text on a surface is the lifted
+     --accent-text. Never a primary action: see --primary. */
+  --accent: #bc392a;
+  --accent-text: #eb8375;  /* oklch 72% .13 29 — 4.54:1 even on --paper-3 */
+  --accent-hover: #8d251d; /* pressed / hover fill, cream text 7.31 */
+  --accent-soft: color-mix(in srgb, var(--accent) 20%, var(--paper));
 
-  /* ---------- Highlight (comic yellow: selected, active, your turn) --- */
-  --highlight: #ffcc1a;
-  --highlight-soft: color-mix(in srgb, var(--highlight) 34%, var(--paper));
+  /* ---------- Highlight (comic yellow: selected, active, your turn) ---
+     oklch 86% .16 91 — lemon, not amber, so it never reads as --player-4
+     ochre or the orange danger rank. Ink on it 13.3:1; on --paper-3 it
+     reads 7.7:1 as text or a ring. The soft fill carries --text. */
+  --highlight: #f8cc3a;
+  --highlight-soft: color-mix(in srgb, var(--highlight) 22%, var(--paper));
 
   /* ---------- Status ---------- */
-  --success: #1f5a29;
-  --success-soft: color-mix(in srgb, var(--success) 12%, var(--paper));
-  --info: #1a5490;
-  --info-soft: color-mix(in srgb, var(--info) 10%, var(--paper));
+  --success: #75bf7e;        /* oklch 74% .12 147 — text, marks, bars */
+  --success-strong: #1f5a29; /* filled button / badge with cream text */
+  --success-soft: color-mix(in srgb, var(--success) 16%, var(--paper));
+  --info: #82aee3;           /* oklch 74% .09 253 */
+  --info-strong: #17518c;
+  --info-soft: color-mix(in srgb, var(--info) 16%, var(--paper));
   --warning: var(--highlight);
   --warning-soft: var(--highlight-soft);
   --danger: var(--accent);
   --danger-soft: var(--accent-soft);
-  --danger-orange: #d8661c; /* ink text only */
-  --danger-orange-soft: color-mix(in srgb, var(--danger-orange) 18%, var(--paper));
+  --danger-orange: #e07937; /* oklch 68% .15 50 — text and fills */
+  --danger-orange-soft: color-mix(in srgb, var(--danger-orange) 16%, var(--paper));
+
+  /* ---------- Lifted status (fills on the board) ----------
+     Marks drawn on them use --ink. */
+  --success-lift: #499b56; /* oklch 62% .13 147 */
+  --info-lift: #4883c6;    /* oklch 60% .12 253 */
+  --accent-lift: #e67060;  /* oklch 68% .15 29 — red marks on the board */
+  --info-pale: #afcef1;    /* oklch 84% .06 253 — marks on an --info-lift wash */
 
   /* ---------- Rank / danger anchors (progression track, squad plates) - */
   --rank-blue: var(--info);
@@ -91,18 +114,25 @@
   --rank-orange: var(--danger-orange);
   --rank-red: var(--accent);
 
-  /* ---------- Hairlines & scrim ---------- */
-  --line: color-mix(in srgb, var(--ink) 25%, transparent);
-  --line-strong: color-mix(in srgb, var(--ink) 45%, transparent);
+  /* ---------- Hairlines & scrim ----------
+     Lines are cream at low alpha: an ink hairline vanishes on charcoal. */
+  --line: color-mix(in srgb, var(--text) 16%, transparent);
+  --line-strong: color-mix(in srgb, var(--text) 32%, transparent);
   --scrim: color-mix(in srgb, var(--page) 80%, transparent);
 
-  /* ---------- Player colours (equal to PlayerIdentities.ts) ---------- */
-  --player-1: #d94444;
-  --player-2: #4a82c8;
-  --player-3: #4a9e50;
-  --player-4: #c8a830;
-  --player-5: #9060c0;
-  --player-6: #3a9aaa;
+  /* ---------- Player colours (equal to PlayerIdentities.ts) ----------
+     One family by character, not by hue: printed-tint pastels at oklch
+     C≈.11–.13 and L 66–76%, softer than every semantic colour, so a
+     player ring never reads as danger, success or "selected". Lightness
+     is staggered so the red/green and blue/purple pairs stay apart under
+     colour-vision deficiency. --ink sits on every one at 5.4:1 or better
+     (onColor is always ink); each also reads 5:1+ as a mark on --paper. */
+  --player-1: #d67069; /* coral      oklch 66% .13  25 */
+  --player-2: #6295d4; /* periwinkle oklch 66% .11 255 */
+  --player-3: #7fc581; /* sage       oklch 76% .12 145 */
+  --player-4: #d9a850; /* ochre      oklch 76% .12  80 */
+  --player-5: #b97fc6; /* orchid     oklch 68% .12 320 */
+  --player-6: #48b7bd; /* aqua       oklch 72% .10 200 */
   --player-1-soft: color-mix(in srgb, var(--player-1) 22%, var(--paper));
   --player-2-soft: color-mix(in srgb, var(--player-2) 22%, var(--paper));
   --player-3-soft: color-mix(in srgb, var(--player-3) 22%, var(--paper));
@@ -110,12 +140,14 @@
   --player-5-soft: color-mix(in srgb, var(--player-5) 22%, var(--paper));
   --player-6-soft: color-mix(in srgb, var(--player-6) 22%, var(--paper));
 
-  /* ---------- Zombie colours (equal to BoardTheme.ts / ZombieTypeConfig) */
-  --zombie-walker: #5f7a3a;
-  --zombie-runner: #d8661c;
-  --zombie-brute: #6b3d8f;
-  --zombie-abom: #8f1611;
-  --zombie-necromancer: #1f5fa8;
+  /* ---------- Zombie colours (equal to BoardTheme.ts / ZombieTypeConfig)
+     Lifted to oklch L 65–68% so each reads 4.5:1+ as text or a dot on
+     --paper. */
+  --zombie-walker: #7f9f53;      /* oklch 66% .11 128 */
+  --zombie-runner: #e07937;      /* oklch 68% .15  50 */
+  --zombie-brute: #ab7ed2;       /* oklch 67% .13 308 */
+  --zombie-abom: #e06062;        /* oklch 65% .16  22 */
+  --zombie-necromancer: #6d92d6; /* oklch 66% .11 262 */
   --zombie-walker-soft: color-mix(in srgb, var(--zombie-walker) 22%, var(--paper));
   --zombie-runner-soft: color-mix(in srgb, var(--zombie-runner) 22%, var(--paper));
   --zombie-brute-soft: color-mix(in srgb, var(--zombie-brute) 22%, var(--paper));
@@ -128,23 +160,23 @@
        --font-display  Bangers. Headlines at 18px and up ONLY: the wordmark,
                        modal and screen titles, the room code, the game-over
                        verdict. Its irregular comic contours smear below that.
-       --font-ui       Oswald. Every caps label, button, chip, badge and
-                       kicker (9–16px). Tall x-height and open apertures, so
-                       a 9px tracked-out label still reads.
-       --font-body     Barlow Condensed. Running text, values, inputs.
+       --font-ui       Satoshi. Every caps label, button, chip, badge and
+                       kicker (12–16px). Nothing on screen goes below 12px;
+                       tracking stays at 0.08em or less.
+       --font-body     Geist. Running text, values, inputs.
 
      --font-stencil is an alias of --font-ui and --font-sans / --font-mono /
      --font-hud are aliases of --font-body, so old call sites keep working. */
   --font-display: "Bangers", "Impact", "Arial Narrow", sans-serif;
-  --font-ui: "Oswald", "Arial Narrow", system-ui, sans-serif;
+  --font-ui: "Satoshi", system-ui, "Helvetica Neue", sans-serif;
   --font-stencil: var(--font-ui);
-  --font-body: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "Geist", system-ui, "Helvetica Neue", sans-serif;
   --font-sans: var(--font-body);
   --font-mono: var(--font-body);
   --font-hud: var(--font-body);
 
-  --text-2xs: 0.65rem;
-  --text-xs: 0.75rem;
+  --text-2xs: 0.75rem;
+  --text-xs: 0.8125rem;
   --text-sm: 0.875rem;
   --text-base: 1rem;
   --text-lg: 1.125rem;
@@ -153,7 +185,7 @@
   --text-3xl: 2.75rem;
   --text-4xl: 3.5rem;
 
-  --font-normal: 400;
+  --font-normal: 450; /* Geist and Satoshi are variable: 450 keeps light-on-dark strokes solid */
   --font-medium: 500;
   --font-semibold: 600;
   --font-bold: 700;
@@ -202,8 +234,10 @@
   --hit: 44px;
 
   /* ---------- Shadows — hard, unblurred ink offsets ---------- */
-  --shadow: 3px 3px 0 var(--ink);
-  --shadow-lg: 5px 5px 0 var(--ink);
+  /* Panels also carry a one-pixel top edge in --paper-3: on a near-black
+     page the ink outline alone disappears. */
+  --shadow: 3px 3px 0 var(--ink), inset 0 1px 0 var(--paper-3);
+  --shadow-lg: 5px 5px 0 var(--ink), inset 0 1px 0 var(--paper-3);
   --shadow-sm: 2px 2px 0 var(--ink);
   /* Offset applied to a pressed control so it "lands" on its shadow */
   --press-offset: 3px;
@@ -269,7 +303,7 @@
    DANGER LEVEL — one accent token, nothing else
    ========================================================================== */
 
-[data-danger="blue"] { --dl-accent: var(--info); --dl-accent-text: var(--text-inverse); }
+[data-danger="blue"] { --dl-accent: var(--info-strong); --dl-accent-text: var(--text-inverse); }
 [data-danger="yellow"] { --dl-accent: var(--highlight); --dl-accent-text: var(--ink); }
 [data-danger="orange"] { --dl-accent: var(--danger-orange); --dl-accent-text: var(--ink); }
 [data-danger="red"] { --dl-accent: var(--accent); --dl-accent-text: var(--text-inverse); }

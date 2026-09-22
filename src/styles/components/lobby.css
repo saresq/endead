@@ -1,16 +1,23 @@
 /* ==========================================================================
    Lobby — room staging screen
 
-   Paper panels on the dark halftone page, keyed by `data-panel`:
-   hostLeftBanner, invite, you (name + character grid), players, map,
-   options, footer. Portrait: one column in that order. Landscape ≥700px:
-   two columns placed with grid-area (DOM order unchanged). The footer is
-   sticky at the bottom of the scrolling stack.
+   Paper panels on the dark halftone page, keyed by `data-panel` and
+   mounted into slots (`data-slot`): top (hostLeftBanner), main (you =
+   name + character grid, loadout = dossier strip + weapons), side
+   (invite, players, map, options) and dock (footer).
+
+   Portrait: the slots are `display: contents` and the panels stack in one
+   column in `order`. Landscape ≥700px: main | side. Desktop ≥1200px:
+   main splits into you | loadout, so three columns. The dock sits under
+   the scrolling stack in every layout, so the start button never scrolls
+   away.
    ========================================================================== */
 
 /* ---------- Container ---------- */
 
 .lobby {
+  --lobby-max: 520px;
+  --lobby-gutter: var(--space-4);
   position: absolute;
   inset: 0;
   display: flex;
@@ -25,8 +32,6 @@
 /* ---------- Stack (the scroll container) ---------- */
 
 .lobby__stack {
-  --lobby-max: 520px;
-  --lobby-gutter: var(--space-4);
   position: relative;
   z-index: 1;
   flex: 1 1 auto;
@@ -41,7 +46,36 @@
   /* Full-width scroller (wheel works anywhere); content is centred and
      capped by the inline padding. */
   padding-top: calc(var(--space-5) + env(safe-area-inset-top));
-  padding-bottom: 0;
+  padding-bottom: 14px;
+  padding-inline: max(var(--lobby-gutter), calc((100% - var(--lobby-max)) / 2));
+}
+
+/* Portrait: slots vanish from layout and the panels flow in reading order. */
+.lobby__slot {
+  display: contents;
+}
+
+.lobby__slot:empty {
+  display: none;
+}
+
+.lobby__stack [data-panel="hostLeftBanner"] { order: 0; }
+.lobby__stack [data-panel="invite"]         { order: 1; }
+.lobby__stack [data-panel="you"]            { order: 2; }
+.lobby__stack [data-panel="loadout"]        { order: 3; }
+.lobby__stack [data-panel="players"]        { order: 4; }
+.lobby__stack [data-panel="map"]            { order: 5; }
+.lobby__stack [data-panel="options"]        { order: 6; }
+
+.lobby__slot > * {
+  min-width: 0;
+}
+
+/* Footer dock: pinned under the scroller, same centred width. */
+.lobby__dock {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
   padding-inline: max(var(--lobby-gutter), calc((100% - var(--lobby-max)) / 2));
 }
 
@@ -74,12 +108,12 @@
 }
 
 /* Stagger the fade-in so sections cascade. */
-.lobby__stack > .lobby-panel:nth-child(2) { animation-delay: 40ms; }
-.lobby__stack > .lobby-panel:nth-child(3) { animation-delay: 80ms; }
-.lobby__stack > .lobby-panel:nth-child(4) { animation-delay: 120ms; }
-.lobby__stack > .lobby-panel:nth-child(5) { animation-delay: 160ms; }
-.lobby__stack > .lobby-panel:nth-child(6) { animation-delay: 200ms; }
-.lobby__stack > .lobby-panel:nth-child(7) { animation-delay: 240ms; }
+.lobby-panel[data-panel="you"]     { animation-delay: 40ms; }
+.lobby-panel[data-panel="loadout"] { animation-delay: 80ms; }
+.lobby-panel[data-panel="players"] { animation-delay: 120ms; }
+.lobby-panel[data-panel="map"]     { animation-delay: 160ms; }
+.lobby-panel[data-panel="options"] { animation-delay: 200ms; }
+.lobby-panel[data-panel="footer"]  { animation-delay: 240ms; }
 
 /* ---------- Invite ---------- */
 
@@ -103,7 +137,7 @@
   font-family: var(--font-display);
   font-size: 32px;
   line-height: 1.1;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
   color: var(--ink);
   background: var(--highlight);
   border: var(--border);
@@ -131,7 +165,7 @@
 .lobby-invite__hint {
   margin: 0;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 14px;
   letter-spacing: 0.04em;
   line-height: 1.4;
   color: var(--text-muted);
@@ -155,8 +189,8 @@
 }
 
 .lobby-squad__count {
-  font-size: 11px;
-  letter-spacing: 0.18em;
+  font-size: 14px;
+  letter-spacing: 0.08em;
   color: var(--text-muted);
 }
 
@@ -194,13 +228,13 @@
   font-size: 14px;
   color: var(--text);
   line-height: 1;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.08em;
   overflow-wrap: anywhere;
 }
 
 .lobby-squad__you {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 14px;
   letter-spacing: 0.04em;
   color: var(--text-muted);
 }
@@ -213,8 +247,8 @@
 }
 
 .lobby-squad__class {
-  font-size: 10px;
-  letter-spacing: 0.16em;
+  font-size: 14px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-muted);
 }
@@ -229,8 +263,8 @@
   align-items: center;
   padding: 2px 6px;
   font-family: var(--font-ui);
-  font-size: 9px;
-  letter-spacing: 0.18em;
+  font-size: 14px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   border-radius: var(--radius-sm);
   line-height: 1.4;
@@ -243,8 +277,8 @@
 
 .lobby-status {
   font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.14em;
+  font-size: 14px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   line-height: 1;
 }
@@ -277,33 +311,58 @@
 
 .lobby-roster {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
   margin-top: 2px;
 }
 
-/* Three across once the panel is wide enough for the role line to fit. */
+/* Twelve survivors: three across on phones, four once there is room, so
+   every row is full. */
 @media (min-width: 560px) {
   .lobby-roster {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 12px;
   }
 }
 
-/* At four across the caption is a name only: the role reads off the dossier
-   strip under the grid, and two lines under an 80px portrait is noise. */
 @media (max-width: 559px) {
-  .lobby-roster__cell .fm-photoslot__name {
-    font-size: 11px;
+  .lobby-roster__cell .fm-photoslot__band .fm-photoslot__name {
+    font-size: 17px;
   }
 
-  .lobby-roster__cell .fm-photoslot__role {
-    display: none;
+  /* Cards are ~100px wide here: 12px keeps "Superviviente" and
+     "Francotiradora" on one line. */
+  .lobby-roster__cell .fm-photoslot__band { padding-inline: 6px; }
+  .lobby-roster__cell .fm-photoslot__band .fm-photoslot__role {
+    font-size: 12px;
+  }
+}
+
+/* Smallest phones: shave the band so "Tiger Sam" still fits. */
+@media (max-width: 359px) {
+  .lobby-roster__cell .fm-photoslot__band {
+    padding-inline: 5px;
   }
 
-  .lobby-roster__cell .fm-photoslot__tag {
-    display: none;
+  .lobby-roster__cell .fm-photoslot__band .fm-photoslot__name {
+    font-size: 15px;
+    letter-spacing: 0.01em;
   }
+}
+
+/* Portrait-shaped frames: the caption band takes the bottom, which leaves
+   a roughly square picture above it. */
+.lobby-roster .fm-photoslot--md .fm-photoslot__frame {
+  aspect-ratio: 3 / 4;
+}
+
+.lobby-roster .fm-photoslot__img {
+  object-position: 50% 0;
+}
+
+/* The yellow caption band and ring already mark the pick. */
+.lobby-roster__cell .fm-photoslot__tag {
+  display: none;
 }
 
 .lobby-roster__cell {
@@ -385,38 +444,61 @@
   outline-offset: 3px;
 }
 
+/* Taken by another player: the picture sits under a dark veil, and the
+   picker's name rides a strip in their player colour across the top edge.
+   The caption band takes a wash of the same colour, so the whole card
+   reads as someone's, not as locked. */
 .lobby-roster__cell--taken {
   cursor: not-allowed;
-  opacity: 0.45;
-  filter: grayscale(0.4);
 }
 
 .lobby-roster__cell--taken .fm-photoslot__frame {
-  border-color: var(--line-strong);
-  border-style: dashed;
   box-shadow: none;
+}
+
+.lobby-roster__cell--taken .fm-photoslot__img {
+  filter: brightness(0.42) saturate(0.6);
+}
+
+.lobby-roster__cell--taken .fm-photoslot__band {
+  --band-bg: color-mix(in oklab, var(--taker, var(--paper-3)) 34%, var(--paper));
 }
 
 .lobby-roster__taken-label {
   position: absolute;
-  inset: auto 0 36% 0;
+  /* Inside the frame's ink border, flush with it. */
+  inset: var(--border-width) var(--border-width) auto;
+  padding: 3px 6px;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.04em;
   text-align: center;
-  font-family: var(--font-mono);
-  font-size: 9px;
-  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--text-inverse);
-  background: var(--ink);
-  padding: 2px 0;
+  color: var(--ink);
+  background: var(--taker, var(--paper-3));
+  border-bottom: var(--border);
+  border-radius: calc(var(--radius-sm) - var(--border-width)) calc(var(--radius-sm) - var(--border-width)) 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   pointer-events: none;
 }
 
-/* ---------- You: inline dossier strip ---------- */
+/* ---------- Loadout: dossier strip + starting weapons ---------- */
 
-/* Folds out under the roster when a survivor is picked. It replaced a modal:
+.lobby-panel--loadout {
+  padding: 16px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Shows the picked survivor above the weapons. It replaced a modal:
    the grid, the weapons and the start button all stay reachable. */
 .lobby-strip {
-  margin-top: 10px;
+  margin-bottom: 8px;
   padding: 10px 12px;
   background: var(--paper-2);
   border: var(--border);
@@ -438,7 +520,7 @@
 }
 
 .lobby-strip__role {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-muted);
 }
 
@@ -451,8 +533,8 @@
 
 .lobby-strip__pip {
   font-family: var(--font-stencil);
-  font-size: 10px;
-  letter-spacing: 0.12em;
+  font-size: 14px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   padding: 3px 7px;
   background: var(--paper);
@@ -471,7 +553,7 @@
 
 .lobby-strip__skill-name {
   display: block;
-  font-size: 13px;
+  font-size: 14px;
   letter-spacing: 0.04em;
 }
 
@@ -481,7 +563,7 @@
 
 .lobby-strip__note {
   margin: 6px 0 0;
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-muted);
 }
 
@@ -489,8 +571,8 @@
   margin-top: 10px;
   padding: 0 0 2px;
   font-family: var(--font-stencil);
-  font-size: 11px;
-  letter-spacing: 0.14em;
+  font-size: 14px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text);
   background: none;
@@ -540,8 +622,18 @@
 }
 
 .lobby-armory__cell .item-card {
+  /* Fill the cell so both cards in a row share a height when only one
+     carries the door line. */
+  flex: 1 1 auto;
+  align-items: flex-start;
   width: 100%;
   pointer-events: none;
+}
+
+/* The armory has room for a second line; "Hacha de bombero" should not clip. */
+.lobby-armory__cell .item-card__name {
+  white-space: normal;
+  line-height: 1.15;
 }
 
 @media (hover: hover) {
@@ -603,32 +695,26 @@
 
 .lobby-armory__meta {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 6px;
-  min-height: 14px;
-}
-
-.lobby-armory__tag {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--text-inverse);
-  background: var(--ink);
-  padding: 2px 5px;
+  min-height: 20px;
+  /* Pin the supply count to the bottom, so it lines up across a row whether
+     or not the neighbouring weapon carries a door tab. */
+  margin-top: auto;
 }
 
 .lobby-armory__supply {
   margin-left: auto;
-  font-size: 10px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.2;
+  color: var(--text-2);
 }
 
 .lobby-armory__cell--selected .lobby-armory__supply {
-  color: var(--ink);
+  color: var(--highlight);
 }
 
 @media (max-width: 420px) {
@@ -661,12 +747,12 @@
   font-size: 20px;
   line-height: 1;
   color: var(--text);
-  letter-spacing: 0.14em;
+  letter-spacing: 0.08em;
 }
 
 .lobby-dossier__sub {
-  font-size: 11px;
-  letter-spacing: 0.14em;
+  font-size: 14px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-muted);
 }
@@ -674,21 +760,24 @@
 .lobby-chip {
   display: inline-flex;
   align-items: center;
-  padding: 2px 8px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.14em;
+  padding: 3px 9px;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-2);
+  color: var(--text);
   background: var(--paper-2);
-  border: 1px solid var(--ink);
+  border: var(--border);
   border-radius: var(--radius-sm);
 }
 
+/* Red warning sticker: paper on red, heavier than the body text beside it. */
 .lobby-chip--rust {
   color: var(--text-inverse);
-  border-color: var(--ink);
   background: var(--accent);
+  box-shadow: var(--shadow-sm);
 }
 
 /* ---------- Starting weapon ---------- */
@@ -727,13 +816,13 @@
 .lobby-loadout__name {
   font-size: 14px;
   color: var(--text);
-  letter-spacing: 0.14em;
+  letter-spacing: 0.08em;
   line-height: 1;
 }
 
 .lobby-loadout__stats {
-  font-size: 11px;
-  letter-spacing: 0.14em;
+  font-size: 14px;
+  letter-spacing: 0.08em;
   color: var(--accent-text);
   text-transform: uppercase;
 }
@@ -775,14 +864,14 @@
 }
 
 .lobby-rank-label {
-  font-size: 11px;
-  letter-spacing: 0.18em;
+  font-size: 14px;
+  letter-spacing: 0.08em;
   color: var(--text);
 }
 
 .lobby-rank-xp {
-  font-size: 10px;
-  letter-spacing: 0.14em;
+  font-size: 14px;
+  letter-spacing: 0.08em;
   color: var(--text-muted);
   text-transform: uppercase;
 }
@@ -801,8 +890,8 @@
   align-items: center;
   padding: 2px 7px;
   font-family: var(--font-mono);
-  font-size: 9px;
-  letter-spacing: 0.14em;
+  font-size: 14px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   border-radius: var(--radius-sm);
   border: 1px solid var(--ink);
@@ -820,8 +909,8 @@
 .lobby-rank-hint {
   grid-column: 2;
   grid-row: 3;
-  font-size: 9px;
-  letter-spacing: 0.16em;
+  font-size: 14px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-muted);
   opacity: 0.7;
@@ -835,9 +924,9 @@
 .lobby-rank-pill--red    { background: var(--accent-soft); border-color: var(--rank-red); }
 
 .lobby-rank-empty {
-  font-size: 10px;
+  font-size: 14px;
   color: var(--text-muted);
-  letter-spacing: 0.14em;
+  letter-spacing: 0.08em;
 }
 
 /* ---------- Map ---------- */
@@ -872,7 +961,7 @@
   font-size: 14px;
   line-height: 1.1;
   color: var(--text);
-  letter-spacing: 0.14em;
+  letter-spacing: 0.08em;
 }
 
 .lobby-area__select-wrap {
@@ -890,7 +979,7 @@
   border: 1px solid var(--ink);
   color: var(--text);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 14px;
   letter-spacing: 0.08em;
   padding: 6px 22px 6px 10px;
   border-radius: var(--radius-sm);
@@ -919,13 +1008,13 @@
   right: 8px;
   pointer-events: none;
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 14px;
 }
 
 .lobby-area__readonly {
   align-self: flex-start;
-  font-size: 10px;
-  letter-spacing: 0.18em;
+  font-size: 14px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-muted);
   padding: 4px 8px;
@@ -955,8 +1044,10 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  padding: 12px 14px;
   cursor: pointer;
   background: var(--paper-2);
+  border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   transition: background-color var(--duration-fast) var(--ease-out);
 }
@@ -972,8 +1063,9 @@
 
 .lobby-roe__check {
   flex-shrink: 0;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
+  margin: 0;
   accent-color: var(--accent);
   cursor: pointer;
 }
@@ -987,37 +1079,41 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 5px;
 }
 
 .lobby-roe__title {
-  font-size: 13px;
-  letter-spacing: 0.14em;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-size: 14px;
+  letter-spacing: 0.08em;
   color: var(--text);
-  line-height: 1;
+  line-height: 1.1;
 }
 
 .lobby-roe__desc {
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  line-height: 1.4;
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--text-2);
+  line-height: 1.3;
 }
 
+/* Risk tag rides at the end of the title, so it never takes a column away
+   from the description. */
 .lobby-roe__tag {
-  flex-shrink: 0;
+  display: inline-flex;
+  padding: 1px 6px;
+  font-size: 12px;
+  line-height: 1.3;
+  white-space: nowrap;
 }
 
-/* ---------- Footer (primary + leave), sticky at the stack bottom ---------- */
+/* ---------- Footer (primary + leave), in the dock under the stack ---------- */
 
 .lobby-panel--footer {
   padding: 12px 20px calc(12px + env(safe-area-inset-bottom));
-  position: sticky;
-  bottom: 0;
-  z-index: 5;
-  margin-top: auto;
-  flex-shrink: 0;
   background: var(--paper);
 }
 
@@ -1029,7 +1125,7 @@
 
 .lobby-footer__missing {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 14px;
   letter-spacing: 0.04em;
   line-height: 1.3;
   color: var(--accent-text);
@@ -1072,8 +1168,8 @@
 
 .lobby__waiting {
   font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.18em;
+  font-size: 14px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-muted);
   text-align: center;
@@ -1089,8 +1185,11 @@
 /* ---------- Mobile ---------- */
 
 @media (max-width: 480px) {
-  .lobby__stack {
+  .lobby {
     --lobby-gutter: var(--space-3);
+  }
+
+  .lobby__stack {
     gap: 10px;
     padding-top: calc(var(--space-3) + env(safe-area-inset-top));
   }
@@ -1112,37 +1211,35 @@
   }
 }
 
-/* ---------- Two columns: landscape phones, tablets, desktop ---------- */
+/* ---------- Two columns: landscape phones, tablets ---------- */
 
 @media (orientation: landscape) and (min-width: 700px) {
-  .lobby__stack {
+  .lobby {
     --lobby-max: 1040px;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    grid-template-rows: auto auto auto auto auto 1fr auto;
-    grid-template-areas:
-      "banner  banner"
-      "you     invite"
-      "you     players"
-      "you     map"
-      "you     options"
-      "you     ."
-      "footer  footer";
-    column-gap: 14px;
-    row-gap: 0;
-    align-content: stretch;
   }
 
-  /* row-gap 0 so an absent banner leaves no empty gap; panels space
-     themselves instead. */
-  .lobby__stack > [data-panel] { margin-bottom: 14px; }
-  .lobby__stack > [data-panel="hostLeftBanner"] { grid-area: banner; }
-  .lobby__stack > [data-panel="invite"]   { grid-area: invite; }
-  .lobby__stack > [data-panel="you"]      { grid-area: you; align-self: start; }
-  .lobby__stack > [data-panel="players"]  { grid-area: players; }
-  .lobby__stack > [data-panel="map"]      { grid-area: map; }
-  .lobby__stack > [data-panel="options"]  { grid-area: options; }
-  .lobby__stack > [data-panel="footer"]   { grid-area: footer; align-self: end; margin-bottom: 0; }
+  .lobby__stack {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      "top   top"
+      "main  side";
+    align-items: start;
+    align-content: start;
+    gap: 14px;
+  }
+
+  .lobby__slot {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 0;
+  }
+
+  .lobby__slot:empty { display: none; }
+  .lobby__slot--top  { grid-area: top; }
+  .lobby__slot--main { grid-area: main; }
+  .lobby__slot--side { grid-area: side; }
 
   /* Footer in one row: primary action wide, leave narrow. */
   .lobby-footer {
@@ -1156,6 +1253,30 @@
   .lobby-footer__missing {
     grid-column: 1 / -1;
   }
+}
+
+/* ---------- Desktop: roster | loadout | room ---------- */
+
+/* Wide and tall enough to show the whole roster, the picked survivor's
+   weapons and the room settings side by side without scrolling. */
+@media (min-width: 1200px) and (min-height: 640px) {
+  .lobby {
+    --lobby-max: 1480px;
+    --lobby-gutter: var(--space-5);
+  }
+
+  .lobby__stack {
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+  }
+
+  .lobby__slot--main {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  /* Weapons stay the column's focus; keep the dossier strip tight. */
+  .lobby-strip__skill { font-size: 14px; }
 }
 
 /* ---------- Landscape phones / short viewports: compact ---------- */
@@ -1207,6 +1328,30 @@
     gap: 3px;
   }
 
+  /* Short portraits: four across, and the crop centres on the face
+     instead of the hair. */
+  .lobby-roster {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .lobby-roster .fm-photoslot__img {
+    object-position: 50% 25%;
+  }
+
+  /* Short portraits: the band carries the name only. */
+  .lobby-roster .fm-photoslot__band {
+    padding: 6px 6px 7px;
+  }
+
+  .lobby-roster .fm-photoslot__band .fm-photoslot__name {
+    font-size: 15px;
+    letter-spacing: 0.01em;
+  }
+
+  .lobby-roster .fm-photoslot__band .fm-photoslot__role {
+    display: none;
+  }
+
   .lobby-roster__cell--selected {
     transform: translateY(-1px);
   }
@@ -1223,9 +1368,8 @@
 }
 
 @media (orientation: landscape) and (min-width: 700px) and (max-height: 500px) {
-  .lobby__stack > [data-panel] { margin-bottom: 8px; }
-  .lobby__stack { column-gap: 10px; }
-  .lobby__stack > [data-panel="footer"] { margin-bottom: 0; }
+  .lobby__stack { gap: 8px 10px; }
+  .lobby__slot { gap: 8px; }
 }
 
 /* ==========================================================================
@@ -1266,8 +1410,8 @@
 
 .lobby-banner__title {
   font-family: var(--font-ui);
-  font-size: 13px;
-  letter-spacing: 0.18em;
+  font-size: 14px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--accent-text);
   line-height: 1;
@@ -1275,8 +1419,8 @@
 
 .lobby-banner__sub {
   font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.16em;
+  font-size: 14px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-2);
   line-height: 1.2;
@@ -1288,8 +1432,8 @@
   gap: 6px;
   padding: 6px 10px;
   font-family: var(--font-mono);
-  font-size: 12px;
-  letter-spacing: 0.18em;
+  font-size: 14px;
+  letter-spacing: 0.08em;
   color: var(--accent-text);
   border: 1px solid var(--ink);
   background: var(--paper);
@@ -1354,7 +1498,7 @@
 .lobby-scrim__title {
   font-family: var(--font-display);
   font-size: 28px;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--accent-text);
   line-height: 1;
@@ -1363,8 +1507,8 @@
 
 .lobby-scrim__sub {
   font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.18em;
+  font-size: 14px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-2);
   line-height: 1.5;
@@ -1374,8 +1518,8 @@
 
 .lobby-scrim__meta {
   font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.16em;
+  font-size: 14px;
+  letter-spacing: 0.08em;
   color: var(--text-muted);
   text-transform: uppercase;
 }

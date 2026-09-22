@@ -63,11 +63,11 @@ Body text and icons SHALL meet WCAG AA contrast (4.5:1 for text under 18.66px bo
 - **THEN** every control that met 44x44px on coarse pointers before still meets it
 
 ### Requirement: Font budget
-The app SHALL load exactly two web font families: `Bangers` as the display face (headings, buttons, big numbers, board cues) and `Barlow Condensed` as the body face (all other text). `--font-mono` and `--font-hud` SHALL resolve to the body face, and numeric readouts SHALL use tabular figures. Every font stack SHALL end in a system fallback. `Oswald` and `JetBrains Mono` SHALL NOT be requested.
+The app SHALL load exactly three web font families: `Bangers` as the display face (titles at 18px and up, board cues), `Satoshi` as the label face (caps labels, buttons, chips) and `Geist` as the body face (all other text). Bangers and Geist SHALL load from Google Fonts; Satoshi SHALL be self-hosted from `public/fonts`. `--font-mono` and `--font-hud` SHALL resolve to the body face, and numeric readouts SHALL use tabular figures. Every font stack SHALL end in a system fallback. No rendered text SHALL be smaller than 12px.
 
 #### Scenario: Network requests on first load
 - **WHEN** the menu loads with an empty cache
-- **THEN** the only font families requested from Google Fonts are Bangers and Barlow Condensed
+- **THEN** the only font families requested from Google Fonts are Bangers and Geist, and Satoshi loads from `/fonts/Satoshi-Variable.woff2`
 
 #### Scenario: Fonts blocked
 - **WHEN** Google Fonts fails to load

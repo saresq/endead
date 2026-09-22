@@ -63,14 +63,14 @@
 .item-card--selected,
 .item-card[aria-selected='true'] {
   background: var(--highlight-soft);
-  color: var(--ink);
+  color: var(--text);
   outline: var(--border-width-heavy) solid var(--highlight);
   outline-offset: 2px;
 }
 
 .item-card--selected .item-card__name,
 .item-card[aria-selected='true'] .item-card__name {
-  color: var(--ink);
+  color: var(--text);
 }
 
 .item-card--selected::after,
@@ -143,6 +143,39 @@
   overflow: hidden;
   text-overflow: ellipsis;
   line-height: 1.3;
+}
+
+/* ---------- Trait (printed ability line) ----------
+   A rule printed on the card, under a perforation. The door glyph takes
+   the closed-door orange from the board, so it reads as "the doors on the
+   map" before the words do. */
+.item-card__trait {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 5px;
+  row-gap: 0;
+  margin-top: 6px;
+  padding-top: 5px;
+  border-top: 1px dashed var(--line-strong);
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  line-height: 1.3;
+}
+
+.item-card__trait-icon {
+  display: inline-flex;
+  color: var(--danger-orange);
+}
+
+.item-card__trait-label {
+  font-weight: var(--font-semibold);
+  color: var(--text);
+}
+
+.item-card__trait-note {
+  flex: 0 0 100%;
+  color: var(--text-muted);
 }
 
 /* ---------- Badge (floating corner) ---------- */
@@ -243,7 +276,7 @@
 }
 
 .item-card--ghost .item-card__badge {
-  background: var(--success);
+  background: var(--success-strong);
   color: var(--text-inverse);
 }
 
@@ -251,7 +284,7 @@
 
 .item-card--featured {
   background: var(--highlight-soft);
-  color: var(--ink);
+  color: var(--text);
   border: var(--border-heavy);
   padding: var(--space-3) var(--space-3);
   box-shadow: var(--shadow);
@@ -274,7 +307,7 @@
 
 .item-card--featured .item-card__name {
   font-size: var(--text-base);
-  color: var(--ink);
+  color: var(--text);
 }
 
 .item-card--featured .item-card__stats {
@@ -367,7 +400,7 @@
 /* Prefix marker for boosted values */
 .item-card__boosted::before {
   content: '▲ ';
-  font-size: 0.7em;
+  font-size: 0.8em;
   vertical-align: middle;
 }
 

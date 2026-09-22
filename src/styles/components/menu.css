@@ -100,14 +100,14 @@
   font-family: var(--font-display);
   font-size: 62px;
   line-height: 1;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--accent-text);
 }
 
 .menu-header__subline {
-  font-size: 10px;
-  letter-spacing: 0.24em;
+  font-size: 14px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-muted);
 }
@@ -156,7 +156,7 @@
   border-left: 3px solid var(--accent);
   color: var(--text);
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.5;
   letter-spacing: 0.02em;
 }
@@ -228,7 +228,7 @@
 
   .menu-wordmark__text {
     font-size: 48px;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.08em;
   }
 }
 

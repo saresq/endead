@@ -745,6 +745,13 @@ export class GameHUD {
         ? es.hud.phaseEnd
         : es.hud.phasePlayers(escapeHtml(activeName));
 
+    // Very small phones swap "Turno de X" for a player-colour dot + name (CSS
+    // picks which one shows). Only the survivors' phase has a player to name.
+    const activeColor = activePid ? getPlayerIdentity(state, activePid).primary : '';
+    const compactPhase = isPlayerPhase && activeName
+      ? `<span class="hud-phaseindicator__compact" aria-hidden="true"><span class="hud-phaseindicator__dot" style="--dot: ${activeColor}"></span>${escapeHtml(activeName)}</span>`
+      : '';
+
     const tick = (active: boolean) =>
       `<span class="hud-phasetick${active ? ' hud-phasetick--current' : ''}" aria-hidden="true"></span>`;
 
@@ -757,7 +764,8 @@ export class GameHUD {
           </button>
           <div class="hud-phaseindicator" role="status" aria-live="polite" aria-label="${es.hud.phaseAria(currentPhaseLabel)}">
             <span class="hud-phaseindicator__bracket hud-phaseindicator__bracket--left" aria-hidden="true">[</span>
-            <span class="hud-phaseindicator__label">${currentPhaseLabel}</span>
+            <span class="hud-phaseindicator__label${compactPhase ? ' hud-phaseindicator__label--has-compact' : ''}">${currentPhaseLabel}</span>
+            ${compactPhase}
             <span class="hud-phaseindicator__bracket hud-phaseindicator__bracket--right" aria-hidden="true">]</span>
             <span class="hud-phaseindicator__ticks" aria-hidden="true">
               ${tick(isPlayerPhase)}

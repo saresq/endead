@@ -28,6 +28,8 @@ export const lobby = {
   weaponGone: 'Agotada',
   weaponMine: 'Tuya',
   opensDoors: 'Abre puertas',
+  opensDoorsNoisy: 'Hace ruido al abrir',
+  opensDoorsAria: (noisy: boolean) => (noisy ? 'abre puertas, hace ruido' : 'abre puertas'),
 
   // Players list
   players: 'Jugadores',

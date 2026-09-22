@@ -6,20 +6,24 @@
    no rust — contrast and outline do the work.
    ========================================================================== */
 
+/* ---------- Self-hosted fonts ----------
+   Satoshi (--font-ui) is a Fontshare face, so it ships from public/fonts
+   instead of Google Fonts. One variable file covers weights 300–900. */
+
+@font-face {
+  font-family: "Satoshi";
+  src: url("/fonts/Satoshi-Variable.woff2") format("woff2");
+  font-weight: 300 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* ---------- Root sizing ---------- */
 
 html {
   font-size: 16px;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   height: 100%;
-}
-
-@media (max-width: 767px) {
-  html {
-    font-size: 14px;
-  }
 }
 
 /* ---------- Body — flat ink ground ---------- */

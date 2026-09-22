@@ -107,7 +107,7 @@
 
 .board-tooltip .tooltip-heart {
   color: var(--accent-text);
-  font-size: 11px;
+  font-size: 14px;
   line-height: 1;
   flex-shrink: 0;
 }
