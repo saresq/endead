@@ -78,6 +78,10 @@
   --accent: #bc392a;
   --accent-text: #eb8375;  /* oklch 72% .13 29 — 4.54:1 even on --paper-3 */
   --accent-hover: #8d251d; /* pressed / hover fill, cream text 7.31 */
+  /* Saturated red for display type only (the wordmark, 36px+, inked
+     outline): 3.8:1 on --paper, clears the 3:1 large-text bar. Body-size
+     red text stays --accent-text. */
+  --accent-display: #e8392a;
   --accent-soft: color-mix(in srgb, var(--accent) 20%, var(--paper));
 
   /* ---------- Highlight (comic yellow: selected, active, your turn) ---
