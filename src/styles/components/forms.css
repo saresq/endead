@@ -507,7 +507,7 @@
 /* ---------- Coarse pointers ----------
    iOS zooms the page when a focused field is under 16px. The :not() chain
    lifts specificity above single-class input styles (.fm-input,
-   .menu-input, .lobby-area__select, .lobby-player__name) so this wins
+   .menu-input, .lobby-player__name) so this wins
    regardless of import order. */
 
 @media (pointer: coarse) {

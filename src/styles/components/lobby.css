@@ -697,16 +697,16 @@
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 6px;
   min-height: 20px;
+  padding-left: 2px;
   /* Pin the supply count to the bottom, so it lines up across a row whether
      or not the neighbouring weapon carries a door tab. */
   margin-top: auto;
 }
 
 .lobby-armory__supply {
-  margin-left: auto;
   font-family: var(--font-body);
   font-size: 14px;
   line-height: 1.2;
@@ -935,91 +935,143 @@
   padding: 16px 20px 18px;
 }
 
-.lobby-area {
+/* Map picker: the chosen map as name + grid size. With more than one map
+   the host gets a trigger that opens a list *below* it (a native select on
+   macOS pops over itself and hides what changed). */
+.lobby-map {
+  position: relative;
   margin-top: 10px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
+}
+
+/* Panels keep a transform from their fade-in, so each is its own stacking
+   context: lift the map panel so the open list paints over Options. */
+.lobby-panel--map {
   position: relative;
+  z-index: 2;
 }
 
-.lobby-area__bar {
-  width: 3px;
-  align-self: stretch;
-  background: var(--accent);
-}
-
-.lobby-area__text {
+.lobby-map__trigger,
+.lobby-map__readout {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  flex: 1;
-  min-width: 0;
-}
-
-.lobby-area__name {
-  font-size: 14px;
-  line-height: 1.1;
-  color: var(--text);
-  letter-spacing: 0.08em;
-}
-
-.lobby-area__select-wrap {
-  position: relative;
-  display: flex;
-  align-items: center;
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.lobby-area__select {
-  appearance: none;
-  -webkit-appearance: none;
-  background: var(--paper-3);
-  border: 1px solid var(--ink);
-  color: var(--text);
-  font-family: var(--font-mono);
-  font-size: 14px;
-  letter-spacing: 0.08em;
-  padding: 6px 22px 6px 10px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
+  align-items: baseline;
+  gap: 10px;
   width: 100%;
-  max-width: 100%;
-  min-width: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  text-align: left;
+}
+
+.lobby-map__trigger {
+  background: var(--paper-3);
+  border: var(--border);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  font: inherit;
+}
+
+.lobby-map__trigger:hover { background: var(--paper-2); }
+
+.lobby-map__trigger:focus-visible,
+.lobby-map__option:focus-visible {
+  outline: 2px solid var(--highlight);
+  outline-offset: 2px;
+}
+
+.lobby-map__trigger[aria-expanded="true"] {
+  border-color: var(--highlight);
+}
+
+.lobby-map__readout {
+  padding-inline: 0;
+  min-height: 0;
+}
+
+.lobby-map__name {
+  font-family: var(--font-ui);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.lobby-area__select:focus-visible {
-  outline: 2px solid var(--highlight);
-  outline-offset: 2px;
+.lobby-map__size {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
-.lobby-area__select option {
-  background: var(--paper);
+.lobby-map__caret {
+  display: inline-flex;
+  align-self: center;
+  margin-left: auto;
   color: var(--text);
+  transition: transform var(--duration-fast) var(--ease-out);
 }
 
-.lobby-area__caret {
+.lobby-map__trigger[aria-expanded="true"] .lobby-map__caret {
+  transform: rotate(180deg);
+}
+
+.lobby-map__list {
   position: absolute;
-  right: 8px;
-  pointer-events: none;
-  color: var(--text-muted);
-  font-size: 14px;
+  z-index: var(--z-dropdown);
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  background: var(--paper);
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  max-height: 260px;
+  overflow-y: auto;
 }
 
-.lobby-area__readonly {
-  align-self: flex-start;
-  font-size: 14px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  padding: 4px 8px;
-  border: 1px dashed var(--line-strong);
+.lobby-map__option {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px;
+  background: transparent;
+  border: 0;
   border-radius: var(--radius-sm);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lobby-map__option:hover { background: var(--paper-2); }
+
+.lobby-map__option[aria-selected="true"] {
+  background: var(--highlight-soft);
+}
+
+.lobby-map__check {
+  display: inline-flex;
+  align-self: center;
+  margin-left: auto;
+  color: var(--highlight);
+}
+
+.lobby-map__note {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lobby-map__caret { transition: none; }
 }
 
 /* ---------- Options ---------- */

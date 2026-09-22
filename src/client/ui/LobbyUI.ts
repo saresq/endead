@@ -67,6 +67,7 @@ export class LobbyUI {
   /** True once /api/maps has answered, so "no maps" isn't confused with "still loading". */
   private mapsLoaded = false;
   private selectedMapId: string | null = null;
+  private mapMenuOpen = false;
   private abominationFest = false;
   private nameDebounceTimer: number | null = null;
   private roomPillCopied = false;
@@ -464,10 +465,6 @@ export class LobbyUI {
       }
     }
 
-    if (rerendered.has('map')) {
-      const mapSelect = this.container.querySelector('#lobby-map-select') as HTMLSelectElement | null;
-      if (mapSelect && this.selectedMapId) mapSelect.value = this.selectedMapId;
-    }
     if (rerendered.has('options')) {
       const abomCheck = this.container.querySelector('#lobby-abom-fest') as HTMLInputElement | null;
       if (abomCheck) abomCheck.checked = this.abominationFest;
@@ -834,34 +831,62 @@ export class LobbyUI {
     isHost: boolean,
   ): string {
     const t = es.lobby;
-    const emptyLabel = this.mapsLoaded ? t.noPlayableMaps : t.loadingMaps;
-    const options = this.availableMaps.length > 0
-      ? this.availableMaps.map(m =>
-          `<option value="${this.escHtml(m.id)}" ${m.id === this.selectedMapId ? 'selected' : ''}>${this.escHtml(m.name)} · ${m.width}×${m.height}</option>`
-        ).join('')
-      : `<option>${this.escHtml(emptyLabel)}</option>`;
+    const maps = this.availableMaps;
+    const size = (m: { width: number; height: number }) => `${m.width}×${m.height}`;
+    const canChoose = isHost && maps.length > 1;
+    if (!canChoose) this.mapMenuOpen = false;
 
-    const body = isHost
-      ? `
-        <div class="lobby-area__select-wrap">
-          <select class="lobby-area__select fm-mono" id="lobby-map-select" aria-labelledby="lobby-map-title">${options}</select>
-          <span class="lobby-area__caret" aria-hidden="true">${icon('ChevronDown', 'xs')}</span>
-        </div>
-      `
-      : `
-        <div class="lobby-area__text">
-          <div class="fm-stencil lobby-area__name">${this.escHtml(selectedMap?.name ?? emptyLabel)}</div>
-          <div class="lobby-area__readonly fm-mono">${this.escHtml(t.mapHostPicks)}</div>
+    // The picked map as a name + size line; shared by the trigger and the
+    // static readout.
+    const current = selectedMap
+      ? `<span class="lobby-map__name" id="lobby-map-current">${this.escHtml(selectedMap.name)}</span>
+         <span class="lobby-map__size">${size(selectedMap)}</span>`
+      : `<span class="lobby-map__name" id="lobby-map-current">${this.escHtml(this.mapsLoaded ? t.noPlayableMaps : t.loadingMaps)}</span>`;
+
+    let body: string;
+    if (canChoose) {
+      // Custom list that opens below the trigger. A native <select> on macOS
+      // pops its menu over itself, so with the current map on top it looked
+      // like nothing opened.
+      const list = this.mapMenuOpen
+        ? `<div class="lobby-map__list" role="listbox" aria-labelledby="lobby-map-title">
+            ${maps.map(m => `
+              <button type="button" class="lobby-map__option" role="option"
+                data-action="pick-map" data-id="${this.escHtml(m.id)}"
+                aria-selected="${m.id === this.selectedMapId}">
+                <span class="lobby-map__name">${this.escHtml(m.name)}</span>
+                <span class="lobby-map__size">${size(m)}</span>
+                ${m.id === this.selectedMapId ? `<span class="lobby-map__check" aria-hidden="true">${icon('Check', 'xs')}</span>` : ''}
+              </button>`).join('')}
+          </div>`
+        : '';
+      body = `
+        <div class="lobby-map">
+          <button type="button" class="lobby-map__trigger" data-action="toggle-map-menu"
+            aria-haspopup="listbox" aria-expanded="${this.mapMenuOpen}"
+            aria-labelledby="lobby-map-title lobby-map-current">
+            ${current}
+            <span class="lobby-map__caret" aria-hidden="true">${icon('ChevronDown', 'sm')}</span>
+          </button>
+          ${list}
         </div>
       `;
+    } else {
+      const note = !isHost
+        ? t.mapHostPicks
+        : maps.length === 1 ? t.mapOnlyOne : '';
+      body = `
+        <div class="lobby-map lobby-map--static">
+          <div class="lobby-map__readout">${current}</div>
+          ${note ? `<div class="lobby-map__note">${this.escHtml(note)}</div>` : ''}
+        </div>
+      `;
+    }
 
     return `
       <section class="fm-panel lobby-panel lobby-panel--map">
         <h2 class="fm-kicker fm-kicker--secondary" id="lobby-map-title">${this.escHtml(t.map)}</h2>
-        <div class="lobby-area">
-          <div class="lobby-area__bar" aria-hidden="true"></div>
-          ${body}
-        </div>
+        ${body}
       </section>
     `;
   }
@@ -977,6 +1002,11 @@ export class LobbyUI {
    *  the lobby container so .lobby--dimmed doesn't blur it. */
   private handleScrimClick = (e: Event): void => {
     const target = e.target as HTMLElement;
+    // Any click outside the open map menu closes it.
+    if (this.mapMenuOpen && !target.closest('.lobby-map')) {
+      this.mapMenuOpen = false;
+      this.render();
+    }
     const reconnectBtn = target.closest('[data-action="reconnect"]') as HTMLElement | null;
     if (!reconnectBtn) return;
     networkManager.connect();
@@ -1021,6 +1051,22 @@ export class LobbyUI {
       if (action === 'open-dossier') {
         const charClass = actionEl.dataset.id;
         if (charClass) this.openDossier(charClass);
+        return;
+      }
+
+      if (action === 'toggle-map-menu') {
+        this.mapMenuOpen = !this.mapMenuOpen;
+        this.render();
+        if (this.mapMenuOpen) {
+          (this.container.querySelector('.lobby-map__option[aria-selected="true"]') as HTMLElement | null)?.focus();
+        }
+        return;
+      }
+
+      if (action === 'pick-map') {
+        const mapId = actionEl.dataset.id;
+        if (mapId) this.selectedMapId = mapId;
+        this.closeMapMenu();
         return;
       }
 
@@ -1099,14 +1145,27 @@ export class LobbyUI {
       }
     }, true);
 
-    // Map select + ROE toggle.
-    this.container.addEventListener('change', (e) => {
-      const target = e.target as HTMLElement;
-      if (target.id === 'lobby-map-select') {
-        this.selectedMapId = (target as HTMLSelectElement).value;
-        this.render();
+    // Map menu: Escape closes, arrows move between options.
+    this.container.addEventListener('keydown', (e) => {
+      if (!this.mapMenuOpen) return;
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        this.closeMapMenu();
         return;
       }
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        const opts = Array.from(this.container.querySelectorAll<HTMLElement>('.lobby-map__option'));
+        if (opts.length === 0) return;
+        e.preventDefault();
+        const i = opts.indexOf(document.activeElement as HTMLElement);
+        const next = e.key === 'ArrowDown' ? (i + 1) % opts.length : (i - 1 + opts.length) % opts.length;
+        opts[next].focus();
+      }
+    });
+
+    // ROE toggle.
+    this.container.addEventListener('change', (e) => {
+      const target = e.target as HTMLElement;
       if (target instanceof HTMLInputElement && target.classList.contains('lobby-roe__check')) {
         const ruleId = target.dataset.roeId ?? (target.id === 'lobby-abom-fest' ? 'endless-horde' : null);
         if (!ruleId) return;
@@ -1115,6 +1174,12 @@ export class LobbyUI {
         if (ruleId === 'endless-horde') this.abominationFest = next;
       }
     });
+  }
+
+  private closeMapMenu(): void {
+    this.mapMenuOpen = false;
+    this.render();
+    (this.container.querySelector('.lobby-map__trigger') as HTMLElement | null)?.focus();
   }
 
   private async handleRoomPillCopy(): Promise<void> {

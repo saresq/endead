@@ -41,10 +41,10 @@ export const lobby = {
 
   // Map
   map: 'Mapa',
-  mapSelectAria: 'Elegir mapa',
   loadingMaps: 'Cargando mapas…',
   noPlayableMaps: 'Ningún mapa guardado es jugable. No se puede empezar.',
   mapHostPicks: 'Lo elige el anfitrión',
+  mapOnlyOne: 'Es el único mapa disponible',
 
   // Options
   options: {
