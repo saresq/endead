@@ -84,6 +84,19 @@ describe('Spawn order follows marker placement order', () => {
     expect(drawn.map(c => c.cardId)).toEqual(['card-1', 'card-2', 'card-3']);
   });
 
+  it('records the ids each Spawn Step card placed', () => {
+    const state = gameFrom(mapWithSpawnsPlaced([MIDDLE, LEFT, RIGHT]));
+    const after = ZombiePhaseManager.executeZombiePhase(state);
+    const cards = after.spawnContext?.cards ?? [];
+
+    // One Walker per card, and the recorded id is the zombie that card placed.
+    expect(cards.map(c => c.spawnedIds?.length)).toEqual([1, 1, 1]);
+    for (const card of cards) {
+      const id = card.spawnedIds![0];
+      expect(after.zombies[id].position.zoneId).toBe(card.zoneId);
+    }
+  });
+
   it('two markers in one zone are one spawn zone, drawing one card', () => {
     // Street cells merge into a single zone, so two spawn markers on the same
     // stretch of connected street are one spawn point — one card, one spawn.

@@ -12,7 +12,7 @@
  *   notificationManager.show({
  *     type: 'alert',
  *     variant: 'danger',
- *     title: 'Aparición',
+ *     title: 'Spawn',
  *     message: '3 Caminantes en la zona A',
  *     priority: 'high',
  *   });

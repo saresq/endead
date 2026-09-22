@@ -347,7 +347,11 @@ export class GameHUD {
         return;
       }
       this.inputController.setMode('ATTACK', weaponId);
-      notificationManager.show({ variant: 'info', message: es.hud.toast.pickAttackZone, duration: 5000 });
+      // A weapon that opens doors also lights the closed doors next door up, so
+      // say so — those zones can only be opened, never attacked through.
+      const armed = activeSurvivor.inventory.find(c => c.id === weaponId);
+      const message = armed?.canOpenDoor ? es.hud.toast.pickAttackOrDoor : es.hud.toast.pickAttackZone;
+      notificationManager.show({ variant: 'info', message, duration: 5000 });
       return;
     }
 
@@ -748,7 +752,7 @@ export class GameHUD {
       <div class="hud-topbar__inner${myTurnClass}${dangerClass}">
         <div class="hud-topbar__left">
           <button class="hud-turnchip" data-action="open-log" title="${es.hud.logTitle}" aria-label="${es.hud.roundChipAria(state.turn)}">
-            <span class="hud-turnchip__label">${es.hud.round}</span>
+            <span class="hud-turnchip__label" aria-hidden="true">${icon('RotateCw', 'xs')}</span>
             <span class="hud-turnchip__value">${String(state.turn).padStart(2, '0')}</span>
           </button>
           <div class="hud-phaseindicator" role="status" aria-live="polite" aria-label="${es.hud.phaseAria(currentPhaseLabel)}">
@@ -891,7 +895,7 @@ export class GameHUD {
     const noAP = survivor.actionsRemaining < 1;
 
     const buttons = [
-      renderActionButton({ id: 'btn-search', icon: 'Search', label: es.hud.search, cost: survivor.freeSearchesRemaining > 0 ? COST_FREE : COST_ONE, disabled: !isMyTurn || (survivor.hasSearched && !survivor.cheatMode) || (noAP && survivor.freeSearchesRemaining <= 0) }),
+      renderActionButton({ id: 'btn-search', icon: 'Search', label: es.hud.search, cost: survivor.freeSearchesRemaining > 0 ? es.common.freeCount(survivor.freeSearchesRemaining) : COST_ONE, free: survivor.freeSearchesRemaining > 0, disabled: !isMyTurn || (survivor.hasSearched && !survivor.cheatMode) || (noAP && survivor.freeSearchesRemaining <= 0) }),
       renderActionButton({ id: 'btn-noise', icon: 'Volume2', label: es.hud.noise, cost: COST_ONE, disabled: !isMyTurn || noAP }),
       renderActionButton({ id: 'btn-door', icon: 'DoorOpen', label: es.hud.door, cost: COST_ONE, disabled: !isMyTurn || noAP || !canOpenDoor }),
       renderActionButton({ id: 'btn-trade', icon: 'Handshake', label: es.hud.trade, cost: COST_ONE, disabled: !isMyTurn || noAP }),
@@ -1087,6 +1091,12 @@ export class GameHUD {
       </div>`;
   }
 
+  /**
+   * Pips for free actions that have no button of their own — Move and the
+   * combat kinds are board clicks. Search is deliberately absent: its action
+   * button already wears the `Gratis` cost chip, and two Search glyphs side by
+   * side read as a bug.
+   */
   private renderFreeActionIndicators(survivor: Survivor): string {
     const indicators: string[] = [];
 
@@ -1101,9 +1111,6 @@ export class GameHUD {
     }
     if (survivor.freeRangedRemaining > 0) {
       indicators.push(`<span class="free-action-pip" title="${es.hud.freeRanged}">${icon('Crosshair', 'sm')}<span class="free-action-pip__count">${survivor.freeRangedRemaining}</span></span>`);
-    }
-    if (survivor.freeSearchesRemaining > 0) {
-      indicators.push(`<span class="free-action-pip" title="${es.hud.freeSearch}">${icon('Search', 'sm')}<span class="free-action-pip__count">${survivor.freeSearchesRemaining}</span></span>`);
     }
 
     if (indicators.length === 0) return '';
@@ -1123,13 +1130,13 @@ export class GameHUD {
     if (survivor.skills.includes('charge')) {
       buttons.push(renderActionButton({
         id: 'btn-charge', icon: 'Swords', label: es.hud.charge,
-        cost: COST_FREE, disabled: !isMyTurn || (survivor.chargeUsedThisTurn && !cheat),
+        cost: COST_FREE, free: true, disabled: !isMyTurn || (survivor.chargeUsedThisTurn && !cheat),
       }));
     }
     if (survivor.skills.includes('born_leader')) {
       buttons.push(renderActionButton({
         id: 'btn-born-leader', icon: 'Crown', label: es.hud.bornLeader,
-        cost: COST_FREE, disabled: !isMyTurn || (survivor.bornLeaderUsedThisTurn && !cheat),
+        cost: COST_FREE, free: true, disabled: !isMyTurn || (survivor.bornLeaderUsedThisTurn && !cheat),
       }));
     }
     if (survivor.skills.includes('bloodlust_melee')) {
@@ -1141,7 +1148,7 @@ export class GameHUD {
     if (survivor.skills.includes('lifesaver')) {
       buttons.push(renderActionButton({
         id: 'btn-lifesaver', icon: 'HeartHandshake', label: es.hud.lifesaver,
-        cost: COST_FREE, disabled: !isMyTurn || (survivor.lifesaverUsedThisTurn && !cheat),
+        cost: COST_FREE, free: true, disabled: !isMyTurn || (survivor.lifesaverUsedThisTurn && !cheat),
       }));
     }
     if (survivor.skills.includes('jump')) {
@@ -1153,7 +1160,7 @@ export class GameHUD {
     if (survivor.skills.includes('shove')) {
       buttons.push(renderActionButton({
         id: 'btn-shove', icon: 'Swords', label: es.hud.shove,
-        cost: COST_FREE, disabled: !isMyTurn || (survivor.shoveUsedThisTurn && !cheat),
+        cost: COST_FREE, free: true, disabled: !isMyTurn || (survivor.shoveUsedThisTurn && !cheat),
       }));
     }
 
@@ -1802,7 +1809,7 @@ export class GameHUD {
 
   // ─── Turn signal ─────────────────────────────────────────────
 
-  /** `Es tu turno · N acciones`, `Esperando a <nombre>` or `Fase de zombis`. */
+  /** `Es tu turno · N acciones`, `Esperando a <nombre>` or `Fase de zombies`. */
   private renderTurnLine(isMyTurn: boolean, survivor: Survivor): string {
     const state = this.state!;
     if (state.phase === GamePhase.Zombies) {

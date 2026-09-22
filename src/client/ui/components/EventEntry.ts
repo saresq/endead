@@ -100,7 +100,13 @@ function renderZombiePhase(entry: HistoryEntry, state: GameState): string {
       .filter(([, n]) => (n ?? 0) > 0)
       .map(([type, n]) => `${n} ${escapeHtml(zombieLabel(type as ZombieType, n ?? 0))}`);
     if (zombies.length) {
-      lines.push(`<div class="event-entry__line"><span class="event-entry__zone">${zone}:</span> ${zombies.join(', ')}</div>`);
+      // Rush cards place their Zombies and activate them on the spot
+      // (rules/08-zombies.md#zombie-rush), so the line always says so — the
+      // board shows them a zone away from where the card put them.
+      const rush = card.detail?.rush
+        ? ` <span class="event-entry__rush" title="${escapeHtml(es.log.rushHint)}">${escapeHtml(es.log.rush)}</span>`
+        : '';
+      lines.push(`<div class="event-entry__line"><span class="event-entry__zone">${zone}:</span> ${zombies.join(', ')}${rush}</div>`);
     }
   }
 

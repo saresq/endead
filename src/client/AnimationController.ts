@@ -15,6 +15,9 @@ export interface FxTarget {
 const FLOAT_TEXT_MS = 1200;
 const FLOAT_TEXT_RISE_PX = 30;
 const FLOAT_TEXT_FONT_PX = 22;
+const MOVE_MS = 300;
+/** Rush moves run slower — they happen inside one broadcast and must be seen. */
+export const RUSH_MOVE_MS = 700;
 
 export interface AnimationEvent {
   type: 'SPAWN' | 'MOVE' | 'ATTACK' | 'DEATH';
@@ -117,12 +120,14 @@ export class AnimationController {
   }
 
   /**
-   * Tween an entity from one screen position to another over ~300ms.
+   * Tween an entity from one screen position to another over ~300ms, or
+   * `durationMs` when the move is worth watching (a Rush, say).
    */
   public animateMove(
     entityId: EntityId,
     fromX: number, fromY: number,
-    toX: number, toY: number
+    toX: number, toY: number,
+    durationMs = MOVE_MS,
   ): void {
     const sprite = this.getSprite(entityId);
     if (!sprite) return;
@@ -132,7 +137,7 @@ export class AnimationController {
     // Start at the old position
     sprite.position.set(fromX, fromY);
 
-    const duration = 300; // ms
+    const duration = durationMs;
     const startTime = performance.now();
 
     const animate = () => {

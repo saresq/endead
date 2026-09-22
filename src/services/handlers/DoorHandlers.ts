@@ -1,5 +1,7 @@
 
 import { GameState, EquipmentCard, ZoneId } from '../../types/GameState';
+
+type SpawnContextCard = NonNullable<GameState['spawnContext']>['cards'][number];
 import { ActionRequest, ActionType } from '../../types/Action';
 import { ZombiePhaseManager } from '../ZombiePhaseManager';
 import { getConnection, openDoorEdge } from './handlerUtils';
@@ -62,13 +64,16 @@ export function handleOpenDoor(state: GameState, intent: ActionRequest): GameSta
       const card = ZombiePhaseManager.drawSpawnCard(newState);
       const detail = card?.[newState.currentDangerLevel];
       if (!card || !detail) continue;
-      newState.spawnContext!.cards.push({
+      const entry: SpawnContextCard = {
         zoneId: zid,
         cardId: card.id,
         detail,
         dangerLevel: newState.currentDangerLevel,
-      });
-      ZombiePhaseManager.applySpawnDetail(newState, zid, detail);
+      };
+      newState.spawnContext!.cards.push(entry);
+      // Rush cards move these out of the room right away — the ids let the
+      // client animate them leaving it instead of popping in beside the survivor.
+      entry.spawnedIds = ZombiePhaseManager.applySpawnDetail(newState, zid, detail);
     }
   }
 

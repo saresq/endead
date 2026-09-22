@@ -259,6 +259,26 @@ describe('handleOpenDoor — standard spawn rules (C6)', () => {
     expect(next.zombies.a1.position.zoneId).toBe('w');
   });
 
+  it('records the Rush zone and the ids it placed, even though they walk out of it', () => {
+    // rules/08-zombies.md#zombie-rush: the card places the Zombies, then they
+    // activate at once — so they leave the Dark Zone in the same broadcast.
+    const state = board({ zombies: { [ZombieType.Brute]: 2 }, rush: true }, {});
+    const next = openDoor(state, 'roomA');
+
+    const card = next.spawnContext!.cards[0];
+    expect(card.zoneId).toBe('roomA');
+    expect(card.detail.rush).toBe(true);
+    expect(card.spawnedIds).toEqual(Object.keys(next.zombies));
+    // They rushed the survivor: placed in roomA, standing in the street.
+    expect(Object.values(next.zombies).map(z => z.position.zoneId)).toEqual(['street', 'street']);
+  });
+
+  it('records no spawned ids for an Extra Activation card', () => {
+    const state = board({ extraActivation: ZombieType.Walker }, { w1: makeZombie('w1', ZombieType.Walker, 'w') });
+    const next = openDoor(state, 'roomA');
+    expect(next.spawnContext!.cards[0].spawnedIds).toEqual([]);
+  });
+
   it('queues wounds from a door-open activation and blocks play until resolved', () => {
     const state = board({ extraActivation: ZombieType.Walker }, { w1: makeZombie('w1', ZombieType.Walker, 'street') });
     state.survivors.s2 = makeSurvivor({ id: 's2', playerId: 'p1', zoneId: 'street' });

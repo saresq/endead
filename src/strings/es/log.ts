@@ -7,18 +7,18 @@ import { colorWord } from './objectives';
 export const log = {
   // --- Server-authored descriptions ---
   molotov: (killed: number, burned: number) =>
-    `Tiró una Molotov: eliminó ${killed} ${plural(killed, 'zombi', 'zombis')} y quemó a ${burned} ${plural(burned, 'superviviente', 'supervivientes')}`,
+    `Tiró una Molotov: eliminó ${killed} ${plural(killed, 'zombie', 'zombies')} y quemó a ${burned} ${plural(burned, 'superviviente', 'supervivientes')}`,
   attack: (weapon: string, dual: boolean, threshold: number) =>
     `Atacó con ${weapon}${dual ? ' (ambidiestro)' : ''} (necesita ${threshold}+)`,
-  doorOpened: (spawned: boolean) => (spawned ? 'Abrió una puerta: ¡aparecieron zombis!' : 'Abrió una puerta'),
+  doorOpened: (spawned: boolean) => (spawned ? 'Abrió una puerta: ¡aparecieron zombies!' : 'Abrió una puerta'),
   doorOpenedShort: 'Abrió una puerta',
   moved: 'Se movió',
-  shoved: (count: number) => `Empujó a ${count} ${plural(count, 'zombi', 'zombis')} a la zona de al lado`,
-  consumed: (item: string) => `Consumió ${item} (+1 PX)`,
+  shoved: (count: number) => `Empujó a ${count} ${plural(count, 'zombie', 'zombies')} a la zona de al lado`,
+  consumed: (item: string) => `Consumió ${item} (+1 XP)`,
   found: (items: string[], traps: number) => `Encontró: ${items.join(', ')}${traps > 0 ? ` (${traps} Aaahh!!)` : ''}`,
-  searchTrap: 'Aaahh!!: ¡apareció un zombi!',
+  searchTrap: 'Aaahh!!: ¡apareció un zombie!',
   epicWeapon: (weapon: string) => `Sacó un arma épica: ${weapon}`,
-  tookObjective: (color: string, xp: number) => `Tomó un objetivo ${colorWord(color, 1)} (+${xp} PX)`,
+  tookObjective: (color: string, xp: number) => `Tomó un objetivo ${colorWord(color, 1)} (+${xp} XP)`,
   cheat: (previousName: string, cheatName: string) =>
     `${previousName} activó un truco: ahora juega como ${cheatName} con acciones ilimitadas.`,
   /** Stored in `lastAction.freeActionType` and shown as a chip. */
@@ -49,7 +49,10 @@ export const log = {
   damageEach: (n: number) => ` · ${n} de daño cada uno`,
   /** `label` is the plural zombie name. */
   extraActivation: (label: string) => `Activación extra: ${label}`,
-  zombieWounds: 'Heridas de zombis',
+  /** Rush card marker on a spawn line: placed, then activated on the spot. */
+  rush: '¡Rush!',
+  rushHint: 'aparecen y activan al instante',
+  zombieWounds: 'Heridas de zombies',
   inZone: (zone: string) => `en ${zone}`,
   tradeWith: (name: string) => `con ${name}`,
 } as const;

@@ -275,6 +275,11 @@ export interface LobbyState {
     name: string; // Display name
     ready: boolean;
     characterClass: string; // Selected character
+    /**
+     * Starting weapon claimed from the six-card grey supply. Optional so
+     * states serialized before lobby weapon choice still parse.
+     */
+    startingWeapon?: string;
   }[];
   /**
    * Set when the host (lobby.players[0]) drops in lobby phase and at
@@ -481,6 +486,10 @@ export interface GameState {
           cardId: string;
           detail: SpawnDetail; // The detail that was applied
           dangerLevel: DangerLevel;
+          /** Ids of the zombies this card placed, in placement order. A Rush card
+           *  activates them right after placing, so the client animates them out
+           *  of `zoneId` instead of popping them in wherever they ended up. */
+          spawnedIds?: string[];
       }[];
       /** Wounds applied directly by zombie attacks this phase (not deferred decisions). */
       zombieWounds?: { survivorId: string; zoneId: string; amount: number }[];

@@ -8,7 +8,7 @@ import { plural } from './core';
 export const modals = {
   waiting: {
     hostAssigning: (host: string, n: number, zone: string) =>
-      `${host} está repartiendo ${n} ${plural(n, 'herida', 'heridas')} de zombi en ${zone}`,
+      `${host} está repartiendo ${n} ${plural(n, 'herida', 'heridas')} de zombie en ${zone}`,
     playerAssigning: (name: string, n: number, zone: string) =>
       `${name} está repartiendo ${n} ${plural(n, 'fallo', 'fallos')} de fuego amigo en ${zone}`,
     resolvingWounds: (name: string) => `${name} está resolviendo sus heridas`,
@@ -28,10 +28,10 @@ export const modals = {
   },
 
   woundDist: {
-    title: 'Repartir heridas de zombis',
+    title: 'Repartir heridas de zombies',
     titleFriendlyFire: 'Repartir el fuego amigo',
     desc: (count: string, n: number, zone: string) =>
-      `${count} ${plural(n, 'herida', 'heridas')} de zombi en ${zone}. Repartilas entre los supervivientes.`,
+      `${count} ${plural(n, 'herida', 'heridas')} de zombie en ${zone}. Repartilas entre los supervivientes.`,
     descFriendlyFire: (count: string, n: number, zone: string, damage: number) =>
       `${count} ${plural(n, 'fallo', 'fallos')} en ${zone}. Cada uno hace ${damage} ${plural(damage, 'herida', 'heridas')}: repartilos entre los supervivientes.`,
     assigned: 'Asignadas:',

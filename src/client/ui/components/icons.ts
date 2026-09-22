@@ -61,6 +61,7 @@ import {
   LocateFixed,
   ScrollText,
   RotateCcw,
+  RotateCw,
   type IconNode,
 } from 'lucide';
 
@@ -122,6 +123,7 @@ const ICON_REGISTRY: Record<string, IconNode> = {
   LocateFixed,
   ScrollText,
   RotateCcw,
+  RotateCw,
 };
 
 export function icon(name: string, size: IconSize = 'md'): string {

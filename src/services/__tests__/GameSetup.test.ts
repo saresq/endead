@@ -3,10 +3,14 @@ import { handleStartGame } from '../handlers/LobbyHandlers';
 import { ActionType } from '../../types/Action';
 import { GameState, GamePhase, initialGameState } from '../../types/GameState';
 import { seedFromString } from '../Rng';
-import { CHARACTER_DEFINITIONS, STARTING_EQUIPMENT_DECK, FIRST_PLAYER_EQUIPMENT_ID } from '../../config/CharacterRegistry';
+import { CHARACTER_DEFINITIONS, STARTING_EQUIPMENT_DECK } from '../../config/CharacterRegistry';
 import { DEFAULT_MAP } from '../../config/DefaultMap';
 
 const CHARACTERS = Object.keys(CHARACTER_DEFINITIONS);
+
+// Weapons are claimed in the lobby (see StartingWeaponChoice.test.ts); these
+// setup tests only need a squad that finished claiming.
+const CLAIMS = ['fire_axe', 'crowbar', 'pistol', 'baseball_bat'];
 
 function lobby(playerCount: number, seedString: string): GameState {
   const state = structuredClone(initialGameState) as GameState;
@@ -17,6 +21,7 @@ function lobby(playerCount: number, seedString: string): GameState {
     name: `P${i + 1}`,
     ready: true,
     characterClass: CHARACTERS[i],
+    startingWeapon: CLAIMS[i],
   })) as never;
   return state;
 }
@@ -30,46 +35,23 @@ function start(state: GameState): GameState {
 const weaponOf = (state: GameState, playerId: string) =>
   state.survivors[`survivor-${playerId}`].inventory[0]?.equipmentId;
 
-describe('Starting equipment is dealt at random (D2)', () => {
-  it('deals one weapon per survivor from the Starting Equipment deck', () => {
-    const next = start(lobby(4, 'deal-a'));
+describe('Starting equipment comes from the lobby claims (D2)', () => {
+  it('gives each survivor a card from the Starting Equipment supply', () => {
+    const next = start(lobby(4, 'claims'));
 
-    const dealt = ['p1', 'p2', 'p3', 'p4'].map(id => weaponOf(next, id));
-    expect(dealt).toHaveLength(4);
-    for (const equipmentId of dealt) {
+    const held = ['p1', 'p2', 'p3', 'p4'].map(id => weaponOf(next, id));
+    expect(held).toEqual(CLAIMS);
+    for (const equipmentId of held) {
       expect(STARTING_EQUIPMENT_DECK).toContain(equipmentId as never);
     }
-    // One card each: only the three Pistols may repeat.
-    const nonPistols = dealt.filter(id => id !== 'pistol');
-    expect(new Set(nonPistols).size).toBe(nonPistols.length);
   });
 
-  it('is reproducible from the seed', () => {
-    const a = start(lobby(4, 'deal-same'));
-    const b = start(lobby(4, 'deal-same'));
+  it('stamps ids that the discard pile drops out of play', () => {
+    const next = start(lobby(4, 'claims'));
 
-    for (const id of ['p1', 'p2', 'p3', 'p4']) {
-      expect(weaponOf(a, id)).toBe(weaponOf(b, id));
+    for (const playerId of next.players) {
+      expect(next.survivors[`survivor-${playerId}`].inventory[0].id).toMatch(/^card-start-/);
     }
-  });
-
-  it('two seeds can deal differently', () => {
-    const a = ['p1', 'p2', 'p3', 'p4'].map(id => weaponOf(start(lobby(4, 'deal-a')), id));
-    const b = ['p1', 'p2', 'p3', 'p4'].map(id => weaponOf(start(lobby(4, 'deal-b')), id));
-
-    // Not a guarantee for any single pair of seeds, but these two differ.
-    expect(a).not.toEqual(b);
-  });
-});
-
-describe('The Fire Axe holder goes first (D2)', () => {
-  it('gives the first player token to whoever was dealt the axe', () => {
-    const next = start(lobby(4, 'deal-a'));
-
-    const holder = next.players.find(id => weaponOf(next, id) === FIRST_PLAYER_EQUIPMENT_ID);
-    expect(holder).toBeDefined();
-    expect(next.players[next.firstPlayerTokenIndex]).toBe(holder);
-    expect(next.activePlayerIndex).toBe(next.firstPlayerTokenIndex);
   });
 });
 

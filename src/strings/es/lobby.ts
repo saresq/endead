@@ -20,6 +20,15 @@ export const lobby = {
   pickAria: (name: string) => `Elegir a ${name}`,
   takenBy: (character: string, player: string) => `${character} (lo eligió ${player})`,
 
+  // You: starting weapon grid
+  pickWeapon: 'Elegí tu arma inicial',
+  pickWeaponAria: (weapon: string) => `Elegir ${weapon}`,
+  weaponGoneAria: (weapon: string) => `${weapon} (no quedan)`,
+  weaponLeft: (n: number) => `Quedan ${n}`,
+  weaponGone: 'Agotada',
+  weaponMine: 'Tuya',
+  opensDoors: 'Abre puertas',
+
   // Players list
   players: 'Jugadores',
   playerFallback: 'Jugador',
@@ -61,12 +70,14 @@ export const lobby = {
 
   // Dossier
   dossierTitle: (name: string) => `Superviviente · ${name}`,
+  dossierMore: 'Ver árbol completo',
+  dossierMoreAria: (name: string) => `Ver el árbol de habilidades de ${name}`,
   survivor: 'Superviviente',
   profile: 'Ficha',
   health: (n: number) => `${n} ${n === 1 ? 'herida' : 'heridas'} para caer`,
   survivorType: { Classic: 'Clásico', Kid: 'Niño' } as Record<string, string>,
   kidNote: 'Escurridizo una vez por turno en un movimiento.',
-  xp: (n: number) => `${n} PX`,
+  xp: (n: number) => `${n} XP`,
   progression: 'Habilidades por nivel',
   pickOne: (n: number) => `Elegí 1 de ${n}`,
 } as const;

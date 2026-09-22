@@ -98,7 +98,7 @@ describe('Pending skill choice', () => {
 describe('Per-turn reset at game start', () => {
   it('gives Amy her free Move in round 1', () => {
     const lobby = structuredClone(initialGameState) as GameState;
-    lobby.lobby.players = [{ id: 'p1', name: 'P1', ready: true, characterClass: 'Amy' } as any];
+    lobby.lobby.players = [{ id: 'p1', name: 'P1', ready: true, characterClass: 'Amy', startingWeapon: 'pistol' } as any];
     const started = handleStartGame(lobby, { playerId: 'p1', type: ActionType.START_GAME });
     expect(started.survivors['survivor-p1'].freeMovesRemaining).toBe(1);
   });

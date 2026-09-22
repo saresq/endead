@@ -117,8 +117,8 @@
 /* TURN chip — paper card with an ink outline */
 .hud-turnchip {
   display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
+  align-items: center;
+  gap: 5px;
   padding: 3px 10px;
   background: var(--paper);
   border: var(--border);
@@ -136,7 +136,11 @@
 .hud-turnchip:hover { background: var(--paper-2); }
 .hud-turnchip:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 
-.hud-turnchip__label { color: var(--text-muted); }
+.hud-turnchip__label {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-muted);
+}
 
 .hud-turnchip__value {
   font-family: var(--font-stencil);
@@ -474,6 +478,14 @@
   font-size: 10px; color: var(--text-2); letter-spacing: 0.1em; text-transform: uppercase;
 }
 
+.event-entry__rush {
+  display: inline-block; padding: 1px 5px; margin-left: 4px;
+  background: var(--danger-orange-soft); color: var(--danger-orange);
+  border: 1px solid var(--danger-orange); border-radius: var(--radius-sm);
+  font-family: var(--font-stencil); font-size: 9px;
+  text-transform: uppercase; letter-spacing: 0.1em; vertical-align: middle;
+}
+
 .event-entry__extra { display: block; font-size: 10px; color: var(--accent-text); font-weight: 700; letter-spacing: 0.04em; }
 .event-entry__badges { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
 
@@ -548,12 +560,20 @@
 .hud-actionstrip .action-btn__spacer,
 .hud-actionstrip .action-btn__kbd { display: none; }
 
+/* Corner tag, deliberately overlapping the icon: it reads as a sticker on the
+   button, not as a third row. Keeps the 56px button from growing. `z-index`
+   beats the icon's own 3, or the glyph draws straight through the tag. */
 .hud-actionstrip .action-btn__cost {
   position: absolute;
   top: 2px;
   right: 2px;
-  font-size: 8px;
-  padding: 0 2px;
+  z-index: 4;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 0 3px;
+  max-width: calc(100% - 4px);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ==========================================================================

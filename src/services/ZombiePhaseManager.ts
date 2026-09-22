@@ -135,16 +135,17 @@ export class ZombiePhaseManager {
        const detail: SpawnDetail = card[currentLevel];
        if (!detail) continue;
 
+       const entry = {
+           zoneId: zone.id,
+           cardId: card.id,
+           detail: detail,
+           dangerLevel: currentLevel,
+       } as NonNullable<GameState['spawnContext']>['cards'][number];
        if (newState.spawnContext) {
-           newState.spawnContext.cards.push({
-               zoneId: zone.id,
-               cardId: card.id,
-               detail: detail,
-               dangerLevel: currentLevel
-           });
+           newState.spawnContext.cards.push(entry);
        }
 
-       this.applySpawnDetail(newState, zone.id, detail);
+       entry.spawnedIds = this.applySpawnDetail(newState, zone.id, detail);
     }
 
     return newState;
@@ -240,18 +241,21 @@ export class ZombiePhaseManager {
     zombie.position.zoneId = options[taken % options.length];
   }
 
-  public static applySpawnDetail(state: GameState, zoneId: ZoneId, detail: SpawnDetail) {
+  /** Applies one drawn card to `zoneId`. Returns the ids it placed, in placement
+   *  order — a Rush card moves them off `zoneId` immediately, so the caller
+   *  records them for the client to animate. */
+  public static applySpawnDetail(state: GameState, zoneId: ZoneId, detail: SpawnDetail): string[] {
       // Handle Extra Activation: re-activate ALL zombies of that type
       // Per rulebook §9/§15: Extra Activation cards have no effect at Blue Danger Level
       if (detail.extraActivation) {
-         if (state.currentDangerLevel === DangerLevel.Blue) return;
+         if (state.currentDangerLevel === DangerLevel.Blue) return [];
          this.activateZombieSet(state, this.idsOfType(state, detail.extraActivation));
-         return;
+         return [];
       }
 
       // Normal Spawn (with Abomination rules and pool exhaustion)
+      const spawnedIds: string[] = [];
       if (detail.zombies) {
-         const spawnedIds: string[] = [];
 
          for (const [type, count] of Object.entries(detail.zombies)) {
             const zombieType = type as ZombieType;
@@ -287,8 +291,7 @@ export class ZombiePhaseManager {
             // Spawn up to available pool count
             const toSpawn = Math.min(count as number, available);
             for (let i = 0; i < toSpawn; i++) {
-               this.spawnZombie(state, zoneId, zombieType);
-               spawnedIds.push(`zombie-${state.nextZombieId - 1}`);
+               spawnedIds.push(this.spawnZombie(state, zoneId, zombieType));
             }
 
             // If we couldn't place all, trigger extra activation for that type
@@ -302,9 +305,12 @@ export class ZombiePhaseManager {
            this.activateZombieSet(state, spawnedIds);
          }
       }
+
+      return spawnedIds;
   }
 
-  public static spawnZombie(state: GameState, zoneId: ZoneId, type: ZombieType) {
+  /** Places one zombie in `zoneId` and returns its id. */
+  public static spawnZombie(state: GameState, zoneId: ZoneId, type: ZombieType): string {
     // Generate unique ID using monotonic counter
     const zombieNum = state.nextZombieId ?? 1;
     state.nextZombieId = zombieNum + 1;
@@ -328,6 +334,7 @@ export class ZombiePhaseManager {
       wounds: 0,
     };
     state.zombies[id] = zombie;
+    return id;
   }
 
   public static getCurrentDangerLevel(state: GameState): DangerLevel {

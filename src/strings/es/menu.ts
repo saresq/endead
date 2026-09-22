@@ -2,7 +2,7 @@
 // Entry screen (MenuUI) and the messages main.ts sends back to it.
 
 export const menu = {
-  subline: 'Apoka zombi · supervivencia cooperativa',
+  subline: 'Apoka zombie · supervivencia cooperativa',
   nameLabel: 'Tu nombre',
   namePlaceholder: 'Cómo te ven los demás',
   createRoom: 'Crear sala',

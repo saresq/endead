@@ -4,7 +4,6 @@
 
 import { EquipmentCard } from '../types/GameState';
 import { EQUIPMENT_CARDS } from './EquipmentRegistry';
-import { Rng, RngState } from '../services/Rng';
 
 /** Classic survivors have 3 Health; Kids have 2 and Slippery once per Turn. */
 export type SurvivorType = 'Classic' | 'Kid';
@@ -45,9 +44,14 @@ export const CHARACTER_DEFINITIONS: Record<string, CharacterDefinition> = {
 };
 
 /**
- * Starting Equipment deck (rules/16-card-registry.md#starting-equipment-6-cards-grey-backs) — 6 grey-back cards, one dealt
- * per survivor at setup. Not part of the Equipment deck, and it never returns
- * to one: `DeckService.discard` drops `card-start-` ids out of play.
+ * Starting Equipment deck (rules/16-card-registry.md#starting-equipment-6-cards-grey-backs) — 6 grey-back cards. Not part
+ * of the Equipment deck, and it never returns to one: `DeckService.discard`
+ * drops `card-start-` ids out of play.
+ *
+ * House rule: the rulebook deals these at random. Here each player claims one
+ * in the lobby, so a squad can never start without a door opener. The supply
+ * is still the rulebook's six cards, so the Pistol can be claimed three times
+ * and everything else once.
  */
 export const STARTING_EQUIPMENT_DECK = [
   'baseball_bat',
@@ -61,7 +65,18 @@ export const STARTING_EQUIPMENT_DECK = [
 /** The card whose holder takes the first player token (rules/03-setup.md#first-player). */
 export const FIRST_PLAYER_EQUIPMENT_ID = 'fire_axe';
 
-function buildEquipment(equipmentKey: string, index: number): EquipmentCard | null {
+/** How many of each starting weapon the supply holds, keyed by equipment id. */
+export const STARTING_WEAPON_SUPPLY: Record<string, number> = STARTING_EQUIPMENT_DECK
+  .reduce<Record<string, number>>((counts, key) => {
+    counts[key] = (counts[key] ?? 0) + 1;
+    return counts;
+  }, {});
+
+/**
+ * Builds one starting weapon card, in hand. `index` only keeps ids unique
+ * across the squad, since the same key can be claimed more than once.
+ */
+export function buildStartingCard(equipmentKey: string, index: number): EquipmentCard | null {
   const template = EQUIPMENT_CARDS[equipmentKey];
   if (!template) return null;
 
@@ -72,30 +87,4 @@ function buildEquipment(equipmentKey: string, index: number): EquipmentCard | nu
     inHand: true,
     slot: 'HAND_1',
   };
-}
-
-/**
- * Deals one starting weapon per survivor from the shuffled Starting Equipment
- * deck. Seeded, so a game is reproducible from `GameState.seed`.
- */
-export function dealStartingEquipment(
-  count: number,
-  seed: RngState,
-): { cards: EquipmentCard[]; newSeed: RngState } {
-  const rng = Rng.from(seed);
-  const deck = [...STARTING_EQUIPMENT_DECK];
-  for (let m = deck.length - 1; m > 0; m--) {
-    const i = rng.nextInt(m + 1);
-    const t = deck[m];
-    deck[m] = deck[i];
-    deck[i] = t;
-  }
-
-  const cards: EquipmentCard[] = [];
-  for (let i = 0; i < count; i++) {
-    const card = buildEquipment(deck[i % deck.length], i);
-    if (card) cards.push(card);
-  }
-
-  return { cards, newSeed: rng.snapshot() };
 }

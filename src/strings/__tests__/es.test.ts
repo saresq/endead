@@ -38,9 +38,9 @@ describe('es strings coverage', () => {
 
 describe('es helpers', () => {
   it('plural picks the singular only for 1', () => {
-    expect(plural(1, 'zombi', 'zombis')).toBe('zombi');
-    expect(plural(0, 'zombi', 'zombis')).toBe('zombis');
-    expect(plural(3, 'zombi', 'zombis')).toBe('zombis');
+    expect(plural(1, 'zombie', 'zombies')).toBe('zombie');
+    expect(plural(0, 'zombie', 'zombies')).toBe('zombies');
+    expect(plural(3, 'zombie', 'zombies')).toBe('zombies');
   });
 
   it('equipmentName resolves by id and falls back to card name', () => {
@@ -59,7 +59,7 @@ describe('es helpers', () => {
 
   it('value functions format', () => {
     expect(es.zones.street(1, 2)).toBe('Zona de calle (1, 2)');
-    expect(es.zones.spawn(3)).toBe('Aparición 3');
+    expect(es.zones.spawn(3)).toBe('Spawn 3');
     expect(es.common.actions(1)).toBe('1 acción');
     expect(es.common.actions(3)).toBe('3 acciones');
   });

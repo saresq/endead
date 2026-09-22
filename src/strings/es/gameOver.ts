@@ -5,7 +5,7 @@ export const gameOver = {
   defeat: 'Derrota',
   abandoned: 'Partida abandonada',
   victoryDesc: 'Todos los supervivientes escaparon.',
-  defeatDesc: 'Los zombis los superaron.',
+  defeatDesc: 'Los zombies los superaron.',
   abandonedDesc: (name: string) => `${name} abandonó la partida.`,
   playAgain: 'Jugar de nuevo',
   waitingHost: 'Esperando al anfitrión…',

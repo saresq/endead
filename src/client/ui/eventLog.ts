@@ -4,7 +4,8 @@
  */
 
 import type { GameState } from '../../types/GameState';
-import { es } from '../../strings/es';
+import { DangerLevel, ZombieType } from '../../types/GameState';
+import { es, zombieLabel } from '../../strings/es';
 
 export type HistoryEntry = GameState['history'][number];
 
@@ -14,7 +15,7 @@ export type HistoryEntry = GameState['history'][number];
  * moves inside the session and closing it are bookkeeping.
  */
 const HIDDEN_ACTIONS = new Set([
-  'JOIN_LOBBY', 'START_GAME', 'SELECT_CHARACTER', 'UPDATE_NICKNAME', 'KICK_PLAYER',
+  'JOIN_LOBBY', 'START_GAME', 'SELECT_CHARACTER', 'SELECT_WEAPON', 'UPDATE_NICKNAME', 'KICK_PLAYER',
   'DISCONNECT', 'RESOLVE_SEARCH', 'CHOOSE_SKILL', 'END_GAME', 'ABANDON',
   'ORGANIZE', 'ORGANIZE_END',
 ]);
@@ -75,7 +76,7 @@ export function groupByRound(entries: readonly HistoryEntry[], currentRound?: nu
   }));
 }
 
-export type CueTone = 'hit' | 'miss' | 'wound' | 'spawn' | 'info';
+export type CueTone = 'hit' | 'miss' | 'wound' | 'spawn' | 'rush' | 'info';
 
 export interface BoardCue {
   zoneId: string;
@@ -91,6 +92,21 @@ function attackZone(entry: HistoryEntry, history: readonly HistoryEntry[], index
     if (e.actionType === 'ATTACK' && e.survivorId === entry.survivorId) return e.payload?.targetZoneId;
   }
   return undefined;
+}
+
+/**
+ * Zombie id → the zone a Rush card placed it in. The card activates them right
+ * after placing (rules/08-zombies.md#zombie-rush), so the state that reaches the
+ * client already has them a zone away; the board animates them leaving instead
+ * of popping them in beside the survivor they walked up to.
+ */
+export function rushOriginsFrom(ctx: GameState['spawnContext']): Map<string, string> {
+  const origins = new Map<string, string>();
+  for (const card of ctx?.cards ?? []) {
+    if (!card.detail?.rush) continue;
+    for (const id of card.spawnedIds ?? []) origins.set(id, card.zoneId);
+  }
+  return origins;
 }
 
 /** Short floating texts for what changed between two states. */
@@ -110,16 +126,40 @@ export function boardCuesFor(prev: GameState, next: GameState): BoardCue[] {
             : { zoneId, text: es.cues.miss, tone: 'miss' });
         }
       }
-      if (entry.actionType === 'OPEN_DOOR' && entry.payload?.targetZoneId) {
-        cues.push({ zoneId: entry.payload.targetZoneId, text: es.cues.doorOpen, tone: 'info' });
-      }
-      const perZone = new Map<string, number>();
+      // Cues stack upwards in the order they are pushed, so the door line goes
+      // last: on a building spawn it shares the zone with the card's cues and
+      // reads as the heading above them.
+      const doorZoneId = entry.actionType === 'OPEN_DOOR' ? entry.payload?.targetZoneId : undefined;
+
       for (const card of entry.spawnContext?.cards ?? []) {
-        const count = Object.values(card.detail?.zombies ?? {}).reduce((s, n) => s + (n ?? 0), 0);
-        if (count > 0) perZone.set(card.zoneId, (perZone.get(card.zoneId) ?? 0) + count);
+        // Extra Activation places nothing and does nothing at Blue
+        // (rules/10-zombie-phase.md#extra-activation-cards) — name the type that moves.
+        if (card.detail?.extraActivation) {
+          if (card.dangerLevel === DangerLevel.Blue) continue;
+          cues.push({
+            zoneId: card.zoneId,
+            text: es.cues.extraActivation(zombieLabel(card.detail.extraActivation, 2)),
+            tone: 'rush',
+          });
+          continue;
+        }
+        for (const [type, count] of Object.entries(card.detail?.zombies ?? {})) {
+          if (!count) continue;
+          cues.push({
+            zoneId: card.zoneId,
+            text: es.cues.spawned(count, zombieLabel(type as ZombieType, count)),
+            tone: 'spawn',
+          });
+        }
+        // A Rush card places its zombies here and activates them at once
+        // (rules/08-zombies.md#zombie-rush), so they are already a zone away.
+        if (card.detail?.rush && (card.spawnedIds?.length ?? 0) > 0) {
+          cues.push({ zoneId: card.zoneId, text: es.cues.rush, tone: 'rush' });
+        }
       }
-      for (const [zoneId, count] of perZone) {
-        cues.push({ zoneId, text: `+${count}`, tone: 'spawn' });
+
+      if (doorZoneId) {
+        cues.push({ zoneId: doorZoneId, text: es.cues.doorOpen, tone: 'info' });
       }
     }
   }

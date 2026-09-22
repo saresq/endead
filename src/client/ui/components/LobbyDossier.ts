@@ -112,3 +112,51 @@ export function renderLobbyDossier(charClass: string, role: string): string {
 
   return parts.join('<div class="lobby-operative__divider" aria-hidden="true"></div>');
 }
+
+/**
+ * Compact dossier for the lobby's character grid: the three lines a player
+ * reads before committing — role, type and health, and the skill they start
+ * with — plus a way into the full tree. Rendered inline under the roster so
+ * picking a survivor never covers the grid, the weapons or the start button.
+ */
+export function renderLobbyDossierStrip(charClass: string, role: string): string {
+  const charDef = CHARACTER_DEFINITIONS[charClass];
+  if (!charDef) return '';
+
+  const typeLabel = es.lobby.survivorType[charDef.type] ?? charDef.type;
+  const blueSkills = (SURVIVOR_CLASSES[charClass]?.[DangerLevel.Blue] ?? [])
+    .filter(id => SKILL_DEFINITIONS[id]);
+
+  const skillLines = blueSkills.map(id => `
+    <p class="lobby-strip__skill">
+      <span class="fm-stencil lobby-strip__skill-name">${escHtml(skillName(id))}</span>
+      <span class="lobby-strip__skill-text">${escHtml(skillDescription(id))}</span>
+    </p>
+  `).join('');
+
+  const kidNote = charDef.type === 'Kid'
+    ? `<p class="lobby-strip__note fm-mono">${escHtml(es.lobby.kidNote)}</p>`
+    : '';
+
+  return `
+    <div class="lobby-strip">
+      <div class="lobby-strip__head">
+        <div class="fm-stencil lobby-strip__name">${escHtml(charClass)}</div>
+        <div class="lobby-strip__role fm-mono">${escHtml(role)}</div>
+      </div>
+      <div class="lobby-strip__pips">
+        <span class="lobby-strip__pip lobby-strip__pip--health">${escHtml(typeLabel)} · ${escHtml(es.lobby.health(charDef.maxHealth))}</span>
+        <span class="lobby-strip__pip lobby-strip__pip--rank">${escHtml(es.danger[DangerLevel.Blue])} · ${escHtml(es.lobby.xp(0))}</span>
+      </div>
+      ${skillLines}
+      ${kidNote}
+      <button
+        type="button"
+        class="lobby-strip__more"
+        data-action="open-dossier"
+        data-id="${escHtml(charClass)}"
+        aria-label="${escHtml(es.lobby.dossierMoreAria(charClass))}"
+      >${escHtml(es.lobby.dossierMore)}</button>
+    </div>
+  `;
+}

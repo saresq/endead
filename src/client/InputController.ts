@@ -12,6 +12,7 @@ import { RenderOptions } from './PixiBoardRenderer';
 import { modalManager } from './ui/overlays/ModalManager';
 import { getZombieTypeDisplay } from './config/ZombieTypeConfig';
 import { icon } from './ui/components/icons';
+import { openableDoorZones, openableDoorEdges } from './utils/doorTargets';
 import { renderButton } from './ui/components/Button';
 import { notificationManager } from './ui/NotificationManager';
 import { es, equipmentName } from '../strings/es';
@@ -99,6 +100,7 @@ export class InputController {
       pendingMoveZoneId: pendingMoveZoneId || undefined,
       moveCostByZone,
       availableDoorZones,
+      openableDoorEdges: openableDoorEdges(state, this.selectedSurvivorId, this.localPlayerId),
       sprintZones,
       attackZones,
     };
@@ -137,9 +139,14 @@ export class InputController {
     const activePlayerId = currentState.players[currentState.activePlayerIndex];
     const isMyTurn = activePlayerId === this.localPlayerId;
 
-    // 1. Check for Survivor Click (Selection) - Allowed ANYTIME
-    const clickedSurvivorId = this.hitTestSurvivors(wx, wy, currentState);
-    
+    // 1. Check for Survivor Click (Selection) - Allowed ANYTIME, except while
+    // targeting: a melee attack, Lifesaver and Shove all aim at a zone a
+    // survivor is standing in, and the token covers the middle of that zone.
+    // Treating those clicks as a re-selection swallowed them silently.
+    const clickedSurvivorId = this.interactionMode === 'DEFAULT'
+      ? this.hitTestSurvivors(wx, wy, currentState)
+      : null;
+
     if (clickedSurvivorId) {
       const survivor = currentState.survivors[clickedSurvivorId];
       if (survivor && survivor.playerId === this.localPlayerId) {
@@ -170,7 +177,13 @@ export class InputController {
         const currentZone = currentState.zones[survivor.position.zoneId];
 
         if (this.interactionMode === 'ATTACK') {
-          this.handleAttackClick(currentState, clickedZoneId, survivor);
+          // A closed door blocks line of sight, so a zone behind one is never
+          // attackable — the armed weapon opens it instead.
+          if (this.getAvailableDoorZones(currentState).includes(clickedZoneId)) {
+            this.sendOpenDoorAction(clickedZoneId);
+          } else {
+            this.handleAttackClick(currentState, clickedZoneId, survivor);
+          }
           this.setMode('DEFAULT');
         } else if (this.interactionMode === 'OPEN_DOOR') {
           this.sendOpenDoorAction(clickedZoneId);
@@ -504,26 +517,20 @@ export class InputController {
     return targets;
   }
 
+  /**
+   * Zones whose door the next click would open — the gold wash. Door targeting
+   * is explicit (the Open Door action), but an armed weapon that opens doors
+   * targets them too: a closed door blocks line of sight, so a zone behind one
+   * can never be an attack target and the click can only mean "open it".
+   */
   private getAvailableDoorZones(state: GameState): ZoneId[] {
-    if (this.interactionMode !== 'OPEN_DOOR' || !this.selectedSurvivorId) return [];
-
-    const activePlayerId = state.players[state.activePlayerIndex];
-    if (activePlayerId !== this.localPlayerId) return [];
-
-    const survivor = state.survivors[this.selectedSurvivorId];
-    if (!survivor || survivor.playerId !== this.localPlayerId) return [];
-
-    // Check if survivor has door-opening equipment in hand
-    const hasOpener = survivor.inventory.some(c => c.inHand && c.canOpenDoor);
-    if (!hasOpener) return [];
-
-    const currentZone = state.zones[survivor.position.zoneId];
-    if (!currentZone) return [];
-
-    // Return zones connected via closed doors
-    return currentZone.connections
-      .filter(c => c.hasDoor && !c.doorOpen)
-      .map(c => c.toZoneId);
+    if (this.interactionMode === 'OPEN_DOOR') {
+      return openableDoorZones(state, this.selectedSurvivorId, this.localPlayerId);
+    }
+    if (this.interactionMode === 'ATTACK') {
+      return openableDoorZones(state, this.selectedSurvivorId, this.localPlayerId, this.selectedWeaponId);
+    }
+    return [];
   }
 
   private clearPendingMove(): void {

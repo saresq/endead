@@ -69,6 +69,9 @@ export const BOARD_THEME = {
     plankBorderAlpha: 1,
     highlightColor: 0xffcc1a,    // matches --highlight
     highlightAlpha: 0.4,
+    openableBorder: 0xffcc1a,    // matches --highlight
+    openableBorderAlpha: 1,
+    openableBorderWidth: 2,
   },
   attack: {
     fillColor: 0xc7241c,         // matches --accent
@@ -220,6 +223,7 @@ export const BOARD_THEME = {
     miss: 0xdcd2b9,             // matches --paper
     wound: 0xc7241c,            // matches --accent
     spawn: 0xd8661c,            // matches --danger-orange
+    rush: 0xc7241c,             // matches --accent (Rush cards: spawn, then move)
     info: 0xffcc1a,             // matches --highlight
     stroke: 0x1a1614,           // matches --ink
   },

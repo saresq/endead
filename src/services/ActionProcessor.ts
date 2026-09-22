@@ -8,7 +8,7 @@ import { XPManager } from './XPManager';
 import { DANGER_VALUES } from '../config/DangerValues';
 
 // --- Handler imports ---
-import { handleJoinLobby, handleUpdateNickname, handleSelectCharacter, handleStartGame, handleEndGame } from './handlers/LobbyHandlers';
+import { handleJoinLobby, handleUpdateNickname, handleSelectCharacter, handleSelectWeapon, handleStartGame, handleEndGame } from './handlers/LobbyHandlers';
 import { handleMove, handleSprint } from './handlers/MovementHandlers';
 import { handleAttack, handleReload, handleResolveWounds, handleDistributeZombieWounds, handleRerollLucky } from './handlers/CombatHandlers';
 import { handleCharge, handleBornLeader, handleBloodlustMelee, handleLifesaver, handleChooseSkill, handleJump, handleShove } from './handlers/SkillHandlers';
@@ -28,6 +28,7 @@ const handlers: Partial<Record<ActionType, ActionHandler>> = {
   [ActionType.JOIN_LOBBY]: handleJoinLobby,
   [ActionType.UPDATE_NICKNAME]: handleUpdateNickname,
   [ActionType.SELECT_CHARACTER]: handleSelectCharacter,
+  [ActionType.SELECT_WEAPON]: handleSelectWeapon,
   [ActionType.START_GAME]: handleStartGame,
   [ActionType.END_GAME]: handleEndGame,
   [ActionType.MOVE]: handleMove,
@@ -146,7 +147,7 @@ const DECISION_ACTIONS = [
 // Not subject to turn checks nor blocked by pending wounds.
 const UNBLOCKED_ACTIONS = [
   ...DECISION_ACTIONS,
-  ActionType.JOIN_LOBBY, ActionType.UPDATE_NICKNAME, ActionType.SELECT_CHARACTER,
+  ActionType.JOIN_LOBBY, ActionType.UPDATE_NICKNAME, ActionType.SELECT_CHARACTER, ActionType.SELECT_WEAPON,
   ActionType.START_GAME, ActionType.END_GAME, ActionType.ACTIVATE_CHEAT,
 ];
 
@@ -279,7 +280,10 @@ export function processAction(state: GameState, intent: ActionRequest): ActionRe
     }
 
     // 6. Log History — merge lastAction feedback into history entry for rich display
-    if (intent.type !== ActionType.SELECT_CHARACTER && intent.type !== ActionType.UPDATE_NICKNAME) {
+    const LOBBY_CHATTER = [
+        ActionType.SELECT_CHARACTER, ActionType.SELECT_WEAPON, ActionType.UPDATE_NICKNAME,
+    ];
+    if (!LOBBY_CHATTER.includes(intent.type)) {
         const historyEntry: any = {
             playerId: intent.playerId,
             survivorId: intent.survivorId || 'system',

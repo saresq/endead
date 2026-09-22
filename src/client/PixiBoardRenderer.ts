@@ -7,12 +7,14 @@ import { tileService } from '../services/TileService';
 import { TileInstance } from '../types/Map';
 import { getPlayerColorNumeric } from './config/PlayerIdentities';
 import { getZoneLayout, getZoneAtCell, setZoneGeometry } from './utils/zoneLayout';
+import { doorEdgeKey } from './utils/doorTargets';
 import {
   type Bounds, type Rect, type CameraPose,
   MIN_ZOOM, MAX_ZOOM, FALLTHROUGH_FOCUS_SCALE,
   computeFit, fitScale, centerOn, clampPose, coverPose, shouldFallThrough, isWorldRectVisible, isTap, isDoubleTap,
 } from './camera';
-import { AnimationController } from './AnimationController';
+import { AnimationController, RUSH_MOVE_MS } from './AnimationController';
+import { rushOriginsFrom } from './ui/eventLog';
 import { AssetManager } from './AssetManager';
 import { BOARD_THEME } from './config/BoardTheme';
 import { getZombieTypeDisplay } from './config/ZombieTypeConfig';
@@ -26,6 +28,8 @@ export interface RenderOptions {
   pendingMoveZoneId?: ZoneId;
   moveCostByZone?: Record<ZoneId, number>;
   availableDoorZones?: ZoneId[];
+  /** `doorEdgeKey` of every closed door the selected survivor could open now. */
+  openableDoorEdges?: string[];
   sprintZones?: ZoneId[];
   attackZones?: ZoneId[];
   editorMode?: boolean;
@@ -64,6 +68,10 @@ export class PixiBoardRenderer {
 
   // Animation
   private _animationController: AnimationController | null = null;
+  /** Spawn context already turned into rush origins — each one animates once. */
+  private lastSpawnContextTimestamp = 0;
+  /** Zombie id → the zone its Rush card placed it in, until its sprite exists. */
+  private rushOrigins = new Map<EntityId, ZoneId>();
 
   // Assets
   private _assetManager: AssetManager | null = null;
@@ -695,7 +703,7 @@ export class PixiBoardRenderer {
     }
 
     // 2. Board overlay (zones + edges + indicators — single pass)
-    this.drawBoard(state, options.validMoveZones || [], options.pendingMoveZoneId, options.editorMode, options.availableDoorZones || [], options.moveCostByZone, options.sprintZones || [], options.attackZones || []);
+    this.drawBoard(state, options);
 
     // 3. Entities (Survivors & Zombies)
     this._lastState = state;
@@ -767,7 +775,19 @@ export class PixiBoardRenderer {
     }
   }
 
-  private drawBoard(state: GameState, validZones: ZoneId[], pendingMoveZoneId?: ZoneId, editorMode?: boolean, doorHighlightZones: ZoneId[] = [], moveCostByZone?: Record<ZoneId, number>, sprintZones: ZoneId[] = [], attackZones: ZoneId[] = []): void {
+  private drawBoard(state: GameState, options: RenderOptions = {}): void {
+    const {
+      validMoveZones: validZones = [],
+      pendingMoveZoneId,
+      editorMode,
+      availableDoorZones: doorHighlightZones = [],
+      openableDoorEdges = [],
+      moveCostByZone,
+      sprintZones = [],
+      attackZones = [],
+    } = options;
+    const openableEdgeKeys = new Set(openableDoorEdges);
+
     const g = this.boardGraphics;
     g.clear();
     this.iconContainer.removeChildren();
@@ -916,7 +936,7 @@ export class PixiBoardRenderer {
     const W = 3;
 
     // Collect door edges for grouped plank rendering
-    interface DoorEdge { x1: number; y1: number; x2: number; y2: number; isVertical: boolean; doorOpen: boolean }
+    interface DoorEdge { x1: number; y1: number; x2: number; y2: number; isVertical: boolean; doorOpen: boolean; openable: boolean }
     const doorEdges: DoorEdge[] = [];
 
     if (edgeMap) {
@@ -945,7 +965,8 @@ export class PixiBoardRenderer {
             const conn = state.zones[zA].connections?.find(c => c.toZoneId === zB);
             if (conn) doorOpen = conn.doorOpen;
           }
-          doorEdges.push({ x1, y1, x2, y2, isVertical, doorOpen });
+          const openable = !!zA && !!zB && openableEdgeKeys.has(doorEdgeKey(zA, zB));
+          doorEdges.push({ x1, y1, x2, y2, isVertical, doorOpen, openable });
         } else if (cls === 'crosswalk') {
           if (isVertical) {
             const ex = Math.max(x1, x2) * TILE_SIZE;
@@ -1021,6 +1042,7 @@ export class PixiBoardRenderer {
         const other = doorEdges[j];
         if (other.isVertical !== first.isVertical) continue;
         if (other.doorOpen !== first.doorOpen) continue;
+        if (other.openable !== first.openable) continue;
 
         // Check adjacency to any member of the group
         for (const g of group) {
@@ -1077,6 +1099,17 @@ export class PixiBoardRenderer {
             minPx = Math.min(minPx, ex); minPy = Math.min(minPy, ey - halfBar);
             maxPx = Math.max(maxPx, ex + TILE_SIZE); maxPy = Math.max(maxPy, ey + halfBar);
           }
+        }
+        if (first.openable) {
+          // An openable door gets the movement highlight's gold, one ring out,
+          // so it reads as "actionable" the way a valid move zone does.
+          const pad = BOARD_THEME.door.openableBorderWidth;
+          g.rect(minPx - pad, minPy - pad, maxPx - minPx + pad * 2, maxPy - minPy + pad * 2);
+          g.stroke({
+            width: BOARD_THEME.door.openableBorderWidth,
+            color: BOARD_THEME.door.openableBorder,
+            alpha: BOARD_THEME.door.openableBorderAlpha,
+          });
         }
         g.rect(minPx - 1, minPy - 1, maxPx - minPx + 2, maxPy - minPy + 2);
         g.stroke({ width: 1, color: BOARD_THEME.door.plankBorder, alpha: BOARD_THEME.door.plankBorderAlpha });
@@ -1307,6 +1340,8 @@ export class PixiBoardRenderer {
 
   private reconcileEntities(state: GameState, activeId?: EntityId): void {
     const currentIds = new Set<EntityId>();
+
+    this.collectRushOrigins(state);
     
     // Combine lists
     const allEntities: (Survivor | Zombie)[] = [
@@ -1356,6 +1391,7 @@ export class PixiBoardRenderer {
       currentIds.add(entity.id);
 
       let sprite = this.entitySprites.get(entity.id);
+      const isNewSprite = !sprite;
       if (!sprite) {
         sprite = this.createEntitySprite(entity);
         this.layerEntities.addChild(sprite);
@@ -1386,18 +1422,7 @@ export class PixiBoardRenderer {
           const repIndex = typeKeys.indexOf(repInfo.type);
           const pos = this.calculatePosition(zoneId, repIndex, true, zoneLayout.scale, zoneLayout.spacing);
 
-          if (this._animationController && !this._animationController.isAnimating(entity.id)) {
-            const oldX = sprite.position.x;
-            const oldY = sprite.position.y;
-            const moved = Math.abs(oldX - pos.x) > 1 || Math.abs(oldY - pos.y) > 1;
-            if (moved) {
-              this._animationController.animateMove(entity.id, oldX, oldY, pos.x, pos.y);
-            } else {
-              sprite.position.set(pos.x, pos.y);
-            }
-          } else if (!this._animationController || !this._animationController.isAnimating(entity.id)) {
-            sprite.position.set(pos.x, pos.y);
-          }
+          this.placeEntitySprite(entity.id, sprite, pos, isNewSprite);
 
           // Mark badge for this type
           const badgeKey = `${zoneId}:${repInfo.type}`;
@@ -1411,18 +1436,7 @@ export class PixiBoardRenderer {
           const zombieIndex = zombiesInZone.indexOf(entity);
           const pos = this.calculatePosition(zoneId, zombieIndex, true, zoneLayout.scale, zoneLayout.spacing);
 
-          if (this._animationController && !this._animationController.isAnimating(entity.id)) {
-            const oldX = sprite.position.x;
-            const oldY = sprite.position.y;
-            const moved = Math.abs(oldX - pos.x) > 1 || Math.abs(oldY - pos.y) > 1;
-            if (moved) {
-              this._animationController.animateMove(entity.id, oldX, oldY, pos.x, pos.y);
-            } else {
-              sprite.position.set(pos.x, pos.y);
-            }
-          } else if (!this._animationController || !this._animationController.isAnimating(entity.id)) {
-            sprite.position.set(pos.x, pos.y);
-          }
+          this.placeEntitySprite(entity.id, sprite, pos, isNewSprite);
         }
       } else {
         // Survivor — always visible, normal layout
@@ -1433,18 +1447,7 @@ export class PixiBoardRenderer {
         const survivorIndex = survivorsInZone.indexOf(entity);
         const pos = this.calculatePosition(zoneId, survivorIndex, false, 1, ENTITY_SPACING);
 
-        if (this._animationController && !this._animationController.isAnimating(entity.id)) {
-          const oldX = sprite.position.x;
-          const oldY = sprite.position.y;
-          const moved = Math.abs(oldX - pos.x) > 1 || Math.abs(oldY - pos.y) > 1;
-          if (moved) {
-            this._animationController.animateMove(entity.id, oldX, oldY, pos.x, pos.y);
-          } else {
-            sprite.position.set(pos.x, pos.y);
-          }
-        } else if (!this._animationController || !this._animationController.isAnimating(entity.id)) {
-          sprite.position.set(pos.x, pos.y);
-        }
+        this.placeEntitySprite(entity.id, sprite, pos, isNewSprite);
       }
     }
 
@@ -1532,6 +1535,56 @@ export class PixiBoardRenderer {
         sprite.destroy({ children: true });
         this.entitySprites.delete(id);
       }
+    }
+  }
+
+  /**
+   * Reads the zones a Rush card placed zombies in. The card activates them right
+   * after placing (rules/08-zombies.md#zombie-rush), so the state that reaches
+   * the client already has them a zone away — without this they would pop into
+   * existence next to the survivor they just walked up to.
+   */
+  private collectRushOrigins(state: GameState): void {
+    const ctx = state.spawnContext;
+    if (!ctx || ctx.timestamp === this.lastSpawnContextTimestamp) return;
+    this.lastSpawnContextTimestamp = ctx.timestamp;
+    this.rushOrigins = rushOriginsFrom(ctx) as Map<EntityId, ZoneId>;
+  }
+
+  /**
+   * Moves a sprite to its slot: a tween from where it was, or — for a sprite
+   * created this frame — from the zone a Rush card placed it in. A brand-new
+   * sprite sits at the board origin, so it must never tween from there.
+   */
+  private placeEntitySprite(
+    entityId: EntityId,
+    sprite: PIXI.Container,
+    pos: { x: number; y: number },
+    isNewSprite: boolean,
+  ): void {
+    const anim = this._animationController;
+    if (anim?.isAnimating(entityId)) return;
+
+    const moved = (from: { x: number; y: number }) =>
+      Math.abs(from.x - pos.x) > 1 || Math.abs(from.y - pos.y) > 1;
+
+    if (isNewSprite) {
+      const origin = this.rushOrigins.get(entityId);
+      this.rushOrigins.delete(entityId);
+      const from = origin ? this.zoneCenter(origin) : null;
+      if (anim && from && moved(from)) {
+        anim.animateMove(entityId, from.x, from.y, pos.x, pos.y, RUSH_MOVE_MS);
+      } else {
+        sprite.position.set(pos.x, pos.y);
+      }
+      return;
+    }
+
+    const from = { x: sprite.position.x, y: sprite.position.y };
+    if (anim && moved(from)) {
+      anim.animateMove(entityId, from.x, from.y, pos.x, pos.y);
+    } else {
+      sprite.position.set(pos.x, pos.y);
     }
   }
 

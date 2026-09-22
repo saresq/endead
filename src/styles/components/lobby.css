@@ -277,9 +277,33 @@
 
 .lobby-roster {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
   margin-top: 2px;
+}
+
+/* Three across once the panel is wide enough for the role line to fit. */
+@media (min-width: 560px) {
+  .lobby-roster {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+  }
+}
+
+/* At four across the caption is a name only: the role reads off the dossier
+   strip under the grid, and two lines under an 80px portrait is noise. */
+@media (max-width: 559px) {
+  .lobby-roster__cell .fm-photoslot__name {
+    font-size: 11px;
+  }
+
+  .lobby-roster__cell .fm-photoslot__role {
+    display: none;
+  }
+
+  .lobby-roster__cell .fm-photoslot__tag {
+    display: none;
+  }
 }
 
 .lobby-roster__cell {
@@ -385,6 +409,232 @@
   background: var(--ink);
   padding: 2px 0;
   pointer-events: none;
+}
+
+/* ---------- You: inline dossier strip ---------- */
+
+/* Folds out under the roster when a survivor is picked. It replaced a modal:
+   the grid, the weapons and the start button all stay reachable. */
+.lobby-strip {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: var(--paper-2);
+  border: var(--border);
+  border-left: var(--border-width-heavy) solid var(--highlight);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+}
+
+.lobby-strip__head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
+.lobby-strip__name {
+  font-size: 18px;
+  line-height: 1.1;
+}
+
+.lobby-strip__role {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.lobby-strip__pips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.lobby-strip__pip {
+  font-family: var(--font-stencil);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  background: var(--paper);
+  border: var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.lobby-strip__pip--health { border-left: var(--border-width-heavy) solid var(--accent); }
+.lobby-strip__pip--rank { border-left: var(--border-width-heavy) solid var(--rank-blue); }
+
+.lobby-strip__skill {
+  margin: 9px 0 0;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.lobby-strip__skill-name {
+  display: block;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+}
+
+.lobby-strip__skill-text {
+  color: var(--text-2);
+}
+
+.lobby-strip__note {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.lobby-strip__more {
+  margin-top: 10px;
+  padding: 0 0 2px;
+  font-family: var(--font-stencil);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text);
+  background: none;
+  border: 0;
+  border-bottom: 2px solid var(--ink);
+  cursor: pointer;
+  min-height: 24px;
+}
+
+.lobby-strip__more:focus-visible {
+  outline: 2px solid var(--highlight);
+  outline-offset: 3px;
+}
+
+@media (hover: hover) {
+  .lobby-strip__more:hover {
+    border-bottom-color: var(--accent-text);
+    color: var(--accent-text);
+  }
+}
+
+/* ---------- You: starting weapon grid ---------- */
+
+/* Two columns of real item cards: the pick is made on stats (accuracy,
+   damage, door opening), so the cards carry the same face the HUD shows. */
+.lobby-armory {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.lobby-armory__cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  transition: transform 80ms ease, filter 140ms ease;
+}
+
+.lobby-armory__cell .item-card {
+  width: 100%;
+  pointer-events: none;
+}
+
+@media (hover: hover) {
+  .lobby-armory__cell:hover:not(:disabled) {
+    transform: translateY(-1px);
+  }
+
+  .lobby-armory__cell:hover:not(:disabled) .item-card {
+    background: var(--paper-2);
+    border-color: var(--ink);
+    box-shadow: var(--card-shadow-hover);
+  }
+}
+
+.lobby-armory__cell:not(:disabled):active {
+  transform: translateY(0);
+}
+
+.lobby-armory__cell:not(:disabled):active .item-card {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+
+/* Selected — same amber ring the roster uses, so both grids read as one pick. */
+.lobby-armory__cell--selected {
+  transform: translateY(-3px);
+}
+
+.lobby-armory__cell--selected .item-card,
+.lobby-armory__cell--selected:hover:not(:disabled) .item-card {
+  border-color: var(--highlight);
+  box-shadow:
+    0 0 0 var(--border-width-heavy) var(--highlight),
+    var(--shadow-sm);
+}
+
+@media (hover: hover) {
+  .lobby-armory__cell--selected:hover:not(:disabled) {
+    transform: translateY(-3px);
+  }
+}
+
+.lobby-armory__cell:focus-visible {
+  outline: 2px solid var(--highlight);
+  outline-offset: 3px;
+}
+
+.lobby-armory__cell--taken {
+  cursor: not-allowed;
+  opacity: 0.45;
+  filter: grayscale(0.4);
+}
+
+.lobby-armory__cell--taken .item-card {
+  border-color: var(--line-strong);
+  border-style: dashed;
+  box-shadow: none;
+}
+
+.lobby-armory__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 14px;
+}
+
+.lobby-armory__tag {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-inverse);
+  background: var(--ink);
+  padding: 2px 5px;
+}
+
+.lobby-armory__supply {
+  margin-left: auto;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.lobby-armory__cell--selected .lobby-armory__supply {
+  color: var(--ink);
+}
+
+@media (max-width: 420px) {
+  .lobby-armory {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* ---------- Dossier modal body (name + loadout + progression) ---------- */

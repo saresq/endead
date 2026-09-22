@@ -17,7 +17,7 @@ export const board = {
   pickerTitleOptions: 'Preparar el ataque',
   pickerSubtitle: (weapon: string) => `${weapon} (cuerpo a cuerpo) · elegí el orden`,
   pickerSubtitleRanged: (weapon: string) => `${weapon} (a distancia) · elegí el orden`,
-  pickerBody: 'Tocá los zombis en el orden en que querés eliminarlos. El primero que toques cae primero.',
+  pickerBody: 'Tocá los zombies en el orden en que querés eliminarlos. El primero que toques cae primero.',
   pickerTieBody: 'Prioridad empatada: elegí a cuál golpear primero.',
   pickerNone: 'Elegí un objetivo',
   pickerAttack: (n: number) => `Atacar (${n} ${plural(n, 'objetivo', 'objetivos')})`,
@@ -28,12 +28,12 @@ export const board = {
   pickerSteadyHand: 'Pulso firme',
   pickerSteadyHandBody: 'Elegí a quién protegés del fuego amigo.',
   pickerBarbarian: 'Bárbaro',
-  pickerBarbarianBody: 'Tirá un dado por zombi en la zona en vez de los dados del arma.',
+  pickerBarbarianBody: 'Tirá un dado por zombie en la zona en vez de los dados del arma.',
 
   // Molotov confirmation
   molotovTitle: 'La Molotov mata a todos',
   molotovBodyOthers: (names: string) =>
-    `${names} está en la zona. La Molotov mata a todo lo que hay adentro, zombis y supervivientes por igual.`,
+    `${names} está en la zona. La Molotov mata a todo lo que hay adentro, zombies y supervivientes por igual.`,
   molotovBodySelf: 'Estás parado en esa zona. La Molotov te mata a vos también.',
   molotovDefeat: 'Si muere un superviviente, la partida se pierde para todo el equipo.',
   molotovConfirm: 'Tirarla igual',

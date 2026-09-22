@@ -60,6 +60,22 @@ describe('renderEventEntry', () => {
     expect(html).toContain('Wanda -2');
   });
 
+  it('marks a Rush card on its spawn line', () => {
+    const html = renderEventEntry({
+      actionType: 'OPEN_DOOR', playerId: 'ben', survivorId: 'doug', timestamp: 3, turn: 2,
+      payload: { targetZoneId: 'Z3' },
+      spawnContext: {
+        timestamp: 3,
+        cards: [{
+          zoneId: 'Z3', cardId: 'c', dangerLevel: 'YELLOW',
+          detail: { zombies: { BRUTE: 2 }, rush: true }, spawnedIds: ['zombie-1', 'zombie-2'],
+        }],
+      } as any,
+    }, state);
+    expect(html).toContain(`Z3:</span> 2 ${zombieLabel(ZombieType.Brute, 2)}`);
+    expect(html).toContain(es.log.rush);
+  });
+
   it('shows the zombie phase on a non-END_TURN entry that ended the round', () => {
     const html = renderEventEntry({
       actionType: 'MOVE', playerId: 'ana', survivorId: 'wanda', timestamp: 4, turn: 3,

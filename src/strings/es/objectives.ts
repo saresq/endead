@@ -23,9 +23,9 @@ export const objectives = {
   takeColorObjective: (n: number, color: string) =>
     `Tomar ${n} ${plural(n, 'objetivo', 'objetivos')} ${colorWord(color, n)}`,
   takeEpicCrate: (n: number) => `Abrir ${n} ${plural(n, 'caja', 'cajas')} de armas épicas`,
-  /** `label` is the already-pluralised zombie name (`zombieLabel(type, n)` or zombi/zombis). */
+  /** `label` is the already-pluralised zombie name (`zombieLabel(type, n)` or zombie/zombies). */
   killZombie: (n: number, label: string) => `Eliminar ${n} ${label}`,
-  anyZombie: (n: number) => plural(n, 'zombi', 'zombis'),
+  anyZombie: (n: number) => plural(n, 'zombie', 'zombies'),
   collectItems: (parts: string[]) => `Juntar objetos: ${parts.join(', ')}`,
   itemQuantity: (quantity: number, item: string) => `${quantity}× ${item}`,
   reachDangerLevel: (level: string) => `Llegar al nivel de peligro ${level}`,

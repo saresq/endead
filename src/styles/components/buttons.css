@@ -385,15 +385,11 @@
   box-shadow: var(--shadow);
 }
 
-/* Free action state — success green left edge */
+/* Free action state — success green left edge. The cost tag keeps its own
+   `--cost--free` yellow: a `.action-btn--free .action-btn__cost` override here
+   would outrank it (two classes beat one) and repaint the tag tan-on-tan. */
 .action-btn--free {
   border-left-color: var(--success);
-}
-
-.action-btn--free .action-btn__cost {
-  background: var(--paper-3);
-  border-color: var(--ink);
-  color: var(--text);
 }
 
 /* Disabled — dashed ink outline plus muted ink text, so the state never

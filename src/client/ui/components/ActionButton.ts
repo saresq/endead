@@ -13,7 +13,8 @@ export interface ActionButtonOptions {
   icon: string;         // Lucide icon name
   label: string;
   kbd?: string;         // Keyboard shortcut hint (desktop only)
-  cost?: string;        // es.common.actions(n) or es.common.free — es.common.actions(1) is hidden (default)
+  cost?: string;        // es.common.actions(n), es.common.free or es.common.freeCount(n) — es.common.actions(1) is hidden (default)
+  free?: boolean;       // Costs no action: styles the cost tag and the button edge
   disabled?: boolean;
   selected?: boolean;   // Active targeting mode
   highlight?: boolean;  // Special highlight (e.g. objective available)
@@ -21,8 +22,11 @@ export interface ActionButtonOptions {
 }
 
 export function renderActionButton(opts: ActionButtonOptions): string {
+  const isFree = opts.free ?? opts.cost === es.common.free;
+
   const classes = [
     'action-btn',
+    isFree ? 'action-btn--free' : '',
     opts.disabled ? 'action-btn--disabled' : '',
     opts.selected ? 'action-btn--selected' : '',
     opts.highlight ? 'action-btn--highlight' : '',
@@ -32,7 +36,7 @@ export function renderActionButton(opts: ActionButtonOptions): string {
 
   // Only show cost if it's free or something other than the default 1 action
   const showCost = opts.cost && opts.cost !== es.common.actions(1);
-  const costHtml = showCost ? `<span class="action-btn__cost${opts.cost === es.common.free ? ' action-btn__cost--free' : ''}">${opts.cost}</span>` : '';
+  const costHtml = showCost ? `<span class="action-btn__cost${isFree ? ' action-btn__cost--free' : ''}">${opts.cost}</span>` : '';
 
   const ariaAttrs = [
     `role="button"`,

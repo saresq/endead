@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "server": "tsx --env-file-if-exists=.env src/server/server.ts",
     "start": "NODE_ENV=production tsx --env-file-if-exists=.env src/server/server.ts",
+    "stop": "tsx scripts/stop.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },

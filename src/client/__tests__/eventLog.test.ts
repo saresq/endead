@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { displayableEntries, groupByRound, boardCuesFor, type HistoryEntry } from '../ui/eventLog';
+import { displayableEntries, groupByRound, boardCuesFor, rushOriginsFrom, type HistoryEntry } from '../ui/eventLog';
 import type { GameState } from '../../types/GameState';
-import { es } from '../../strings/es';
+import { es, zombieLabel } from '../../strings/es';
+import { ZombieType } from '../../types/GameState';
 
 let ts = 0;
 function entry(actionType: string, playerId: string, turn: number, extra: Partial<HistoryEntry> = {}): HistoryEntry {
@@ -64,6 +65,22 @@ describe('groupByRound', () => {
   });
 });
 
+describe('rushOriginsFrom', () => {
+  const ctx = (cards: unknown[]) => ({ timestamp: 1, cards } as never);
+
+  it('maps every id a Rush card placed to the zone it placed them in', () => {
+    const origins = rushOriginsFrom(ctx([
+      { zoneId: 'room', cardId: 'c1', dangerLevel: 'YELLOW', detail: { zombies: { BRUTE: 2 }, rush: true }, spawnedIds: ['z1', 'z2'] },
+      { zoneId: 'street', cardId: 'c2', dangerLevel: 'YELLOW', detail: { zombies: { WALKER: 1 } }, spawnedIds: ['z3'] },
+    ]));
+    expect([...origins]).toEqual([['z1', 'room'], ['z2', 'room']]);
+  });
+
+  it('is empty without a spawn context', () => {
+    expect(rushOriginsFrom(undefined).size).toBe(0);
+  });
+});
+
 describe('boardCuesFor', () => {
   it('cues attack hits and misses at the target zone', () => {
     const prev = state([entry('MOVE', 'a', 1)]);
@@ -101,7 +118,60 @@ describe('boardCuesFor', () => {
     ]);
     expect(boardCuesFor(prev, next)).toEqual([
       { zoneId: 'd1', text: es.cues.doorOpen, tone: 'info' },
-      { zoneId: 's1', text: '+3', tone: 'spawn' },
+      { zoneId: 's1', text: es.cues.spawned(2, zombieLabel(ZombieType.Walker, 2)), tone: 'spawn' },
+      { zoneId: 's1', text: es.cues.spawned(1, zombieLabel(ZombieType.Runner, 1)), tone: 'spawn' },
+      // The 's2' card is an Extra Activation at Blue: it does nothing, so it says nothing.
+    ]);
+  });
+
+  it('names the type an Extra Activation card sends at the board', () => {
+    const prev = state([]);
+    const next = state([
+      entry('END_TURN', 'a', 2, {
+        spawnContext: {
+          timestamp: 1,
+          cards: [{ zoneId: 's2', cardId: 'c2', detail: { extraActivation: 'WALKER' }, dangerLevel: 'ORANGE' }],
+        } as any,
+      }),
+    ]);
+    expect(boardCuesFor(prev, next)).toEqual([
+      { zoneId: 's2', text: es.cues.extraActivation(zombieLabel(ZombieType.Walker, 2)), tone: 'rush' },
+    ]);
+  });
+
+  it('says nothing for an Extra Activation drawn at Blue', () => {
+    const prev = state([]);
+    const next = state([
+      entry('END_TURN', 'a', 2, {
+        spawnContext: {
+          timestamp: 1,
+          cards: [{ zoneId: 's2', cardId: 'c2', detail: { extraActivation: 'WALKER' }, dangerLevel: 'BLUE' }],
+        } as any,
+      }),
+    ]);
+    expect(boardCuesFor(prev, next)).toEqual([]);
+  });
+
+  it('cues a Rush at the zone the card placed the zombies in', () => {
+    const prev = state([]);
+    const next = state([
+      entry('OPEN_DOOR', 'a', 1, {
+        payload: { targetZoneId: 'room' },
+        spawnContext: {
+          timestamp: 2,
+          cards: [{
+            zoneId: 'room', cardId: 'c1', dangerLevel: 'YELLOW',
+            detail: { zombies: { BRUTE: 2 }, rush: true },
+            spawnedIds: ['zombie-1', 'zombie-2'],
+          }],
+        } as any,
+      }),
+    ]);
+    // Stacking runs bottom-up, so the door line is pushed last to sit on top.
+    expect(boardCuesFor(prev, next)).toEqual([
+      { zoneId: 'room', text: es.cues.spawned(2, zombieLabel(ZombieType.Brute, 2)), tone: 'spawn' },
+      { zoneId: 'room', text: es.cues.rush, tone: 'rush' },
+      { zoneId: 'room', text: es.cues.doorOpen, tone: 'info' },
     ]);
   });
 

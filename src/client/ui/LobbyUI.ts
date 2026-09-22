@@ -7,11 +7,13 @@ import { CHARACTER_DEFINITIONS } from '../../config/CharacterRegistry';
 import { characterImageUrl } from '../utils/characterAsset';
 import { renderButton } from './components/Button';
 import { renderPhotoSlot } from './components/PhotoSlot';
-import { renderLobbyDossier } from './components/LobbyDossier';
+import { renderLobbyDossier, renderLobbyDossierStrip } from './components/LobbyDossier';
+import { renderItemCard } from './components/ItemCard';
+import { weaponOptions, isLoadoutComplete } from './lobbyLoadout';
 import { icon } from './components/icons';
 import { notificationManager } from './NotificationManager';
 import { modalManager } from './overlays/ModalManager';
-import { es } from '../../strings/es';
+import { es, equipmentName } from '../../strings/es';
 import { displayName } from '../utils/displayName';
 import { setNickname } from '../identity';
 
@@ -352,7 +354,7 @@ export class LobbyUI {
 
     const selectedMap = this.availableMaps.find(m => m.id === this.selectedMapId) ?? null;
     const myChar = myPlayer?.characterClass || null;
-    const allReady = players.length > 0 && players.every(p => !!p.characterClass);
+    const allReady = players.length > 0 && players.every(p => isLoadoutComplete(p));
 
     // Build the list of panels for this render pass. Each entry is a
     // stable key + its HTML output; we only swap DOM for keys whose
@@ -362,7 +364,7 @@ export class LobbyUI {
     const hostId = players[0]?.id ?? null;
     if (this.hostLeftActive) panels.push({ key: 'hostLeftBanner', html: this.renderHostLeftBanner() });
     panels.push({ key: 'invite', html: this.renderInvitePanel() });
-    panels.push({ key: 'you', html: this.renderYouPanel(myPlayer ?? null, myChar, takenClasses) });
+    panels.push({ key: 'you', html: this.renderYouPanel(myPlayer ?? null, myChar, takenClasses, players) });
     panels.push({ key: 'players', html: this.renderPlayersPanel(players, hostId) });
     panels.push({ key: 'map', html: this.renderMapPanel(selectedMap, isHost) });
     panels.push({ key: 'options', html: this.renderOptionsPanel(abomFest, isHost) });
@@ -584,19 +586,26 @@ export class LobbyUI {
   }
 
   private renderPlayersPanel(
-    players: { id: PlayerId; name: string; ready: boolean; characterClass: string }[],
+    players: { id: PlayerId; name: string; ready: boolean; characterClass: string; startingWeapon?: string }[],
     hostId: PlayerId | null,
   ): string {
     const t = es.lobby;
     const rows = players.map(p => {
-      const ready = !!p.characterClass;
+      const ready = isLoadoutComplete(p);
+      const weaponLabel = p.startingWeapon
+        ? equipmentName({ equipmentId: p.startingWeapon, name: p.startingWeapon })
+        : '';
       const isMe = p.id === this.localPlayerId;
       const isHost = p.id === hostId;
-      const status = ready
-        ? `<span class="lobby-squad__class fm-mono">${this.escHtml(p.characterClass)}</span>
-           <span class="lobby-squad__dot" aria-hidden="true">·</span>
-           <span class="lobby-status lobby-status--ready">● ${this.escHtml(t.ready)}</span>`
+      const claims = [p.characterClass, weaponLabel].filter(Boolean).map(label =>
+        `<span class="lobby-squad__class fm-mono">${this.escHtml(label)}</span>`,
+      ).join('<span class="lobby-squad__dot" aria-hidden="true">·</span>');
+      const badge = ready
+        ? `<span class="lobby-status lobby-status--ready">● ${this.escHtml(t.ready)}</span>`
         : `<span class="lobby-status lobby-status--standby">● ${this.escHtml(t.choosing)}</span>`;
+      const status = claims
+        ? `${claims}<span class="lobby-squad__dot" aria-hidden="true">·</span>${badge}`
+        : badge;
 
       return `
         <li class="lobby-squad__row">
@@ -621,11 +630,12 @@ export class LobbyUI {
     `;
   }
 
-  /** Name input + character grid. */
+  /** Name input + character grid + starting weapon grid. */
   private renderYouPanel(
     myPlayer: { id: PlayerId; name: string } | null,
     myChar: string | null,
     takenClasses: Map<string, string>,
+    players: { id: PlayerId; startingWeapon?: string }[],
   ): string {
     const t = es.lobby;
     const characterKeys = Object.keys(CHARACTER_DEFINITIONS);
@@ -693,7 +703,67 @@ export class LobbyUI {
         <div class="lobby-roster" role="radiogroup" aria-labelledby="lobby-pick-title">
           ${cells}
         </div>
+        ${myChar ? renderLobbyDossierStrip(myChar, roleFor(myChar)) : ''}
+        ${this.renderArmory(myPlayer?.id ?? null, players)}
       </section>
+    `;
+  }
+
+  /**
+   * Starting weapon grid. The six grey-back cards are claimed here rather than
+   * dealt, so a squad can see — and guarantee — a door opener before starting
+   * (rules/16-card-registry.md#starting-equipment-6-cards-grey-backs).
+   */
+  private renderArmory(
+    myPlayerId: PlayerId | null,
+    players: { id: PlayerId; startingWeapon?: string }[],
+  ): string {
+    if (!myPlayerId) return '';
+    const t = es.lobby;
+
+    const cells = weaponOptions(players, myPlayerId).map(option => {
+      const name = equipmentName(option.card);
+      const gone = option.remaining <= 0;
+      const cellClass = [
+        'lobby-armory__cell',
+        option.mine ? 'lobby-armory__cell--selected' : '',
+        gone ? 'lobby-armory__cell--taken' : '',
+      ].filter(Boolean).join(' ');
+
+      let supply: string;
+      if (option.mine) supply = t.weaponMine;
+      else if (gone) supply = t.weaponGone;
+      else supply = t.weaponLeft(option.remaining);
+
+      const doorTag = option.card.canOpenDoor
+        ? `<span class="lobby-armory__tag">${this.escHtml(t.opensDoors)}</span>`
+        : '';
+
+      return `
+        <button
+          type="button"
+          class="${cellClass}"
+          data-action="select-weapon"
+          data-id="${this.escHtml(option.equipmentId)}"
+          ${gone ? 'disabled' : ''}
+          role="radio"
+          aria-checked="${option.mine}"
+          aria-label="${this.escHtml(gone ? t.weaponGoneAria(name) : t.pickWeaponAria(name))}"
+        >
+          ${renderItemCard(option.card, { variant: 'weapon', showSlot: false })}
+          <div class="lobby-armory__meta">
+            ${doorTag}
+            <span class="lobby-armory__supply fm-mono">${this.escHtml(supply)}</span>
+          </div>
+        </button>
+      `;
+    }).join('');
+
+    return `
+      <h2 class="fm-kicker fm-kicker--secondary lobby-you__pick" id="lobby-armory-title">${this.escHtml(t.pickWeapon)}</h2>
+      <div class="lobby-armory" role="radiogroup" aria-labelledby="lobby-armory-title">
+        ${cells}
+      </div>
     `;
   }
 
@@ -780,9 +850,9 @@ export class LobbyUI {
     const t = es.lobby;
     const players = this.state?.lobby.players ?? [];
     const totalCount = players.length;
-    const readyCount = players.filter(p => !!p.characterClass).length;
+    const readyCount = players.filter(p => isLoadoutComplete(p)).length;
     const missingNames = players
-      .filter(p => !p.characterClass)
+      .filter(p => !isLoadoutComplete(p))
       .map(p => displayName(p.name, p.characterClass) || t.playerFallback)
       .join(', ');
 
@@ -876,7 +946,31 @@ export class LobbyUI {
             type: ActionType.SELECT_CHARACTER,
             payload: { characterClass: charClass, name: nameInput?.value },
           });
-          this.openDossier(charClass);
+          // Only follow the pick if the full tree is already open — picking
+          // itself no longer opens anything.
+          if (this.dossierModalId && modalManager.isOpen(this.dossierModalId)) {
+            this.openDossier(charClass);
+          }
+        }
+        return;
+      }
+
+      // The strip shows the opening skill; the full tree is still a modal,
+      // now only when asked for.
+      if (action === 'open-dossier') {
+        const charClass = actionEl.dataset.id;
+        if (charClass) this.openDossier(charClass);
+        return;
+      }
+
+      if (action === 'select-weapon') {
+        const equipmentId = actionEl.dataset.id;
+        if (equipmentId) {
+          networkManager.sendAction({
+            playerId: this.localPlayerId,
+            type: ActionType.SELECT_WEAPON,
+            payload: { equipmentId },
+          });
         }
         return;
       }

@@ -48,5 +48,5 @@
 
 - [x] 7.1 `npm test` passes; `npm run build` type-checks
 - [x] 7.2 Headless screenshot tour (scratchpad Playwright script `tour4.mjs`, or Playwright MCP): board fully visible and centred at 1440x900, 1024x768, 1920x1080; survivor visible at 390x664 portrait; landscape 844x390 shows board and End Turn; iPad Mini landscape uses the rail
-- [ ] 7.3 Manual on a real phone: sheet drag/snap, double-tap zoom, pinch, tap-to-move still confirms on second tap, no page zoom on input focus, End Turn visible with the URL bar expanded
+- [x] 7.3 Manual on a real phone: sheet drag/snap, double-tap zoom, pinch, tap-to-move still confirms on second tap, no page zoom on input focus, End Turn visible with the URL bar expanded — all six passed on a real phone 2026-09-17; UI notes raised from the same pass (free-action chip overlapping the action icon, crowded top bar, duplicate search glyph, `PX`) are tracked separately
 - [x] 7.4 Grep confirms no `game-layout`, `hud-fab-slot`, `hud-actions__tray` references remain

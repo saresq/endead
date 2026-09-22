@@ -8,6 +8,7 @@ export enum ActionType {
   JOIN_LOBBY = 'JOIN_LOBBY',
   UPDATE_NICKNAME = 'UPDATE_NICKNAME',
   SELECT_CHARACTER = 'SELECT_CHARACTER',
+  SELECT_WEAPON = 'SELECT_WEAPON',
   START_GAME = 'START_GAME',
   END_GAME = 'END_GAME',
 
@@ -59,6 +60,11 @@ export interface UpdateNicknamePayload {
 export interface SelectCharacterPayload {
   characterClass: string;
   name?: string;
+}
+
+export interface SelectWeaponPayload {
+  /** Registry key of a card in the starting weapon supply. */
+  equipmentId: string;
 }
 
 export interface StartGamePayload {
@@ -150,6 +156,7 @@ export interface ActionPayloadMap {
   [ActionType.JOIN_LOBBY]: JoinLobbyPayload;
   [ActionType.UPDATE_NICKNAME]: UpdateNicknamePayload;
   [ActionType.SELECT_CHARACTER]: SelectCharacterPayload;
+  [ActionType.SELECT_WEAPON]: SelectWeaponPayload;
   [ActionType.START_GAME]: StartGamePayload;
   [ActionType.END_GAME]: undefined;
   [ActionType.MOVE]: MovePayload;
