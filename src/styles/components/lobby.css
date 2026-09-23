@@ -487,7 +487,9 @@
 }
 
 /* Kid survivors wear a small badge in the portrait's top-right corner
-   (the roster hides the selected tag that would sit there). On a taken
+   (the roster hides the selected tag that would sit there). It is info,
+   not a call to action, so it rests in the caption band's neutral paper
+   and only turns yellow with the rest of the card when picked. On a taken
    card it drops below the picker's name strip. */
 .lobby-roster__kid {
   position: absolute;
@@ -495,12 +497,17 @@
   right: calc(var(--border-width) + 5px);
   display: inline-flex;
   padding: 3px;
-  color: var(--ink);
-  background: var(--highlight);
+  color: var(--text);
+  background: var(--paper-3);
   border: 1px solid var(--ink);
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-sm);
   line-height: 0;
+}
+
+.lobby-roster__cell--selected .lobby-roster__kid {
+  color: var(--ink);
+  background: var(--highlight);
 }
 
 .lobby-roster__cell--taken .lobby-roster__kid {
