@@ -50,23 +50,15 @@ export function shouldFallThrough(scale: number): boolean {
 }
 
 function clampAxis(pos: number, scale: number, min: number, max: number, vStart: number, vSize: number): number {
-  const span = (max - min) * scale;
-  if (span <= vSize) {
-    // The board already fits on this axis, so 35% visibility would let one
-    // drag park it in a corner of a large screen. Keep all of it inside.
-    const lower = vStart + vSize - max * scale; // board's far edge at the viewport's far edge
-    const upper = vStart - min * scale;         // board's near edge at the viewport's near edge
-    return Math.max(lower, Math.min(upper, pos));
-  }
-  const need = Math.min(span * MIN_VISIBLE_FRACTION, vSize);
+  const need = Math.min((max - min) * scale * MIN_VISIBLE_FRACTION, vSize);
   const lower = vStart + need - max * scale;         // board's right/bottom edge at least `need` inside
   const upper = vStart + vSize - need - min * scale; // board's left/top edge at least `need` inside
   return Math.max(lower, Math.min(upper, pos));
 }
 
 /**
- * Keep the board inside the viewport: fully inside on an axis where it fits,
- * otherwise at least 35% of it visible on that axis.
+ * Keep at least 35% of the board's width and height inside the viewport, so
+ * the player can pan freely even when the whole board already fits.
  */
 export function clampPose(pose: CameraPose, bounds: Bounds, viewport: Rect): CameraPose {
   return {

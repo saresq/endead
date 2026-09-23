@@ -383,8 +383,17 @@ export class PixiBoardRenderer {
       }
     });
 
-    // Zoom (Wheel)
     const canvas = this.app.canvas;
+
+    // A mouse drag that starts on the board pans it. Without this the browser
+    // starts a text selection over the HUD, and dragging that selection fires
+    // pointercancel and ends the pan. Blur by hand, since focus no longer moves.
+    canvas.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    }, { signal });
+
+    // Zoom (Wheel)
     canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
       this.stopCameraTween();

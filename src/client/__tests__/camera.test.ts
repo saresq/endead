@@ -88,26 +88,11 @@ describe('clampPose', () => {
     expect(left).toBeCloseTo(100 + 400 - 1350 * 0.5 * 0.35, 5);
   });
 
-  it('keeps a board that already fits fully inside the viewport', () => {
-    // 2560x1440-ish map area: the board fits on both axes, so a hard drag
-    // must not park it in a corner the way the 35% rule allowed.
+  it('lets a board that already fits pan until 35% of it remains', () => {
     const big: Rect = { x: 0, y: 44, w: 2560, h: 1250 };
-    for (const pose of [{ x: -9000, y: -9000, scale: 1 }, { x: 9000, y: 9000, scale: 1 }]) {
-      const c = clampPose(pose, board, big);
-      expect(c.x + board.minX).toBeGreaterThanOrEqual(big.x - 1e-6);
-      expect(c.x + board.maxX).toBeLessThanOrEqual(big.x + big.w + 1e-6);
-      expect(c.y + board.minY).toBeGreaterThanOrEqual(big.y - 1e-6);
-      expect(c.y + board.maxY).toBeLessThanOrEqual(big.y + big.h + 1e-6);
-    }
-  });
-
-  it('clamps per axis: fully inside where it fits, 35% where it does not', () => {
-    // 1350 wide board in a 1000-wide, 1200-tall viewport: wide axis uses 35%,
-    // tall axis must stay fully inside.
-    const mixed: Rect = { x: 0, y: 0, w: 1000, h: 1200 };
-    const c = clampPose({ x: -5000, y: 5000, scale: 1 }, board, mixed);
-    expect(c.x + board.maxX).toBeCloseTo(1350 * 0.35, 5);
-    expect(c.y + board.maxY).toBeCloseTo(1200, 5);
+    const c = clampPose({ x: -9000, y: 9000, scale: 1 }, board, big);
+    expect(c.x + board.maxX).toBeCloseTo(big.x + 1350 * 0.35, 5);
+    expect(c.y + board.minY).toBeCloseTo(big.y + big.h - 900 * 0.35, 5);
   });
 });
 
