@@ -691,7 +691,12 @@ export class LobbyUI {
       const takenOverlay = takenByOther
         ? `<div class="lobby-roster__taken-label" aria-hidden="true">${this.escHtml(takenByName)}</div>`
         : '';
-      const aria = takenByOther ? t.takenBy(name, takenByName) : t.pickAria(name);
+      const isKid = CHARACTER_DEFINITIONS[name].type === 'Kid';
+      const kidBadge = isKid
+        ? `<span class="lobby-roster__kid" title="${this.escHtml(t.survivorType.Kid)}" aria-hidden="true">${icon('Baby', 'sm')}</span>`
+        : '';
+      const baseAria = takenByOther ? t.takenBy(name, takenByName) : t.pickAria(name);
+      const aria = isKid ? `${baseAria} (${t.survivorType.Kid})` : baseAria;
 
       return `
         <button
@@ -712,6 +717,7 @@ export class LobbyUI {
             imageUrl: characterImageUrl(name),
             captionPlacement: 'band',
           })}
+          ${kidBadge}
           ${takenOverlay}
         </button>
       `;

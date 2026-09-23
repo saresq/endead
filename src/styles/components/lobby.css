@@ -486,6 +486,27 @@
   pointer-events: none;
 }
 
+/* Kid survivors wear a small badge in the portrait's top-right corner
+   (the roster hides the selected tag that would sit there). On a taken
+   card it drops below the picker's name strip. */
+.lobby-roster__kid {
+  position: absolute;
+  top: calc(var(--border-width) + 5px);
+  right: calc(var(--border-width) + 5px);
+  display: inline-flex;
+  padding: 3px;
+  color: var(--ink);
+  background: var(--highlight);
+  border: 1px solid var(--ink);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+  line-height: 0;
+}
+
+.lobby-roster__cell--taken .lobby-roster__kid {
+  top: calc(var(--border-width) + 30px);
+}
+
 /* ---------- Loadout: dossier strip + starting weapons ---------- */
 
 .lobby-panel--loadout {
